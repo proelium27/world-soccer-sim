@@ -22,6 +22,16 @@ export interface TrophyNews {
   tid?: number;
   /** Winning nation, for the international ones. */
   nation?: string;
+  /**
+   * Which confederation's championship this was, for a confederation cup only —
+   * absent on the World Cup and on both club competitions.
+   *
+   * Carried straight off `IntlTournamentSummary.confederation` so a caller
+   * listing several of these side by side can say which is which without
+   * parsing the display name. The News Feed ignores it (its headline names the
+   * tournament in full); the season history table uses it for a short label.
+   */
+  confederation?: string;
   /** Who they beat in the final. Only the international summaries record it. */
   runnerUp?: string;
   /** The final scoreline, champion first, with a shootout appended if it went there. */
@@ -110,6 +120,7 @@ export function trophyNewsBySeason(records: TrophyRecords): Map<number, TrophyNe
     add(s.season, {
       kind,
       name: s.name,
+      confederation: s.confederation,
       nation: s.champion,
       runnerUp: s.runnerUp,
       score: pens

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
 import type { SimThrough, IntlMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
@@ -529,12 +530,30 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     }
   }), [runExclusive, runJump, commitLeague]);
 
+  /**
+   * Dismissing the recap lands the user on Season History.
+   *
+   * A jump is the one action that plays years of the whole world without the
+   * user seeing a screen of it, and the recap answers only half of that: it is
+   * their club's seasons. Who won everything else is exactly what they are
+   * about to go looking for, and clicking through twenty seasons of the Awards
+   * and cup pages to find out is the complaint that page was built for.
+   *
+   * The navigation lives here rather than in `JumpOverlay` because this is the
+   * only thing that closes it — the overlay renders its button solely in the
+   * finished state, so there is no path that dismisses a running or failed jump
+   * through here (a failure clears the overlay in `jumpSeasonsAction`'s catch).
+   * It also keeps the overlay a presentational component its render test can
+   * mount without a router.
+   */
+  const navigate = useNavigate();
   const closeJump = useCallback(() => {
     jumpOpenRef.current = false;
     setJumpOpen(false);
     setJumpProgress(null);
     setJumpResult(null);
-  }, []);
+    navigate("/season-history");
+  }, [navigate]);
 
   const offseasonAction = useCallback(() => runExclusive(async () => {
     const current = leagueRef.current;

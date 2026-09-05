@@ -3729,3 +3729,124 @@ body.nav-drawer-open {
   font-weight: var(--sg-weight-semibold);
   margin-bottom: 0.15rem;
 }
+
+/* ── Season History ────────────────────────────────────────────────────────
+   One line per season across every competition in the world, so this is the
+   widest table in the game — sixteen columns on the shipped twelve-country
+   world, and more if a save adds leagues. It gets its own horizontal scroller
+   rather than relying on the narrow-viewport `.main-content .table` rule,
+   which only kicks in below 992px.
+
+   Deliberately NOT striped. The season column is sticky so the year stays put
+   while you scroll across the countries, and a sticky cell has to paint an
+   opaque background of its own or the columns it overlaps show through it —
+   which a stripe would then contradict on every other row. A row-header column
+   in its own surface tone reads as intentional and does the same job as a
+   stripe: `--sg-surface-2` against the card's `--sg-surface`. */
+.sh-scroll {
+  overflow-x: auto;
+}
+.sh-table {
+  /* Cells hold a three-letter code or a short club name, so the table has no
+     reason to stretch a column and every reason to stay narrow. */
+  width: auto;
+  min-width: 100%;
+  /* A touch stronger than the global stripe. Sixteen columns is a long way for
+     the eye to travel along one season, and at the default 0.035 the stripe is
+     invisible against this surface. */
+  --bs-table-striped-bg: oklch(0.94 0.007 155 / 0.055);
+}
+.sh-table > tbody > tr > td,
+.sh-table > tbody > tr > th {
+  border-bottom-color: var(--sg-border);
+}
+/* A season is a meaningful unit, not a stat line, so the rows get a little
+   more height than `table-sm` gives. This is the one density concession here:
+   DESIGN.md is explicit that this system is closer to Football Manager than to
+   Linear, so the rest of the fix is grouping and striping rather than padding. */
+.sh-table > thead > tr > *,
+.sh-table > tbody > tr > * {
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+/* The table runs edge to edge inside the card, so the outermost cells need
+   their own room or the year and the last country sit on the border. */
+.sh-table > * > tr > *:first-child {
+  padding-left: 0.7rem;
+}
+.sh-table > * > tr > *:last-child {
+  padding-right: 0.7rem;
+}
+/* Splits the row in two: the world's trophies, then the countries' own. The
+   dozen three-letter codes read as one undifferentiated block without it. */
+.sh-divide {
+  border-left: 1px solid var(--sg-border-strong);
+}
+.sh-season {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 1px solid var(--sg-border-strong);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--sg-weight-semibold);
+  white-space: nowrap;
+}
+/* The sticky cell HAS to paint an opaque background, and setting it on
+   `.sh-season` alone loses: Bootstrap's `.table > :not(caption) > * > *` sets
+   `background-color: var(--bs-table-bg)`, which this theme maps to
+   `transparent`, and that selector out-specifies a lone class. The columns
+   underneath then show straight through the year as you scroll. */
+.sh-table > thead > tr > .sh-season,
+.sh-table > tbody > tr > .sh-season {
+  background-color: var(--sg-surface-2);
+}
+/* ...and it has to follow the striping, or the one column that can't be
+   transparent is also the one column that ignores the row rhythm. Two tones of
+   the same surface rather than Bootstrap's translucent overlay, since a
+   translucent stripe over a sticky cell is exactly the bleed-through above. */
+.sh-table > tbody > tr:nth-of-type(odd) > .sh-season {
+  background-color: oklch(0.268 0.016 155);
+}
+/* Country columns are one code wide; keep them tight so more of the world fits
+   before the table needs scrolling. */
+.sh-country {
+  min-width: 3.4rem;
+}
+/* A champion that is your club. The marker has to be per CELL rather than the
+   per-row `.team-highlight` the standings use, because a season row names a
+   different club in every column. */
+.sh-own {
+  box-shadow: inset 0 0 0 9999px var(--sg-user-wash);
+  font-weight: var(--sg-weight-semibold);
+}
+/* The International column carries one winner in a World Cup year and up to
+   six in a confederation-championship year, which is the only cell here that
+   can hold more than one thing.
+
+   The min-width is what keeps a row's HEIGHT from depending on the viewport.
+   Without it the column collapses to whatever is left over, and at 1280px that
+   was 155px — one champion per line, so a confederation year became a
+   five-line row while the same save read as three lines on a wider screen.
+   Fixing the column instead makes the table scroll sooner and every row the
+   same height everywhere. */
+.sh-intl-col {
+  /* 19rem is measured, not picked: it is the widest this can be while the
+     shipped twelve-country world still fits a 1680px viewport without
+     scrolling, and it is wide enough for the longest pair of champions
+     ("NAM United States" beside "EUR England") to share a line. */
+  min-width: 18rem;
+}
+.sh-intl {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.6rem;
+}
+/* Which tournament a nation won: "WC", or its confederation. Mono and muted so
+   it reads as a label on the name beside it rather than as part of it. */
+.sh-code {
+  font-family: var(--sg-font-mono);
+  font-size: var(--sg-text-xs);
+  color: var(--sg-text-faint);
+  letter-spacing: 0.03em;
+}

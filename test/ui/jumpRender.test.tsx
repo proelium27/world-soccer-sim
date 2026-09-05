@@ -5,6 +5,7 @@ import { makeLeague } from "../helpers/league.js";
 import { JumpOverlay } from "../../src/ui/components/JumpOverlay.js";
 import { JumpSeasonsForm } from "../../src/ui/components/JumpSeasonsForm.js";
 import { MAX_JUMP_SEASONS } from "../../src/core/autopilot.js";
+import { SPECTATOR_TID } from "../../src/core/spectator.js";
 
 /**
  * Render harness for the two jump surfaces. Both are reachable only after a
@@ -52,6 +53,30 @@ describe("jump surfaces render", () => {
     );
     expect(html).toContain("Welcome back");
     expect(html).toContain("Take over");
+    // The recap covers the user's club; Season History covers the rest of the
+    // world, and taking over goes there. Saying so beats a silent redirect.
+    expect(html).toContain("Season History");
+    expect(html).toContain("Roster");
+  });
+
+  it("says nothing about a squad or a Roster on a spectator save", () => {
+    // A spectator can jump like anyone else (beginAutopilot just swaps one
+    // club-less sentinel for another), and has no squad to be handed back and
+    // no Roster page to be sent to — ClubOnly would bounce them off it.
+    const base = makeLeague(0, 1);
+    const league = { ...base, meta: { ...base.meta, userTid: SPECTATOR_TID } };
+    const html = renderToStaticMarkup(
+      createElement(JumpOverlay, {
+        open: true,
+        progress: { seasonsDone: 1, totalSeasons: 1, season: 1 },
+        result: { league, managedSeasons: [1] },
+        onClose: () => {},
+      }),
+    );
+    expect(html).not.toContain("Roster");
+    expect(html).not.toContain("Your club");
+    // The half that still applies: the world played on, and here is where to read it.
+    expect(html).toContain("Season History");
   });
 
   it("renders nothing when closed", () => {
