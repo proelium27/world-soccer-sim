@@ -1,12 +1,25 @@
+import { OVR_SCALE_SHIFT, RATING_MAX } from "../../core/constants.js";
+
 type Rgb = readonly [number, number, number];
 
 const LOW_COLOR: Rgb = [220, 53, 69]; // #dc3545, matches RatingDelta's negative-delta red
 const MID_COLOR: Rgb = [108, 117, 125]; // #6c757d, neutral gray
 const HIGH_COLOR: Rgb = [25, 135, 84]; // #198754, matches RatingDelta's positive-delta green
 
-const LOW_VALUE = 40;
-const MID_VALUE = 65;
-const HIGH_VALUE = 90;
+/*
+ * Three positions on the OVR scale, so they move with OVR_SCALE_SHIFT like every
+ * other one. Left behind they would have kept describing the old scale: the
+ * neutral midpoint was "an average starter", and an average starter is now a 76
+ * rather than a 65, so every ordinary first-teamer would have rendered green and
+ * a genuinely weak player neutral gray.
+ *
+ * The top is clamped to RATING_MAX because the faithful shift puts it at 101,
+ * which no rating can reach. That leaves the green half of the gradient two
+ * points narrower than the red half, which is invisible.
+ */
+const LOW_VALUE = 40 + OVR_SCALE_SHIFT;
+const MID_VALUE = 65 + OVR_SCALE_SHIFT;
+const HIGH_VALUE = Math.min(RATING_MAX, 90 + OVR_SCALE_SHIFT);
 
 function lerp(a: number, b: number, t: number): number {
   return Math.round(a + (b - a) * t);
@@ -18,9 +31,9 @@ function mixColor(from: Rgb, to: Rgb, t: number): string {
 }
 
 /**
- * Maps a 0-100 rating to a red -> gray -> green color, so values around
- * ~90+ read as strong (green) and values around ~40 or below read as
- * weak (red), with a smooth gradient in between.
+ * Maps an OVR to a red -> gray -> green color, so an elite player reads as
+ * strong (green) and a weak one as red, with a smooth gradient between. The
+ * three thresholds are positions on the rating scale and move with it.
  */
 export function getRatingColor(value: number): string {
   const clamped = Math.max(LOW_VALUE, Math.min(HIGH_VALUE, value));
