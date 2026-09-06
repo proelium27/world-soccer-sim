@@ -85,6 +85,7 @@ export interface GameEvents {
   national_job_accepted: Record<string, never>;
   /** The user listed one of their players for loan. */
   player_loaned_out: { seasons: 1 | 2 | 3 };
+  player_loaned_in: { seasons: 1 | 2 | 3 };
   /** The user released a player from their senior roster. */
   player_released: Record<string, never>;
   /** The user extended a player's contract on their senior roster. */

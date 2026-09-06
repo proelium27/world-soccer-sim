@@ -418,16 +418,27 @@ export function keepsDepthFloor(
 
 /**
  * Release a player from a team's roster back to the free agent pool. No-op
- * if the release would take the squad below the positional depth floor.
+ * if the release would take the squad below the positional depth floor, or if
+ * the club doesn't own him.
+ *
+ * The ownership check is what stops a club dumping a player it has in on loan.
+ * His contract belongs to his parent, so "releasing" him would free nobody and
+ * make nobody a free agent — it would drop the pid off this roster while the
+ * loan stayed live, which is a free early recall plus the wage relief that goes
+ * with it, and the loan mechanic deliberately offers neither. It only became
+ * reachable when the user could borrow; `activeLoans` defaults to empty so no
+ * existing caller changes behaviour.
  */
 export function releasePlayer(
   teams: StoredTeam[],
   players: Player[],
   tid: number,
   pid: number,
+  activeLoans: ActiveLoan[] = [],
 ): StoredTeam[] {
   const team = teams.find((t) => t.tid === tid);
   if (!team) return teams;
+  if (activeLoans.some((l) => l.pid === pid && l.parentTid !== tid)) return teams;
   const playerMap = new Map(players.map((p) => [p.pid, p]));
   if (!keepsDepthFloor(team, playerMap, pid)) return teams;
   return teams.map((t) =>

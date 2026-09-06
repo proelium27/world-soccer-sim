@@ -45,7 +45,18 @@ export interface RenewalsDue {
 /** The pids this group covers, whatever their contract status. */
 function groupPids(league: LeagueStore, team: StoredTeam, group: RenewalGroup): number[] {
   if (group === "academy") return team.academyRoster;
-  if (group === "senior") return team.roster;
+  if (group === "senior") {
+    // The senior roster lists who plays here, not who is owned here: a player
+    // in on loan sits on it while his contract belongs to his parent club, so
+    // extending him would be re-signing another club's player. The mirror of
+    // the "loanedOut" group below, which covers exactly the opposite set.
+    const borrowed = new Set(
+      league.activeLoans
+        .filter((l) => l.loaneeTid === team.tid && l.parentTid !== team.tid)
+        .map((l) => l.pid),
+    );
+    return team.roster.filter((pid) => !borrowed.has(pid));
+  }
   return league.activeLoans.filter((l) => l.parentTid === team.tid).map((l) => l.pid);
 }
 

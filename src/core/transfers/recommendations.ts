@@ -104,12 +104,12 @@ export function hasFieldConstraint(f: PlayerFieldFilters): boolean {
  * Club-level half of the field filters. Checked once per club rather than once
  * per player so a competition filter skips 20-odd rosters whole.
  */
-function teamMatchesFilters(team: StoredTeam, f: PlayerFieldFilters): boolean {
+export function teamMatchesFilters(team: StoredTeam, f: PlayerFieldFilters): boolean {
   return f.compId == null || team.compId === f.compId;
 }
 
 /** Player-level half of the field filters. `season` dates ages and contracts. */
-function playerMatchesFilters(player: Player, f: PlayerFieldFilters, season: number): boolean {
+export function playerMatchesFilters(player: Player, f: PlayerFieldFilters, season: number): boolean {
   if (f.position && player.pos !== f.position) return false;
   if (f.nationality && player.nationality !== f.nationality) return false;
   if (f.minOvr != null && player.ovr < f.minOvr) return false;

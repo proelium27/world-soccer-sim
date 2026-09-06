@@ -491,7 +491,7 @@ export function Manual() {
             <li><strong>Transfers</strong>. Recommended targets you can actually afford, plus your live negotiations. Make offers, read counter-offers, close deals.</li>
             <li><strong>Watchlist</strong>. Players you&apos;ve starred to keep an eye on. Click the star beside anyone&apos;s name &mdash; on his profile, in the transfer search, or on the Free Agents and Incoming Talent lists &mdash; and he shows up here with his club, this season&apos;s form, his wage, when his contract runs out, what your scouts think he&apos;s worth, and whether his club would entertain an offer at all. It&apos;s a shortlist and nothing more: watching a player doesn&apos;t scout him, doesn&apos;t tell his club anything, and doesn&apos;t change what he costs. Everything on it is worked out fresh each time you open it, so a name you starred three seasons ago shows the club he&apos;s at today at today&apos;s price. He drops off on his own if he retires.</li>
             <li><strong>Incoming Offers</strong>. AI clubs bidding for <em>your</em> players. Accept, reject, or counter to push the fee upward.</li>
-            <li><strong>Loans</strong>. List your own players for a fixed-length loan, look over AI clubs' incoming loan offers, and keep track of who's currently out on loan.</li>
+            <li><strong>Loans</strong>. List your own players for a fixed-length loan, look over AI clubs' incoming loan offers, borrow other clubs' young players, and keep track of who's out on loan and who you have in.</li>
             <li><strong>Finance</strong>. Budget, the full wage-bill table, a projected (or final) season settlement, your transfer history, and a league-wide money table.</li>
             <li><strong>Youth Intake</strong>. This year's crop from your academy, on trial. Offer a contract to a few of them; the rest leave. Also where you set your scout directions &mdash; which countries your scouts look in, and which positions they look for.</li>
             <li><strong>Free Agents</strong>. Every other unsigned player, sign straight to your senior team. The default view shows the best across every position but caps how many of any one position it lists, so a spot that always has lots of free agents (defensive and attacking mids only get two roster spots per club, so their good extras spill into free agency more often) can't crowd out the rest. Pick a position from the dropdown to see that position's full list.</li>
@@ -2101,6 +2101,37 @@ export function Manual() {
             each deal expires and lets you extend him from there, one at a time or all at once,
             which is the only place you can &mdash; he isn't on your Roster page while he's gone,
             so the Roster page's own Extend all button can't reach him.
+          </p>
+          <p>
+            <strong>You can borrow players too.</strong> The <strong>Loan a Player In</strong> panel
+            on the Loans page searches the whole world for players another club would lend you, and
+            you can take up to <strong>2 a window</strong>. The rules are the
+            same ones the AI plays by: a club will only lend someone{" "}
+            <strong>23 or under</strong> who <strong>isn&apos;t in its starting
+            eleven</strong>, whose contract covers the loan, and who it can spare without leaving
+            itself thin at his position &mdash; and only to a club he&apos;d be worth more to than
+            he is to them. You pay the flat fee up front and his wages for the whole loan.
+          </p>
+          <p>
+            That last rule is the one that decides what you can get, and it isn&apos;t a dial
+            anyone set &mdash; it just falls out of what a player is worth to each club. Near the
+            top of the pyramid almost nobody improves your side enough for their club to part with
+            them, so the list is thin and the names are ordinary. Lower down it&apos;s a different
+            screen entirely: a second- or third-division club can borrow players who&apos;d walk
+            into its first eleven. Loans are how a small club punches up, which is exactly what
+            they&apos;re for in real football. The panel shows the players you can actually take by
+            default; turn the switch off to see everyone you looked at and the reason each club
+            said no.
+          </p>
+          <p>
+            A borrowed player is <strong>yours to pick, not yours to keep</strong>. He shows up on
+            your Roster page with an <strong>On loan</strong> badge, plays and picks up cards and
+            injuries exactly like anyone else, and counts against your squad cap. But his contract
+            belongs to his parent club, so you can&apos;t sell him, release him, loan him on, or
+            re-sign him, and no club will bid for him. When the loan runs out he goes home, whether
+            you wanted him to or not &mdash; there's no option to buy him or keep him on. The{" "}
+            <strong>Players In on Loan</strong> list at the bottom of the Loans page shows who
+            you&apos;re borrowing and when you lose them.
           </p>
         </Section>
 

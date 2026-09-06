@@ -2450,6 +2450,23 @@ export const LOAN_OFFERS_MAX = 5;
 /** Most loans any one AI club will send out / take on in a single window (mirrors AI_MARKET_MAX_BUYS/SELLS). */
 export const AI_LOAN_MAX_MOVES = 2;
 
+/**
+ * Most players the user can take on loan in a single window. Deliberately the
+ * same number an AI club is held to (AI_LOAN_MAX_MOVES) rather than pinned to
+ * it by reference — the two caps answer the same question and happen to agree,
+ * but they are not required to, and a difficulty lever would move this one
+ * alone.
+ *
+ * It exists because a loan is the cheapest route to quality in the game: the
+ * fee is LOAN_FEE_RATE of a permanent one and the borrower's only real cost is
+ * the wage. Without a cap, a window spent borrowing five buried prospects from
+ * big clubs is a strictly better use of money than one signing, which is not
+ * the trade a loan is meant to be. Counted off league.transfers (a loan is
+ * logged with loanSeasons + the window it was agreed in), so there is no
+ * persisted field to migrate.
+ */
+export const LOAN_IN_MAX_PER_WINDOW = 2;
+
 /* ────────────────────────────────────────────────────────────────────────
  * End-of-season awards (Player of the Season, Golden Boot, Team of the
  * Season). Scoring layers explicit per-season goal/assist/defensive-stat

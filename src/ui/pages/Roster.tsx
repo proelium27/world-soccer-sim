@@ -52,6 +52,12 @@ interface RosterTableProps {
   onToggleTransferListed: (pid: number, listed: boolean) => void;
   loanListedPids: Set<number>;
   onToggleLoanListed: (pid: number, listed: boolean) => void;
+  /**
+   * Players in on loan: pid -> whose he is and when he goes back. They play
+   * for you but belong to someone else, so their rows carry no ownership
+   * controls (see the derived map in Roster).
+   */
+  borrowedFrom: Map<number, { club: string; returnSeason: number }>;
   /** Loans can only be listed while a transfer window is open, same as the Loans page. */
   windowOpen: boolean;
   /** Bench-only: pids flagged for more minutes, and the toggle. Omitted on the XI table. */
@@ -76,6 +82,7 @@ function RosterTable({
   onToggleTransferListed,
   loanListedPids,
   onToggleLoanListed,
+  borrowedFrom,
   windowOpen,
   moreMinutesPids,
   onToggleMoreMinutes,
@@ -119,6 +126,7 @@ function RosterTable({
         {players.map((p) => {
           const ss = p.stats.find((s) => s.season === season);
           const prev = previousRatings(p);
+          const borrowed = borrowedFrom.get(p.pid);
           return (
             <tr
               key={p.pid}
@@ -173,6 +181,14 @@ function RosterTable({
                 <Flag nationality={p.nationality} />
                 <InjuryBadge player={p} />
                 <SuspensionBadge player={p} />
+                {borrowed && (
+                  <span
+                    className="badge bg-secondary ms-1"
+                    title={`On loan from ${borrowed.club}. He plays for you until ${seasonYear(borrowed.returnSeason)}, then goes back — he isn't yours to sell, release or re-sign.`}
+                  >
+                    On loan
+                  </span>
+                )}
               </td>
               <td><PositionBadge player={p} /></td>
               <td className="text-end">{season - p.born}</td>
@@ -184,7 +200,11 @@ function RosterTable({
               </td>
               <td className="text-end">{formatWeeklyWage(p.contract.salary)}</td>
               <td className="text-end">
-                {p.contract.expiresSeason <= season ? (
+                {borrowed ? (
+                  // His contract is his parent club's business. What matters
+                  // here is when you lose him, so the column says that instead.
+                  <span className="text-muted">Back {seasonYear(borrowed.returnSeason)}</span>
+                ) : p.contract.expiresSeason <= season ? (
                   <span
                     className="badge bg-warning text-dark"
                     title="His deal runs out this season. Extend him before the offseason or he leaves on a free."
@@ -212,7 +232,11 @@ function RosterTable({
               )}
               <td className="text-end">
                 <div className="d-inline-flex gap-1">
-                  {canExtend(p, season) && (
+                  {/* Extending, selling, loaning out and releasing all assume
+                      the club owns him. A borrowed player gets none of them —
+                      only the more-minutes flag below, which is a note to
+                      yourself about your own lineup. */}
+                  {!borrowed && canExtend(p, season) && (
                     refusingPids.has(p.pid) ? (
                       <span
                         className="text-muted small fst-italic text-nowrap"
@@ -224,16 +248,18 @@ function RosterTable({
                       <ExtendControl player={p} season={season} onExtend={onExtend} />
                     )
                   )}
-                  <ListingMenu
-                    player={p}
-                    season={season}
-                    transferListed={transferListedPids.has(p.pid)}
-                    loanListed={loanListedPids.has(p.pid)}
-                    keepsDepthFloor={releasablePids.has(p.pid)}
-                    windowOpen={windowOpen}
-                    onToggleTransferListed={onToggleTransferListed}
-                    onToggleLoanListed={onToggleLoanListed}
-                  />
+                  {!borrowed && (
+                    <ListingMenu
+                      player={p}
+                      season={season}
+                      transferListed={transferListedPids.has(p.pid)}
+                      loanListed={loanListedPids.has(p.pid)}
+                      keepsDepthFloor={releasablePids.has(p.pid)}
+                      windowOpen={windowOpen}
+                      onToggleTransferListed={onToggleTransferListed}
+                      onToggleLoanListed={onToggleLoanListed}
+                    />
+                  )}
                   {onToggleMoreMinutes && p.pos !== "GK" && (
                     <button
                       className={
@@ -246,16 +272,18 @@ function RosterTable({
                       {moreMinutesPids?.has(p.pid) ? "Getting minutes" : "More minutes"}
                     </button>
                   )}
-                  <button
-                    className="btn btn-sm btn-outline-danger"
-                    onClick={() => onRelease(p.pid)}
-                    disabled={!releasablePids.has(p.pid)}
-                    title={releasablePids.has(p.pid)
-                      ? undefined
-                      : `Can't release: squad would be too thin at ${p.pos}`}
-                  >
-                    Release
-                  </button>
+                  {!borrowed && (
+                    <button
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={() => onRelease(p.pid)}
+                      disabled={!releasablePids.has(p.pid)}
+                      title={releasablePids.has(p.pid)
+                        ? undefined
+                        : `Can't release: squad would be too thin at ${p.pos}`}
+                    >
+                      Release
+                    </button>
+                  )}
                 </div>
               </td>
             </tr>
@@ -323,6 +351,19 @@ export function Roster() {
       // behind this memo for the same reason everything else here does: a
       // dragover fires a render per pixel.
       renewals: renewalsDue(league, "senior"),
+      // Players on this roster the club doesn't own. Everything that assumes
+      // ownership — extend, transfer-list, loan-list, release — is hidden for
+      // them; the core refuses each one anyway, this stops the page offering
+      // it. Keyed by pid so the row can name where he came from and when he
+      // goes back, which is the only thing the user can act on.
+      borrowedFrom: new Map(
+        league.activeLoans
+          .filter((l) => l.loaneeTid === userTeam.tid && l.parentTid !== userTeam.tid)
+          .map((l) => [l.pid, {
+            club: league.teams.find((t) => t.tid === l.parentTid)?.name ?? "another club",
+            returnSeason: l.returnSeason,
+          }] as const),
+      ),
     };
   }, [league]);
 
@@ -337,8 +378,10 @@ export function Roster() {
 
   const {
     players, slots, xi, starterPids, bench, teamRating,
-    playerMap, releasablePids, renewals,
+    playerMap, releasablePids, renewals, borrowedFrom,
   } = derived;
+  // The pitch chips only need to know *whether* he's borrowed, not the details.
+  const borrowedPidSet = new Set(borrowedFrom.keys());
 
   const formation = teamFormation(userTeam);
 
@@ -520,6 +563,7 @@ export function Roster() {
             onToggleTransferListed={setTransferListedAction}
             loanListedPids={loanListedPids}
             onToggleLoanListed={handleToggleLoanListed}
+            borrowedPids={borrowedPidSet}
             windowOpen={windowOpen}
             dragOverSlotIndex={dragOverSlotIndex}
             setDragOverSlotIndex={setDragOverSlotIndex}
@@ -539,6 +583,7 @@ export function Roster() {
             onToggleTransferListed={setTransferListedAction}
             loanListedPids={loanListedPids}
             onToggleLoanListed={handleToggleLoanListed}
+            borrowedFrom={borrowedFrom}
             windowOpen={windowOpen}
             dragOverPid={dragOverPid}
             setDragOverPid={setDragOverPid}
@@ -562,6 +607,7 @@ export function Roster() {
               onToggleTransferListed={setTransferListedAction}
               loanListedPids={loanListedPids}
               onToggleLoanListed={handleToggleLoanListed}
+              borrowedFrom={borrowedFrom}
               windowOpen={windowOpen}
               moreMinutesPids={moreMinutesPids}
               onToggleMoreMinutes={setMoreMinutesAction}
