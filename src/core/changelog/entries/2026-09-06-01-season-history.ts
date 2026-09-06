@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-04",
+  date: "2026-09-06",
   title: "Season History: who won what, one line a season",
   items: [
     "There's a new **Season History** page in the sidebar, just above Club History. One line per season, newest at the top. This is straight off a request from someone who'd jumped twenty years ahead and then had to open twenty separate pages to find out what had happened in them.",
