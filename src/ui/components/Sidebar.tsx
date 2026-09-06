@@ -36,6 +36,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       )}
       <NavLink to="/leaders" className="nav-link" onClick={onNavigate}>Stat Leaders</NavLink>
       <NavLink to="/awards" className="nav-link" onClick={onNavigate}>Awards</NavLink>
+      <NavLink to="/season-history" className="nav-link" onClick={onNavigate}>Season History</NavLink>
       <NavLink to="/history" className="nav-link" onClick={onNavigate}>Club History</NavLink>
       <NavLink to="/frivolities" className="nav-link" onClick={onNavigate}>Frivolities</NavLink>
       <NavLink to="/season-preview" className="nav-link" onClick={onNavigate}>Season Preview</NavLink>

@@ -45,6 +45,7 @@ import { Manager } from "./pages/Manager.js";
 import { NewsFeed } from "./pages/NewsFeed.js";
 import { Awards } from "./pages/Awards.js";
 import { ClubHistory } from "./pages/ClubHistory.js";
+import { SeasonHistory } from "./pages/SeasonHistory.js";
 import { ClubSeason } from "./pages/ClubSeason.js";
 import { SeasonPreview } from "./pages/SeasonPreview.js";
 import { SetScouting } from "./pages/SetScouting.js";
@@ -156,6 +157,10 @@ export function App() {
             <Route path="/schedule" element={<ClubOnly><Schedule /></ClubOnly>} />
             <Route path="/news" element={<NewsFeed />} />
             <Route path="/awards" element={<Awards />} />
+            {/* Every season on one page, a line each. Not ClubOnly: it is a
+                record of the whole world, which a spectator save has as much
+                of as a managed one. */}
+            <Route path="/season-history" element={<SeasonHistory />} />
             <Route path="/history" element={<ClubHistory />} />
             {/* One club, one season: squad, league finish, cup runs, power ranking. */}
             <Route path="/club/:tid/:season" element={<ClubSeason />} />

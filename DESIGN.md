@@ -95,11 +95,82 @@ Componentry is Bootstrap 5 with every token overridden, plus bespoke CSS for the
 
 **No emoji anywhere in the UI.** Icons are hand-written inline SVG — see `src/ui/components/AwardIcons.tsx` for the house style.
 
-## 6. Do's and Don'ts
+## 6. Wide data tables
+
+Tables are the primary content here, and the widest of them run to sixteen or
+more columns — a season of the whole world, a league's full stat line, every
+club in a 626-club pyramid. Those hit problems a normal table never does, and
+the fixes are structural rather than cosmetic. Reference implementation:
+`.sh-*` in `styles.css` (Season History), which is the widest table shipped.
+
+**The Grouping Rule.** A wide table's problem is almost never spacing; it is
+that N parallel columns read as one undifferentiated wall. Split them into
+meaningful blocks with a 1px `--sg-border-strong` rule (`.sh-divide`) and raise
+the row stripe. Season History puts a rule between the world's trophies and the
+twelve country columns, which is the single change that made it legible.
+
+Reach for grouping, striping and row rhythm **before** padding. Density is
+deliberate here (§7), so the reflex to add whitespace fights the system and
+buys less than a divider does.
+
+**Striping is a function of column count.** The global
+`--bs-table-striped-bg` is calibrated for a table you can take in at a glance.
+Past roughly ten columns the eye loses the row between one end and the other,
+and the stripe has to carry more: Season History raises it to `0.055` alpha
+**on that table only**. Raise it locally, never globally.
+
+**The Sticky Column Rule.** A table wider than its container pins the column
+that says which row you are on — the season, the club, the player. Two traps,
+both silent:
+
+- Bootstrap's `.table > :not(caption) > * > *` sets `background-color` from
+  `--bs-table-bg`, which this system maps to `transparent`, and that selector
+  out-specifies a lone class. A sticky cell styled with one therefore scrolls
+  *through* rather than over. Qualify it (`.sh-table > tbody > tr > .sh-season`).
+- A sticky cell must paint opaque, which is incompatible with the translucent
+  stripe every other row uses. So a pinned column takes two solid tones —
+  `--sg-surface-2` and `--sg-surface-2-striped` — and follows the row rhythm
+  that way. A pinned column that ignores the striping reads as a seam.
+
+**The Reflow Rule.** Give a `min-width` to any column whose content wraps.
+Otherwise it collapses to whatever is left over and **row height becomes a
+function of the viewport**: the same save reads as a three-line row on one
+screen and a five-line row on a narrower one. Pinning the column makes the
+table scroll instead, which is the tradeoff to want — height is rhythm, width
+is a scrollbar. Size the value by measurement (Season History's 18rem is the
+widest that still fits the shipped world unscrolled at 1680px), and expect it
+to be approximate: content-driven columns still grow past their floor when the
+content is unusually long.
+
+**Abbreviate in parallel, spell out in singular.** When N columns do the same
+job side by side, the header carries the identity and the cell can be a short
+code with the full name on `title` — the shape does the work, the way a
+bracket's does. A column that is one of a kind gets the full name and a crest.
+Never rely on `title` alone to disambiguate: hover does not exist on touch, so
+the cell has to link somewhere that resolves it.
+
+**Budget elements, not just pixels.** A crest or flag costs several DOM nodes
+each, and this app's one known performance failure is DOM weight, not
+JavaScript (see the `/transfers` freeze in CLAUDE.md). In an N×M grid that is
+thousands of nodes, so parallel columns take text and the few singular ones
+take the art.
+
+**Swap column sets rather than adding columns.** Two parallel datasets that
+both want a column per entity double the width for no extra insight per screen.
+A `nav-pills` toggle that swaps which one the columns show keeps one width
+budget and one line per row — Season History's league-champions / domestic-cup
+toggle.
+
+Worth applying to: Power Rankings (626 rows, the remaining uncapped list),
+Standings, Stat Leaders, Finance's league-wide table, and the Frivolities
+boards.
+
+## 7. Do's and Don'ts
 
 ### Do:
 - **Do** let the pitch-green accent carry real surface area (nav, primary actions, active states) per the Committed color strategy; a token sliver of color would undersell "sharp/confident."
 - **Do** use tabular figures and consistent column alignment in every data table; this is a spreadsheet-adjacent tool used across long sessions.
+- **Do** reach for column grouping, a stronger row stripe and a pinned identity column when a wide table reads cramped, per §6 — those are the fixes; padding is not.
 - **Do** pair every color-coded signal (win/loss, rating delta, hype tier) with a non-color cue (icon, sign, label) per the Signal Rule.
 - **Do** add new colors as tokens in `:root` rather than literals at the call site, and keep them on the established hue family.
 - **Do** keep motion to clear, responsive feedback on state changes (sim results, roster updates); nothing choreographed.
@@ -110,4 +181,6 @@ Componentry is Bootstrap 5 with every token overridden, plus bespoke CSS for the
 - **Don't** reach for Bootstrap's stock blue/gray or a raw hex; both bypass the system.
 - **Don't** introduce a fifth or sixth green — the win/qualification/user distinctions already carry the load, and another one collapses them.
 - **Don't** sacrifice table density for SaaS-style whitespace; this system is closer to Basketball GM/Football Manager/a broadcast scoreboard than to Linear/Notion/Stripe.
+- **Don't** put a crest or a flag in every cell of a wide grid; the art belongs to the one-of-a-kind columns, and at N×M it is the DOM weight that has actually frozen this app before.
+- **Don't** let a wrapping column size itself off the leftovers — give it a `min-width`, or the row height changes with the browser window (§6, the Reflow Rule).
 - **Don't** orchestrate animated sequences or transitions beyond direct state-change feedback.

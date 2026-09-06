@@ -94,9 +94,13 @@ export function JumpOverlay({ open, progress, result, onClose }: JumpOverlayProp
                 Welcome back to {seasonYear(result.league.season)}
               </h5>
               <p className="text-muted small mb-3">
-                {rows.length === 0
-                  ? `${club?.name ?? "Your club"} is yours again.`
-                  : `Here's how ${club?.name ?? "your club"} got on while the AI had it.`}
+                {/* No club at all is a spectator save, which can jump like any
+                    other and has no squad to have been handed back. */}
+                {!club
+                  ? "The world played on without anybody in charge."
+                  : rows.length === 0
+                    ? `${club.name} is yours again.`
+                    : `Here's how ${club.name} got on while the AI had it.`}
               </p>
               {rows.length > 0 && (
                 <div className="jump-recap">
@@ -135,8 +139,17 @@ export function JumpOverlay({ open, progress, result, onClose }: JumpOverlayProp
                 </div>
               )}
               <p className="text-muted small mt-3 mb-3">
-                Your lineup was cleared and the squad has moved on without you, so it's
-                worth a look at the Roster before you sim anything.
+                {/* A spectator save has no squad and no Roster page, and it can
+                    jump like any other — so the advice is gated rather than
+                    pointing at a route ClubOnly would bounce them off. */}
+                {club && (
+                  <>
+                    Your lineup was cleared and the squad has moved on without you, so
+                    it&apos;s worth a look at the Roster before you sim anything.{" "}
+                  </>
+                )}
+                Taking over lands you on Season History, which has every champion from
+                the years you missed.
               </p>
               <button type="button" className="btn btn-primary" onClick={onClose}>
                 Take over
