@@ -1795,7 +1795,12 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyProfile> = {
     budgetScale: 1.35,
     academyOffset: 4,
     buyPriceScale: 0.85,
-    protectedStarOvr: 85,
+    // Offsets from PROTECTED_STAR_OVR rather than absolute bars, so the four
+    // levels keep their intended ORDER when the rating scale moves. Written
+    // out, only `normal` tracked the constant and OVR_SCALE_SHIFT inverted the
+    // ladder outright -- easy's bar (85) ended up BELOW normal's (91), so easy
+    // withheld more players than normal rather than fewer.
+    protectedStarOvr: PROTECTED_STAR_OVR + 5,
     protectedStarTopFinish: 1,
     fogScale: 0.5,
     boardPatience: 1.7,
@@ -1819,7 +1824,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyProfile> = {
     budgetScale: 0.8,
     academyOffset: -3,
     buyPriceScale: 1.3,
-    protectedStarOvr: 78,
+    protectedStarOvr: PROTECTED_STAR_OVR - 2,
     protectedStarTopFinish: 5,
     fogScale: 1.25,
     boardPatience: 0.75,
@@ -1831,7 +1836,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyProfile> = {
     budgetScale: 0.6,
     academyOffset: -6,
     buyPriceScale: 1.6,
-    protectedStarOvr: 76,
+    protectedStarOvr: PROTECTED_STAR_OVR - 4,
     protectedStarTopFinish: 6,
     fogScale: 1.5,
     boardPatience: 0.55,
