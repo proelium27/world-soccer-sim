@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-04",
+  date: "2026-09-06",
   title: "Playoffs at every step of the pyramid",
   items: [
     "The promotion playoff now runs at **both** boundaries in a country, instead of only the second division into the top flight. A third-division club has the same route up that everyone above it has: finish 3rd through 6th and you're in a bracket, two-legged semi-finals and then a final at a neutral ground. Germany plays its version at both steps too, so a 2. Bundesliga club sitting 16th has 3. Liga's third-placed side to hold off.",
