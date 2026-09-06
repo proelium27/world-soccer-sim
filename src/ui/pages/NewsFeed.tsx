@@ -424,9 +424,15 @@ export function NewsFeed() {
                           return (
                             <tr key={`p-${p.d2CompId}-${season}-${i}`}
                                 className={highlighted ? "team-highlight" : undefined}>
+                              {/* Name the division: a country settles one place
+                                  per step of its pyramid, so two of these land
+                                  in the same season and "promotion playoff"
+                                  alone does not say which. */}
                               <td className="small">
-                                Promotion playoff
-                                <span className="text-muted"> (from {ordinal(p.position)})</span>
+                                {p.promoted ? "Promoted" : "Stayed up"} via playoff
+                                <span className="text-muted">
+                                  {" "}({compName(p.d1CompId) ?? "—"}, from {ordinal(p.position)})
+                                </span>
                               </td>
                               <td className="text-muted small">
                                 beat {teamCell(p.runnerUpTid, season)}

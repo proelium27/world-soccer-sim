@@ -6,7 +6,7 @@ import {
 import { computeCountrySwaps } from "../../src/core/promotion.js";
 import {
   englandCompetitions, buildCompetitions, competitionPlayoffFormat, worldCompetitions,
-  countryDivisions,
+  countryDivisions, competitionTeamCount,
 } from "../../src/core/competitions.js";
 import type { StandingsRow } from "../../src/core/standings.js";
 import type { CupTie } from "../../src/core/cup/types.js";
@@ -129,6 +129,91 @@ describe("promotionPlayoffFields — German", () => {
       // test that checks for it.
       const autoDown = spots > 1 ? d1Table.slice(-(spots - 1)).map((r) => r.tid) : [];
       expect(autoDown).not.toContain(field.teams[0]);
+    }
+  });
+});
+
+/** A three-division country with an explicit format, plus its tables. */
+function pyramid(
+  format: PlayedPlayoffFormat | "none",
+  spots = 3,
+  sizes: [number, number, number] = [20, 20, 20],
+) {
+  const [d1, d2, d3] = sizes;
+  const comps = buildCompetitions([{
+    country: "Anywhere", divisions: 3, d1Teams: d1, d2Teams: d2, d3Teams: d3,
+    promotionSpots: spots, playoffFormat: format,
+  }]);
+  const tables = new Map([
+    [comps[0].id, table(0, d1)],
+    [comps[1].id, table(100, d2)],
+    [comps[2].id, table(200, d3)],
+  ]);
+  return { comps, tables };
+}
+
+describe("promotionPlayoffFields — a deeper pyramid", () => {
+  it("seats a bracket at EVERY step, each out of its own division", () => {
+    const { comps, tables } = pyramid("english");
+    const fields = promotionPlayoffFields(comps, tables);
+    expect(fields.map((f) => [f.d1CompId, f.d2CompId]))
+      .toEqual([[comps[0].id, comps[1].id], [comps[1].id, comps[2].id]]);
+    // 3rd through 6th of each lower division, and the tier they really are —
+    // the deeper bracket must not report itself as tier 2.
+    expect(fields[0].teams).toEqual([102, 103, 104, 105]);
+    expect(fields[0].tiers).toEqual([2, 2, 2, 2]);
+    expect(fields[1].teams).toEqual([202, 203, 204, 205]);
+    expect(fields[1].tiers).toEqual([3, 3, 3, 3]);
+    expect(fields[1].positions).toEqual([3, 4, 5, 6]);
+  });
+
+  it("plays the German tie at every step too, across the right pair", () => {
+    const { comps, tables } = pyramid("german");
+    const fields = promotionPlayoffFields(comps, tables);
+    expect(fields).toHaveLength(2);
+    // 20 clubs, 3 places: 18th and 19th go down, 17th plays the 3rd-placed
+    // club below. Once for each boundary.
+    expect(fields[0].teams).toEqual([17, 102]);
+    expect(fields[0].tiers).toEqual([1, 2]);
+    expect(fields[1].teams).toEqual([117, 202]);
+    expect(fields[1].tiers).toEqual([2, 3]);
+    expect(fields[1].positions).toEqual([18, 3]);
+  });
+
+  it("gives no two playoffs a club in common", () => {
+    for (const format of ["english", "german"] as const) {
+      const { comps, tables } = pyramid(format);
+      const all = promotionPlayoffFields(comps, tables).flatMap((f) => f.teams);
+      expect(new Set(all).size).toBe(all.length);
+    }
+  });
+
+  it("yields to the swap where a club would otherwise be moved twice", () => {
+    // A 10-club middle division giving out 5 places: the bracket wants 5th
+    // through 8th, and 6th through 10th are already being relegated to the
+    // third tier. The automatic swap is not optional, so the playoff is what
+    // gives — the top place is settled on the table and only the deeper
+    // bracket, whose entrants come from an untouched division, is seated.
+    const { comps, tables } = pyramid("english", 5, [20, 10, 20]);
+    const fields = promotionPlayoffFields(comps, tables);
+    expect(fields.map((f) => f.d2CompId)).toEqual([comps[2].id]);
+    expect(fields[0].teams).toEqual([204, 205, 206, 207]);
+  });
+
+  it("holds a playoff at both of every shipped country's steps, bar the one that promotes one club", () => {
+    const world = worldCompetitions();
+    const tables = new Map(world.map((c, i) => [c.id, table(i * 100, competitionTeamCount(c))]));
+    const held = new Map<string, number>();
+    for (const f of promotionPlayoffFields(world, tables)) {
+      held.set(f.country, (held.get(f.country) ?? 0) + 1);
+    }
+    for (const { country, divisions } of countryDivisions(world)) {
+      // Scotland gives out one place, so there is no spare one to play for and
+      // it holds none at either step.
+      const want = competitionPlayoffFormat(divisions[0], divisions[1]) === "none"
+        ? 0
+        : divisions.length - 1;
+      expect([country, held.get(country) ?? 0]).toEqual([country, want]);
     }
   });
 });

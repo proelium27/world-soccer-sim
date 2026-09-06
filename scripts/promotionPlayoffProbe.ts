@@ -5,8 +5,9 @@
  * a unit test on a hand-built table would catch:
  *
  *  1. **Does the bracket seat the right clubs?** Every country with two or more
- *     promotion places should hold one, with entrants at tier-2 positions
- *     autoSpots+1 .. autoSpots+4 and nobody who went up automatically.
+ *     promotion places should hold one at EVERY step of its pyramid, with
+ *     entrants at the lower division's positions autoSpots+1 .. autoSpots+4 and
+ *     nobody who went up automatically.
  *  2. **Is the same number of clubs still promoted?** The playoff redistributes
  *     the last place; if it ever creates or drops one, the division sizes stop
  *     adding up and the world quietly deforms over a dynasty.
@@ -26,7 +27,9 @@ import { createLeagueState } from "../src/core/leagueState.js";
 import { simThrough } from "../src/core/simThrough.js";
 import { simOffseason } from "../src/core/offseason.js";
 import { computeStandings } from "../src/core/standings.js";
-import { competitionOf, effectivePromotionSpots } from "../src/core/competitions.js";
+import {
+  competitionOf, effectivePromotionSpots, promotionLinks,
+} from "../src/core/competitions.js";
 import {
   playPromotionPlayoffs, playoffOutcomes, PLAYOFF_ROUND_FINAL,
 } from "../src/core/promotionPlayoff.js";
@@ -41,6 +44,14 @@ const fail = (msg: string): void => {
 };
 
 const seedWins = [0, 0, 0, 0];
+/**
+ * The same split, kept per LINK (keyed by the upper division's tier), because
+ * seating a playoff at every step raises a question the pooled number cannot
+ * answer: whether the lower bracket is as much of a lottery as the top one.
+ * A deeper division is weaker and more spread out, so its 3rd-placed club may
+ * be further ahead of its 6th than the top flight's is.
+ */
+const seedWinsByTier = new Map<number, number[]>();
 const formatCounts: Record<string, number> = { english: 0, german: 0 };
 let germanHeld = 0;
 let germanSwapped = 0;
@@ -108,22 +119,31 @@ for (let s = 0; s < SEASONS; s++) {
       }
       const seed = p.teams.indexOf(p.winnerTid!);
       if (seed < 0) fail(`${d2.name}: winner was not an entrant`);
-      else seedWins[seed]++;
+      else {
+        seedWins[seed]++;
+        const byTier = seedWinsByTier.get(d1.tier) ?? [0, 0, 0, 0];
+        byTier[seed]++;
+        seedWinsByTier.set(d1.tier, byTier);
+      }
       continue;
     }
 
-    // German: one tie, tier-1 incumbent first, and both automatic counts cut by
-    // one so the tie can settle a place on each side at once.
+    // German: one tie, the incumbent from above first, and both automatic
+    // counts cut by one so the tie can settle a place on each side at once.
     if (p.ties.length !== 1) fail(`${d2.name}: ${p.ties.length} ties, expected 1`);
     if (p.autoPromoted !== spots - 1 || p.autoRelegated !== spots - 1) {
       fail(`${d2.name}: German auto counts ${p.autoPromoted}/${p.autoRelegated} != ${spots - 1} each`);
     }
-    if (p.tiers[0] !== 1 || p.tiers[1] !== 2) fail(`${d2.name}: German entrants are not [tier 1, tier 2]`);
+    // Against the LINK's own tiers, not the literal 1 and 2: a D3-D2 tie reads
+    // [2, 3] and asserting [1, 2] would only ever pass on the top link.
+    if (p.tiers[0] !== d1.tier || p.tiers[1] !== d2.tier) {
+      fail(`${d2.name}: German entrants are [${p.tiers}], expected [${d1.tier}, ${d2.tier}]`);
+    }
     if (d1Table[d1Table.length - spots].tid !== p.teams[0]) {
-      fail(`${d2.name}: the tier-1 entrant is not the lowest club above the drop zone`);
+      fail(`${d2.name}: the ${d1.name} entrant is not the lowest club above the drop zone`);
     }
     if (d2Table[spots - 1].tid !== p.teams[1]) {
-      fail(`${d2.name}: the tier-2 entrant is not the club below the automatic places`);
+      fail(`${d2.name}: the ${d2.name} entrant is not the club below the automatic places`);
     }
     if (p.winnerTid === p.teams[0]) germanHeld++;
     else germanSwapped++;
@@ -151,8 +171,10 @@ for (let s = 0; s < SEASONS; s++) {
   }
   void scorelines;
 
-  for (const comp of league.competitions.filter((c) => c.tier === 2)) {
-    const d1 = league.competitions.find((c) => c.country === comp.country && c.tier === 1)!;
+  // EVERY link, not only the top one — a playoff is seated at each step of a
+  // country's pyramid, so checking tier 2 alone would leave the D3-D2 place
+  // entirely unverified.
+  for (const { upper: d1, lower: comp } of promotionLinks(league.competitions)) {
     const spots = effectivePromotionSpots(
       league.competitions, d1, comp, tables.get(d1.id)!.length, tables.get(comp.id)!.length,
     );
@@ -190,6 +212,12 @@ const total = seedWins.reduce((a, b) => a + b, 0);
 seedWins.forEach((n, i) => {
   console.log(`  entrant ${i + 1} (best-placed = 1) won ${n} (${((n / total) * 100).toFixed(1)}%)`);
 });
+for (const tier of [...seedWinsByTier.keys()].sort((a, b) => a - b)) {
+  const wins = seedWinsByTier.get(tier)!;
+  const n = wins.reduce((a, b) => a + b, 0);
+  const pct = wins.map((w) => `${((w / n) * 100).toFixed(1)}%`).join(" / ");
+  console.log(`    playing for a tier-${tier} place (n=${n}): ${pct}`);
+}
 console.log(`  finals: ${finals}, extra time ${extraTimes}, shootouts ${shootouts}`);
 console.log(`  formats: english ${formatCounts.english}, german ${formatCounts.german}`);
 console.log(`  german ties: challenger went up ${germanSwapped}, incumbent held on ${germanHeld}`);

@@ -658,6 +658,14 @@ export function Manual() {
             World setup when you start a save.
           </p>
           <p>
+            It happens at <em>every</em> step of a country&apos;s pyramid, not just the top one, so
+            a country with three divisions plays two of them each summer: one for the last place in
+            the top flight, one for the last place in the second. That matters most when you start
+            at the bottom — there&apos;s a way up out of the third division on the same terms as
+            everyone else, and you can be promoted twice in two seasons without ever finishing
+            first.
+          </p>
+          <p>
             The <strong>English</strong> system is what England, Spain, Italy, France, Turkey and
             the rest use. Only the top clubs go up automatically and the last place is decided on
             the pitch by the four that finished just below them, so in a country promoting three,
@@ -672,17 +680,17 @@ export function Manual() {
             The <strong>German</strong> system, which the Bundesliga uses, points the last place at
             both divisions at once. One fewer club goes up automatically and one fewer goes down,
             and then the club that just missed out below plays the lowest club that just survived
-            above, home and away, for the remaining top-flight place. Win it from below and you
-            swap: you go up, they go down. Win it from above and nobody moves at all, so that
-            season the country promotes and relegates one fewer club than usual. It is a harder
-            route up than the English bracket, because you are playing a top-flight side rather
-            than your own division's stragglers.
+            above, home and away, for the remaining place. Win it from below and you swap: you go
+            up, they go down. Win it from above and nobody moves at all, so that season the country
+            promotes and relegates one fewer club than usual. It is a harder route up than the
+            English bracket, because you are playing a side from the division above rather than
+            your own division's stragglers.
           </p>
           <p>
-            Scotland promotes only one club and so runs no playoff by default: its champion goes
-            up and that's that. You can give it either system in World setup, though the English
-            bracket needs at least two promotion places to sit below, so at one place only the
-            German one is offered.
+            Scotland promotes only one club and so runs no playoff at either step by default: its
+            champions go up and that's that. You can give it either system in World setup, though
+            the English bracket needs at least two promotion places to sit below, so at one place
+            only the German one is offered.
           </p>
           <p>
             It's played the moment the season ends, before anyone retires or moves clubs, so a

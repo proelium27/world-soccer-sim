@@ -48,9 +48,10 @@ export interface CompetitionSwap {
  *
  * Absent (a headless caller, a world with no eligible country, a save from
  * before playoffs existed) means the plain top-N slice, which is exactly the old
- * behaviour. Playoffs are seated at the TOP link only, so on a three-division
- * country the second link never finds an outcome and takes that plain slice —
- * see promotionPlayoffFields.
+ * behaviour. A three-division country seats a playoff at BOTH of its links, so
+ * both lookups normally hit — but each link is looked up on its own, so a
+ * country that can stage only one still settles the other on the table alone.
+ * See promotionPlayoffFields.
  */
 export function computeCountrySwaps(
   competitions: Competition[],

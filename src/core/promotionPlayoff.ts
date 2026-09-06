@@ -5,7 +5,7 @@ import type { Competition } from "./competitions.js";
 import type { TeamMatchData } from "./league/composites.js";
 import type { CupTie } from "./cup/types.js";
 import {
-  countryDivisions, effectivePromotionSpots, competitionPlayoffFormat,
+  countryDivisions, promotionLinks, effectivePromotionSpots, competitionPlayoffFormat,
 } from "./competitions.js";
 import { leagueMatchData } from "./league/composites.js";
 import { playFirstLeg, resolveTwoLeggedTie, resolveCupTie } from "./cup/simCup.js";
@@ -37,13 +37,15 @@ export type PlayedPlayoffFormat = "english" | "german";
 /**
  * One country's promotion playoff for its last promotion place.
  *
- * Two shapes, by `format`:
+ * One of these is seated at **every** promotion link, so a three-division
+ * country decides two places this way each summer. Two shapes, by `format`:
  *  - **english** — the four clubs below the automatic places contest two-legged
- *    semi-finals and a neutral-ground final. Entirely within tier 2; no
- *    top-flight club is at risk, and exactly one extra club goes up.
- *  - **german** — tier 2's next club plays tier 1's lowest safe club over two
- *    legs. Either the challenger goes up and the incumbent goes down, or
- *    neither moves and the country simply promotes and relegates one fewer.
+ *    semi-finals and a neutral-ground final. Entirely within the lower
+ *    division; no club from above is at risk, and exactly one extra goes up.
+ *  - **german** — the lower division's next club plays the upper division's
+ *    lowest safe club over two legs. Either the challenger goes up and the
+ *    incumbent goes down, or neither moves and the country simply promotes and
+ *    relegates one fewer.
  *
  * Played inside the offseason, on end-of-season squads, and stored on the
  * season-history entry for the season it decides. Box scores are deliberately
@@ -55,23 +57,35 @@ export interface PromotionPlayoff {
   /** The season just finished — the one whose final tables seeded this. */
   season: number;
   country: string;
-  /** The top flight the winner plays in next season. */
+  /**
+   * The **upper** division of this link — the one the winner plays in next
+   * season. Named for tier 1 because that was the only link a playoff could
+   * ever sit on when the field shipped, and kept because it is persisted on
+   * every save's history; on a D3-D2 playoff it holds the second division.
+   * Same convention `DIVISION_2_OFFSET` and friends already use for numbers
+   * that generalised past the tier they were named for.
+   */
   d1CompId: number;
-  /** The second tier the challenger (or challengers) came from. */
+  /** The **lower** division — where the challenger (or challengers) came from. */
   d2CompId: number;
   format: PlayedPlayoffFormat;
   /**
-   * The entrants. English: the four tier-2 clubs, best league finish first.
-   * German: exactly two, the **tier-1 club first**, then the tier-2 challenger.
+   * The entrants. English: the four lower-division clubs, best league finish
+   * first. German: exactly two, the **upper-division club first**, then the
+   * challenger from below.
    */
   teams: number[];
   /** Each entrant's 1-based finishing position *in his own division's table*. */
   positions: number[];
-  /** Which division each entrant came from, index-aligned with `teams`. */
-  tiers: (1 | 2)[];
-  /** How many tier-2 clubs go up on the table alone, before this decides the rest. */
+  /**
+   * Which division each entrant came from, as a real `Competition.tier`,
+   * index-aligned with `teams`. Compare it against the link's own divisions
+   * rather than against the literal 1 — a D3-D2 tie reads [2, 3].
+   */
+  tiers: number[];
+  /** How many lower-division clubs go up on the table alone, before this decides the rest. */
   autoPromoted: number;
-  /** How many tier-1 clubs go down on the table alone. */
+  /** How many upper-division clubs go down on the table alone. */
   autoRelegated: number;
   /**
    * English: two semi-finals (round `PLAYOFF_ROUND_SEMI`) then the final.
@@ -81,7 +95,7 @@ export interface PromotionPlayoff {
   ties: CupTie[];
   /**
    * Who won the deciding tie. For the English format that is always the club
-   * promoted; for the German one it may be the **tier-1 club**, which means
+   * promoted; for the German one it may be the **incumbent from above**, which means
    * nobody moves. Read `playoffOutcomes` rather than this field to find out
    * what actually happened to the table. Null only while unplayed.
    */
@@ -91,22 +105,47 @@ export interface PromotionPlayoff {
 /** One country's playoff field, worked out from its final tables. */
 export interface PlayoffField {
   country: string;
+  /** The upper division of the link — see `PromotionPlayoff.d1CompId` on the name. */
   d1CompId: number;
+  /** The lower division of the link. */
   d2CompId: number;
   format: PlayedPlayoffFormat;
   autoPromoted: number;
   autoRelegated: number;
   teams: number[];
   positions: number[];
-  tiers: (1 | 2)[];
+  tiers: number[];
 }
 
 /**
- * Which countries hold a promotion playoff this season, who is in it, and under
- * which format.
+ * Every club an automatic promotion or relegation slice can move, one entry per
+ * link, keyed by that link's LOWER competition (the same key `playoffOutcomes`
+ * and `computeCountrySwaps` use).
  *
- * A country holds one when it has two divisions, its format is not `none`, and
- * its tables can actually seat the field. Two feasibility rules, one per format:
+ * Built from the plain top-N/bottom-N slices, which a seated playoff only ever
+ * shrinks — so this is a safe superset to test a candidate field against.
+ */
+function automaticSlices(
+  competitions: Competition[],
+  tablesByCompId: Map<number, StandingsRow[]>,
+): { key: number; tids: Set<number> }[] {
+  return promotionLinks(competitions).flatMap(({ upper, lower }) => {
+    const up = tablesByCompId.get(upper.id);
+    const low = tablesByCompId.get(lower.id);
+    if (!up || !low) return [];
+    const n = effectivePromotionSpots(competitions, upper, lower, up.length, low.length);
+    if (n <= 0) return [];
+    return {
+      key: lower.id,
+      tids: new Set([...low.slice(0, n), ...up.slice(-n)].map((r) => r.tid)),
+    };
+  });
+}
+
+/**
+ * One link's field, or null where its format or its tables cannot seat one.
+ *
+ * Two feasibility rules, one per format:
  *
  *  - **english** needs at least **two** promotion places, because the bracket
  *    sits *below* the automatic ones — with a single place the only bracket
@@ -122,69 +161,120 @@ export interface PlayoffField {
  * tidiness, because every division's size is fixed and one extra club promoted
  * would mean one extra relegated.
  */
+function seatField(
+  competitions: Competition[],
+  tablesByCompId: Map<number, StandingsRow[]>,
+  d1: Competition,
+  d2: Competition,
+): PlayoffField | null {
+  const format = competitionPlayoffFormat(d1, d2);
+  if (format === "none") return null;
+  const d1Table = tablesByCompId.get(d1.id);
+  const d2Table = tablesByCompId.get(d2.id);
+  if (!d1Table || !d2Table) return null;
+  const spots = effectivePromotionSpots(
+    competitions, d1, d2, d1Table.length, d2Table.length,
+  );
+  if (spots <= 0) return null;
+  const base = { country: d1.country, d1CompId: d1.id, d2CompId: d2.id };
+
+  if (format === "english") {
+    if (spots < 2) return null;
+    const autoPromoted = spots - 1;
+    const size = PROMOTION_PLAYOFF_SEMI_FINALS * 2;
+    if (d2Table.length < autoPromoted + size) return null;
+    const entrants = d2Table.slice(autoPromoted, autoPromoted + size);
+    return {
+      ...base,
+      format,
+      // Relegation is untouched by an English playoff: the same number still
+      // goes down on the table, because the tie only decides which club from
+      // below joins them going the other way.
+      autoPromoted,
+      autoRelegated: spots,
+      teams: entrants.map((r) => r.tid),
+      positions: entrants.map((_, i) => autoPromoted + 1 + i),
+      tiers: entrants.map(() => d2.tier),
+    };
+  }
+
+  // German: one club either side of the line. The upper-division entrant is the
+  // lowest club NOT already relegated on the table — index `length - spots`,
+  // which sits exactly above the bottom `spots - 1`.
+  const auto = spots - 1;
+  const d1Index = d1Table.length - spots;
+  if (d1Index < 0 || auto >= d2Table.length) return null;
+  return {
+    ...base,
+    format,
+    autoPromoted: auto,
+    autoRelegated: auto,
+    teams: [d1Table[d1Index].tid, d2Table[auto].tid],
+    positions: [d1Index + 1, auto + 1],
+    tiers: [d1.tier, d2.tier],
+  };
+}
+
+/**
+ * Which promotion places are played for this season, who is in each, and under
+ * which format.
+ *
+ * **One field per LINK, not per country.** England plays a playoff at every step
+ * of its pyramid and Germany plays its relegation tie at both, so a three-
+ * division country decides two places this way — and the lower one is much of
+ * the point of having it: a save whose top flight is out of reach still has the
+ * division above it to chase. It was the top link alone until third divisions
+ * had been around long enough to be worth playing for.
+ *
+ * **A middle division is spoken for at both ends at once, and that is what the
+ * `blocked` guard is for.** `effectivePromotionSpots` already keeps one
+ * division's automatic slices from overlapping (see `swapLimitOf`), but a
+ * playoff reaches further into the table than the automatic places do — three
+ * clubs further for an English bracket — so in a tightly packed pyramid the same
+ * club can be an entrant in the playoff for promotion *and* sit in the slice
+ * being relegated below it. `applyCompetitionSwaps` would then move him twice
+ * and silently keep whichever it wrote last, which is the division-size
+ * corruption every other guard in this area exists to prevent.
+ *
+ * **A playoff yields to a swap, never the other way round**: a field holding a
+ * club that any other link's plain automatic slice already moves is not seated
+ * at all, and that link settles its place on the table alone. The automatic
+ * swap is not optional and the playoff is, so there is only one thing that can
+ * give — and it is the same call the "division too short to seat four" rule
+ * makes: no playoff beats a broken one. `claimed` then stops two playoffs
+ * sharing a club, which is why the links are walked **top-down**: where only
+ * one of them can be seated, the more consequential place is the one played
+ * for. None of this can bite in the shipped world (the tightest country needs
+ * 6 clubs of a 12-club second tier) but a hand-built one reaches it, since
+ * `MIN_DIVISION_TEAMS` is 8 and `MAX_PROMOTION_SPOTS` is 6.
+ */
 export function promotionPlayoffFields(
   competitions: Competition[],
   tablesByCompId: Map<number, StandingsRow[]>,
 ): PlayoffField[] {
-  // The TOP link only, deliberately, even now a country can run three
-  // divisions: `tier1Pairs` used to say this by being the only thing on offer,
-  // and it has to be said out loud now that `promotionLinks` would hand back
-  // every boundary. A second playoff between the lower two is a real feature
-  // (England and Germany both hold one) but it is a feature, with its own page,
-  // news and changelog — not something a deeper pyramid should switch on by
-  // itself. computeCountrySwaps needs no matching guard: outcomes are keyed by
-  // the LOWER division's compId, so a lower link simply finds none and takes
-  // the plain top-N slice.
-  return countryDivisions(competitions).flatMap(({ divisions }) => {
-    const [d1, d2] = divisions;
-    if (!d2) return [];
-    const format = competitionPlayoffFormat(d1, d2);
-    if (format === "none") return [];
-    const d1Table = tablesByCompId.get(d1.id);
-    const d2Table = tablesByCompId.get(d2.id);
-    if (!d1Table || !d2Table) return [];
-    const spots = effectivePromotionSpots(
-      competitions, d1, d2, d1Table.length, d2Table.length,
-    );
-    if (spots <= 0) return [];
-    const base = { country: d1.country, d1CompId: d1.id, d2CompId: d2.id };
+  const slices = automaticSlices(competitions, tablesByCompId);
+  const out: PlayoffField[] = [];
 
-    if (format === "english") {
-      if (spots < 2) return [];
-      const autoPromoted = spots - 1;
-      const size = PROMOTION_PLAYOFF_SEMI_FINALS * 2;
-      if (d2Table.length < autoPromoted + size) return [];
-      const entrants = d2Table.slice(autoPromoted, autoPromoted + size);
-      return {
-        ...base,
-        format,
-        // Relegation is untouched by an English playoff: the same number still
-        // goes down on the table, because the tie only decides which tier-2
-        // club joins them going the other way.
-        autoPromoted,
-        autoRelegated: spots,
-        teams: entrants.map((r) => r.tid),
-        positions: entrants.map((_, i) => autoPromoted + 1 + i),
-        tiers: entrants.map(() => 2 as const),
-      };
+  for (const { divisions } of countryDivisions(competitions)) {
+    // Entrants already committed further up this country's pyramid. Every
+    // OTHER link's automatic slices are added per candidate below; this link's
+    // own deliberately are not, since its entrants come out of exactly the
+    // places it is holding back.
+    const claimed = new Set<number>();
+    for (let i = 0; i + 1 < divisions.length; i++) {
+      const field = seatField(competitions, tablesByCompId, divisions[i], divisions[i + 1]);
+      if (!field) continue;
+      const blocked = new Set(claimed);
+      for (const s of slices) {
+        if (s.key === field.d2CompId) continue;
+        for (const tid of s.tids) blocked.add(tid);
+      }
+      if (field.teams.some((tid) => blocked.has(tid))) continue;
+      for (const tid of field.teams) claimed.add(tid);
+      out.push(field);
     }
-
-    // German: one club either side of the line. The tier-1 entrant is the
-    // lowest club NOT already relegated on the table — index
-    // `length - spots`, which sits exactly above the bottom `spots - 1`.
-    const auto = spots - 1;
-    const d1Index = d1Table.length - spots;
-    if (d1Index < 0 || auto >= d2Table.length) return [];
-    return {
-      ...base,
-      format,
-      autoPromoted: auto,
-      autoRelegated: auto,
-      teams: [d1Table[d1Index].tid, d2Table[auto].tid],
-      positions: [d1Index + 1, auto + 1],
-      tiers: [1, 2],
-    };
-  });
+  }
+  return out;
 }
 
 /**
@@ -264,14 +354,15 @@ export function playPromotionPlayoff(
   }
 
   if (field.format === "german") {
-    // The tier-2 challenger hosts the first leg and the top-flight club the
-    // second, the same way round the English bracket does it. Cosmetic here for
-    // the reason semiFinalPairings sets out, so no result rests on it.
-    const [topFlight, challenger] = field.teams;
+    // The challenger from below hosts the first leg and the incumbent from
+    // above the second, the same way round the English bracket does it.
+    // Cosmetic here for the reason semiFinalPairings sets out, so no result
+    // rests on it.
+    const [incumbent, challenger] = field.teams;
     const rng = tieRng(lid, season, field.d2CompId, PLAYOFF_ROUND_FINAL, 0);
     const hd = matchData.get(challenger)!;
-    const ad = matchData.get(topFlight)!;
-    const leg1 = playFirstLeg(rng, challenger, topFlight, hd, ad, PLAYOFF_ROUND_FINAL);
+    const ad = matchData.get(incumbent)!;
+    const leg1 = playFirstLeg(rng, challenger, incumbent, hd, ad, PLAYOFF_ROUND_FINAL);
     const tie = resolveTwoLeggedTie(rng, leg1, hd, ad, 0);
     return { ...base, ties: [{ ...tie, boxScore: null }], winnerTid: tie.winner };
   }
@@ -319,13 +410,13 @@ export function playPromotionPlayoff(
  * is the same lesson `cupMatchData` and the domestic cups already carry.**
  * Composites are z-normalized within the pool they are built from, so:
  *
- *  - an **English** bracket pools the tier-2 division alone, which is exactly
+ *  - an **English** bracket pools the lower division alone, which is exactly
  *    right because all four entrants come from it — measuring them against that
  *    division is measuring them against each other;
- *  - a **German** tie pools **both divisions**, because it is cross-division. A
- *    tier-2 club measured against its own division reads as an average side and
- *    would meet a top-flight club as an equal, which would make the incumbent's
- *    advantage vanish.
+ *  - a **German** tie pools **both divisions of its link**, because it is
+ *    cross-division. A club measured against its own division reads as an
+ *    average side and would meet the division above as an equal, which would
+ *    make the incumbent's advantage vanish.
  *
  * Season form is applied, because the playoff is the last act of the season it
  * decides. Suspensions are deliberately not carried in, the same call the cups
@@ -409,7 +500,7 @@ export interface PlayoffOutcome {
 }
 
 /**
- * Each played playoff's effect on the table, keyed by the tier-2 competition.
+ * Each played playoff's effect on the table, keyed by its link's LOWER competition.
  *
  * A playoff still in progress (no winner) is skipped, so the swap falls back to
  * the plain top-N slice rather than leaving a place undecided.
@@ -419,7 +510,7 @@ export function playoffOutcomes(playoffs: PromotionPlayoff[]): Map<number, Playo
   for (const p of playoffs) {
     if (p.winnerTid === null) continue;
     if (p.format === "german") {
-      // teams[0] is the top-flight incumbent, teams[1] the challenger.
+      // teams[0] is the incumbent from the division above, teams[1] the challenger.
       const challengerWon = p.winnerTid === p.teams[1];
       out.set(p.d2CompId, {
         format: "german",

@@ -69,7 +69,24 @@ export function newsHeadlineNode(item: FeedItem, ctx: NewsHeadlineContext): Reac
     const p = item.data;
     const up = teamByTid.get(p.tid)?.name ?? "A club";
     const beaten = teamByTid.get(p.runnerUpTid)?.name ?? "the other finalist";
-    return <>{up} win the promotion playoff final {p.score} against {beaten}</>;
+    // Name the division. A country settles one place per step of its pyramid,
+    // so two of these land in the same feed and "win the promotion playoff"
+    // alone does not say which one was at stake.
+    const into = competitions.find((c) => c.id === p.d1CompId)?.name;
+    // A German tie the incumbent held on to is the one case where the winner
+    // keeps his place rather than taking one.
+    if (!p.promoted) {
+      return (
+        <>
+          {up} survive the playoff{into ? ` and stay in ${into}` : ""}, beating {beaten} {p.score}
+        </>
+      );
+    }
+    return (
+      <>
+        {up} win the playoff {p.score} against {beaten} to go up to {into ?? "the division above"}
+      </>
+    );
   }
   if (item.kind === "award") {
     const a = item.data;
