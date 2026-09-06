@@ -17,9 +17,9 @@ const HIGH_COLOR: Rgb = [25, 135, 84]; // #198754, matches RatingDelta's positiv
  * which no rating can reach. That leaves the green half of the gradient two
  * points narrower than the red half, which is invisible.
  */
-const LOW_VALUE = 40 + OVR_SCALE_SHIFT;
-const MID_VALUE = 65 + OVR_SCALE_SHIFT;
-const HIGH_VALUE = Math.min(RATING_MAX, 90 + OVR_SCALE_SHIFT);
+export const LOW_VALUE = 40 + OVR_SCALE_SHIFT;
+export const MID_VALUE = 65 + OVR_SCALE_SHIFT;
+export const HIGH_VALUE = Math.min(RATING_MAX, 90 + OVR_SCALE_SHIFT);
 
 function lerp(a: number, b: number, t: number): number {
   return Math.round(a + (b - a) * t);
