@@ -85,7 +85,7 @@ function teamForSeason(
 
 export function PlayerProfile() {
   const { pid } = useParams<{ pid: string }>();
-  const { league, movePlayerToClubAction, releasePlayerGodModeAction } = useLeague();
+  const { league, movePlayerToClubAction, releasePlayerGodModeAction, editPlayerAction } = useLeague();
   const [statsTab, setStatsTab] = useState<"league" | "cup" | "domestic" | "intl">("league");
   // Totals or per-90 rates, across both the league and cup stat tables (they
   // record minutes in the same shape). No qualifier here, unlike the Stat
@@ -278,6 +278,17 @@ export function PlayerProfile() {
             </span>
           </>
         )}
+        {/* Shown whether or not God Mode is currently on: the lock is saved
+            state, so turning God Mode off must not hide the reason a player
+            has stopped developing. */}
+        {player.ratingsLocked && (
+          <>
+            {" "}&middot;{" "}
+            <span className="text-warning" title="God Mode: his ratings, overall and potential won't change in the offseason.">
+              Ratings locked
+            </span>
+          </>
+        )}
       </p>
 
       <PositionStrip player={player} />
@@ -300,6 +311,15 @@ export function PlayerProfile() {
           <div className="gm-panel-title">God Mode</div>
           <div className="d-flex flex-wrap align-items-center gap-2">
             <button className="btn btn-sm btn-warning" onClick={() => setEditing(true)}>Edit Player</button>
+            {/* The same setting the edit modal stages, offered as one click for
+                when locking him is the only thing you came here to do. */}
+            <button
+              className="btn btn-sm btn-outline-warning"
+              title="Freeze his ratings, overall and potential so the offseason stops moving them."
+              onClick={() => editPlayerAction(player.pid, { ratingsLocked: !player.ratingsLocked })}
+            >
+              {player.ratingsLocked ? "Unlock ratings" : "Lock ratings"}
+            </button>
             <div className="d-flex align-items-center gap-1">
               <label className="small text-muted m-0">Move to</label>
               <select

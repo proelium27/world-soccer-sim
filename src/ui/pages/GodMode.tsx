@@ -474,7 +474,7 @@ function CreatePlayer() {
 
 // --- Section C: Roster Builder ---
 function RosterBuilder() {
-  const { league, movePlayerToClubAction, releasePlayerGodModeAction } = useLeague();
+  const { league, movePlayerToClubAction, releasePlayerGodModeAction, editPlayerAction } = useLeague();
   const [tid, setTid] = useState<number | null>(null);
   const [filter, setFilter] = useState("");
   const { sort, toggle } = useTableSort<"default" | "name" | "pos" | "ovr">("default", "desc");
@@ -542,7 +542,15 @@ function RosterBuilder() {
               <tr key={pid}>
                 <td><Link to={`/player/${pid}`}>{p.name}</Link></td>
                 <td>{p.pos}</td>
-                <td>{p.ovr}</td>
+                <td>
+                  {p.ovr}
+                  {/* The state has to be readable from the squad list, or
+                      locking a whole roster means opening 25 profiles to find
+                      out which ones you already did. */}
+                  {p.ratingsLocked && (
+                    <span className="text-warning small ms-1" title="Ratings locked: he won't develop.">locked</span>
+                  )}
+                </td>
                 <td className="text-end">
                   <select
                     className="form-select form-select-sm d-inline-block me-2" style={{ width: "auto" }}
@@ -553,6 +561,13 @@ function RosterBuilder() {
                       <option key={t.tid} value={t.tid}>{t.name}</option>
                     ))}
                   </select>
+                  <button
+                    className="btn btn-sm btn-outline-warning me-2"
+                    title="Freeze his ratings, overall and potential so the offseason stops moving them."
+                    onClick={() => editPlayerAction(pid, { ratingsLocked: !p.ratingsLocked })}
+                  >
+                    {p.ratingsLocked ? "Unlock" : "Lock"}
+                  </button>
                   <button className="btn btn-sm btn-outline-danger" onClick={() => releasePlayerGodModeAction(pid)}>Release</button>
                 </td>
               </tr>
