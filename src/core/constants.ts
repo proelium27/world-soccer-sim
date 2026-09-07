@@ -1150,7 +1150,45 @@ export interface ProgressionProfile {
   /** Growth resistance: ovr at which positive development is damped to `dampingFloor`. */
   readonly dampingEnd: number;
   readonly dampingFloor: number;
+  /**
+   * Shift applied to every gate that compares a player's POTENTIAL against a
+   * fixed bar. See `potentialBar`.
+   */
+  readonly potentialBarOffset: number;
 }
+
+/**
+ * A fixed potential threshold, moved onto the model's own distribution.
+ *
+ * **Every potential gate in the game is an absolute number, and an honest
+ * forecast sits lower than an optimistic one, so the steady model slides the
+ * whole distribution out from under all of them at once.** Measured on real
+ * youth intakes across the world's academy anchors: median listed potential
+ * **53 → 42**, share clearing `AI_PROSPECT_MIN_POT` (70) **18.7% → 7.8%**, share
+ * clearing `RETIREMENT_PROSPECT_POT_THRESHOLD` (65) **24.7% → 11.7%**. Nothing
+ * throws; AI clubs simply stop protecting the wonderkids `AI_PROSPECT_SLOTS`
+ * exists to protect, and more young free agents wash out of the pool — which
+ * are the two bugs #318 and the retirement rework were written to fix,
+ * half-reopened by a setting that never mentions either.
+ *
+ * The invariant that has to hold is the **share**, not the number. Both bars are
+ * defined by what they are *for* — "genuine wonderkids, not every teenager",
+ * "a high-ceilinged prospect a club will plainly sign" — which is a statement
+ * about where a player sits in his intake, and that is exactly the
+ * comparable-within-a-population-but-not-across-populations trap this codebase
+ * has hit four times before. `STEADY_POTENTIAL_BAR_OFFSET` is therefore the
+ * shift that reproduces the random model's share on the steady one's
+ * distribution, measured rather than chosen: 70 → 58 and 65 → 53, i.e. the same
+ * -12 on both, which is what a clean translation of the distribution looks like.
+ *
+ * Re-derive it with `scripts/progressionModelProbe.ts` section G if any of the
+ * `STEADY_*` constants move.
+ */
+export function potentialBar(bar: number, model: ProgressionModel): number {
+  return bar + PROGRESSION_PROFILES[model].potentialBarOffset;
+}
+
+export const STEADY_POTENTIAL_BAR_OFFSET = -12;
 
 /**
  * `"steady"`'s own age curve. Same control-point shape as `BASE_AGE_CURVE` and
@@ -1263,6 +1301,7 @@ export const PROGRESSION_PROFILES: Record<ProgressionModel, ProgressionProfile> 
     biasSdYoung: PROGRESSION_BIAS_SD_YOUNG,
     dampingEnd: GROWTH_DAMPING_END,
     dampingFloor: GROWTH_DAMPING_FLOOR,
+    potentialBarOffset: 0,
   },
   steady: {
     ageCurve: STEADY_AGE_CURVE,
@@ -1273,6 +1312,7 @@ export const PROGRESSION_PROFILES: Record<ProgressionModel, ProgressionProfile> 
     biasSdYoung: PROGRESSION_BIAS_SD_YOUNG,
     dampingEnd: GROWTH_DAMPING_END,
     dampingFloor: GROWTH_DAMPING_FLOOR,
+    potentialBarOffset: STEADY_POTENTIAL_BAR_OFFSET,
   },
 };
 

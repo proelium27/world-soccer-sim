@@ -1452,9 +1452,16 @@ export function Manual() {
             four meets or beats it. And here's the important bit: potential has <em>zero</em> effect
             on how a player actually develops. It's a forecast of the development model, not an input
             to it. It also gets re-estimated as the player ages, so it drifts toward his current OVR
-            over time. On a <a href="#development">steady careers</a> save it's a much sharper
-            forecast, because there's far less luck left for it to be guessing at &mdash; the
-            scouting fog below becomes most of what stands between you and the real number.
+            over time.
+          </p>
+          <p>
+            On a <a href="#development">steady careers</a> save that number means something
+            different, and it's worth knowing which. There's far less luck left for it to be
+            guessing at, so the simulated careers nearly all agree with each other and the estimate
+            lands close to what actually happens: the three-in-four rule above stops applying, and
+            POT reads as roughly where a player ends up rather than as an optimistic ceiling he
+            probably won't reach. That makes it a lot more useful, and it makes the scouting fog
+            below most of what still stands between you and the real number.
           </p>
           <p>
             <strong>You don't see a player's exact potential. You see a scouting estimate.</strong>{" "}

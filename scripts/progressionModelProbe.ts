@@ -25,12 +25,15 @@
  * is a tuning instrument, not a verdict. `SEEDS=1,2 npx tsx scripts/progressionModelProbe.ts`
  */
 import { generatePlayer } from "../src/core/players/generate.js";
+import { generateYouthIntake } from "../src/core/players/youth.js";
 import { progressPlayer, retirementProbability } from "../src/core/players/progression.js";
 import { mulberry32, hashInts } from "../src/engine/rng.js";
 import type { Player, Position } from "../src/core/players/types.js";
 import { POSITIONS } from "../src/core/players/types.js";
 import {
   type ProgressionModel, FULL_SEASON_APPEARANCES, LEAGUE_BASE,
+  AI_PROSPECT_MIN_POT, RETIREMENT_PROSPECT_POT_THRESHOLD,
+  potentialBar, STEADY_POTENTIAL_BAR_OFFSET,
 } from "../src/core/constants.js";
 
 const MODELS: ProgressionModel[] = ["random", "steady"];
@@ -238,7 +241,7 @@ for (const [label, fn] of [
 ] as const) {
   console.log(`   ${label.padEnd(17)} | ${MODELS.map((m) => f(fn(careers[m]))).join("  ")}`);
 }
-console.log("   (above is an EVER-PRESENT, the best case. estimatePotential forecasts at a");
+console.log("   (below is an EVER-PRESENT, the best case. estimatePotential forecasts at a");
 console.log("    minutesFactor of 1 against MINUTES_FACTOR_MAX 1.15, so a man who plays every");
 console.log("    week is expected to beat it. At rotation minutes:)");
 const rotation: Record<string, Career[]> = {};
@@ -248,4 +251,79 @@ for (const [label, fn] of [
   ["share peak >= pot", (c: Career[]) => (c.filter((x) => x.peak >= x.potentialAt16).length / c.length) * 100],
 ] as const) {
   console.log(`   ${label.padEnd(17)} | ${MODELS.map((m) => f(fn(rotation[m]))).join("  ")}`);
+}
+
+// -------------------------------------------- G. the absolute-threshold check
+/**
+ * Every gate in the game that reads a POTENTIAL is an ABSOLUTE number, and the
+ * steady model moves the whole distribution down (an honest forecast is lower
+ * than an optimistic one). So a bar sized against the random model's spread
+ * lands somewhere else entirely under steady, and silently — nothing throws, a
+ * club just stops protecting the player it was written to protect.
+ *
+ * `AI_PROSPECT_MIN_POT` is the one that matters most: its own comment sizes it
+ * "well above the ~62 median intake potential" so a club spends its five
+ * protected slots on genuine wonderkids rather than filler. If the share of an
+ * intake clearing it collapses, AI clubs go back to binning their best youth —
+ * the exact bug `AI_PROSPECT_SLOTS` was added to fix, reopened by a setting
+ * that never mentions it.
+ *
+ * Measured on a real youth intake rather than the cohort above, because the
+ * academy base is what sets the level and `youthGenerationBase` is what
+ * produces it.
+ */
+console.log("\nG. ABSOLUTE POTENTIAL GATES — a real youth intake, by model");
+console.log("   The bars below are absolute, so a model that shifts the POT distribution");
+console.log("   moves them relative to it. AI_PROSPECT_MIN_POT decides whether AI clubs");
+console.log("   protect their wonderkids at all.");
+console.log("   metric                    |  random  steady");
+const intakes: Record<string, number[]> = {};
+for (const model of MODELS) {
+  const pots: number[] = [];
+  for (const seed of SEEDS) {
+    // A spread of academy anchors across the world's clubs, at the real
+    // intake age, through the real intake path.
+    for (let anchor = 20; anchor <= 62; anchor += 2) {
+      const { players } = generateYouthIntake(
+        mulberry32(hashInts(seed, anchor, 0x59_54_48)),
+        anchor, 1, 1, seed, "England", null, 40, undefined, model,
+      );
+      for (const p of players) pots.push(p.potential);
+    }
+  }
+  intakes[model] = pots;
+}
+// Reported against the EFFECTIVE bar each model actually applies (see
+// `potentialBar`), not the raw constant — the raw constant is what the gate
+// used to be and measuring it would only re-report the problem the offset
+// exists to fix. The shares are what has to match between the columns.
+for (const [label, fn] of [
+  ["median POT", (p: number[], _m: ProgressionModel) => pct(p, 0.5)],
+  ["mean POT", (p: number[], _m: ProgressionModel) => mean(p)],
+  ["effective prospect bar", (_p: number[], m: ProgressionModel) =>
+    potentialBar(AI_PROSPECT_MIN_POT, m)],
+  ["  share clearing it", (p: number[], m: ProgressionModel) =>
+    (p.filter((x) => x >= potentialBar(AI_PROSPECT_MIN_POT, m)).length / p.length) * 100],
+  ["effective retirement bar", (_p: number[], m: ProgressionModel) =>
+    potentialBar(RETIREMENT_PROSPECT_POT_THRESHOLD, m)],
+  ["  share clearing it", (p: number[], m: ProgressionModel) =>
+    (p.filter((x) => x > potentialBar(RETIREMENT_PROSPECT_POT_THRESHOLD, m)).length / p.length) * 100],
+] as const) {
+  console.log(`   ${label.padEnd(25)} | ${MODELS.map((m) => f(fn(intakes[m], m))).join("  ")}`);
+}
+// Re-derives STEADY_POTENTIAL_BAR_OFFSET from scratch: the steady bar that
+// would reproduce the random model's share. Run this after touching any
+// STEADY_* constant — if these stop landing near the shipped offset, the two
+// columns above have quietly stopped matching.
+console.log("   re-derived offset (bar holding random's share, vs the shipped one):");
+for (const [label, bar] of [
+  ["AI_PROSPECT_MIN_POT", AI_PROSPECT_MIN_POT],
+  ["RETIREMENT_PROSPECT", RETIREMENT_PROSPECT_POT_THRESHOLD],
+] as const) {
+  const share = intakes.random.filter((x) => x >= bar).length / intakes.random.length;
+  const steadyBar = pct(intakes.steady, 1 - share);
+  console.log(
+    `   ${label.padEnd(25)} | ${f(bar, 0)} -> ${f(steadyBar, 0)}`
+    + `  (offset ${f(steadyBar - bar, 0)}, shipped ${f(STEADY_POTENTIAL_BAR_OFFSET, 0)})`,
+  );
 }

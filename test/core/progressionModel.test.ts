@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { mulberry32 } from "../../src/engine/rng.js";
+import { mulberry32, hashInts } from "../../src/engine/rng.js";
 import { generatePlayer } from "../../src/core/players/generate.js";
 import { generateYouthIntake } from "../../src/core/players/youth.js";
 import { generateWorld } from "../../src/core/league/generate.js";
-import { progressPlayer, estimatePotential } from "../../src/core/players/progression.js";
+import {
+  progressPlayer, estimatePotential, isWantedForRetirement,
+} from "../../src/core/players/progression.js";
 import { createLeagueState } from "../../src/core/leagueState.js";
 import { migrateLeague } from "../../src/db/migrate.js";
 import { englandCompetitions } from "../../src/core/competitions.js";
@@ -15,6 +17,7 @@ import {
   PROGRESSION_BIAS_SD_YOUNG,
   GROWTH_DAMPING_END, GROWTH_DAMPING_FLOOR,
   FULL_SEASON_APPEARANCES,
+  AI_PROSPECT_MIN_POT, RETIREMENT_PROSPECT_POT_THRESHOLD, potentialBar,
 } from "../../src/core/constants.js";
 import type { Player } from "../../src/core/players/types.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
@@ -277,5 +280,61 @@ describe("steady careers", () => {
   it("uses its own age curve", () => {
     expect(PROGRESSION_PROFILES.steady.ageCurve).toBe(STEADY_AGE_CURVE);
     expect(STEADY_AGE_CURVE).not.toEqual(BASE_AGE_CURVE);
+  });
+});
+
+describe("potential gates move with the model", () => {
+  /**
+   * Every gate that compares a POTENTIAL against a fixed bar is an absolute
+   * number, and steady development lists lower potentials for the same players
+   * (an honest forecast sits below an optimistic one). So the whole
+   * distribution slides out from under all of them at once, and silently:
+   * nothing throws, AI clubs just stop protecting the wonderkids
+   * `AI_PROSPECT_SLOTS` exists to protect. Measured before the offset, the share
+   * of a real youth intake clearing `AI_PROSPECT_MIN_POT` fell 18.7% to 7.8%.
+   *
+   * The invariant is the SHARE, not the number. Both bars are defined by what
+   * they are for ("genuine wonderkids, not every teenager"), which is a
+   * statement about where a player sits in his own intake.
+   */
+  function intakePotentials(model: "random" | "steady"): number[] {
+    const pots: number[] = [];
+    for (let anchor = 20; anchor <= 62; anchor += 6) {
+      const { players } = generateYouthIntake(
+        mulberry32(hashInts(anchor, 0x59_54_48)),
+        anchor, 1, 1, 3, "England", null, 60, undefined, model,
+      );
+      for (const p of players) pots.push(p.potential);
+    }
+    return pots;
+  }
+
+  it("keeps roughly the same share of an intake above each bar", () => {
+    for (const bar of [AI_PROSPECT_MIN_POT, RETIREMENT_PROSPECT_POT_THRESHOLD]) {
+      const share = (model: "random" | "steady") => {
+        const pots = intakePotentials(model);
+        const at = potentialBar(bar, model);
+        return pots.filter((p) => p >= at).length / pots.length;
+      };
+      // A band rather than an exact match: one offset covers both bars, so it
+      // lands close on each rather than exactly on either.
+      expect(Math.abs(share("steady") - share("random"))).toBeLessThan(0.05);
+    }
+  });
+
+  it("leaves the random model's bars exactly where they were", () => {
+    expect(potentialBar(AI_PROSPECT_MIN_POT, "random")).toBe(AI_PROSPECT_MIN_POT);
+    expect(potentialBar(RETIREMENT_PROSPECT_POT_THRESHOLD, "random"))
+      .toBe(RETIREMENT_PROSPECT_POT_THRESHOLD);
+  });
+
+  it("exempts a prospect from retirement on the model's own bar", () => {
+    // A ceiling that clears the steady bar but not the random one: the same
+    // player is a prospect worth keeping in one save and a journeyman in the
+    // other, which is the point of moving the bar rather than the player.
+    const between = RETIREMENT_PROSPECT_POT_THRESHOLD - 6;
+    const p = { ...player(5, 20), potential: between } as Player;
+    expect(isWantedForRetirement(p, false, 20, "random")).toBe(false);
+    expect(isWantedForRetirement(p, false, 20, "steady")).toBe(true);
   });
 });

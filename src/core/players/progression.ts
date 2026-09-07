@@ -6,7 +6,7 @@ import {
   BASE_AGE_CURVE_PEAK, PHYSICAL_AGE_SHIFT, SKILL_AGE_SHIFT,
   GK_AGE_SHIFT,
   MINUTES_FACTOR_MIN, MINUTES_FACTOR_MAX, FULL_SEASON_APPEARANCES,
-  PROGRESSION_PROFILES, type ProgressionModel, type ProgressionProfile,
+  PROGRESSION_PROFILES, potentialBar, type ProgressionModel, type ProgressionProfile,
   GROWTH_DAMPING_START,
   GENERATIONAL_CHANCE, GENERATIONAL_DAMPING_END, GENERATIONAL_DAMPING_FLOOR,
   GENERATIONAL_BIAS_MIN_Z,
@@ -332,15 +332,22 @@ export function retirementProbability(age: number, wanted = true): number {
  * less than current ovr, so without it every unsigned player above ovr 65 —
  * veterans included — would be exempted onto the damped curve and retire *less*
  * than under the old age-only model. See `RETIREMENT_PROSPECT_MAX_AGE`.
+ *
+ * The ceiling bar moves with the save's development model. A steady save lists
+ * lower potentials for the same players, so a fixed bar would exempt half as
+ * many prospects and wash the pool's young free agents out — which measurably
+ * starves AI free agency of the useful under-24s it fills holes with. See
+ * `potentialBar`.
  */
 export function isWantedForRetirement(
   player: Player,
   rostered: boolean,
   age: number,
+  model: ProgressionModel = "random",
 ): boolean {
   return rostered
     || (age < RETIREMENT_PROSPECT_MAX_AGE
-      && player.potential > RETIREMENT_PROSPECT_POT_THRESHOLD);
+      && player.potential > potentialBar(RETIREMENT_PROSPECT_POT_THRESHOLD, model));
 }
 
 /**
@@ -354,7 +361,8 @@ export function rollRetirement(
   player: Player,
   season: number,
   rostered = true,
+  model: ProgressionModel = "random",
 ): boolean {
   const age = ageOf(player, season);
-  return rng() < retirementProbability(age, isWantedForRetirement(player, rostered, age));
+  return rng() < retirementProbability(age, isWantedForRetirement(player, rostered, age, model));
 }

@@ -372,7 +372,9 @@ export function simOffseasonReporting(
   //    be deleted from the save entirely: the Season Preview's farewell list is
   //    built from this snapshot, since nothing can be looked up afterwards.
   const retirees = players.filter((p) =>
-    rollRetirement(rng, p, endingSeason, !unrosteredLastSeason.has(p.pid)));
+    rollRetirement(
+      rng, p, endingSeason, !unrosteredLastSeason.has(p.pid), league.progressionModel,
+    ));
   const retiredPids = new Set(retirees.map((p) => p.pid));
   // The farewell notice itself is built at step 3.66, once this season's awards
   // and champions exist to rank the retirees by — see there. What is kept here
@@ -617,6 +619,7 @@ export function simOffseasonReporting(
   let faSignings: { pid: number; toTid: number }[];
   ({ teams, players, signings: faSignings } = runAIFreeAgency(
     teams, players, nextSeason, rng, league.meta.userTid, signingOrder, activeLoans,
+    league.progressionModel,
   ));
   // Log each free-agent arrival as a fee-0 transfer FROM the sentinel so the
   // player's club-by-season history registers the move (an unrecorded free
@@ -822,7 +825,9 @@ export function simOffseasonReporting(
   // 6. Trim AI squads back down to target composition. Loaned-in players are
   //    left in place (owned by their parent — see trimRosterSurplus) so
   //    trimming can't orphan a live loan into a duplicate.
-  teams = trimRosterSurplus(teams, players, league.meta.userTid, nextSeason, activeLoans);
+  teams = trimRosterSurplus(
+    teams, players, league.meta.userTid, nextSeason, activeLoans, league.progressionModel,
+  );
 
   // 6.4. AI<->AI transfer market (summer window, cross-division by design —
   //      no division filtering here, see design doc).
