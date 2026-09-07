@@ -56,6 +56,9 @@ import { clampScoutingSpend } from "./finance/scouting.js";
 import { competitionOf, competitionTeamCount, competitionNationalities, tierOf } from "./competitions.js";
 import type { TransferClause } from "./transfers/clauses.js";
 import {
+  pointsDeductionMap, assessDebtSanction, breachStreak, applyDebtInterest,
+} from "./finance/debt.js";
+import {
   settleBonuses, payoutDeltas, expireClauses, scrubClausesForPids,
 } from "./transfers/clauses.js";
 import { simThroughInternational, confederationCupChampions } from "./international/index.js";
@@ -209,7 +212,15 @@ export function simOffseasonReporting(
     const compTidSet = new Set(compTids);
     tablesByCompId.set(
       comp.id,
-      computeStandings(compTids, league.played.filter((m) => compTidSet.has(m.home))),
+      computeStandings(
+        compTids,
+        league.played.filter((m) => compTidSet.has(m.home)),
+        // Any points docked this season come off HERE, which is what makes a
+        // deduction a real sporting penalty rather than a cosmetic one: this is
+        // the map that decides promotion and relegation, prize money, European
+        // places, and the finish the board reviews.
+        pointsDeductionMap(league.debtSanctions, league.season),
+      ),
     );
   }
 
@@ -572,6 +583,51 @@ export function simOffseasonReporting(
   };
   for (const comp of league.competitions) settle(tablesByCompId.get(comp.id)!, comp.id);
 
+  // 3.55. Financial sanctions on the user's club, read off the balance it has
+  //       just ended the season on — after prize money and hype revenue have
+  //       settled, which is what makes this the club's year-end position rather
+  //       than a mid-summer snapshot. A club too deep in the red is barred from
+  //       registering players next season, and deeper still is docked points
+  //       from next season's table too, escalating while it stays in breach.
+  //
+  //       Read here rather than after the summer market on purpose: the
+  //       accounts close when the season does, so selling in July does not undo
+  //       last year's breach. That is the real dynamic and it gives the player
+  //       the right instruction — balance the books before the final whistle —
+  //       which the Dashboard and Finance warnings exist to make actionable in
+  //       time.
+  //
+  //       The competition used for the scale is the one just played, since that
+  //       is the income the club was living on; promotion or relegation at step
+  //       3.6 changes next season's limit but not this season's verdict.
+  //
+  //       AI clubs are never assessed. That containment is the whole reason
+  //       this needs no dynasty audit — see the DEBT_* block in constants.ts —
+  //       and a jumped or spectated save is skipped for the same reason the
+  //       board review is: nobody was picking the team.
+  let debtSanctions = league.debtSanctions ?? [];
+  {
+    const userTid = league.meta.userTid;
+    // A jumped save parks `userTid` at AUTOPILOT_TID and a spectator save at
+    // SPECTATOR_TID, and no club holds either — so this lookup already returns
+    // undefined for both and no sentinel check is needed. Which is just as
+    // well: importing them here would close a cycle, since `autopilot.ts`
+    // imports this file.
+    const userTeam = teams.find((t) => t.tid === userTid);
+    if (userTeam) {
+      const sanction = assessDebtSanction(
+        nextSeason,
+        userTid,
+        userTeam.budget,
+        financeScaleFor(
+          league.competitions, userTeam.compId, userTid, userTid, league.difficulty,
+        ),
+        breachStreak(debtSanctions, endingSeason, userTid),
+      );
+      if (sanction) debtSanctions = [...debtSanctions, sanction];
+    }
+  }
+
   // 3.6. Promotion/relegation: per country, bottom PROMOTION_RELEGATION_COUNT
   //      of its tier-1 table swap with top PROMOTION_RELEGATION_COUNT of its
   //      tier-2 table, using the tables just computed above (the season that
@@ -893,11 +949,15 @@ export function simOffseasonReporting(
   //      user's club only, by his difficulty. This is where a hard level really
   //      bites: the base allocation shrinks while the wage bill doesn't, so an
   //      expensive squad runs at a loss until the user sells his way out of it.
+  //      Interest on a negative balance is taken first, for the user's club
+  //      only, so it compounds: it deepens the balance the next charge is
+  //      measured against. Charged before the base allocation arrives because
+  //      it is owed on last season's debt, not on this season's income.
   const salaryMap = new Map(players.map((p) => [p.pid, p.contract.salary]));
   teams = teams.map((t) => ({
     ...t,
     budget: chargeSeasonStart(
-      t.budget,
+      t.tid === league.meta.userTid ? applyDebtInterest(t.budget) : t.budget,
       wageBill([...t.roster, ...t.academyRoster], salaryMap),
       financeScaleFor(league.competitions, t.compId, t.tid, league.meta.userTid, league.difficulty),
       t.hype,
@@ -1042,6 +1102,7 @@ export function simOffseasonReporting(
   const rolled: LeagueStore = {
     ...league,
     teams,
+    debtSanctions,
     transferClauses: clauses,
     players,
     season: nextSeason,

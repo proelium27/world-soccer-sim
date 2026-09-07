@@ -4,6 +4,7 @@ import type { StoredTeam } from "./teams/clubs.js";
 import type { ScheduleGame } from "./schedule.js";
 import type { CompletedTransfer, TransferNegotiation } from "./transfers/negotiation.js";
 import type { TransferClause } from "./transfers/clauses.js";
+import type { DebtSanction } from "./finance/debt.js";
 import type { InboundOffer } from "./transfers/inboundOffers.js";
 import type { NewsEvent } from "./newsEvents.js";
 import type { ArchivedPlayer } from "./players/archive.js";
@@ -264,6 +265,22 @@ export interface LeagueStore {
    */
   superCups: SuperCupTie[];
   /**
+   * Financial sanctions against the user's club, one record per season it
+   * ended too deep in the red — a registration embargo, and past a further
+   * threshold a points deduction on top.
+   *
+   * Appended in the offseason from the balance the club ended the season on
+   * (after prize money settles), and read for the season each record names.
+   * Nothing else in the sim writes here and AI clubs are never assessed, which
+   * is what keeps this off the strength ladder and out of the dynasty audits —
+   * see the DEBT_* block in constants.ts.
+   *
+   * Optional: absent on every save written before debt existed, and
+   * `migrate.ts` backfills `[]`. Absent is exact rather than a guess — those
+   * saves could not be sanctioned, because nothing was assessing them.
+   */
+  debtSanctions?: DebtSanction[];
+  /**
    * National-team football, played entirely inside the offseason on a two-year
    * cycle (odd seasons qualify, even seasons play the tournament). Starts empty
    * on a new save and fills from the first offseason onward; see
@@ -433,6 +450,7 @@ export function createLeagueState(
     promotionPlayoffs: [],
     // Season 1 has no super cups: nothing has been won yet to contest one.
     superCups: [],
+    debtSanctions: [],
     international: emptyInternationalState(),
     godMode: false,
     manager: emptyManagerState(userTid, 1),

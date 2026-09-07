@@ -38,6 +38,7 @@ import { qualifyingLeg } from "../../core/constants.js";
 import {
   PowerRankingPanel, CupBracketPanel, InternationalBracketPanel, MatchdayPanel,
 } from "./worldPanels.js";
+import { pointsDeductionMap } from "../../core/finance/debt.js";
 
 /** How many standings rows the table snippet shows before pointing at /standings. */
 const STANDINGS_TOP_N = 8;
@@ -61,8 +62,9 @@ export function SpectatorDashboard({ league }: { league: LeagueStore }) {
     return computeStandings(
       divisionTids,
       league.played.filter((m) => tidSet.has(m.home)),
+      pointsDeductionMap(league.debtSanctions, league.season),
     );
-  }, [league.teams, league.played, competition]);
+  }, [league.teams, league.played, competition, league.debtSanctions, league.season]);
 
   const nextMd = nextMatchday(league);
   const lastMd = league.schedule.length > 0

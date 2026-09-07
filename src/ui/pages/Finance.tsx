@@ -19,6 +19,8 @@ import { Flag } from "../components/Flag.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { PlayerRefLink, usePlayerRefs } from "../components/PlayerRefLink.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
+import { pointsDeductionMap } from "../../core/finance/debt.js";
+import { userDebtView } from "../userDebt.js";
 
 /**
  * A signed money amount on the money-year timeline.
@@ -137,7 +139,9 @@ export function Finance() {
     // match and the old form scanned the whole division for each one.
     const divisionTids = new Set(divisionTeamIds);
     const matches = league.played.filter((m) => divisionTids.has(m.home));
-    const standings = computeStandings(divisionTeamIds, matches);
+    const standings = computeStandings(
+      divisionTeamIds, matches, pointsDeductionMap(league.debtSanctions, league.season),
+    );
     return {
       rank: standings.findIndex((r) => r.tid === league.meta.userTid) + 1,
       started: matches.length > 0,
@@ -164,6 +168,10 @@ export function Finance() {
 
   const difficulty = difficultyProfile(league.difficulty);
   const inTheRed = userTeam.budget < 0;
+  // One derivation shared with the spending actions and the Dashboard warning,
+  // so the page that tells you your headroom and the button that refuses the
+  // signing can never disagree.
+  const debt = userDebtView(league);
   const seasonOver = league.phase === "offseason";
 
   // The user's own projection, so it takes the difficulty-aware scale — the
@@ -269,15 +277,58 @@ export function Finance() {
     <div className="container-fluid p-3">
       <h4>Finance: {userTeam.name}</h4>
 
-      {inTheRed && (
+      {/* The sanction already in force, if any. Kept separate from the
+          projection below because they answer different questions: this is what
+          you are living with now, that is what today's balance would cost you
+          next season. */}
+      {debt?.sanction && (
         <div className="alert alert-danger py-2" role="alert">
+          <div className="fw-semibold">
+            {debt.sanction.pointsDeduction > 0
+              ? `Transfer embargo and a ${debt.sanction.pointsDeduction}-point deduction`
+              : "Transfer embargo"}
+          </div>
+          <div className="small mb-0">
+            You ended last season {currency.format(-debt.sanction.balance)} overdrawn, past your{" "}
+            {currency.format(debt.sanction.limit)} limit
+            {debt.sanction.consecutiveSeasons > 1
+              && `, and that is ${debt.sanction.consecutiveSeasons} seasons running`}.
+            You can&apos;t buy or sign anyone this season. You can still sell, promote from your
+            academy, and take on trialists.
+            {debt.sanction.pointsDeduction > 0
+              && ` The ${debt.sanction.pointsDeduction} points are already off your league table.`}
+          </div>
+        </div>
+      )}
+
+      {/* Warned DURING the season, not after. The books are read at the final
+          whistle, so telling the player once the penalty has landed gives him no
+          chance to sell his way out of it. */}
+      {debt && debt.projected !== "clear" && (
+        <div className="alert alert-warning py-2" role="alert">
+          <div className="fw-semibold">
+            {debt.projected === "deduction"
+              ? "On course for a points deduction"
+              : "On course for a transfer embargo"}
+          </div>
+          <div className="small mb-0">
+            Finish the season this far overdrawn and next season starts with a transfer embargo
+            {debt.projected === "deduction" && " and a points deduction"}. Your books are read
+            at the final whistle, so selling in the summer won&apos;t undo it. Get back above{" "}
+            {currency.format(debt.embargoAt)} before the season ends.
+          </div>
+        </div>
+      )}
+
+      {debt?.inDebt && (
+        <div className="alert alert-secondary py-2" role="alert">
           <div className="fw-semibold">You&apos;re in the red.</div>
           <div className="small mb-0">
-            You can&apos;t sign anyone until the balance is positive again, and your scouting is
-            stuck at zero while you&apos;re overdrawn, so potential estimates will get vaguer.
-            Nothing forces a sale and there&apos;s no interest to pay. You simply stay
-            overdrawn until income digs you out. Sell someone, or get your wage bill under what
-            the club earns.
+            You can borrow up to {currency.format(debt.limit)}, and you have{" "}
+            {currency.format(debt.headroom)} of that left. Carrying this balance into next season
+            costs {currency.format(debt.interestNext)} in interest, and interest compounds. Your
+            scouting also stays at zero while you&apos;re overdrawn, so potential estimates get
+            vaguer.
           </div>
         </div>
       )}

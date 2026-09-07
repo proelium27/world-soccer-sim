@@ -547,6 +547,10 @@ function migrateFields(league: LeagueStore): LeagueStore {
     // before clauses existed agreed none, so empty is exact rather than a
     // guess — there is nothing to reconstruct and nothing was lost.
     transferClauses: anyVersion.transferClauses ?? [],
+    // Absent on every save written before club debt existed. `[]` is exact
+    // rather than a guess: nothing was assessing those seasons, so no club
+    // could have been sanctioned in them.
+    debtSanctions: anyVersion.debtSanctions ?? [],
     // Pre-cup saves have no Continental Cup; they start with none and get one
     // seeded at their next offseason from that season's final tables (so an
     // existing save picks the cup up from the following season onward). Backfill

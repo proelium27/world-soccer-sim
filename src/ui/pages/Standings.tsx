@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useLeague } from "../context/LeagueContext.js";
 import { HelpHint, PotHelp } from "../components/HelpHint.js";
 import { computeStandings, type StandingsRow } from "../../core/standings.js";
+import { pointsDeductionMap } from "../../core/finance/debt.js";
 import { computeTeamRating } from "../../core/teams/teamRating.js";
 import { teamSlots } from "../../core/lineup/formations.js";
 import { tierOf } from "../../core/competitions.js";
@@ -109,10 +110,16 @@ export function Standings() {
   let championTid: number;
   if (season === "current") {
     const teamIds = league.teams.filter((t) => t.compId === compId).map((t) => t.tid);
-    standings = computeStandings(teamIds, league.played.filter((m) => {
-      const home = league.teams.find((t) => t.tid === m.home);
-      return home?.compId === compId;
-    }));
+    standings = computeStandings(
+      teamIds,
+      league.played.filter((m) => {
+        const home = league.teams.find((t) => t.tid === m.home);
+        return home?.compId === compId;
+      }),
+      // A past season's stored table already has its deductions applied — the
+      // offseason computed it that way — so only the live table needs them here.
+      pointsDeductionMap(league.debtSanctions, league.season),
+    );
     // A "champion" only means something once the season has actually been
     // DECIDED, which is the offseason phase — not merely once a ball has been
     // kicked. Testing `played.length > 0` (as this did) crowned whoever led the
@@ -273,7 +280,20 @@ export function Standings() {
                   <td className="text-end">{row.gf}</td>
                   <td className="text-end">{row.ga}</td>
                   <td className="text-end">{row.gd}</td>
-                  <td className="text-end">{row.points}</td>
+                  <td className="text-end">
+                    {row.points}
+                    {row.deducted !== undefined && (
+                      // Without this the points column simply does not add up
+                      // against the W/D/L beside it, which reads as a bug
+                      // rather than as a penalty.
+                      <span
+                        className="text-danger ms-1 small"
+                        title={`${row.deducted}-point deduction for breaching the club's overdraft`}
+                      >
+                        (-{row.deducted})
+                      </span>
+                    )}
+                  </td>
                   {season === "current" && <td className="text-end">{rating?.ovr ?? "-"}</td>}
                   {season === "current" && <td className="text-end">{rating?.pot ?? "-"}</td>}
                 </tr>

@@ -11,6 +11,7 @@ import {
   contractTerms, extendContract, seasonSalaryForOvr, extendAcademyContract, academyContractTerms,
 } from "./contracts.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
+import { affordable, type SpendPolicy } from "./finance/debt.js";
 
 /**
  * True while a player the user signed from free agency is inside his
@@ -453,6 +454,7 @@ export function signFreeAgent(
   season: number,
   phase: "regular" | "offseason",
   activeLoans: ActiveLoan[] = [],
+  spend?: SpendPolicy,
 ): { teams: StoredTeam[]; players: Player[] } {
   if (!freeAgentPids(teams, players, activeLoans).has(pid)) {
     return { teams, players };
@@ -463,8 +465,12 @@ export function signFreeAgent(
   }
   const player = players.find((p) => p.pid === pid);
   if (!player) return { teams, players };
+  // A free transfer is still a registration, so an embargoed club cannot make
+  // one however little it costs. Absent policy = the old cash-in-hand rule, so
+  // nothing that does not pass one changes behaviour.
+  if (spend?.embargoed) return { teams, players };
   const wageCharge = phase === "regular" ? contractTerms(player, season).salary : 0;
-  if (wageCharge > team.budget) return { teams, players };
+  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
   // The one-season transfer hold is keyed to the season the player actually
   // joins the XI: a mid-season signing plays this season; an offseason signing
@@ -506,6 +512,7 @@ export function signToAcademy(
   season: number,
   phase: "regular" | "offseason",
   activeLoans: ActiveLoan[] = [],
+  spend?: SpendPolicy,
 ): { teams: StoredTeam[]; players: Player[] } {
   if (!freeAgentPids(teams, players, activeLoans).has(pid)) {
     return { teams, players };
@@ -519,7 +526,11 @@ export function signToAcademy(
     return { teams, players };
   }
   const wageCharge = phase === "regular" ? academyContractTerms(season).salary : 0;
-  if (wageCharge > team.budget) return { teams, players };
+  // Payable out of the overdraft, and deliberately NOT gated on the embargo:
+  // a club barred from the transfer market can still run its own academy, which
+  // is both how real sanctions work and the one route out of trouble that
+  // costs almost nothing.
+  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
   return {
     teams: teams.map((t) =>
@@ -548,6 +559,7 @@ export function promoteFromAcademy(
   pid: number,
   season: number,
   phase: "regular" | "offseason",
+  spend?: SpendPolicy,
 ): { teams: StoredTeam[]; players: Player[] } {
   const team = teams.find((t) => t.tid === tid);
   if (!team || !team.academyRoster.includes(pid) || team.roster.length >= ROSTER_CAP) {
@@ -556,7 +568,10 @@ export function promoteFromAcademy(
   const player = players.find((p) => p.pid === pid);
   if (!player) return { teams, players };
   const wageCharge = phase === "regular" ? contractTerms(player, season).salary : 0;
-  if (wageCharge > team.budget) return { teams, players };
+  // A promotion is not a new registration — he is already at the club — so
+  // this takes the overdraft and ignores the embargo, or a sanction would
+  // strand a club's own graduates in the academy.
+  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
   return {
     teams: teams.map((t) =>
@@ -757,6 +772,7 @@ export function signTrialist(
   pid: number,
   season: number,
   phase: "regular" | "offseason" = "offseason",
+  spend?: SpendPolicy,
 ): { teams: StoredTeam[]; players: Player[] } {
   const team = teams.find((t) => t.tid === tid);
   if (!team || !(team.youthTrialists ?? []).includes(pid)) return { teams, players };
@@ -770,7 +786,8 @@ export function signTrialist(
   // and picks him up with everyone else, but nothing stops the page being
   // opened in March: the trial list survives until the next rollover.
   const wageCharge = phase === "regular" ? terms.salary : 0;
-  if (wageCharge > team.budget) return { teams, players };
+  // Overdraft yes, embargo no — see signToAcademy.
+  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
   return {
     teams: teams.map((t) =>

@@ -53,6 +53,7 @@ import { superCupChampion } from "../../core/superCup/types.js";
 import { usePlayerMap } from "../usePlayerMap.js";
 import type { PlayedMatch } from "../../core/standings.js";
 import { trackEvent } from "../analytics.js";
+import { userSpendPolicy } from "../userDebt.js";
 
 interface LeagueContextValue {
   league: LeagueStore | null;
@@ -600,6 +601,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       l.season,
       l.phase,
       l.activeLoans,
+      userSpendPolicy(l),
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("free_agent_signed");
@@ -698,6 +700,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const signToAcademyAction = useCallback((pid: number) => mutate((l) => {
     const { teams, players } = signToAcademy(
       l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, l.activeLoans,
+      userSpendPolicy(l),
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("player_signed_to_academy");
@@ -719,7 +722,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const signTrialistAction = useCallback((pid: number) => mutate((l) => {
     const { teams, players } = signTrialist(
-      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase,
+      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, userSpendPolicy(l),
     );
     if (teams === l.teams && players === l.players) return null;
     // Reuses the academy event rather than adding one: the analytics set is
@@ -765,7 +768,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const promoteFromAcademyAction = useCallback((pid: number) => mutate((l) => {
     const { teams, players } = promoteFromAcademy(
-      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase,
+      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, userSpendPolicy(l),
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("player_promoted_from_academy");
