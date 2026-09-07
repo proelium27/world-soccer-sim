@@ -314,6 +314,18 @@ export function Loans() {
               You can borrow again when the next one opens.
             </div>
           )}
+          {/* Affordability is the one user-side check that depends on which
+              player it is, so it can't be hoisted in the gate the way the cap
+              and a full squad are — and on a list ranked by overall the top
+              rows are refused on price before it's ever reached. Said here so
+              a club in the red doesn't read as forty clubs turning it down. */}
+          {ws.open && userTeam.budget <= 0 && (
+            <div className="alert alert-warning">
+              <strong>You&apos;re in the red.</strong> A loan still costs a fee and
+              his wages, so you can&apos;t take anyone on until the books are
+              back in order.
+            </div>
+          )}
 
           {!ws.open ? (
             <p className="text-muted mb-0">Loans can only be agreed while a window is open.</p>

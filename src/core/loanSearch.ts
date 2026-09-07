@@ -34,9 +34,40 @@ import { teamSlots } from "./lineup/formations.js";
 import { deriveLeagueContexts } from "./ai/clubContext.js";
 import { keepValueToClub, valueToClub } from "./ai/evaluate.js";
 import {
-  LOAN_AI_MAX_AGE, LOAN_IN_MAX_PER_WINDOW, LOAN_MIN_SURPLUS,
-  ROSTER_SAFETY_FLOOR,
+  LOAN_AI_MAX_AGE, LOAN_DURATION_MULTIPLIER, LOAN_FEE_MIN, LOAN_IN_MAX_PER_WINDOW,
+  LOAN_MIN_SURPLUS, ROSTER_SAFETY_FLOOR, difficultyProfile,
 } from "./constants.js";
+
+/**
+ * What a loan costs the **user**, as against `computeLoanFee`'s club-blind
+ * figure. Two corrections, both user-facing price rules rather than changes to
+ * the market:
+ *
+ *  - the difficulty's `buyPriceScale`, exactly as `reservationPrice` and
+ *    `scoutedValue` take it on the buy side. Without it a loan is the one
+ *    acquisition route that ignores the difficulty entirely, so Brutal makes
+ *    buying 1.6x dearer and borrowing free — see the constant's own note about
+ *    a figure that ignores the tax reading as a bug rather than a difficulty.
+ *  - `LOAN_FEE_MIN`, because `trueTransferValue` is exactly 0 below
+ *    `VALUATION_OVR_FLOOR` and a fee is a fraction of it, so more than half the
+ *    world would otherwise be free to borrow.
+ *
+ * **One definition, used by the row, the affordability gate and the charge.** A
+ * quoted fee that isn't the fee actually taken out of the budget is the same
+ * class of bug as a button the action refuses.
+ */
+export function userLoanFee(
+  league: LeagueStore,
+  player: Player,
+  season: number,
+  seasons: 1 | 2 | 3,
+): number {
+  const scale = difficultyProfile(league.difficulty).buyPriceScale;
+  return Math.max(
+    Math.round(LOAN_FEE_MIN * LOAN_DURATION_MULTIPLIER[seasons]),
+    Math.round(computeLoanFee(player, season, seasons) * scale),
+  );
+}
 
 /** One borrowable player, with what a loan of a given length would cost. */
 export interface LoanTarget {
@@ -154,6 +185,14 @@ export function loanGateFor(
   const atCap = loansTakenThisWindow(league) >= LOAN_IN_MAX_PER_WINDOW;
 
   return (player, team, seasons) => {
+    // The user's own situation first. These two are true of *every* row, so
+    // checked last they never surface: the list is ranked by overall and its
+    // top rows are refused on price long before anything about the user is
+    // reached, which left a full squad reading as forty clubs rating their
+    // players too highly. A reason the user can act on outranks one he can't.
+    if (!hasRosterRoom(user)) return "Your squad is full";
+    if (atCap) return `You've agreed ${LOAN_IN_MAX_PER_WINDOW} loans this window`;
+
     if (loanOutlivesContract(player, season, seasons)) {
       const most = maxLoanSeasons(player, season);
       return most === 0
@@ -176,9 +215,11 @@ export function loanGateFor(
       return "His club rates him too highly to lend";
     }
 
-    if (!hasRosterRoom(user)) return "Your squad is full";
-    if (atCap) return `You've agreed ${LOAN_IN_MAX_PER_WINDOW} loans this window`;
-    const cost = computeLoanFee(player, season, seasons) + acquisitionWageCharge(league, player);
+    // Last, because it's the only user-side check that depends on the player.
+    // A club in the red therefore still can't surface it on an overall-ranked
+    // list, whose top rows fail on price first — the page says that once, above
+    // the table, rather than leaving the user's own finances invisible.
+    const cost = userLoanFee(league, player, season, seasons) + acquisitionWageCharge(league, player);
     if (cost > user.budget) return "You can't afford the fee";
     return null;
   };
@@ -246,7 +287,7 @@ export function searchLoanTargets(
       player,
       parentTid: team.tid,
       maxSeasons: maxLoanSeasons(player, ws.season),
-      fee: computeLoanFee(player, ws.season, seasons),
+      fee: userLoanFee(league, player, ws.season, seasons),
       available: reason === null,
       unavailableReason: reason,
     });
@@ -277,7 +318,7 @@ export function requestLoan(league: LeagueStore, pid: number, seasons: 1 | 2 | 3
 
   return executeLoan(
     league, pid, parent.tid, user.tid, seasons,
-    computeLoanFee(player, ws.season, seasons), ws.season, ws.window,
+    userLoanFee(league, player, ws.season, seasons), ws.season, ws.window,
   );
 }
 

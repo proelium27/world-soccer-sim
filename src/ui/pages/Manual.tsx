@@ -278,9 +278,9 @@ export function Manual() {
               finishing next to you.
             </li>
             <li>
-              <strong>What you pay</strong>. Asking prices are marked up or down for you. Selling
-              isn't affected, and neither is what anything is worth on paper, just the fee you're
-              asked for when you go and buy someone.
+              <strong>What you pay</strong>. Asking prices are marked up or down for you, and so are
+              loan fees. Selling isn't affected, and neither is what anything is worth on paper,
+              just the fee you're asked for when you go and get someone.
             </li>
             <li>
               <strong>Who'll sell to you</strong>. The best players at the best clubs are already off
@@ -2110,7 +2110,10 @@ export function Manual() {
             <strong>23 or under</strong> who <strong>isn&apos;t in its starting
             eleven</strong>, whose contract covers the loan, and who it can spare without leaving
             itself thin at his position &mdash; and only to a club he&apos;d be worth more to than
-            he is to them. You pay the flat fee up front and his wages for the whole loan.
+            he is to them. You pay the flat fee up front and his wages for the whole loan. The fee
+            is a fraction of what he&apos;d cost to buy outright, with a small minimum so borrowing
+            is never free, and it&apos;s marked up or down by your difficulty the same way an asking
+            price is.
           </p>
           <p>
             That last rule is the one that decides what you can get, and it isn&apos;t a dial

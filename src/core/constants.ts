@@ -2444,6 +2444,29 @@ export const LOAN_AI_MAX_AGE = 23;
  */
 export const LOAN_MIN_SURPLUS = 0.05;
 
+/**
+ * Floor under the loan fee the **user** is quoted and charged, before the
+ * duration multiplier. Not applied to AI↔AI loans, deliberately: `computeLoanFee`
+ * is shared with `runAILoanMarket`, which moves ~630 loans a season, so flooring
+ * it there would push real money between AI clubs and land on the weak-league
+ * solvency tripwire that `docs/transfer-mobility.md` documents. That is an
+ * audited change; this is a user-facing price rule, the same shape as
+ * `DifficultyProfile.buyPriceScale`.
+ *
+ * It exists because **`trueTransferValue` is exactly 0 for any player at or
+ * below `VALUATION_OVR_FLOOR` (45), and that is 55% of the world** — every
+ * multiplier in that function sits on a zero base, so potential and age can't
+ * lift it. A loan fee is a fraction of that value, so borrowing more than half
+ * the world's players costs literally nothing and the fee column reads "$0",
+ * which players report as a bug (2026-09-07).
+ *
+ * Sized to stay out of the way of the real curve rather than to be felt: at
+ * `LOAN_FEE_RATE` 0.08 it binds up to about ovr 48 (whose fee is ~$36k) and is
+ * irrelevant above that (ovr 52 is ~$202k). Raising it much further would
+ * flatten the gradient the fee formula exists to express.
+ */
+export const LOAN_FEE_MIN = 25_000;
+
 /** Most incoming loan offers shown for the user's listed players in a single window. */
 export const LOAN_OFFERS_MAX = 5;
 

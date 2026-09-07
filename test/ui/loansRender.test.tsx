@@ -169,6 +169,20 @@ describe("Loans page: bringing a player in", () => {
     expect(panel).not.toContain("Extend");
   });
 
+  it("says the club is in the red rather than letting the rows blame other clubs", () => {
+    // Affordability is the one user-side check that depends on which player it
+    // is, so it can't be hoisted in the gate — and on an overall-ranked list
+    // the top rows are refused on price first, so it never reaches a row.
+    const base = makeLeague(0, 1);
+    const league: LeagueStore = {
+      ...base,
+      teams: base.teams.map((t) =>
+        t.tid === base.meta.userTid ? { ...t, budget: -5_000_000 } : t),
+    };
+    const panel = card(render(league), "Loan a Player In");
+    expect(panel).toContain("You&#x27;re in the red");
+  });
+
   it("explains why a refused player is out of reach when you ask to see them", () => {
     // Every top-40-by-overall borrowable player is refused on price, which is
     // exactly why the panel filters to the available ones by default.

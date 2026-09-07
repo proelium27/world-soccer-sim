@@ -11,7 +11,9 @@ import { renewalsDue } from "../../src/core/contractRenewal.js";
 import { resolveXI } from "../../src/core/lineup/resolveXI.js";
 import { teamSlots } from "../../src/core/lineup/formations.js";
 import { acquisitionWageCharge } from "../../src/core/transfers/negotiation.js";
-import { LOAN_AI_MAX_AGE, LOAN_IN_MAX_PER_WINDOW } from "../../src/core/constants.js";
+import {
+  LOAN_AI_MAX_AGE, LOAN_FEE_MIN, LOAN_IN_MAX_PER_WINDOW, ROSTER_CAP,
+} from "../../src/core/constants.js";
 import {
   SUMMER_WINDOW_CLOSE_MATCHDAY, WINTER_WINDOW_OPEN_MATCHDAY,
 } from "../../src/core/calendar.js";
@@ -217,6 +219,80 @@ describe("a borrowed player is not the borrowing club's to dispose of", () => {
     expect(due.pids).not.toContain(pid);
     expect(due.refusingPids).not.toContain(pid);
     expect(borrowedPids(expiring, userTid).has(pid)).toBe(true);
+  });
+});
+
+describe("what a loan costs the user", () => {
+  const DIFFICULTIES = ["easy", "normal", "hard", "brutal"] as const;
+  const atDifficulty = (d: LeagueStore["difficulty"]): LeagueStore =>
+    ({ ...windowLeague(), difficulty: d });
+
+  it("is never free, on any difficulty", () => {
+    // trueTransferValue is exactly 0 at or below VALUATION_OVR_FLOOR (45) —
+    // every multiplier in it sits on a zero base — and that is 55% of the
+    // world, so without LOAN_FEE_MIN most of the loan market is free and the
+    // fee column reads "$0". Reported by a player, 2026-09-07.
+    for (const d of DIFFICULTIES) {
+      const rows = searchLoanTargets(atDifficulty(d), 1, { availableOnly: true });
+      expect(rows.length).toBeGreaterThan(0);
+      for (const r of rows) expect(r.fee).toBeGreaterThan(0);
+    }
+  });
+
+  it("rises with difficulty, so borrowing can't dodge the price lever", () => {
+    // A loan was the one acquisition route buyPriceScale never reached.
+    const feeFor = (d: LeagueStore["difficulty"], pid: number) =>
+      searchLoanTargets(atDifficulty(d), 1).find((t) => t.player.pid === pid)!.fee;
+    // Someone whose fee is above the floor, or every level reads identically.
+    const pricey = searchLoanTargets(atDifficulty("normal"), 1)
+      .find((t) => t.fee > LOAN_FEE_MIN * 4)!;
+    expect(pricey).toBeDefined();
+
+    const fees = DIFFICULTIES.map((d) => feeFor(d, pricey.player.pid));
+    expect(fees[0]).toBeLessThan(fees[1]);   // easy  < normal
+    expect(fees[1]).toBeLessThan(fees[2]);   // normal < hard
+    expect(fees[2]).toBeLessThan(fees[3]);   // hard  < brutal
+  });
+
+  it("charges exactly what the row quoted, and pays it to his club", () => {
+    for (const d of DIFFICULTIES) {
+      const league = atDifficulty(d);
+      const row = searchLoanTargets(league, 1, { availableOnly: true })[0];
+      const after = requestLoan(league, row.player.pid, 1);
+      const parentBefore = league.teams.find((t) => t.tid === row.parentTid)!.budget;
+      const parentAfter = after.teams.find((t) => t.tid === row.parentTid)!.budget;
+      expect(parentAfter - parentBefore).toBe(row.fee);
+    }
+  });
+});
+
+describe("a refusal names something the user can act on", () => {
+  // The list is ranked by overall and its top rows are refused on price, so a
+  // user-state reason checked last would never surface: a full squad used to
+  // read as forty clubs rating their players too highly.
+  it("says the squad is full rather than blaming the selling clubs", () => {
+    const base = windowLeague();
+    const tid = base.meta.userTid;
+    const donor = base.teams.find((t) => t.tid !== tid)!;
+    const full: LeagueStore = {
+      ...base,
+      teams: base.teams.map((t) => (t.tid === tid
+        ? { ...t, roster: [...t.roster, ...donor.roster].slice(0, ROSTER_CAP + 5) }
+        : t)),
+    };
+    const rows = searchLoanTargets(full, 1);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.unavailableReason === "Your squad is full")).toBe(true);
+  });
+
+  it("says the window cap is spent rather than blaming the selling clubs", () => {
+    let league = windowLeague();
+    for (let i = 0; i < LOAN_IN_MAX_PER_WINDOW; i++) {
+      league = requestLoan(league, firstAvailable(league).player.pid, 1);
+    }
+    const rows = searchLoanTargets(league, 1);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => /agreed \d+ loans this window/.test(r.unavailableReason ?? ""))).toBe(true);
   });
 });
 
