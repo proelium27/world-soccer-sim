@@ -185,6 +185,13 @@ export const FILE_WEIGHTS_SECONDS: Readonly<Record<string, number>> = {
   "test/core/transfers/clauseOffseason.test.ts": 167,
   "test/core/transfers/inboundOffers.test.ts": 154,
   "test/core/generate.test.ts": 55,
+  // Measured at ~50s locally rather than from a CI run, so it is entered
+  // unscaled and is an UNDER-estimate by roughly the 1.5x CI factor. Being low
+  // costs balance only, never correctness, and it is better than the 10s
+  // default this would otherwise take: most of the file's cost is the two
+  // whole-world builds and the intake sweeps, which do not shrink on CI.
+  // Re-take it from the next green run, the way the note above describes.
+  "test/core/progressionModel.test.ts": 50,
   "test/core/autopilot.test.ts": 141,
   "test/core/nationalManager.test.ts": 114,
   "test/core/ai/transferMarket.test.ts": 45,
