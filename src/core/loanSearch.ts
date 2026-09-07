@@ -210,6 +210,25 @@ export function loanGateFor(
     // only to a club he is worth meaningfully more to. No club-blind market
     // price is involved — comparing a club-relative keep value against one is
     // the category error that inverted the strength ladder (see loans.ts).
+    // He has to be getting a game, because that is what his club is lending him
+    // for. Same rule the AI half enforces (see runAILoanMarket), and it has to
+    // apply here too or the user is offered a deal no AI club could get — one
+    // that leaves the player exactly as benched as he already was, which is the
+    // opposite of why his club agreed. It also does the work an arbitrary
+    // minimum-value floor would have done on the list, and does it on the
+    // principle rather than on a number: the players it drops are the ones who
+    // would sit in your reserves.
+    //
+    // BEFORE the price test, and that is a copy decision rather than a
+    // behavioural one — a strong club fails both, and "he wouldn't get a game"
+    // is about the user's own squad and explains the short list, where "his
+    // club rates him too highly" is about somebody else and reads as bad luck.
+    // A player who really is only blocked on price still says so, since he
+    // passes this one.
+    if (player.ovr <= userCtx.posWeakestStarterOvr[player.pos]) {
+      return "He wouldn't get a game with you";
+    }
+
     const reservation = keepValueToClub(player, parentCtx);
     if (valueToClub(player, userCtx) < reservation * (1 + LOAN_MIN_SURPLUS)) {
       return "His club rates him too highly to lend";

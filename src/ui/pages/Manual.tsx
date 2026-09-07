@@ -2081,7 +2081,11 @@ export function Manual() {
             same deal he left with. AI clubs also loan players to each other in the background, and
             they stick strictly to real-football logic: <strong>only young players who aren't in
             their club's starting XI</strong> go out on loan. A starter is already getting his
-            minutes at home, so he's never loaned, whatever the numbers say. A club will let a
+            minutes at home, so he's never loaned, whatever the numbers say. The club taking him
+            has to be one that would <strong>actually play him</strong> &mdash; he has to be better
+            than the weakest man in their first eleven at his position. That's the whole point of
+            the move, and it's why a weak player can sit listed and draw no offers at all: nobody
+            wants to develop someone who'd be on their bench too. A club will let a
             prospect it rates highly go out, though, as long as someone else rates him more, so the
             players moving are genuinely ones worth watching rather than only the ones nobody wanted.
             Second-division clubs can't take a loan of a player good enough that the top flight would
@@ -2109,22 +2113,25 @@ export function Manual() {
             same ones the AI plays by: a club will only lend someone{" "}
             <strong>23 or under</strong> who <strong>isn&apos;t in its starting
             eleven</strong>, whose contract covers the loan, and who it can spare without leaving
-            itself thin at his position &mdash; and only to a club he&apos;d be worth more to than
-            he is to them. You pay the flat fee up front and his wages for the whole loan. The fee
+            itself thin at his position &mdash; only to a club he&apos;d be worth more to than
+            he is to them, and only if he&apos;d <strong>get into your team</strong>. That last
+            condition is the one that shapes the list: he has to be better than the weakest man in
+            your first eleven at his position, because a club lends a young player to get him games,
+            not to have him sit on someone else&apos;s bench. A strong enough squad will find
+            nobody offered at all. You pay the flat fee up front and his wages for the whole loan. The fee
             is a fraction of what he&apos;d cost to buy outright, with a small minimum so borrowing
             is never free, and it&apos;s marked up or down by your difficulty the same way an asking
             price is.
           </p>
           <p>
-            That last rule is the one that decides what you can get, and it isn&apos;t a dial
-            anyone set &mdash; it just falls out of what a player is worth to each club. Near the
-            top of the pyramid almost nobody improves your side enough for their club to part with
-            them, so the list is thin and the names are ordinary. Lower down it&apos;s a different
-            screen entirely: a second- or third-division club can borrow players who&apos;d walk
-            into its first eleven. Loans are how a small club punches up, which is exactly what
-            they&apos;re for in real football. The panel shows the players you can actually take by
-            default; turn the switch off to see everyone you looked at and the reason each club
-            said no.
+            That&apos;s what decides how good a loan you can get, and it isn&apos;t a dial anyone
+            set &mdash; it falls out of how strong your own eleven is. The better your squad, the
+            fewer players clear it: the very best sides in the world are offered nobody, a
+            mid-table top-flight club gets a short list, and a second- or third-division club can
+            borrow players who&apos;d walk straight into its team. Loans are how a small club
+            punches up, which is exactly what they&apos;re for in real football. The panel shows
+            the players you can actually take by default; turn the switch off to see everyone you
+            looked at and the reason each club said no.
           </p>
           <p>
             A borrowed player is <strong>yours to pick, not yours to keep</strong>. He shows up on

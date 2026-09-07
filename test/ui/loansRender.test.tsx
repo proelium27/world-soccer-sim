@@ -144,8 +144,21 @@ describe("Loans page renders", () => {
 });
 
 describe("Loans page: bringing a player in", () => {
+  /**
+   * A second-division club. A club is only offered players who would get into
+   * its team, so the generated default (tid 0, an English top-flight side) can
+   * borrow nobody — the mechanic working, but a fixture that shows nothing.
+   * Same cached world, different club in charge.
+   */
+  function borrower(): LeagueStore {
+    const base = makeLeague(0, 1);
+    const tier2 = new Set(base.competitions.filter((c) => c.tier === 2).map((c) => c.id));
+    const tid = base.teams.find((t) => tier2.has(t.compId))!.tid;
+    return { ...base, meta: { ...base.meta, userTid: tid } };
+  }
+
   it("lists borrowable players with their club and fee", () => {
-    const league = makeLeague(0, 1);
+    const league = borrower();
     const targets = searchLoanTargets(league, 1, { availableOnly: true });
     expect(targets.length).toBeGreaterThan(0);
 
@@ -155,7 +168,7 @@ describe("Loans page: bringing a player in", () => {
   });
 
   it("names the players in on loan and doesn't offer to extend them", () => {
-    const base = makeLeague(0, 1);
+    const base = borrower();
     const target = searchLoanTargets(base, 1, { availableOnly: true })[0];
     const league = requestLoan(base, target.player.pid, 2);
     expect(league).not.toBe(base);
@@ -184,9 +197,9 @@ describe("Loans page: bringing a player in", () => {
   });
 
   it("explains why a refused player is out of reach when you ask to see them", () => {
-    // Every top-40-by-overall borrowable player is refused on price, which is
-    // exactly why the panel filters to the available ones by default.
-    const league = makeLeague(0, 1);
+    // The panel filters to the available ones by default precisely because
+    // plenty of rows are refused — most often because he wouldn't get a game.
+    const league = borrower();
     const refused = searchLoanTargets(league, 1).filter((t) => !t.available);
     expect(refused.length).toBeGreaterThan(0);
     expect(refused[0].unavailableReason).toBeTruthy();

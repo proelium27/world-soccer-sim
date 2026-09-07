@@ -18,9 +18,25 @@ import {
   SUMMER_WINDOW_CLOSE_MATCHDAY, WINTER_WINDOW_OPEN_MATCHDAY,
 } from "../../src/core/calendar.js";
 
-/** Right after generation the summer window is open (matchdays 1-4). */
+/** The first club in the shallowest competition of the given tier. */
+function tidInTier(league: LeagueStore, tier: number): number {
+  const comps = new Set(league.competitions.filter((c) => c.tier === tier).map((c) => c.id));
+  return league.teams.find((t) => comps.has(t.compId))!.tid;
+}
+
+/**
+ * Right after generation the summer window is open (matchdays 1-4).
+ *
+ * The user is a SECOND-DIVISION club, not the generated default (tid 0, an
+ * English top-flight side). A club only borrows players who would get into its
+ * team, so the strongest clubs in the world can borrow nobody at all — that is
+ * the mechanic working, and it makes tid 0 a fixture that measures nothing.
+ * The world itself is still the cached `makeLeague(0, 1)` one; only which club
+ * the user manages moves, so no new fixture is generated.
+ */
 function windowLeague(seed = 1): LeagueStore {
-  return makeLeague(0, seed);
+  const base = makeLeague(0, seed);
+  return { ...base, meta: { ...base.meta, userTid: tidInTier(base, 2) } };
 }
 
 /** The first row a request would actually go through on. */
@@ -293,6 +309,34 @@ describe("a refusal names something the user can act on", () => {
     const rows = searchLoanTargets(league, 1);
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => /agreed \d+ loans this window/.test(r.unavailableReason ?? ""))).toBe(true);
+  });
+});
+
+describe("a loan has to get the player a game", () => {
+  it("won't offer anyone to a club whose XI he couldn't break into", () => {
+    // The whole purpose of a loan is minutes — progression's minutesFactor only
+    // bites during growth years — so a club is offered nobody it wouldn't play.
+    // Measured before this rule existed, 53% of loans produced zero appearances
+    // (scripts/loanMinutesProbe.ts); after it, 89% of loanees play.
+    const base = makeLeague(0, 1);
+    const league: LeagueStore = {
+      ...base, meta: { ...base.meta, userTid: tidInTier(base, 1) },
+    };
+    const user = league.teams.find((t) => t.tid === league.meta.userTid)!;
+    const byPid = new Map(league.players.map((p) => [p.pid, p]));
+    const xi = resolveXI(
+      user.roster.map((pid) => byPid.get(pid)!), teamSlots(user), user.starters,
+    );
+    const weakestStarter = Math.min(...xi.map((p) => p.ovr));
+
+    // Every player still offered beats somebody in the XI he'd be joining.
+    for (const t of searchLoanTargets(league, 1, { availableOnly: true })) {
+      expect(t.player.ovr).toBeGreaterThan(weakestStarter - 1);
+    }
+    // And the refusal says so rather than blaming the selling club.
+    const refused = searchLoanTargets(league, 1)
+      .filter((t) => t.unavailableReason === "He wouldn't get a game with you");
+    expect(refused.length).toBeGreaterThan(0);
   });
 });
 

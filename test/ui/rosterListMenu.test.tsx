@@ -89,12 +89,24 @@ describe("Roster List menu", () => {
 });
 
 describe("a player the club has in on loan", () => {
+  /**
+   * Managed from a second-division club: a club is only offered players who
+   * would get into its team, so the generated default (an English top-flight
+   * side) can borrow nobody. Same cached world, different club in charge.
+   */
+  const tier2 = new Set(base.competitions.filter((c) => c.tier === 2).map((c) => c.id));
+  const asBorrower: LeagueStore = {
+    ...base,
+    meta: { ...base.meta, userTid: base.teams.find((t) => tier2.has(t.compId))!.tid },
+  };
   /** Borrow the first available player, so the roster holds someone we don't own. */
   const borrowed = requestLoan(
-    base, searchLoanTargets(base, 1, { availableOnly: true })[0].player.pid, 2,
+    asBorrower,
+    searchLoanTargets(asBorrower, 1, { availableOnly: true })[0].player.pid,
+    2,
   );
   const pid = borrowed.activeLoans[0].pid;
-  const name = base.players.find((p) => p.pid === pid)!.name;
+  const name = asBorrower.players.find((p) => p.pid === pid)!.name;
 
   it("is marked on his row and dated by his loan, not his contract", () => {
     const html = render(borrowed);
