@@ -15,6 +15,72 @@ import { OVR_WEIGHTS } from "./players/templates.js";
 export const LEAGUE_BASE = 54;
 
 /**
+ * How many points every generated rating is lifted so the game reads on EA FC's
+ * scale rather than its own (2026-09-06, user ask).
+ *
+ * WHAT IT FIXES. Measured on a fresh world, a big-four top flight generated
+ * min/mean/max **50 / 64.5 / 81** against EA FC's Premier League at roughly
+ * **62 / 76 / 91** — about 11 points low at the mean and 9 at p90. The
+ * difference is presentational, not a balance problem: a 74-rated best player
+ * reads as mediocre to anyone who has played EA FC, where the same player would
+ * be an 85. After the shift a big-four top flight generates **61 / 75.5 / 92**.
+ *
+ * WHY THIS IS A RELABEL AND NOT A REBALANCE, which is the whole reason it ships
+ * without a dynasty audit. A uniform additive shift is an affine change of
+ * units, and every consumer of `ovr` is invariant to one:
+ *
+ *  - **The match sim cannot see it.** Composites z-normalise within each
+ *    competition, so adding a constant to everybody moves the mean and leaves
+ *    the sd — hence every z-score, hence every result — untouched. Verified:
+ *    `touchStats.test.ts`'s scoreline hash does not move.
+ *  - **Both money curves are differences from a floor.** Wages are
+ *    `WAGE_WEEKLY_COEFF * (ovr - WAGE_OVR_FLOOR)^3` and value is
+ *    `(ovr - VALUATION_OVR_FLOOR)^n + (ovr - VALUATION_ELITE_THRESHOLD)^2`, so
+ *    shifting those three floors with the ratings leaves every wage and fee
+ *    identical to the pound. Verified per player by `scripts/ovrScaleProbe.ts`.
+ *  - **Everything else that reads ovr reads a GAP** — the familiarity
+ *    penalties, `SECONDARY_POSITION_CUTOFF`, `slotValue`, the country ladder's
+ *    0.94-ovr-per-offset-point, Power Rankings' Elo-per-point,
+ *    `POSITION_OVR_CALIBRATION`, the scouting fog's half-widths. None move.
+ *
+ * So the change is this constant, the ~18 constants that name a POSITION on the
+ * ovr scale (each carries a back-reference to here), and a save migration. A
+ * constant that names a WIDTH or a WEIGHT must not move; the distinction is the
+ * only thing to get right, and `ovrScaleProbe.ts` is what proves it was.
+ *
+ * APPLIED TO `rollRating`'s OUTPUT, NOT TO THE GENERATION BASES, and that is
+ * deliberate. `base` is `LEAGUE_BASE` plus the country and division offsets, and
+ * `academyBase` feeds `YOUTH_BASE_FLOOR`'s softplus — a nonlinearity anchored at
+ * absolute zero, so shifting the bases would move which academies saturate on it
+ * and quietly re-tune the weakest leagues' youth. Shifting the output instead
+ * leaves the whole base-side arithmetic — the softplus, the academy anchors, the
+ * strength ladder, the division offsets — reading exactly as it did.
+ *
+ * NOT APPLIED TO THE `ABS` TIER, which stays on its absolute `ABS_LOW_MIN`..
+ * `ABS_LOW_MAX` floor. `ABS` marks the skills that are irrelevant at a position,
+ * and — checked against `GEN_OFFSETS` and `OVR_WEIGHTS` — every one of them
+ * carries **zero** ovr weight there (a GK's finishing, an outfielder's
+ * goalkeeping), so leaving them alone changes no ovr at all. It is also the more
+ * EA-like reading: outfielders there carry goalkeeping stats in the teens too.
+ *
+ * THE ONE PLACE IT IS NOT NEUTRAL IS THE CEILING. Ratings clamp at `RATING_MAX`
+ * (99) and the game's generational ceiling was already 95, so there is no room
+ * to shift it by 11 — see `GENERATIONAL_DAMPING_END`. The bottom moves the other
+ * way and in our favour: a shift lifts the weakest academies off the
+ * `RATING_MIN` clamp they were underflowing into, so slightly fewer ratings pin
+ * at 1. Both effects are counted by the probe rather than assumed.
+ *
+ * WHAT A SHIFT CANNOT DO is narrow the game's range. It spans 5→81 at
+ * generation against EA's ~47→91, so it is about twice as wide, and a shift
+ * preserves every gap by definition: English D1 sits 43.3 points above Serbian
+ * D3 before and after. The top flights land on EA and the deep tiers stay below
+ * anything EA models — which is the right trade, since EA has no third division
+ * in Serbia to be inconsistent with. Closing that gap means COMPRESSING the
+ * scale, which breaks every invariant listed above and is a genuine rebalance.
+ */
+export const OVR_SCALE_SHIFT = 11;
+
+/**
  * Half-range of per-team strength targets (pre-normalization magnitude).
  * Widened 7→9 alongside the LEAGUE_BASE/RATING_NOISE_SD retune above — a pure
  * LEAGUE_BASE shift alone raises the whole distribution uniformly but can't
@@ -119,7 +185,7 @@ export const DIVISION_2_BUDGET_SCALE = 0.6;
  * via `scripts/divisionAudit.ts` if it turns out too loose (barely reduces
  * the season-30 drift) or too tight (empties Division 2 of anyone decent).
  */
-export const DIVISION_2_REFUSAL_OVR_THRESHOLD = 70;
+export const DIVISION_2_REFUSAL_OVR_THRESHOLD = 70 + OVR_SCALE_SHIFT;
 
 /**
  * The same bar for a pyramid deeper than two, keyed by tier. A third-tier club
@@ -139,7 +205,13 @@ export const DIVISION_2_REFUSAL_OVR_THRESHOLD = 70;
  */
 const DIVISION_REFUSAL_OVR_BY_TIER: Record<number, number> = {
   2: DIVISION_2_REFUSAL_OVR_THRESHOLD,
-  3: 62,
+  // Shifted like every other position on the scale. Left at a bare 62 while
+  // tier 2 moved with OVR_SCALE_SHIFT, the gap between the two ceilings went
+  // from the designed 8 points to 19 — and measured on a fresh world, nine
+  // third-division players cleared the stale bar at GENERATION, where before it
+  // caught nobody until a career had developed. The sweep would have emptied
+  // third divisions upward far harder than intended.
+  3: 62 + OVR_SCALE_SHIFT,
 };
 
 /**
@@ -736,9 +808,9 @@ export const ROSTER_SAFETY_FLOOR = 18;
  */
 export const FREE_AGENT_CULL_MIN_AGE = 24;
 /** Career-peak ovr (best across his ratings history) at or below which he goes. */
-export const FREE_AGENT_CULL_MAX_PEAK_OVR = 65;
+export const FREE_AGENT_CULL_MAX_PEAK_OVR = 65 + OVR_SCALE_SHIFT;
 /** Potential at or below which he's judged never going to become useful. */
-export const FREE_AGENT_CULL_MAX_POT = 65;
+export const FREE_AGENT_CULL_MAX_POT = 65 + OVR_SCALE_SHIFT;
 
 /**
  * Unsigned free agents above which a save is treated as bloated, and gets culled
@@ -1054,8 +1126,8 @@ export const PROGRESSION_BIAS_SD_YOUNG = 3;
  * 100-season audit that Division 1's own mean still holds flat (61-64.5
  * throughout, no further compounding drift from tightening this).
  */
-export const GROWTH_DAMPING_START = 65;
-export const GROWTH_DAMPING_END = 80;
+export const GROWTH_DAMPING_START = 65 + OVR_SCALE_SHIFT;
+export const GROWTH_DAMPING_END = 80 + OVR_SCALE_SHIFT;
 export const GROWTH_DAMPING_FLOOR = 0.02;
 
 /**
@@ -1080,7 +1152,29 @@ export const GROWTH_DAMPING_FLOOR = 0.02;
  * undisturbed; his arrival is announced on the News Feed.
  */
 export const GENERATIONAL_CHANCE = 1 / 2500;
-export const GENERATIONAL_DAMPING_END = 95;
+/**
+ * THE ONE CONSTANT OVR_SCALE_SHIFT COULD NOT SHIFT CLEANLY, and the reason is
+ * worth knowing before anyone "fixes" it back to a bare `+ OVR_SCALE_SHIFT`.
+ *
+ * Every other position on the ovr scale took the shift and stayed inside the
+ * scale. This one did not have the room: it was 95 against a `RATING_MAX` of 99,
+ * so the faithful translation is 106 and there is nowhere to put it. Capping is
+ * the honest option, and it means a generational talent's headroom above
+ * `GROWTH_DAMPING_END` compresses from 15 points to 8 — the rarest legend now
+ * peaks in the mid-to-high 90s against a field topping out around 91, where
+ * before he reached ~95 against a field topping out around 80.
+ *
+ * That is a real behaviour change and it was taken deliberately rather than by
+ * lowering the shift: it is also the more EA-like arrangement, since EA's own
+ * best player is 91 and a 16-point gap to the rest of the world is not a thing
+ * that scale has ever had. The player-visible effect is confined to roughly one
+ * player every 30 seasons (GENERATIONAL_CHANCE is 1/2500 per player generated).
+ *
+ * The 99 is not the operative ceiling in practice anyway — his ratings clamp at
+ * RATING_MAX individually, so the rating clamp binds before the damping curve
+ * does.
+ */
+export const GENERATIONAL_DAMPING_END = Math.min(RATING_MAX, 95 + OVR_SCALE_SHIFT);
 export const GENERATIONAL_DAMPING_FLOOR = 0.6;
 export const GENERATIONAL_BIAS_MIN_Z = 1.5;
 
@@ -1163,13 +1257,14 @@ export interface ProgressionProfile {
  * **Every potential gate in the game is an absolute number, and an honest
  * forecast sits lower than an optimistic one, so the steady model slides the
  * whole distribution out from under all of them at once.** Measured on real
- * youth intakes across the world's academy anchors: median listed potential
- * **53 → 42**, share clearing `AI_PROSPECT_MIN_POT` (70) **18.7% → 7.8%**, share
- * clearing `RETIREMENT_PROSPECT_POT_THRESHOLD` (65) **24.7% → 11.7%**. Nothing
- * throws; AI clubs simply stop protecting the wonderkids `AI_PROSPECT_SLOTS`
- * exists to protect, and more young free agents wash out of the pool — which
- * are the two bugs #318 and the retirement rework were written to fix,
- * half-reopened by a setting that never mentions either.
+ * youth intakes across the world's academy anchors (on the pre-`OVR_SCALE_SHIFT`
+ * scale, where the bars read 70 and 65): median listed potential **53 → 42**,
+ * share clearing `AI_PROSPECT_MIN_POT` **18.7% → 7.8%**, share clearing
+ * `RETIREMENT_PROSPECT_POT_THRESHOLD` **24.7% → 11.7%**. Nothing throws; AI clubs
+ * simply stop protecting the wonderkids `AI_PROSPECT_SLOTS` exists to protect,
+ * and more young free agents wash out of the pool — which are the two bugs #318
+ * and the retirement rework were written to fix, half-reopened by a setting that
+ * never mentions either.
  *
  * The invariant that has to hold is the **share**, not the number. Both bars are
  * defined by what they are *for* — "genuine wonderkids, not every teenager",
@@ -1178,17 +1273,31 @@ export interface ProgressionProfile {
  * comparable-within-a-population-but-not-across-populations trap this codebase
  * has hit four times before. `STEADY_POTENTIAL_BAR_OFFSET` is therefore the
  * shift that reproduces the random model's share on the steady one's
- * distribution, measured rather than chosen: 70 → 58 and 65 → 53, i.e. the same
- * -12 on both, which is what a clean translation of the distribution looks like.
+ * distribution, measured rather than chosen. On the shipped scale that is
+ * **81 → 70 and 76 → 65**, and the two bars agreeing on one number is what a
+ * clean translation of the distribution looks like.
  *
- * Re-derive it with `scripts/progressionModelProbe.ts` section G if any of the
- * `STEADY_*` constants move.
+ * **It is NOT simply a constant in rating points, and `OVR_SCALE_SHIFT` proved
+ * it.** The gap between the two models' forecasts comes from the *noise*, which
+ * is measured in rating points and did not move when every rating was lifted
+ * +11 — so the offset should have been untouched, and it was −12 before the
+ * lift and re-derives to −11 after. The missing point is the `RATING_MAX`
+ * ceiling: the random model's forecast is the 75th percentile of sixteen noisy
+ * futures, so it is the one with an optimistic upper tail, and lifting the scale
+ * clips that tail against 99 more often than it clips steady's near-deterministic
+ * one. Measured, the median listed potential moved **+10 for random against +11
+ * for steady** — the distributions did not translate by quite the same amount.
+ *
+ * Re-derive it with `scripts/progressionModelProbe.ts` section G after any
+ * change to a `STEADY_*` constant **or to the rating scale**. The re-derivation
+ * reads a percentile off an integer-valued distribution, so expect it to wobble
+ * a point with sample size; take the value both bars agree on.
  */
 export function potentialBar(bar: number, model: ProgressionModel): number {
   return bar + PROGRESSION_PROFILES[model].potentialBarOffset;
 }
 
-export const STEADY_POTENTIAL_BAR_OFFSET = -12;
+export const STEADY_POTENTIAL_BAR_OFFSET = -11;
 
 /**
  * `"steady"`'s own age curve. Same control-point shape as `BASE_AGE_CURVE` and
@@ -1455,7 +1564,7 @@ export const RETIREMENT_NOTABLE_LIMIT = 15;
  * (a script like scripts/retirementAudit.ts) before loosening either bar: the
  * retirement rate is itself tuned and moves these projections.
  */
-export const RETIREE_ARCHIVE_MIN_PEAK_OVR = 70;
+export const RETIREE_ARCHIVE_MIN_PEAK_OVR = 70 + OVR_SCALE_SHIFT;
 export const RETIREE_ARCHIVE_MIN_APPEARANCES = 200;
 /**
  * Raised 2,000 -> 20,000 on 2026-08-22, once splitting the archive into its own
@@ -1506,7 +1615,7 @@ export const RETIREE_ARCHIVE_LIMIT = 20_000;
  * 80 ≈ 84.2k, 85 ≈ 119.5k, 90 ≈ 163.5k, 99 ≈ 268k.
  */
 export const WAGE_WEEKLY_MIN = 1_000;
-export const WAGE_OVR_FLOOR = 40;
+export const WAGE_OVR_FLOOR = 40 + OVR_SCALE_SHIFT;
 export const WAGE_WEEKLY_COEFF = 1.3;
 /** Per-signing wage spread: two same-ovr players can differ by up to ±15%. */
 export const WAGE_VARIATION = 0.15;
@@ -1736,7 +1845,7 @@ export const SCOUT_POT_FOG_SHIFT_FRACTION = 0.5;
  * potential gap, before age/potential/contract multipliers:
  * 65 ~= 35M, 70 ~= 57M, 75 ~= 84M, 80 ~= 117M, 85 ~= 156M, 90 ~= 201M.
  */
-export const VALUATION_OVR_FLOOR = 45;
+export const VALUATION_OVR_FLOOR = 45 + OVR_SCALE_SHIFT;
 /**
  * Rescaled 56_000 -> 32_000 on 2026-08-08 (see the elite constants below for
  * the matching change at the top of the curve).
@@ -1785,7 +1894,7 @@ export const VALUATION_CONTRACT_YEAR_BONUS_CAP = 0.4;
  * PROTECTED_STAR_* constants below), the way a top club would never sell its
  * best player at any price.
  */
-export const VALUATION_ELITE_THRESHOLD = 76;
+export const VALUATION_ELITE_THRESHOLD = 76 + OVR_SCALE_SHIFT;
 /**
  * Softened 2026-08-08 (was COEFF 11_000_000 / EXPONENT 2.5). The old curve was
  * so steep it *saturated*: at ovr 80 the elite term alone was $352M, so every
@@ -1830,7 +1939,7 @@ export const MAX_TRANSFER_VALUE = 350_000_000;
  *   better in a tier-1 league last season (a strong second-division finish
  *   doesn't take a player off the market).
  */
-export const PROTECTED_STAR_OVR = 80;
+export const PROTECTED_STAR_OVR = 80 + OVR_SCALE_SHIFT;
 export const PROTECTED_STAR_TOP_FINISH = 4;
 
 /**
@@ -1922,7 +2031,12 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyProfile> = {
     budgetScale: 1.35,
     academyOffset: 4,
     buyPriceScale: 0.85,
-    protectedStarOvr: 85,
+    // Offsets from PROTECTED_STAR_OVR rather than absolute bars, so the four
+    // levels keep their intended ORDER when the rating scale moves. Written
+    // out, only `normal` tracked the constant and OVR_SCALE_SHIFT inverted the
+    // ladder outright -- easy's bar (85) ended up BELOW normal's (91), so easy
+    // withheld more players than normal rather than fewer.
+    protectedStarOvr: PROTECTED_STAR_OVR + 5,
     protectedStarTopFinish: 1,
     fogScale: 0.5,
     boardPatience: 1.7,
@@ -1946,7 +2060,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyProfile> = {
     budgetScale: 0.8,
     academyOffset: -3,
     buyPriceScale: 1.3,
-    protectedStarOvr: 78,
+    protectedStarOvr: PROTECTED_STAR_OVR - 2,
     protectedStarTopFinish: 5,
     fogScale: 1.25,
     boardPatience: 0.75,
@@ -1958,7 +2072,7 @@ export const DIFFICULTIES: Record<Difficulty, DifficultyProfile> = {
     budgetScale: 0.6,
     academyOffset: -6,
     buyPriceScale: 1.6,
-    protectedStarOvr: 76,
+    protectedStarOvr: PROTECTED_STAR_OVR - 4,
     protectedStarTopFinish: 6,
     fogScale: 1.5,
     boardPatience: 0.55,
@@ -2134,8 +2248,8 @@ export const AI_NEED_MAX = 1.8;
  * The band is set so a bottom-of-a-weak-league squad sits near 0 and a genuine
  * superclub near 1, with typical top-flight sides spread across the middle.
  */
-export const STATURE_STRENGTH_LO = 55;
-export const STATURE_STRENGTH_HI = 78;
+export const STATURE_STRENGTH_LO = 55 + OVR_SCALE_SHIFT;
+export const STATURE_STRENGTH_HI = 78 + OVR_SCALE_SHIFT;
 export const STATURE_W_STRENGTH = 0.65;
 export const STATURE_W_HYPE = 0.35;
 
@@ -2160,9 +2274,9 @@ export const STATURE_W_HYPE = 0.35;
  * will not drop down. Big enough a step down and he refuses outright.
  */
 /** Below this ovr a player is indifferent to club size — he just wants to play. */
-export const PLAYER_WILL_CARE_FLOOR = 62;
+export const PLAYER_WILL_CARE_FLOOR = 62 + OVR_SCALE_SHIFT;
 /** At/above this ovr he weighs club stature at full strength. */
-export const PLAYER_WILL_CARE_CEILING = 78;
+export const PLAYER_WILL_CARE_CEILING = 78 + OVR_SCALE_SHIFT;
 /**
  * How hard a step down bites. A fully-caring player looking at a club a full
  * 1.0 of stature below his own has the buyer's valuation scaled by
@@ -2336,7 +2450,7 @@ export const BONUS_GOAL_RATE_BY_POS: Record<string, number> = {
   GK: 0, CB: 0.023, FB: 0.037, DM: 0.075, CM: 0.156, AM: 0.279, W: 0.274, ST: 0.550,
 };
 export const BONUS_GOAL_OVR_SLOPE = 0.004;
-export const BONUS_GOAL_OVR_REFERENCE = 65;
+export const BONUS_GOAL_OVR_REFERENCE = 65 + OVR_SCALE_SHIFT;
 
 /**
  * How likely a SUGGESTED bonus should be to pay out.
@@ -2701,7 +2815,7 @@ export const AWARD_MIN_APPEARANCES = 19;
  * 25-ovr gap is worth 1.5, ~18-19 goals equivalent — close to a realistic season's floor rather
  * than dwarfing it.
  */
-export const AWARD_OVR_BASELINE = 65;
+export const AWARD_OVR_BASELINE = 65 + OVR_SCALE_SHIFT;
 export const AWARD_OVR_WEIGHT = 0.06;
 
 /**
@@ -3274,7 +3388,7 @@ export const NEWS_BALLON_DOR_PLACINGS = 3;
  * it. A squad player quietly becoming a full-back in another country is not
  * news; an established starter changing what he is, is.
  */
-export const NEWS_POSITION_CHANGE_OVR = 72;
+export const NEWS_POSITION_CHANGE_OVR = 72 + OVR_SCALE_SHIFT;
 
 /* ────────────────────────────────────────────────────────────────────────
  * Continental Cup (cross-country knockout tournament)
@@ -4282,7 +4396,7 @@ export const CONFEDERATION_CUP_MIN_NATIONS = 4;
  * great keeper now has a case at all, where before he had a maximum annual
  * haul of a World XI slot plus a Team of the Season slot.
  */
-export const GOAT_OVR_BASELINE = 70;
+export const GOAT_OVR_BASELINE = 70 + OVR_SCALE_SHIFT;
 export const GOAT_PEAK_WEIGHT = 6;
 export const GOAT_PRIME_WEIGHT = 1.5;
 export const GOAT_LONGEVITY_WEIGHT = 4;
@@ -4757,7 +4871,7 @@ export const AI_PROSPECT_SLOTS = 5;
  * would spend all five slots on filler and still bin the player worth keeping.
  */
 export const AI_PROSPECT_MAX_AGE = PROSPECT_AGE_MAX;
-export const AI_PROSPECT_MIN_POT = 70;
+export const AI_PROSPECT_MIN_POT = 70 + OVR_SCALE_SHIFT;
 
 /**
  * The user's youth intake is a TRIAL GROUP he chooses from, not a squad handed

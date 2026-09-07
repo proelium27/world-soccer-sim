@@ -88,6 +88,12 @@ export interface PlayerEdit {
   clearInjury?: boolean;
   /** Lift a league ban outright, along with the yellow tally behind it. */
   clearSuspension?: boolean;
+  /**
+   * Freeze (true) or resume (false) this player's development — see
+   * `Player.ratingsLocked`. Omitted leaves the current setting alone, so an
+   * edit that says nothing about the lock can't clear one.
+   */
+  ratingsLocked?: boolean;
 }
 
 /**
@@ -124,6 +130,10 @@ export function applyPlayerEdit(
       injury: edit.clearInjury ? null : p.injury,
       suspension: edit.clearSuspension ? null : p.suspension,
       yellowCount: edit.clearSuspension ? 0 : p.yellowCount,
+      // Normalized to true-or-absent rather than stored as `false`, so "absent
+      // means unlocked" stays literally true of every player in the save and
+      // not just of the ones nobody has edited.
+      ratingsLocked: (edit.ratingsLocked ?? p.ratingsLocked) ? true : undefined,
     };
   });
 }

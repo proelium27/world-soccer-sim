@@ -4,6 +4,10 @@ import { migrateLeague } from "../../src/db/migrate.js";
 import { mulberry32 } from "../../src/engine/rng.js";
 import { buildCompetitionSchedule, type LeagueStore } from "../../src/core/leagueState.js";
 import { simThrough } from "../../src/core/simThrough.js";
+// simThrough HALTS before the user's own cup final, so one call finishes a
+// season only when his club happens not to reach one. playSeason loops until
+// the offseason and is byte-identical for a seed that never halts.
+import { playSeason } from "../helpers/offseasonLeague.js";
 import { simOffseason } from "../../src/core/offseason.js";
 import { HYPE_INITIAL, SCOUTING_SPEND_DEFAULT } from "../../src/core/constants.js";
 import { generateTwoDivisionLeague } from "../../src/core/league/generate.js";
@@ -306,7 +310,7 @@ describe("migrateLeague", () => {
     // reconstructed later, because retirement plus the capped archive delete
     // the player outright.
     const rng = mulberry32(21);
-    const league = simOffseason(simThrough(makeLeague(0, 21), "season", rng), rng);
+    const league = simOffseason(playSeason(makeLeague(0, 21), rng), rng);
     const entry = league.seasonHistory.at(-1)!;
     expect(entry.awardWinners!.length).toBeGreaterThan(0);
 
@@ -333,14 +337,14 @@ describe("migrateLeague", () => {
 
   it("leaves award winners a save already recorded exactly as they are", () => {
     const rng = mulberry32(22);
-    const league = simOffseason(simThrough(makeLeague(0, 22), "season", rng), rng);
+    const league = simOffseason(playSeason(makeLeague(0, 22), rng), rng);
     const before = league.seasonHistory.at(-1)!.awardWinners!;
     expect(migrateLeague(league).seasonHistory.at(-1)!.awardWinners).toEqual(before);
   });
 
   it("backfills compId/divisionConvergence on old-save teams, and a competitions table on a pre-refactor save", () => {
     const rng = mulberry32(12);
-    const league = simOffseason(simThrough(createEnglandOnlyLeagueState(0, mulberry32(11)), "season", rng), rng);
+    const league = simOffseason(playSeason(createEnglandOnlyLeagueState(0, mulberry32(11)), rng), rng);
     // Simulate a save from before the second division / competitions
     // refactor: teams have legacy `division` (not `compId`), history entries
     // have `divisionsByTid` and a [D1, D2] awards tuple with a top-level

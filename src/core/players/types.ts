@@ -165,4 +165,17 @@ export interface Player {
    * record: nothing here feeds progression or valuation.
    */
   intl?: IntlCareer;
+  /**
+   * God Mode: freeze this player's development. While set, `progressPlayer`
+   * leaves his ratings, ovr, listed position and potential exactly where they
+   * are — no growth, no age decline — for every offseason until it is cleared.
+   *
+   * It stops *simulated* drift only. A God Mode edit still applies to a locked
+   * player (the lock is not a write guard), and everything else about him —
+   * contracts, injuries, transfers, retirement — carries on as normal.
+   *
+   * Absent = unlocked, which is what every player in a save predating this is,
+   * so there is nothing for `migrate.ts` to backfill.
+   */
+  ratingsLocked?: boolean;
 }

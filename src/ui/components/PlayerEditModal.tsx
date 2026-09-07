@@ -29,6 +29,7 @@ export function PlayerEditModal({ player, onClose }: { player: Player; onClose: 
   const [ratings, setRatings] = useState({ ...player.ratings });
   const [clearInjury, setClearInjury] = useState(false);
   const [clearBan, setClearBan] = useState(false);
+  const [ratingsLocked, setRatingsLocked] = useState(player.ratingsLocked === true);
 
   // Close on Escape, matching the app's other click-away popovers.
   useEffect(() => {
@@ -49,6 +50,7 @@ export function PlayerEditModal({ player, onClose }: { player: Player; onClose: 
       ratings,
       clearInjury: player.injury ? clearInjury : undefined,
       clearSuspension: isSuspended(player) ? clearBan : undefined,
+      ratingsLocked,
     };
     await editPlayerAction(player.pid, edit);
     onClose();
@@ -120,6 +122,25 @@ export function PlayerEditModal({ player, onClose }: { player: Player; onClose: 
               />
             </div>
           ))}
+        </div>
+
+        {/* Staged like the two clear-this checkboxes below rather than flipped
+            live, because it saves with the rest of the edit. */}
+        <div className="form-check mb-3">
+          <input
+            type="checkbox"
+            className="form-check-input"
+            id="gm-lock-ratings"
+            checked={ratingsLocked}
+            onChange={(e) => setRatingsLocked(e.target.checked)}
+          />
+          <label className="form-check-label" htmlFor="gm-lock-ratings">
+            Lock ratings
+            <span className="d-block text-muted small">
+              He stops developing: these ratings, his overall and his potential stay put every
+              offseason until you unlock him. Everything else about him carries on as normal.
+            </span>
+          </label>
         </div>
 
         {player.injury && (

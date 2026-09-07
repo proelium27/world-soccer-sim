@@ -247,6 +247,18 @@ export function estimatePotential(
 /**
  * Season-end rating movement (see stepRatings) followed by a fresh potential
  * estimate off the new ratings. Does not mutate the input.
+ *
+ * `player.ratingsLocked` (God Mode) freezes the outcome, not the work: the rng
+ * draws are spent exactly as they would have been and only the result is
+ * discarded. That is the whole reason the branch sits at the return rather than
+ * at the top — the shared stream's draw count is load-bearing, so an early exit
+ * would shift every player generated after this one and make one locked player
+ * silently re-roll the rest of the world.
+ *
+ * A locked player still gets his snapshot appended, carrying the frozen values.
+ * `hist` is what the OVR chart plots and what `ovrDuringSeason` reads for the
+ * awards, so skipping it would leave a hole in his career rather than a flat
+ * line through it.
  */
 export function progressPlayer(
   rng: () => number,
@@ -276,10 +288,22 @@ export function progressPlayer(
   // He trains as what he currently is, so the rating step reads his old
   // position; only once the season's development has landed do we ask whether
   // it has made him something else.
-  const ratings = stepRatings(rng, profile, player.ratings, age, player.pos, minutesFactor, player.pid, player.heightCm);
-  const pos = changedPosition(player, ratings) ?? player.pos;
-  const ovr = computeOvr(pos, ratings, player.heightCm);
-  const potential = estimatePotential(rng, ratings, ovr, age, pos, player.heightCm, player.pid, model);
+  const stepped = stepRatings(
+    rng, profile, player.ratings, age, player.pos, minutesFactor, player.pid, player.heightCm,
+  );
+  const steppedPos = changedPosition(player, stepped) ?? player.pos;
+  const steppedOvr = computeOvr(steppedPos, stepped, player.heightCm);
+  const steppedPotential = estimatePotential(
+    rng, stepped, steppedOvr, age, steppedPos, player.heightCm, player.pid, model,
+  );
+
+  // Every draw above has now been spent. From here on a locked player simply
+  // keeps what he already had.
+  const locked = player.ratingsLocked === true;
+  const ratings = locked ? player.ratings : stepped;
+  const pos = locked ? player.pos : steppedPos;
+  const ovr = locked ? player.ovr : steppedOvr;
+  const potential = locked ? player.potential : steppedPotential;
 
   // Career peak, kept as a running maximum rather than re-derived from `hist`
   // by everyone who wants it. Compared against the snapshot being appended

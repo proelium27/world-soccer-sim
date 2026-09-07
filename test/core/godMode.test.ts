@@ -143,6 +143,35 @@ describe("applyPlayerEdit", () => {
     expect(out[0].injury).toBeNull();
   });
 
+  it("locks and unlocks ratings, and leaves the setting alone when the edit is silent", () => {
+    const locked = applyPlayerEdit([player()], 1, 4, { ratingsLocked: true });
+    expect(locked[0].ratingsLocked).toBe(true);
+
+    // An edit that says nothing about the lock must not clear one — the modal
+    // sends a full PlayerEdit, but the one-click toggles send only this field.
+    const stillLocked = applyPlayerEdit(locked, 1, 4, { potential: 90 });
+    expect(stillLocked[0].ratingsLocked).toBe(true);
+
+    const unlocked = applyPlayerEdit(locked, 1, 4, { ratingsLocked: false });
+    expect(unlocked[0].ratingsLocked).toBeUndefined();
+  });
+
+  it("leaves an unlocked player's flag absent rather than false", () => {
+    // "Absent means unlocked" is the invariant migrate.ts leans on to need no
+    // backfill; writing `false` would make it merely usually true.
+    const out = applyPlayerEdit([player()], 1, 4, { potential: 80 });
+    expect(out[0].ratingsLocked).toBeUndefined();
+  });
+
+  it("still applies a rating edit to a locked player", () => {
+    // The lock stops the simulation, not the sandbox.
+    const locked = applyPlayerEdit([player()], 1, 4, { ratingsLocked: true });
+    const out = applyPlayerEdit(locked, 1, 4, { ratings: { finishing: 99 } });
+    expect(out[0].ratings.finishing).toBe(99);
+    expect(out[0].ovr).toBe(computeOvr("ST", { ...RATINGS, finishing: 99 }, 180));
+    expect(out[0].ratingsLocked).toBe(true);
+  });
+
   it("leaves other players untouched and is immutable", () => {
     const a = player();
     const out = applyPlayerEdit([a], 1, 4, { name: "B" });

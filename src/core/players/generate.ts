@@ -8,7 +8,8 @@ import { estimatePotential } from "./progression.js";
 import { gaussian, hashInts, mulberry32 } from "../../engine/rng.js";
 import {
   TIER_OFFSET, RATING_NOISE_SD, ABS_LOW_MIN, ABS_LOW_MAX,
-  RATING_MIN, RATING_MAX, POSITION_RATING_SPREAD, type ProgressionModel,
+  RATING_MIN, RATING_MAX, POSITION_RATING_SPREAD, OVR_SCALE_SHIFT,
+  type ProgressionModel,
 } from "../constants.js";
 import { seasonSalaryForOvr } from "../contracts.js";
 import { emptyCareerSummary } from "./careerSummary.js";
@@ -26,12 +27,29 @@ const clampRating = (x: number): number =>
  * carries no weight in any OVR row, so scaling it would move nothing but the
  * cosmetic value of a striker's goalkeeping.
  */
+/**
+ * The single choke point for every generated rating, and therefore where
+ * OVR_SCALE_SHIFT is applied — see that constant for why the shift lands on the
+ * output here rather than on `base` (the bases feed YOUTH_BASE_FLOOR's softplus
+ * and the country/division ladders, all of which must keep reading as they do).
+ *
+ * The `ABS` tier deliberately does NOT take the shift: it is the floor for
+ * skills that are irrelevant at a position, and every such skill carries zero
+ * weight in that position's OVR row, so leaving it alone moves no ovr.
+ *
+ * The shift is added inside `clampRating`, not around it, so the [1, 99] bounds
+ * still hold. That is also the one place the shift is not a clean +11: it lifts
+ * the weakest academies off the floor they were underflowing into, and pushes a
+ * small tail of elite ratings into the ceiling.
+ */
 function rollRating(rng: () => number, tier: Tier, base: number, spread: number): number {
   if (tier === "ABS") {
     return clampRating(ABS_LOW_MIN + rng() * (ABS_LOW_MAX - ABS_LOW_MIN));
   }
   const offset = TIER_OFFSET[tier];
-  return clampRating(base + offset + gaussian(rng) * RATING_NOISE_SD * spread);
+  return clampRating(
+    base + offset + gaussian(rng) * RATING_NOISE_SD * spread + OVR_SCALE_SHIFT,
+  );
 }
 
 export function generatePlayer(

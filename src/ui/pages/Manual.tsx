@@ -153,9 +153,11 @@ export function Manual() {
             If you don't have a roster file, the "Download Real Rosters" button next to Import gets
             you one covering every league in the game. It's a separate download rather than part of
             the game, which is why it's a button that fetches it instead of something already built
-            in. Two things worth knowing before you look at the squads: the best players come out
-            around 80 rather than 90, because ratings are rescaled onto the spread this game is
-            tuned for and the ordering matters more than the absolute numbers; and imported clubs
+            in. Two things worth knowing before you look at the squads: ratings are rescaled onto this
+            game's own spread rather than copied across, so the ordering is what carries over and
+            the exact numbers can shift &mdash; in a fully covered top division they now land very
+            close to the ratings you'd expect, though a club in a division the file only partly
+            covers can read lower; and imported clubs
             don't show a crest, since a crest belongs to a team slot rather than a club name and
             would otherwise end up on the wrong team. Colors do carry over. If you'd rather have a
             file made to your own description, the "Copy AI Prompt to Customize" button beside it
@@ -1427,19 +1429,34 @@ export function Manual() {
           <p>
             <strong>OVR</strong> is a position-weighted blend of those ratings. A striker's OVR
             leans on finishing and speed, a center back's on tackling, positioning, and strength.
-            The scale is deliberately tight:
+            In a top division it reads roughly like this:
           </p>
           <ul>
-            <li><strong>65</strong>. An average starter.</li>
-            <li><strong>70</strong>. A good starter.</li>
-            <li><strong>75</strong>. Usually a team's best player.</li>
-            <li><strong>80&ndash;85</strong>. A league-wide elite player.</li>
-            <li><strong>90+</strong>. A rare, generational outlier.</li>
+            <li><strong>76</strong>. An average starter.</li>
+            <li><strong>81</strong>. A good starter.</li>
+            <li><strong>86</strong>. Usually a team's best player.</li>
+            <li><strong>91&ndash;96</strong>. A league-wide elite player.</li>
+            <li><strong>97+</strong>. A rare, generational outlier.</li>
           </ul>
           <p>
+            Those numbers should feel familiar if you've played the big licensed football games,
+            and that's on purpose &mdash; the whole scale was lifted 11 points so it reads the way
+            you expect. A top-flight squad now runs from the low 60s up to the low 90s, where it
+            used to run from about 50 to 81. Nothing else moved with it: wages, transfer fees,
+            match results and every rule in the game were shifted by the same amount at the same
+            time, so a player who was worth £40M is still worth £40M and a season that finished
+            with 82 points still finishes with 82 points. Only the number on his card changed.
+          </p>
+          <p>
+            One consequence worth knowing: the lower you go, the further the game runs below what
+            those games cover. A third division here sits in the 30s and 40s, because this world
+            has twelve countries and three divisions each &mdash; a lot of football that a game
+            built around the top flights never has to put a number on.
+          </p>
+          <p>
             <strong>An OVR means the same thing wherever a player plays.</strong> The weights are
-            different for every position, but the scale they land on isn't: a 78 full back is exactly
-            as rare as a 78 striker, and every position has the same shot at producing your club's
+            different for every position, but the scale they land on isn't: an 89 full back is exactly
+            as rare as an 89 striker, and every position has the same shot at producing your club's
             best player. That's worth saying out loud because it used to be false. A position whose
             rating leaned hardest on the handful of skills it's generated best at read several points
             high, so strikers and keepers filled the top of every list and full backs and central
@@ -2486,7 +2503,7 @@ export function Manual() {
           <p>Think like a real sporting director:</p>
           <ul>
             <li><strong>Age is an asset class.</strong> A 21-year-old and a 29-year-old at the same OVR are totally different buys. The young one holds his resale value (and might still grow), while the veteran loses value every season. Buy young, sell before the decline.</li>
-            <li><strong>Watch the wage bill, not just fees.</strong> Wages climb steeply with OVR and come out of your budget up front. A squad of 80s can out-wage your income even if you never pay a single transfer fee, and the Finance page shows you exactly where you'll land.</li>
+            <li><strong>Watch the wage bill, not just fees.</strong> Wages climb steeply with OVR and come out of your budget up front. A squad of 90s can out-wage your income even if you never pay a single transfer fee, and the Finance page shows you exactly where you'll land.</li>
             <li><strong>Sell into demand.</strong> Incoming offers come from clubs that actually need your player, and their first bid is rarely their best. Counter once or twice before you accept, but greedy counters end talks.</li>
             <li><strong>Decide your scouting spend a year ahead.</strong> It sharpens valuations, target rankings, and potential estimates, but you set it in the offseason and it's locked for the season. So if you're planning a busy transfer year, budget for scouting the offseason before, and dial it back for a quiet one.</li>
             <li><strong>Potential is a forecast, not a fact.</strong> Most players fall short of it. Paying a big potential premium is a real gamble, and that's the game working as intended.</li>
@@ -2690,6 +2707,7 @@ export function Manual() {
             <li><strong>Manage any club.</strong> The <em>God Mode</em> page (it shows up in the sidebar once the switch is on) opens on a Switch Club tab. Pick any club in the world and take charge of it on the spot, no job offer needed and no waiting for the offseason. The club you leave goes straight to the AI, its youth academy graduates onto the senior squad on the way out, and any transfer talks you were holding are dropped. You arrive at the new club knowing its players' ratings but not their ceilings, same as taking a job normally. It goes in your career record as a spell like any other, and the board there starts you on a fresh slate.</li>
             <li><strong>Manage any country.</strong> The same page has a Switch Country tab. Take charge of any national team in the world without waiting for a federation to come calling, and step down again whenever you like. Only countries with enough players born into your world to name a squad are listed, since the rest have no team to manage. The country you leave goes back to the AI and picks its own eleven again from the squad you named, the new one starts you on a fresh slate with its federation, and your club job carries on untouched. If a campaign is already under way you inherit it as it stands. In a spectator save there's nobody for a federation to appoint, so take a club first.</li>
             <li><strong>Edit any player.</strong> Open any player's profile and hit <em>Edit</em>. Change every one of his 14 ratings (OVR recomputes as you go), his potential, name, nationality, age, position, height, and his contract wage and length. You can also clear an injury outright.</li>
+            <li><strong>Lock a player's ratings.</strong> Freeze a player where he is and the offseason stops moving him: no growth, no decline with age, and his overall and potential hold too. There's a <em>Lock ratings</em> button on his profile, a checkbox in the edit window, and a Lock button on every row of the Roster Builder if you're doing a whole squad. Everything else about him carries on as normal — he still plays, gets injured, signs contracts, moves clubs and eventually retires. Unlock him and he picks up developing again from wherever you left him. The lock is saved with the game, so it stays put if you switch God Mode back off, and his profile says so.</li>
             <li><strong>Move players freely.</strong> From a player's profile, send him to any club instantly, with no fee, no budget check, and no cap, or release him to free agency.</li>
             <li><strong>Create players.</strong> The <em>God Mode</em> page has a Create Player tool. Build a player from scratch and drop him onto any club or leave him a free agent.</li>
             <li><strong>Build any club's roster.</strong> The same page lets you pick any club and add, move, or release its players directly.</li>
