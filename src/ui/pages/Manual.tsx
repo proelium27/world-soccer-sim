@@ -1577,8 +1577,9 @@ export function Manual() {
           </p>
           <p>
             <strong>Steady careers.</strong> The other setting. Everything above still applies
-            &mdash; the same age curve, the same physical-before-technical decline, the same
-            retirement rules, the same generational talents &mdash; but the summer dice are gone.
+            &mdash; physical ratings still go before technical ones, keepers still last longest,
+            the retirement rules are unchanged, generational talents still turn up &mdash; but the
+            summer dice are gone and the shape of the arc is drawn differently.
             A player improves through his early twenties, holds through his peak years, and starts
             falling away from about thirty, dropping faster every year after that. He'll still
             drift a point either way from one season to the next, but he won't lurch: nobody adds
