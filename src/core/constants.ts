@@ -1105,10 +1105,11 @@ export const POTENTIAL_SIM_PERCENTILE = 0.75;
  * How a save develops its players. `"random"` is the model the game has always
  * run: a shared per-group "form" roll every season, big enough that a squad
  * player can genuinely break out or collapse in one summer. `"steady"` is the
- * alternative added 2026-09-07 on player request — the same age curve shape
- * and the same minutes nudge, but with the per-season dice turned down so far
- * that a career reads as one continuous arc: grow through the early twenties,
- * hold through the peak years, decline from thirty at an accelerating rate.
+ * alternative added 2026-09-07 on player request — the same development model
+ * and the same minutes nudge, with the per-season dice turned down and the age
+ * curve redrawn, so that a career reads as one continuous arc: grow through the
+ * early twenties, hold through the peak years, decline from thirty at an
+ * accelerating rate.
  *
  * **The variance is moved, not deleted.** Careers still differ from one
  * another by roughly as much as they did; what changes is *where the spread
@@ -1212,11 +1213,21 @@ export const STEADY_FORM_SD_OLD = 0.4;
 
 /**
  * **Everything else about `"steady"` is the shipped model, and that is a
- * measured result rather than a shortcut.** Three constants were written for
- * this profile — a widened development bias, and a relaxed growth damping — and
- * `scripts/steadySweep.ts` says all three should be exactly what the random
- * model already uses. Both mistakes are worth recording, because both are the
- * conclusion anyone reasoning from first principles reaches:
+ * measured result rather than a shortcut.** Five constants were written for this
+ * profile and every one of them was then deleted, because `scripts/steadySweep.ts`
+ * says each should be exactly what the random model already uses.
+ *
+ * The first pair was a trimmed per-rating noise, and it was merely unnecessary:
+ * that term is independent per rating, so it very largely cancels once ~12
+ * ratings are averaged into an ovr — which is the documented reason the shared
+ * form roll had to be invented at all. Leaving it alone therefore costs almost
+ * nothing in ovr stability while keeping the thing that would otherwise be lost,
+ * a player's attribute *profile* continuing to shift over a career instead of
+ * being frozen in shape at generation.
+ *
+ * The other two were wrong rather than redundant, and both are worth recording
+ * because both are the conclusion anyone reasoning from first principles
+ * reaches:
  *
  *  1. **"With the form roll gone, careers will all look the same, so widen the
  *     per-player bias to keep them apart."** Measured, no: the form roll is
