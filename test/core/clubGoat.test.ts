@@ -3,6 +3,7 @@ import {
   clubGoatRanking, clubStint, CLUB_GOAT_PARTS,
 } from "../../src/core/frivolities/clubGoat.js";
 import { playerGoatRanking, pointsOf } from "../../src/core/frivolities/goat.js";
+import { GOAT_OVR_BASELINE } from "../../src/core/constants.js";
 import { allCareers } from "../../src/core/frivolities/careers.js";
 import { emptyTotals, emptyBestSeasons } from "../../src/core/frivolities/stats.js";
 import { emptySeasonStats, type Player } from "../../src/core/players/types.js";
@@ -142,18 +143,28 @@ describe("clubGoatRanking", () => {
   it("ranks on time at the club, not on career — the whole point of the board", () => {
     // A one-season visitor with a monumental career elsewhere against a club
     // servant. The world board has the visitor first; the club board must not.
+    //
+    // Both ratings are set relative to GOAT_OVR_BASELINE, because that is what
+    // the score measures them against -- `peak` and `prime` both count only the
+    // rating ABOVE it. Written out as 90 and 78 they straddled the baseline as
+    // it stood when they were written, and once the rating scale moved
+    // (OVR_SCALE_SHIFT) the servant sat BELOW it, scored a clamped zero on both
+    // components, and lost a comparison he exists to win. The gap between them
+    // is the fixture; the absolute numbers never were.
+    const great = GOAT_OVR_BASELINE + 15;
+    const good = GOAT_OVR_BASELINE + 6;
     const visitor = makePlayer({
       pid: 1,
       name: "Visitor",
       lines: [[2021, 1, 30], ...Array.from({ length: 10 }, (_, i): [number, number, number] =>
         [2022 + i, 2, 38])],
-      ovrBySeason: Object.fromEntries(Array.from({ length: 11 }, (_, i) => [2021 + i, 90])),
+      ovrBySeason: Object.fromEntries(Array.from({ length: 11 }, (_, i) => [2021 + i, great])),
     });
     const servant = makePlayer({
       pid: 2,
       name: "Servant",
       lines: Array.from({ length: 10 }, (_, i): [number, number, number] => [2021 + i, 1, 38]),
-      ovrBySeason: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [2021 + i, 78])),
+      ovrBySeason: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [2021 + i, good])),
     });
     const store = makeStore({ players: [visitor, servant] });
 

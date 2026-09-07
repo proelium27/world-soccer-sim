@@ -5,7 +5,7 @@ import { applyRosterFile, applyRosterFileToNewLeague } from "../../src/core/team
 import { assignAIFormations } from "../../src/core/teams/clubs.js";
 import { worldCompetitions, worldTeamSlots } from "../../src/core/competitions.js";
 import { POSITIONS, SKILL_KEYS, type PlayerRatings } from "../../src/core/players/types.js";
-import { ROSTER_COMPOSITION } from "../../src/core/constants.js";
+import { ROSTER_COMPOSITION, OVR_SCALE_SHIFT, RATING_MAX } from "../../src/core/constants.js";
 
 const base = makeLeague(0, 11, 11);
 const league = { ...base, meta: { ...base.meta, name: base.teams[0].name } };
@@ -14,11 +14,20 @@ const league = { ...base, meta: { ...base.meta, name: base.teams[0].name } };
 const d1 = league.competitions.find((c) => c.name === "English Division 1")!;
 const d1Slot0 = league.teams.filter((t) => t.compId === d1.id).sort((a, b) => a.tid - b.tid)[0];
 
-function fileWithSquad(players: unknown[]): RosterFile {
+function fileWithSquad(players: unknown[], ovrScale: number | null = OVR_SCALE_SHIFT): RosterFile {
   return parseRosterFile(
     JSON.stringify({
       format: "world-soccer-sim-roster",
       formatVersion: 1,
+      // Stamped, so these read as files authored TODAY. A file with no
+      // ovrScale is a pre-shift one by definition and is lifted on import --
+      // which is its own case below, not something every other test should be
+      // silently exercising.
+      //
+      // `null` rather than `undefined` is the omit sentinel, because passing
+      // `undefined` to a defaulted parameter TRIGGERS the default -- so the
+      // legacy case was silently getting a stamped file and testing nothing.
+      ...(ovrScale === null ? {} : { ovrScale }),
       competitions: [
         { match: "English Division 1", clubs: [{ name: "Real Import", abbrev: "IMP", colors: ["#111111", "#eeeeee"], players }] },
       ],
@@ -428,5 +437,54 @@ describe("applyRosterFileToNewLeague", () => {
       plain.playersAdded,
       plain.warnings,
     ]);
+  });
+});
+
+describe("applyRosterFile — rating scale", () => {
+  /**
+   * A roster file's `overall`/`ratings`/`potential` are absolute numbers with
+   * nothing behind them to re-derive from, so a file written before
+   * OVR_SCALE_SHIFT describes players 11 points below the world it lands in.
+   *
+   * That is worse than it sounds, and the second case is the one that says why:
+   * the filler topping a short squad up is generated on the CURRENT scale, so an
+   * unlifted file puts real first-teamers BELOW their own auto-generated
+   * reserves, and prices them off a wage floor 11 points above where they sit.
+   * It covers every file authored so far, the hosted "Download Real Rosters" one
+   * included.
+   */
+  const spec = (name: string, pos: string, overall: number) =>
+    ({ name, pos, age: 24, overall, potential: overall });
+
+  const ovrOf = (f: RosterFile, name: string) => {
+    const out = applyRosterFile(league, f).league;
+    const team = out.teams.find((t) => t.tid === d1Slot0.tid)!;
+    const byPid = new Map(out.players.map((p) => [p.pid, p]));
+    return team.roster.map((pid) => byPid.get(pid)!).find((p) => p.name === name)!.ovr;
+  };
+
+  it("lifts a file with no scale marker onto the current one", () => {
+    const legacy = fileWithSquad([spec("Legacy", "ST", 70)], null);
+    const current = fileWithSquad([spec("Current", "ST", 70 + OVR_SCALE_SHIFT)]);
+    // The same player, authored on either scale, lands on the same rating.
+    expect(ovrOf(legacy, "Legacy")).toBe(ovrOf(current, "Current"));
+    expect(ovrOf(legacy, "Legacy")).toBeGreaterThanOrEqual(70 + OVR_SCALE_SHIFT - 1);
+  });
+
+  it("keeps a legacy file's first-teamers above the filler generated around them", () => {
+    const out = applyRosterFile(league, fileWithSquad([spec("Star", "ST", 78)], null)).league;
+    const team = out.teams.find((t) => t.tid === d1Slot0.tid)!;
+    const byPid = new Map(out.players.map((p) => [p.pid, p]));
+    const squad = team.roster.map((pid) => byPid.get(pid)!);
+    const star = squad.find((p) => p.name === "Star")!;
+    const filler = squad.filter((p) => p.name !== "Star");
+    expect(filler.length).toBeGreaterThan(0);
+    expect(star.ovr).toBeGreaterThan(Math.max(...filler.map((p) => p.ovr)));
+  });
+
+  it("leaves a file already on the current scale exactly as written", () => {
+    const want = Math.min(RATING_MAX, 70 + OVR_SCALE_SHIFT);
+    expect(Math.abs(ovrOf(fileWithSquad([spec("Exact", "ST", want)]), "Exact") - want))
+      .toBeLessThanOrEqual(1);
   });
 });

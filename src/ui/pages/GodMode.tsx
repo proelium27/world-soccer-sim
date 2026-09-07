@@ -7,6 +7,7 @@ import { NATIONALITIES } from "../../core/players/nationalities.js";
 import { SKILL_LABELS } from "../components/PlayerRatingsTooltip.js";
 import { TeamIdentityEditor, type EditableTeam } from "../components/TeamIdentityEditor.js";
 import type { NewPlayerSpec } from "../../core/godMode.js";
+import { OVR_SCALE_SHIFT } from "../../core/constants.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 import { BackLink } from "../components/BackLink.js";
 import { ClubCrest } from "../components/ClubCrest.js";
@@ -362,10 +363,13 @@ function CreatePlayer() {
   const [pos, setPos] = useState<Position>("ST");
   const [age, setAge] = useState(20);
   const [heightCm, setHeightCm] = useState(180);
-  const [potential, setPotential] = useState(70);
+  // Starting points on the rating scale rather than fixed numbers, so the form
+  // opens on a plausible player instead of a third-division one after
+  // OVR_SCALE_SHIFT moved everything up by 11.
+  const [potential, setPotential] = useState(70 + OVR_SCALE_SHIFT);
   const [salary, setSalary] = useState(1_000_000);
   const [contractLength, setContractLength] = useState(4);
-  const [ratings, setRatings] = useState<PlayerRatings>(flatRatings(50));
+  const [ratings, setRatings] = useState<PlayerRatings>(flatRatings(50 + OVR_SCALE_SHIFT));
   const [tid, setTid] = useState<number | "fa">("fa");
   const [created, setCreated] = useState<string | null>(null);
 
