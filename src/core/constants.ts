@@ -1102,6 +1102,170 @@ export const POTENTIAL_SIM_MAX_AGE = 40;
 export const POTENTIAL_SIM_PERCENTILE = 0.75;
 
 /**
+ * How a save develops its players. `"random"` is the model the game has always
+ * run: a shared per-group "form" roll every season, big enough that a squad
+ * player can genuinely break out or collapse in one summer. `"steady"` is the
+ * alternative added 2026-09-07 on player request — the same age curve shape
+ * and the same minutes nudge, but with the per-season dice turned down so far
+ * that a career reads as one continuous arc: grow through the early twenties,
+ * hold through the peak years, decline from thirty at an accelerating rate.
+ *
+ * **The variance is moved, not deleted.** Careers still differ from one
+ * another by roughly as much as they did; what changes is *where the spread
+ * lives*. Under `"random"` most of it is `formSd`, re-rolled every offseason,
+ * so who ends up elite is decided a season at a time and a nobody can arrive
+ * from nowhere at 26. Under `"steady"` most of it is `biasSd` — the fixed,
+ * pid-derived development personality (`developmentBias`) that is the same
+ * number for a player every season of his life. So a prospect's trajectory
+ * becomes a property of *who he is*, settled when he is generated and merely
+ * revealed over time, which is what makes scouting worth paying for and what
+ * stops the league's best players turning over into strangers every few years.
+ */
+export type ProgressionModel = "random" | "steady";
+
+/**
+ * Everything `stepRatings` reads that depends on the model. Bundled into one
+ * record rather than passed as loose numbers so that adding a knob means
+ * adding a field here and filling it in for both models — a model silently
+ * inheriting the other one's value for a new term is the failure this shape
+ * exists to prevent.
+ *
+ * `PROGRESSION_PROFILES.random` restates the shipped constants **by
+ * reference**, never by copying their values, so it cannot drift away from
+ * them: retuning `PROGRESSION_FORM_SD_YOUNG` retunes the random profile with
+ * it, and a save on the default model is provably the game as it was.
+ */
+export interface ProgressionProfile {
+  /** [age - BASE_AGE_CURVE_PEAK, expected mean rating delta] control points. */
+  readonly ageCurve: readonly (readonly [number, number])[];
+  /** Independent per-rating noise, at age 18 and at RETIREMENT_START_AGE. */
+  readonly noiseSdYoung: number;
+  readonly noiseSdOld: number;
+  /** Shared per-group "form" roll — the term that actually swings ovr. */
+  readonly formSdYoung: number;
+  readonly formSdOld: number;
+  /** Fixed per-player development personality, tapering to 0 by peak age. */
+  readonly biasSdYoung: number;
+  /** Growth resistance: ovr at which positive development is damped to `dampingFloor`. */
+  readonly dampingEnd: number;
+  readonly dampingFloor: number;
+}
+
+/**
+ * `"steady"`'s own age curve. Same control-point shape as `BASE_AGE_CURVE` and
+ * the same canonical peak, redrawn to the arc the request describes.
+ *
+ * The plateau is the part that needed care, because it cannot be drawn
+ * directly. A rating group reads this curve at a *shifted* age
+ * (`PHYSICAL_AGE_SHIFT` +3, `SKILL_AGE_SHIFT` -1.5), so at any real age the
+ * two groups are sampling points **4.5 years apart** — there is no single flat
+ * window that holds both of them still across ages 24-30. A player's ovr
+ * plateau is therefore not a flat stretch of this curve; it is physicals
+ * already easing off cancelling against skills still inching up, which is what
+ * a real plateau is made of and why the shape below is *widened* around the
+ * peak rather than squared off. Three differences from the shipped curve:
+ *
+ *  1. **A wider, shallower shoulder** either side of the peak (x = -3..+3), so
+ *     the two groups' opposing drifts stay small enough to cancel into an ovr
+ *     that holds rather than crests.
+ *  2. **A later, steeper fall.** Decline starts further out and then drops away
+ *     faster than the shipped curve's near-linear -0.5/year, matching "as they
+ *     age up in their 30s they decline more, and faster".
+ *  3. **The same growth height at the young end**, deliberately untouched:
+ *     `YOUTH_BASE_OFFSET` and the academy anchors are calibrated against how
+ *     far a 16-year-old climbs, and moving that would re-open the
+ *     anti-inflation sweep for nothing the request asks for.
+ *
+ * The area under the two curves is close but not equal, which is the point of
+ * the audit rather than an oversight: what has to hold flat is the
+ * *survival-weighted lifetime delta* (see `PHYSICAL_AGE_SHIFT`), and a curve
+ * that pays out later is worth less than one that pays out early, because
+ * fewer players are still in the game to collect it.
+ *
+ * **The tail was swept, not drawn.** A first hand-drawn tail (gentle into the
+ * early thirties, hard after) held ratings up too long: mean ovr through the
+ * plateau years came out 1.5 above the random model's and the survival-weighted
+ * lifetime drift went from the shipped -2.81 to -0.86, i.e. most of the way from
+ * "slightly deflationary" to "flat", which is the direction that ratchets a
+ * league's mean up over a dynasty. Pulling the mid-30s down (this table) puts
+ * both back: plateau ovr +1.3 and drift -3.87, a shade *more* deflationary than
+ * the shipped model, which is the safe side to miss on. A third, steeper tail
+ * was measured too and overshoots badly (drift -7.27) — `scripts/steadySweep.ts`
+ * keeps all three so the choice stays reproducible.
+ */
+export const STEADY_AGE_CURVE: readonly [number, number][] = [
+  [-8, 3], [-7, 2.7], [-6, 2.2], [-5, 1.7], [-4, 1.2], [-3, 0.7], [-2, 0.35], [-1, 0.15],
+  [0, 0.05], [1, 0], [2, -0.1], [3, -0.4], [4, -1.0], [5, -1.9], [6, -3.0], [7, -4.2],
+  [8, -5.6], [9, -7.1], [10, -8.8],
+];
+
+/**
+ * `"steady"`'s form roll. This is the constant the whole setting is about: the
+ * shared per-group draw is what survives being averaged into ovr (see
+ * `PROGRESSION_FORM_SD_YOUNG`), so shrinking it is what removes breakout and
+ * collapse seasons. Deliberately **not zero** — the request asks for a rating
+ * that can "stay the same or hover", and at exactly 0 every rating in a group
+ * moves in lockstep forever, which reads as a spreadsheet rather than a career.
+ */
+export const STEADY_FORM_SD_YOUNG = 0.9;
+export const STEADY_FORM_SD_OLD = 0.4;
+
+/**
+ * **Everything else about `"steady"` is the shipped model, and that is a
+ * measured result rather than a shortcut.** Three constants were written for
+ * this profile — a widened development bias, and a relaxed growth damping — and
+ * `scripts/steadySweep.ts` says all three should be exactly what the random
+ * model already uses. Both mistakes are worth recording, because both are the
+ * conclusion anyone reasoning from first principles reaches:
+ *
+ *  1. **"With the form roll gone, careers will all look the same, so widen the
+ *     per-player bias to keep them apart."** Measured, no: the form roll is
+ *     zero-mean and re-rolled every season, so it very largely cancels over a
+ *     career and contributes far less to how careers *end up* than to how they
+ *     *move*. At the shipped bias of 3 the spread is already there: plateau
+ *     ratings hold 92% of the random model's spread, and peak-ovr sd comes out
+ *     13.9 against 13.8. The widened version (bias 5, and with the relaxed
+ *     damping of mistake 2 alongside it) blew the elite tier open instead —
+ *     peak p90 80 → 90, and 19.5% of a cohort peaking at 85+ against 0.9%.
+ *  2. **"`growthDamping` was sized to suppress lucky jumps, so with no luck left
+ *     it will wall the league off below 80."** Measured, the opposite: elite is
+ *     *more* reachable under steady development at the shipped 80 / 0.02, not
+ *     less (80+ in 3.9% of plateau player-seasons against the random model's
+ *     2.7%). A consistent bias pushes through a damping band better than a
+ *     coin-flipping form roll does, because the roll spends half its seasons
+ *     undoing the other half. Relaxing the damping made it worse monotonically
+ *     in the sweep: at bias 3 the 85+ share of plateau player-seasons runs 0.1%
+ *     at the shipped 80 / 0.02 against 5.5% at 90 / 0.25.
+ *
+ * So the whole of `"steady"` is: **the shipped development model, with the form
+ * roll turned down and the age curve redrawn.** Restated by reference below for
+ * the same reason `random` is — a retune of any of these must reach both models
+ * rather than leaving this one holding a stale copy.
+ */
+export const PROGRESSION_PROFILES: Record<ProgressionModel, ProgressionProfile> = {
+  random: {
+    ageCurve: BASE_AGE_CURVE,
+    noiseSdYoung: PROGRESSION_NOISE_SD_YOUNG,
+    noiseSdOld: PROGRESSION_NOISE_SD_OLD,
+    formSdYoung: PROGRESSION_FORM_SD_YOUNG,
+    formSdOld: PROGRESSION_FORM_SD_OLD,
+    biasSdYoung: PROGRESSION_BIAS_SD_YOUNG,
+    dampingEnd: GROWTH_DAMPING_END,
+    dampingFloor: GROWTH_DAMPING_FLOOR,
+  },
+  steady: {
+    ageCurve: STEADY_AGE_CURVE,
+    noiseSdYoung: PROGRESSION_NOISE_SD_YOUNG,
+    noiseSdOld: PROGRESSION_NOISE_SD_OLD,
+    formSdYoung: STEADY_FORM_SD_YOUNG,
+    formSdOld: STEADY_FORM_SD_OLD,
+    biasSdYoung: PROGRESSION_BIAS_SD_YOUNG,
+    dampingEnd: GROWTH_DAMPING_END,
+    dampingFloor: GROWTH_DAMPING_FLOOR,
+  },
+};
+
+/**
  * Retirement (reworked 2026-07-28 — was age-only). Two inputs: **age** sets
  * the shape of the curve, **whether a club rostered him last season** sets its
  * scale. Nothing else — not ovr, not potential, not minutes. Roster status is

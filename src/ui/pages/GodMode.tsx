@@ -20,7 +20,7 @@ const NATION_NAMES = Object.keys(NATIONALITIES);
 const flatRatings = (v: number): PlayerRatings =>
   Object.fromEntries(SKILL_KEYS.map((k) => [k, v])) as PlayerRatings;
 
-type Tab = "club" | "nation" | "create" | "roster" | "finance";
+type Tab = "club" | "nation" | "development" | "create" | "roster" | "finance";
 
 export function GodMode() {
   const league = useLeague().league;
@@ -38,11 +38,12 @@ export function GodMode() {
       </p>
 
       <ul className="nav nav-tabs mb-3">
-        {(["club", "nation", "create", "roster", "finance"] as Tab[]).map((t) => (
+        {(["club", "nation", "development", "create", "roster", "finance"] as Tab[]).map((t) => (
           <li key={t} className="nav-item">
             <button className={`nav-link ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
               {t === "club" ? "Switch Club"
                 : t === "nation" ? "Switch Country"
+                : t === "development" ? "Development"
                 : t === "create" ? "Create Player"
                 : t === "roster" ? "Roster Builder" : "Club Finances"}
             </button>
@@ -52,6 +53,7 @@ export function GodMode() {
 
       {tab === "club" && <SwitchClub />}
       {tab === "nation" && <SwitchCountry />}
+      {tab === "development" && <Development />}
       {tab === "create" && <CreatePlayer />}
       {tab === "roster" && <RosterBuilder />}
       {tab === "finance" && <ClubFinances />}
@@ -184,6 +186,60 @@ function SwitchClub() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// --- Section A3: Development ---
+/**
+ * Switch this save between the two development models (see `ProgressionModel`).
+ *
+ * The odd one out on this page: everything else here is a sandbox liberty that
+ * bypasses a rule, and this bypasses nothing. It is a genuine setting, and it
+ * is here rather than on a settings screen because God Mode is where a save's
+ * own rules get edited and because the alternative — offering it only at
+ * creation, as the New League screen does — would mean starting over to try
+ * the other one. Safe mid-save for the reasons on `LeagueStore.progressionModel`:
+ * it scales rng draws without changing their count, and nothing persisted
+ * derives from it.
+ *
+ * Exported (alone among the sections here) so `progressionSettingReach.test.tsx`
+ * can render it directly. Server rendering cannot click a tab, so a test of the
+ * page as a whole only ever reaches the one that opens by default — which is
+ * the same limitation `playerProfileColumns.test.tsx` documents.
+ *
+ * What it does NOT do is rewrite history. Careers already played stay exactly
+ * as they were played; the change takes effect from the next offseason, which
+ * the copy says outright rather than leaving the user to discover.
+ */
+export function Development() {
+  const { league, godModeSetProgressionModelAction, simming } = useLeague();
+  if (!league) return null;
+  const steady = league.progressionModel === "steady";
+
+  return (
+    <div style={{ maxWidth: 620 }}>
+      <div className="form-check form-switch mb-2">
+        <input
+          type="checkbox"
+          className="form-check-input"
+          id="god-steady-progression"
+          checked={steady}
+          disabled={simming}
+          onChange={(e) => void godModeSetProgressionModelAction(e.target.checked ? "steady" : "random")}
+        />
+        <label className="form-check-label" htmlFor="god-steady-progression">
+          Steady careers, no random growth
+        </label>
+      </div>
+      <p className="text-secondary small mb-2">
+        {steady
+          ? "Players follow their own arc: they improve through their early twenties, hold through their peak, and fall away from thirty, faster every year after that. How much they play still speeds it up or slows it down, and talent still separates them — but nobody goes from squad filler to superstar over one summer."
+          : "Every summer is a roll of the dice. A squad player can add eight points out of nowhere, and a prospect can go backwards for no reason you'll ever see."}
+      </p>
+      <p className="text-secondary small mb-0">
+        Takes effect at your next offseason. Seasons already played stay as they were.
+      </p>
     </div>
   );
 }

@@ -28,6 +28,7 @@ function createEnglandOnlyLeagueState(userTid: number, rng: () => number, seed =
     // Same value the old derived allocator produced, so pids are unchanged.
     nextPid: Math.max(0, ...league.players.map((p) => p.pid)) + 1,
     aiManagedSeasons: [],
+    progressionModel: "random" as const,
     rollingCoefficients: true,
     season: 1,
     phase: "regular",

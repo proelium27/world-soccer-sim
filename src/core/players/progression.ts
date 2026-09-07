@@ -3,13 +3,11 @@ import { computeOvr } from "./ovr.js";
 import { changedPosition } from "./positions.js";
 import { gaussian, hashInts, mulberry32 } from "../../engine/rng.js";
 import {
-  BASE_AGE_CURVE, BASE_AGE_CURVE_PEAK, PHYSICAL_AGE_SHIFT, SKILL_AGE_SHIFT,
+  BASE_AGE_CURVE_PEAK, PHYSICAL_AGE_SHIFT, SKILL_AGE_SHIFT,
   GK_AGE_SHIFT,
   MINUTES_FACTOR_MIN, MINUTES_FACTOR_MAX, FULL_SEASON_APPEARANCES,
-  PROGRESSION_NOISE_SD_YOUNG, PROGRESSION_NOISE_SD_OLD,
-  PROGRESSION_FORM_SD_YOUNG, PROGRESSION_FORM_SD_OLD,
-  PROGRESSION_BIAS_SD_YOUNG,
-  GROWTH_DAMPING_START, GROWTH_DAMPING_END, GROWTH_DAMPING_FLOOR,
+  PROGRESSION_PROFILES, type ProgressionModel, type ProgressionProfile,
+  GROWTH_DAMPING_START,
   GENERATIONAL_CHANCE, GENERATIONAL_DAMPING_END, GENERATIONAL_DAMPING_FLOOR,
   GENERATIONAL_BIAS_MIN_Z,
   POTENTIAL_SIM_TRIALS, POTENTIAL_SIM_MAX_AGE, POTENTIAL_SIM_PERCENTILE,
@@ -81,9 +79,9 @@ export function ageOf(player: Player, season: number): number {
   return season - player.born;
 }
 
-/** Base expected rating delta for an age, read off BASE_AGE_CURVE (keyed by age - peak). */
-function baseAgeDelta(effectiveAge: number): number {
-  return interpolate(BASE_AGE_CURVE, effectiveAge - BASE_AGE_CURVE_PEAK);
+/** Base expected rating delta for an age, read off the model's curve (keyed by age - peak). */
+function baseAgeDelta(profile: ProgressionProfile, effectiveAge: number): number {
+  return interpolate(profile.ageCurve, effectiveAge - BASE_AGE_CURVE_PEAK);
 }
 
 /** Linearly interpolate a young/old std dev pair by age (narrows as players age). */
@@ -112,11 +110,15 @@ function biasSdAt(young: number, age: number): number {
  * player already is to elite, independent of age. 1 (no damping) at/below
  * the start of the range, GROWTH_DAMPING_FLOOR at/above the end.
  */
-function growthDamping(ovr: number, generational: boolean): number {
+function growthDamping(profile: ProgressionProfile, ovr: number, generational: boolean): number {
   // Generational talents damp on a much softer curve (same start, far higher
-  // end and floor) — elite is resistible, legendary is merely rare.
-  const end = generational ? GENERATIONAL_DAMPING_END : GROWTH_DAMPING_END;
-  const floor = generational ? GENERATIONAL_DAMPING_FLOOR : GROWTH_DAMPING_FLOOR;
+  // end and floor) — elite is resistible, legendary is merely rare. Deliberately
+  // NOT read off the profile: a generational talent is a property of the player,
+  // not of the save's development model, and both shipped models put the same
+  // numbers in `dampingEnd`/`dampingFloor` anyway (see PROGRESSION_PROFILES for
+  // why relaxing them for "steady" was built, measured and reverted).
+  const end = generational ? GENERATIONAL_DAMPING_END : profile.dampingEnd;
+  const floor = generational ? GENERATIONAL_DAMPING_FLOOR : profile.dampingFloor;
   if (ovr <= GROWTH_DAMPING_START) return 1;
   if (ovr >= end) return floor;
   const t = (ovr - GROWTH_DAMPING_START) / (end - GROWTH_DAMPING_START);
@@ -141,9 +143,18 @@ function growthDamping(ovr: number, generational: boolean): number {
  * are what actually swings ovr season to season. Shared by real progression
  * and potential's forward simulation so both use the exact same development
  * model. Does not mutate the input.
+ *
+ * Which curve and which spreads it reads come from the save's
+ * `ProgressionModel` (see `PROGRESSION_PROFILES`). **The model scales the
+ * draws, never the draw COUNT**: both `gaussian(rng)` calls below happen
+ * whatever the profile says, and `gaussian` is itself exactly two `rng()`
+ * draws with no rejection loop. So switching a save's model advances the
+ * shared stream identically — which is what makes the setting safe to flip
+ * mid-save, and what lets `"random"` be provably the game as it was.
  */
 function stepRatings(
   rng: () => number,
+  profile: ProgressionProfile,
   ratings: PlayerRatings,
   age: number,
   pos: Player["pos"],
@@ -152,9 +163,9 @@ function stepRatings(
   heightCm: number,
 ): PlayerRatings {
   const gkShift = pos === "GK" ? GK_AGE_SHIFT : 0;
-  const noiseSd = sdAt(PROGRESSION_NOISE_SD_YOUNG, PROGRESSION_NOISE_SD_OLD, age);
-  const formSd = sdAt(PROGRESSION_FORM_SD_YOUNG, PROGRESSION_FORM_SD_OLD, age);
-  const biasSd = biasSdAt(PROGRESSION_BIAS_SD_YOUNG, age);
+  const noiseSd = sdAt(profile.noiseSdYoung, profile.noiseSdOld, age);
+  const formSd = sdAt(profile.formSdYoung, profile.formSdOld, age);
+  const biasSd = biasSdAt(profile.biasSdYoung, age);
   const generational = isGenerational(pid);
   // A generational talent's development personality is floored at a solidly
   // positive z — never a total bust, though per-season form rolls still vary
@@ -163,13 +174,13 @@ function stepRatings(
     ? Math.max(developmentBias(pid), GENERATIONAL_BIAS_MIN_Z)
     : developmentBias(pid);
   const bias = biasZ * biasSd;
-  const damping = growthDamping(computeOvr(pos, ratings, heightCm), generational);
+  const damping = growthDamping(profile, computeOvr(pos, ratings, heightCm), generational);
   const next = { ...ratings };
   for (const [group, shift] of [
     [PHYSICAL_KEYS, gkShift + PHYSICAL_AGE_SHIFT],
     [SKILL_KEYS_GROUP, gkShift + SKILL_AGE_SHIFT],
   ] as const) {
-    const base = baseAgeDelta(age + shift);
+    const base = baseAgeDelta(profile, age + shift);
     const mean = base > 0 ? base * minutesFactor : base;
     const formRoll = gaussian(rng) * formSd;
     const combined = mean + bias + formRoll;
@@ -189,6 +200,22 @@ function stepRatings(
  * each trial, and reading off the POTENTIAL_SIM_PERCENTILE. So on average a
  * player exceeds this number about 25% of the time, matching real careers
  * where most players fall short of their potential but some meet or beat it.
+ *
+ * Because it forward-simulates with the *save's own* development model, a
+ * `"steady"` save's estimate is a far sharper forecast than a `"random"`
+ * one's — sixteen trials of a near-deterministic career agree with each other.
+ * That is the correct reading rather than a degenerate one: in a world where
+ * luck no longer decides careers, a scout genuinely can tell you where a
+ * prospect ends up, and the scouting fog (`potentialFog`) becomes the only
+ * thing standing between the user and that answer.
+ *
+ * `model` defaults to `"random"` — the shipped model, and the model every
+ * save that predates the setting is on — so a caller that does not care
+ * (tests, probes, fixtures) gets the game as it was. The three call paths
+ * that *must* pass it are world generation, youth intake and roster import,
+ * all of which reach here via `generatePlayer`; a steady save that forgot one
+ * would misprice exactly the prospects its Youth Intake screen is asking the
+ * user to choose between, so `progressionModel.test.ts` pins each of them.
  */
 export function estimatePotential(
   rng: () => number,
@@ -198,13 +225,15 @@ export function estimatePotential(
   pos: Player["pos"],
   heightCm: number,
   pid: number,
+  model: ProgressionModel = "random",
 ): number {
+  const profile = PROGRESSION_PROFILES[model];
   const peaks: number[] = [];
   for (let trial = 0; trial < POTENTIAL_SIM_TRIALS; trial++) {
     let simRatings = ratings;
     let peak = ovr;
     for (let simAge = age + 1; simAge <= POTENTIAL_SIM_MAX_AGE; simAge++) {
-      simRatings = stepRatings(rng, simRatings, simAge, pos, 1, pid, heightCm);
+      simRatings = stepRatings(rng, profile, simRatings, simAge, pos, 1, pid, heightCm);
       const simOvr = computeOvr(pos, simRatings, heightCm);
       if (simOvr > peak) peak = simOvr;
     }
@@ -224,7 +253,9 @@ export function progressPlayer(
   player: Player,
   season: number,
   inAcademy = false,
+  model: ProgressionModel = "random",
 ): Player {
+  const profile = PROGRESSION_PROFILES[model];
   const age = ageOf(player, season);
 
   let minutesFactor: number;
@@ -245,10 +276,10 @@ export function progressPlayer(
   // He trains as what he currently is, so the rating step reads his old
   // position; only once the season's development has landed do we ask whether
   // it has made him something else.
-  const ratings = stepRatings(rng, player.ratings, age, player.pos, minutesFactor, player.pid, player.heightCm);
+  const ratings = stepRatings(rng, profile, player.ratings, age, player.pos, minutesFactor, player.pid, player.heightCm);
   const pos = changedPosition(player, ratings) ?? player.pos;
   const ovr = computeOvr(pos, ratings, player.heightCm);
-  const potential = estimatePotential(rng, ratings, ovr, age, pos, player.heightCm, player.pid);
+  const potential = estimatePotential(rng, ratings, ovr, age, pos, player.heightCm, player.pid, model);
 
   // Career peak, kept as a running maximum rather than re-derived from `hist`
   // by everyone who wants it. Compared against the snapshot being appended

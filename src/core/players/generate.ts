@@ -8,7 +8,7 @@ import { estimatePotential } from "./progression.js";
 import { gaussian, hashInts, mulberry32 } from "../../engine/rng.js";
 import {
   TIER_OFFSET, RATING_NOISE_SD, ABS_LOW_MIN, ABS_LOW_MAX,
-  RATING_MIN, RATING_MAX, POSITION_RATING_SPREAD,
+  RATING_MIN, RATING_MAX, POSITION_RATING_SPREAD, type ProgressionModel,
 } from "../constants.js";
 import { seasonSalaryForOvr } from "../contracts.js";
 import { emptyCareerSummary } from "./careerSummary.js";
@@ -44,6 +44,13 @@ export function generatePlayer(
   genSeed = 0,
   homeCountry?: string,
   nationalities?: NationalityWeights | null,
+  // The save's development model, forwarded to `estimatePotential` so a
+  // prospect's listed ceiling is a forecast of the world he will actually
+  // develop in. Trailing and defaulted for the same reason the two above are:
+  // this is a 10-argument function with ~50 call sites, most of them fixtures
+  // that want the shipped model. Every call site that has a league in scope
+  // passes it.
+  model: ProgressionModel = "random",
 ): Player {
   const tiers = GEN_OFFSETS[pos];
   const spread = POSITION_RATING_SPREAD[pos];
@@ -56,7 +63,7 @@ export function generatePlayer(
   const heightCm = Math.round(loH + rng() * (hiH - loH));
 
   const ovr = computeOvr(pos, ratings, heightCm);
-  const potential = estimatePotential(rng, ratings, ovr, age, pos, heightCm, pid);
+  const potential = estimatePotential(rng, ratings, ovr, age, pos, heightCm, pid, model);
   const born = season - age;
 
   // Nationality/name draw from a (genSeed, pid)-derived sub-stream: `genSeed`

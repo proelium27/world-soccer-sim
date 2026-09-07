@@ -28,7 +28,7 @@ import { generateSchedule } from "./schedule.js";
 import { SEASON_MATCHDAYS } from "./calendar.js";
 import { worldCompetitions } from "./competitions.js";
 import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
-import { DEFAULT_DIFFICULTY, type Difficulty } from "./constants.js";
+import { DEFAULT_DIFFICULTY, type Difficulty, type ProgressionModel } from "./constants.js";
 import { isSpectatorTid } from "./spectator.js";
 
 export type { StoredTeam } from "./teams/clubs.js";
@@ -349,6 +349,22 @@ export interface LeagueStore {
    * so no dynasty in progress changes.
    */
   rollingCoefficients: boolean;
+
+  /**
+   * How this save develops its players — see `ProgressionModel`.
+   *
+   * Unlike `difficulty` and `rollingCoefficients` beside it, this one is **safe
+   * to change mid-save**, and God Mode offers exactly that. It is read at one
+   * point (the offseason's progression pass, plus the generation paths that
+   * forecast a potential off the same model) and it scales rng draws without
+   * changing their count, so flipping it advances the shared stream identically
+   * and merely changes how careers move from the next offseason on. Nothing
+   * persisted derives from it, so there is no stale state to unwind either way.
+   *
+   * Migrated to `"random"` for old saves, which is the only model that has ever
+   * existed, so no dynasty in progress changes.
+   */
+  progressionModel: ProgressionModel;
 }
 
 export function createLeagueState(
@@ -373,8 +389,16 @@ export function createLeagueState(
    * differ only in this are the same world.
    */
   userNation: string | null = null,
+  /**
+   * How careers develop (see `LeagueStore.progressionModel`). Passed into
+   * generation as well as stored, so the world's opening potentials are a
+   * forecast of the model the save will actually run — a steady save whose
+   * first squad was scouted on the random model would over-rate every prospect
+   * in it until his first offseason re-estimate.
+   */
+  progressionModel: ProgressionModel = "random",
 ): LeagueStore {
-  const league = generateWorld(rng, seed, competitions);
+  const league = generateWorld(rng, seed, competitions, progressionModel);
   // Each AI club lines up in the formation that fields its strongest XI; the
   // user's club keeps the neutral 4-3-3 default and picks its own on the Roster page.
   const teams = assignAIFormations(
@@ -450,5 +474,6 @@ export function createLeagueState(
     nextPid: Math.max(0, ...league.players.map((p) => p.pid)) + 1,
     aiManagedSeasons: [],
     rollingCoefficients,
+    progressionModel,
   };
 }

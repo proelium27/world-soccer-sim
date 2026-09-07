@@ -343,7 +343,9 @@ export function simOffseasonReporting(
     const ovrFor = ovrLookup(p.hist, p.peakOvr ?? p.ovr);
     const base = p.career ?? summaryOf(p.stats.filter((s) => s.season !== endingSeason), ovrFor);
     p = { ...p, career: finished ? withSeason(base, finished, ovrFor(endingSeason)) : base };
-    const progressed = progressPlayer(rng, p, endingSeason, academyPids.has(p.pid));
+    const progressed = progressPlayer(
+      rng, p, endingSeason, academyPids.has(p.pid), league.progressionModel,
+    );
     const tid = tidLastSeason.get(p.pid);
     // Only rostered players, and away from the user's own club only the ones
     // good enough to be news. Every conversion in the world would bury the feed
@@ -684,6 +686,7 @@ export function simOffseasonReporting(
         // academyBase (see academyFacilities.ts).
         + (t.tid === league.meta.userTid ? academyOffset + academyFacilitiesBonus(t) : 0),
       nextSeason, nextPid, genSeed, homeCountry, nationalities,
+      undefined, undefined, league.progressionModel,
     );
     nextPid = updatedNextPid;
     // Note: a generational talent's arrival is deliberately NOT announced.
@@ -748,6 +751,7 @@ export function simOffseasonReporting(
         // an outfielder 27. Steering that draw would shift the shared stream
         // and re-roll every club generated after his.
         { positions: directions.positions },
+        league.progressionModel,
       );
       nextPid = afterExtras;
       userYouth = [...userYouth, ...extraYouth];
