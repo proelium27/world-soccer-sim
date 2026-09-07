@@ -1,4 +1,5 @@
 import type { GoatComponent } from "../../core/frivolities/goat.js";
+import { GOAT_OVR_BASELINE } from "../../core/constants.js";
 
 /*
  * The wording and the expanded arithmetic behind a GOAT score.
@@ -25,8 +26,11 @@ const PART_LABELS: Record<string, { label: string; help: string }> = {
 
 /** Wording for each line of arithmetic inside a component. */
 const TERM_LABELS: Record<string, string> = {
-  peakOvr: "rating above 70 at his peak",
-  primeOvr: "rating above 70, added up across every season",
+  // Interpolated rather than written out: these two describe GOAT_OVR_BASELINE,
+  // which moves with OVR_SCALE_SHIFT, and a hardcoded number here would quietly
+  // start describing a threshold the board no longer uses.
+  peakOvr: `rating above ${GOAT_OVR_BASELINE} at his peak`,
+  primeOvr: `rating above ${GOAT_OVR_BASELINE}, added up across every season`,
   seasons: "seasons played",
   rating: "match rating above 6.0, scaled by how much he played",
   ballonDOr: "Ballon d'Or",

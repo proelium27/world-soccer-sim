@@ -1,13 +1,21 @@
 /**
  * Rescaling EA overalls onto soccer-gm's rating band.
  *
- * The two scales are not the same animal. A freshly generated soccer-gm world
- * spans roughly 23-81 OVR (tier-1 p50 62, p95 73, max 81) and only ever reaches
- * 90+ through decades of progression; EA FC's top flights run 47-91 with a
- * couple of dozen players at 88+. Importing EA numbers verbatim would lift the
- * whole world ~10 points, which collides with the fragile anti-inflation
- * equilibrium the sim is tuned around (wages are cubic in ovr, the elite
- * valuation premium keys off 76, the division-2 ceiling off 70).
+ * The two scales USED to be different animals, and this module is why an import
+ * never disturbed the sim. Before OVR_SCALE_SHIFT a generated world spanned
+ * roughly 23-81 (tier-1 p50 62, p95 73, max 81) against EA's top flights at
+ * 47-91, so importing EA numbers verbatim would have lifted the whole world ~10
+ * points into the fragile anti-inflation equilibrium the sim is tuned around.
+ *
+ * Since the shift a generated big-four top flight runs 61-92 against EA's
+ * 62-91, so for a FULLY COVERED league the rank-match is now very close to the
+ * identity and an imported star keeps roughly the rating he really has. That is
+ * a happy side effect, not a reason to delete this: the match is still what
+ * guarantees it, the deeper tiers are still nothing like EA's range (a third
+ * division here sits in the 30s and 40s, and EA models no such thing), and a
+ * partly-covered league still scales against the pooled world rather than its
+ * own band. Rank-matching keeps all three cases honest without a tuned constant
+ * to drift, so it stays.
  *
  * So we rank-match instead of hand-fitting a curve: a player at the Nth
  * percentile of the imported set is assigned the OVR at the Nth percentile of a

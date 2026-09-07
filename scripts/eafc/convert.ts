@@ -30,7 +30,7 @@ import type { Position } from "../../src/core/players/types.js";
 import { POSITIONS } from "../../src/core/players/types.js";
 import { HEIGHT_RANGES } from "../../src/core/players/templates.js";
 import { computeOvr } from "../../src/core/players/ovr.js";
-import { ROSTER_COMPOSITION, NUM_TEAMS, RATING_MIN, RATING_MAX } from "../../src/core/constants.js";
+import { ROSTER_COMPOSITION, NUM_TEAMS, RATING_MIN, RATING_MAX, OVR_SCALE_SHIFT } from "../../src/core/constants.js";
 import { worldCompetitions, competitionTeamCount } from "../../src/core/competitions.js";
 import { generateWorld } from "../../src/core/league/generate.js";
 import { mulberry32 } from "../../src/engine/rng.js";
@@ -519,6 +519,12 @@ export function convert(csvText: string, opts: Partial<ConvertOptions> = {}): {
   const file: RosterFile = {
     format: ROSTER_FILE_FORMAT,
     formatVersion: ROSTER_FILE_VERSION,
+    // Stamped, and it is load-bearing rather than bookkeeping: these overalls
+    // are rank-matched onto a FRESHLY GENERATED reference world (see scale.ts),
+    // so they are already on whatever scale the game currently uses. Absent, the
+    // importer would read the file as pre-shift and lift it a second time,
+    // landing every imported player OVR_SCALE_SHIFT points too high.
+    ovrScale: OVR_SCALE_SHIFT,
     competitions: competitionsOut,
   };
 
