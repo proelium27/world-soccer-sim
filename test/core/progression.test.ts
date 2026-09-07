@@ -251,6 +251,68 @@ describe("progressPlayer", () => {
     const nearElite = meanDeltaAt(85);
     expect(nearElite).toBeLessThan(midTier);
   });
+
+  // God Mode's ratings lock. The freeze has to be invisible to the rng stream:
+  // see the note on progressPlayer for why an early exit would re-roll the rest
+  // of the world.
+  describe("ratingsLocked", () => {
+    it("leaves ratings, ovr, position and potential exactly where they were", () => {
+      const rng = mulberry32(21);
+      const p = generatePlayer(rng, "CM", 55, 1, 18, 1);
+      const after = progressPlayer(rng, { ...p, ratingsLocked: true }, 1);
+      expect(after.ratings).toEqual(p.ratings);
+      expect(after.ovr).toBe(p.ovr);
+      expect(after.pos).toBe(p.pos);
+      expect(after.potential).toBe(p.potential);
+    });
+
+    it("still records the season, so the career chart runs flat rather than stopping", () => {
+      const rng = mulberry32(22);
+      const p = generatePlayer(rng, "CB", 55, 1, 19, 1);
+      const after = progressPlayer(rng, { ...p, ratingsLocked: true }, 1);
+      expect(after.hist).toHaveLength(p.hist.length + 1);
+      const snap = after.hist[after.hist.length - 1];
+      expect(snap.season).toBe(1);
+      expect(snap.ovr).toBe(p.ovr);
+      expect(snap.ratings).toEqual(p.ratings);
+    });
+
+    it("holds him still across a whole career, ageing included", () => {
+      const rng = mulberry32(23);
+      let p: Player = { ...generatePlayer(rng, "ST", 55, 1, 19, 1), ratingsLocked: true };
+      const ovr = p.ovr;
+      for (let season = 1; season <= 20; season++) p = progressPlayer(rng, p, season);
+      expect(p.ovr).toBe(ovr);
+    });
+
+    // The invariant that keeps one locked player from changing anyone else's
+    // career: identical draw count, so every player progressed after him sees
+    // the stream he would have seen anyway.
+    it("consumes exactly the same rng draws as an unlocked player", () => {
+      const counted = (seed: number) => {
+        const base = mulberry32(seed);
+        let draws = 0;
+        return { rng: () => { draws++; return base(); }, count: () => draws };
+      };
+      for (const seed of [31, 32, 33]) {
+        const p = generatePlayer(mulberry32(seed), "W", 55, 1, 22, 1);
+        const free = counted(seed + 900);
+        progressPlayer(free.rng, p, 1);
+        const held = counted(seed + 900);
+        progressPlayer(held.rng, { ...p, ratingsLocked: true }, 1);
+        expect(held.count()).toBe(free.count());
+      }
+    });
+
+    // Unlocking is a real state, not just the absence of ever having locked him.
+    it("resumes developing once the lock comes off", () => {
+      const rng = mulberry32(24);
+      const p = generatePlayer(rng, "CM", 55, 1, 18, 1);
+      const held = progressPlayer(mulberry32(41), { ...p, ratingsLocked: true }, 1);
+      const freed = progressPlayer(mulberry32(41), { ...held, ratingsLocked: false }, 2);
+      expect(freed.ratings).not.toEqual(p.ratings);
+    });
+  });
 });
 
 describe("retirementProbability", () => {
