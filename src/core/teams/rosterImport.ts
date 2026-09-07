@@ -3,7 +3,7 @@ import { assignAIFormations, type StoredTeam } from "./clubs.js";
 import type { Player, PlayerRatings, Position } from "../players/types.js";
 import { SKILL_KEYS, POSITIONS } from "../players/types.js";
 import type { RosterFile, RosterFilePlayer } from "./rosterFile.js";
-import { resolveRosterSlots, rescaleRosterFile } from "./rosterFile.js";
+import { resolveRosterSlots } from "./rosterFile.js";
 import { applyTeamIdentities } from "./customize.js";
 import { generatePlayer } from "../players/generate.js";
 import { computeOvr } from "../players/ovr.js";
@@ -266,8 +266,7 @@ export interface RosterFileApplyResult {
  * record survives. The club's saved starting XI is cleared (the old XI's pids
  * are gone) and stale scouting/transfer-list references are pruned.
  */
-export function applyRosterFile(league: LeagueStore, rawFile: RosterFile): RosterFileApplyResult {
-  const file = rescaleRosterFile(rawFile);
+export function applyRosterFile(league: LeagueStore, file: RosterFile): RosterFileApplyResult {
   const { slots, warnings } = resolveRosterSlots(league, file);
 
   const withIdentities = applyTeamIdentities(

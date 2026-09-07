@@ -325,13 +325,6 @@ export async function loadLeague(
     || inlineCareers
     || shrankOnLoad(assembled, migrated)
     || namedAwardWinners(assembled, migrated)
-    // A rating-scale lift, like the award-winner backfill above, has to be
-    // persisted rather than left in memory. It is deterministic from the stored
-    // originals so a repeat would be correct — but it replaces every player
-    // object, so an un-persisted lift costs a deep map over the whole pool on
-    // every load AND makes the session's first save a full write of all ~15k
-    // player rows instead of a dirty-set diff.
-    || assembled.meta.ovrScale !== migrated.meta.ovrScale
   ) {
     await saveLeague(migrated);
   }

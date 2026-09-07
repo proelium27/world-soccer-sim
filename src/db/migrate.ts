@@ -1,8 +1,6 @@
 import type { LeagueStore } from "../core/leagueState.js";
 import { CLUBS, type StoredTeam } from "../core/teams/clubs.js";
-import type {
-  Player, SeasonStats, RatingsSnapshot, Position, PlayerRatings, SkillKey,
-} from "../core/players/types.js";
+import type { Player, SeasonStats, RatingsSnapshot, Position } from "../core/players/types.js";
 import type { PlayerMatchLine } from "../engine/attribution.js";
 import type { TeamSeasonStats } from "../core/standings.js";
 import { computeSeasonAwards, type SeasonAwards } from "../core/awards.js";
@@ -11,9 +9,7 @@ import { backfillAwardWinners } from "../core/awardWinners.js";
 import {
   HYPE_INITIAL, SCOUTING_SPEND_DEFAULT,
   NUM_TEAMS, DEFAULT_DIFFICULTY,
-  OVR_SCALE_SHIFT, RATING_MIN, RATING_MAX,
 } from "../core/constants.js";
-import { GEN_OFFSETS } from "../core/players/templates.js";
 import { chargeSeasonStart, wageBill, financeScale } from "../core/finance/budget.js";
 import { englandCompetitions } from "../core/competitions.js";
 import { cullOnLoad } from "../core/players/freeAgentCull.js";
@@ -321,155 +317,7 @@ function migratePlayer(p: Player, fallbackTid: number, currentSeason: number): P
  * the real-club-names era) would be silently reverted on the next load.
  */
 export function migrateLeague(league: LeagueStore): LeagueStore {
-  return cullOnLoad(migrateFields(rescaleRatings(league)));
-}
-
-/**
- * Lift a save written on an older rating scale onto the current one.
- *
- * Runs FIRST, before every other backfill, because the rest of this file reads
- * ratings as though they are on the live scale: `migrateFields` re-derives
- * `ovr` from stored ratings, `cullOnLoad` gates on `FREE_AGENT_CULL_MAX_PEAK_OVR`,
- * and the award/career reconstruction all compare against shifted thresholds.
- * Running it late would mean each of those judged old numbers by new rules.
- *
- * WHY A SAVE CANNOT SIMPLY BE LEFT ALONE. `OVR_SCALE_SHIFT` moved every
- * threshold in the game by the same amount it moved the ratings, which is what
- * makes the shift a relabel rather than a rebalance — but only for a world whose
- * ratings actually moved. An untouched save keeps 65-rated players and inherits
- * an 81-rated Division 2 ceiling (so nobody is ever swept up), a 91-rated
- * protected-star bar (so nobody is ever protected) and a wage floor 11 points
- * below its own squad, which prices a first-teamer at roughly a fifth of his
- * proper salary. The migration is mandatory, not cosmetic.
- *
- * `meta.ovrScale` records the scale the ratings are on; absent means 0, the
- * scale everything predating the shift was generated on. Writing it back is what
- * makes this idempotent — the delta is zero on the next load.
- *
- * The `ABS` tier is skipped, matching generation: those are the skills that are
- * irrelevant at a position (a keeper's finishing, an outfielder's goalkeeping),
- * they sit on an absolute floor rather than on the league's scale, and every one
- * of them carries zero weight in that position's OVR row — so skipping them
- * moves no player's rating by a single point, and keeps old saves and new ones
- * describing an outfielder's goalkeeping the same way.
- */
-function rescaleRatings(league: LeagueStore): LeagueStore {
-  const delta = OVR_SCALE_SHIFT - (league.meta.ovrScale ?? 0);
-  if (delta === 0) return league;
-
-  const lift = (v: number): number =>
-    Math.round(Math.max(RATING_MIN, Math.min(RATING_MAX, v + delta)));
-  const liftRatings = (ratings: PlayerRatings, pos: Position): PlayerRatings => {
-    const next = { ...ratings };
-    for (const key of Object.keys(next) as (keyof PlayerRatings)[]) {
-      if (GEN_OFFSETS[pos]?.[key as SkillKey] === "ABS") continue;
-      next[key] = lift(next[key]);
-    }
-    return next;
-  };
-
-  const players = league.players.map((p) => ({
-    ...p,
-    ratings: liftRatings(p.ratings, p.pos),
-    ovr: lift(p.ovr),
-    potential: lift(p.potential),
-    ...(p.peakOvr === undefined ? {} : { peakOvr: lift(p.peakOvr) }),
-    hist: p.hist.map((h) => ({
-      ...h,
-      ratings: liftRatings(h.ratings, h.pos ?? p.pos),
-      ovr: lift(h.ovr),
-      potential: lift(h.potential),
-    })),
-    ...(p.career === undefined ? {} : {
-      // CareerSummary carries no peak of its own — the peak lives on the player
-      // as `peakOvr`, lifted above — so only the per-season ratings move here.
-      career: {
-        ...p.career,
-        seasons: p.career.seasons.map((s) => ({ ...s, ovr: lift(s.ovr) })),
-      },
-    }),
-  }));
-
-  // The archive and the two name-carrying snapshots hold bare ovr numbers with
-  // no ratings behind them, so nothing else can recover these. Left alone, every
-  // retiree and every past award winner would read 11 points worse than the
-  // living players beside them, for the life of the save.
-  //
-  // `finalOvr` is lifted alongside `peakOvr` for exactly that reason: it is the
-  // rating he retired at, stored rather than derived, and it is read on the
-  // retiree's profile and (via awardWinners) on the awards board, where it would
-  // otherwise sit 11 below a correctly-lifted peak on the same card.
-  const retiredPlayers = (league.retiredPlayers ?? []).map((r) => ({
-    ...r,
-    peakOvr: lift(r.peakOvr),
-    finalOvr: lift(r.finalOvr),
-    seasons: r.seasons.map((s) => ({ ...s, ovr: lift(s.ovr) })),
-  }));
-  const seasonHistory = (league.seasonHistory ?? []).map((entry) => ({
-    ...entry,
-    // An ARRAY, not a record. Mapping it through Object.entries/fromEntries
-    // silently produced `{"0": ..., "1": ...}`, which every consumer then
-    // iterates with for...of and throws on -- and because the object is written
-    // straight back to disk on the next save, one load was enough to corrupt the
-    // save permanently. Nothing caught it because the return was cast, so the
-    // cast is gone too; the shape is checked now.
-    awardWinners: entry.awardWinners?.map((w) => ({ ...w, ovr: lift(w.ovr) })),
-    retirements: entry.retirements && {
-      ...entry.retirements,
-      notable: entry.retirements.notable.map((r) => ({ ...r, ovr: lift(r.ovr) })),
-    },
-  }));
-
-  // Every past snapshot is on the rating scale too, and none of it is ever
-  // recomputed — PowerRankings renders past rows in the same table as the live
-  // one, so an unlifted history reads as the whole world dropping 11 points the
-  // moment you look back a season.
-  const powerRankingHistory = (league.powerRankingHistory ?? []).map((snap) => ({
-    ...snap,
-    rows: snap.rows.map((row) => ({
-      ...row,
-      ovr: lift(row.ovr),
-      pot: lift(row.pot),
-      powerScore: lift(row.powerScore),
-    })),
-  }));
-
-  return {
-    ...league,
-    meta: { ...league.meta, ovrScale: OVR_SCALE_SHIFT },
-    players,
-    retiredPlayers,
-    seasonHistory,
-    powerRankingHistory,
-    international: rescaleInternational(league.international, lift),
-  };
-}
-
-/**
- * The international state's stored mean OVRs: a nation's squad rating and every
- * rank in a power snapshot. Same argument as `powerRankingHistory` — derived
- * once, stored forever, never recomputed, and shown beside live numbers.
- */
-function rescaleInternational(
-  intl: LeagueStore["international"],
-  lift: (v: number) => number,
-): LeagueStore["international"] {
-  if (!intl) return intl;
-  const squads = <T extends { rating: number }>(rows: T[]): T[] =>
-    rows.map((s) => ({ ...s, rating: lift(s.rating) }));
-  return {
-    ...intl,
-    powerRankings: (intl.powerRankings ?? []).map((snap) => ({
-      ...snap,
-      ranks: snap.ranks.map((r) => ({ ...r, rating: lift(r.rating) })),
-    })),
-    qualifying: intl.qualifying && { ...intl.qualifying, squads: squads(intl.qualifying.squads) },
-    tournament: intl.tournament && { ...intl.tournament, squads: squads(intl.tournament.squads) },
-    confederationCups: (intl.confederationCups ?? []).map((c) => ({
-      ...c,
-      squads: squads(c.squads),
-    })),
-  };
+  return cullOnLoad(migrateFields(league));
 }
 
 /**

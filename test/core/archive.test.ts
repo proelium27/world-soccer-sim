@@ -144,8 +144,8 @@ describe("extendRetireeArchive", () => {
 
   it("appends only the archive-worthy retirees", () => {
     const out = extendRetireeArchive([], [
-      worthy(1, RETIREE_ARCHIVE_MIN_PEAK_OVR),
-      makePlayer({ pid: 2, hist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR + 10]] }), // never played
+      worthy(1, 80),
+      makePlayer({ pid: 2, hist: [[2029, 90]] }), // never played
     ], SEASON);
     expect(out.map((r) => r.pid)).toEqual([1]);
   });
@@ -153,10 +153,10 @@ describe("extendRetireeArchive", () => {
   it("keeps the best careers when the cap is exceeded, not the oldest", () => {
     // A dynasty must lose its journeymen, not its legends — the whole reason
     // the cap prunes by career score rather than by age.
-    const existing: ArchivedPlayer[] = [archivePlayer(worthy(1, RETIREE_ARCHIVE_MIN_PEAK_OVR + 15), 2000)];
+    const existing: ArchivedPlayer[] = [archivePlayer(worthy(1, 95), 2000)];
     const out = extendRetireeArchive(
       existing,
-      [worthy(2, RETIREE_ARCHIVE_MIN_PEAK_OVR + 1), worthy(3, RETIREE_ARCHIVE_MIN_PEAK_OVR + 5)],
+      [worthy(2, 71), worthy(3, 85)],
       SEASON,
       2,
     );
@@ -166,7 +166,7 @@ describe("extendRetireeArchive", () => {
 
   it("is pure: the same input produces the same output and the input is untouched", () => {
     const existing: ArchivedPlayer[] = [];
-    const retirees = [worthy(1, RETIREE_ARCHIVE_MIN_PEAK_OVR), worthy(2, RETIREE_ARCHIVE_MIN_PEAK_OVR + 2)];
+    const retirees = [worthy(1, 80), worthy(2, 82)];
     const a = extendRetireeArchive(existing, retirees, SEASON);
     const b = extendRetireeArchive(existing, retirees, SEASON);
     expect(a).toEqual(b);

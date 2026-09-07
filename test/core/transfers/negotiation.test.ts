@@ -11,7 +11,6 @@ import {
   RESERVATION_FACTOR_MIN, RESERVATION_FACTOR_MAX,
   NEGOTIATION_LOWBALL_FACTOR, NEGOTIATION_MAX_ROUNDS,
   SCOUTING_SPEND_MAX, ROSTER_CAP,
-  DIVISION_2_REFUSAL_OVR_THRESHOLD, VALUATION_ELITE_THRESHOLD,
 } from "../../../src/core/constants.js";
 
 /** Pads the user's roster (tid 0) up to ROSTER_CAP with fabricated pids. */
@@ -239,22 +238,13 @@ describe("makeTransferOffer / acceptCounterOffer", () => {
     const d2Team = league.teams.find((t) => t.compId === 1 && t.tid !== 0)!;
     const d1Team = league.teams.find((t) => t.compId === 0 && t.tid !== 0)!;
     const target = league.players.find((p) => d2Team.roster.includes(p.pid))!;
-    // A "breakout" D2 player is one at/above DIVISION_2_REFUSAL_OVR_THRESHOLD:
-    // wouldRefuseExtension flags him as buyable even though the depth floor
-    // wouldn't. He also has to stay below VALUATION_ELITE_THRESHOLD to remain
-    // affordable, since the elite premium deliberately prices the very best
-    // players out of every budget (see valuation.test.ts) — a separate mechanic
-    // from the refusal path this test exercises.
-    //
-    // Sat at the midpoint of the two rather than written out as a number, so it
-    // stays between them when the rating scale moves (it did, +11, and a
-    // hardcoded 74 quietly stopped being a breakout at all).
-    const breakoutOvr = Math.floor(
-      (DIVISION_2_REFUSAL_OVR_THRESHOLD + VALUATION_ELITE_THRESHOLD) / 2,
-    );
-    expect(breakoutOvr).toBeGreaterThanOrEqual(DIVISION_2_REFUSAL_OVR_THRESHOLD);
-    expect(breakoutOvr).toBeLessThan(VALUATION_ELITE_THRESHOLD);
-    const star = { ...target, ovr: breakoutOvr, potential: breakoutOvr };
+    // A "breakout" D2 player is one at/above DIVISION_2_REFUSAL_OVR_THRESHOLD
+    // (70): wouldRefuseExtension flags him as buyable even though the depth
+    // floor wouldn't. Keep him below VALUATION_ELITE_THRESHOLD (76) so he's
+    // still affordable — the elite premium deliberately prices the very best
+    // players out of every budget (see valuation.test.ts), which is a separate
+    // mechanic from the refusal path this test exercises.
+    const star = { ...target, ovr: 74, potential: 74 };
     const players = league.players.map((p) => (p.pid === target.pid ? star : p));
 
     // Thin the D2 club's roster at his position down to just him, so a sale
