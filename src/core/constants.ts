@@ -205,7 +205,13 @@ export const DIVISION_2_REFUSAL_OVR_THRESHOLD = 70 + OVR_SCALE_SHIFT;
  */
 const DIVISION_REFUSAL_OVR_BY_TIER: Record<number, number> = {
   2: DIVISION_2_REFUSAL_OVR_THRESHOLD,
-  3: 62,
+  // Shifted like every other position on the scale. Left at a bare 62 while
+  // tier 2 moved with OVR_SCALE_SHIFT, the gap between the two ceilings went
+  // from the designed 8 points to 19 — and measured on a fresh world, nine
+  // third-division players cleared the stale bar at GENERATION, where before it
+  // caught nobody until a career had developed. The sweep would have emptied
+  // third divisions upward far harder than intended.
+  3: 62 + OVR_SCALE_SHIFT,
 };
 
 /**

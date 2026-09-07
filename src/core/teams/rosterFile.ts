@@ -4,6 +4,7 @@ import type { PlayerRatings, Position } from "../players/types.js";
 import { POSITIONS, SKILL_KEYS } from "../players/types.js";
 import { sanitizeNationalityWeights, type NationalityWeights } from "../players/nationalities.js";
 import { worldCompetitions, MAX_DIVISIONS } from "../competitions.js";
+import { OVR_SCALE_SHIFT, RATING_MIN, RATING_MAX } from "../constants.js";
 
 /**
  * A compact, human/AI-authorable file describing clubs to overlay onto an
@@ -98,6 +99,27 @@ export interface RosterFile {
    * who omitted a nationality, and every youth intake from then on.
    */
   nationalities?: NationalityWeights;
+  /**
+   * Which rating scale this file's `overall`, `ratings` and `potential` values
+   * are on, as the `OVR_SCALE_SHIFT` in force when it was written.
+   *
+   * The roster-file twin of `meta.ovrScale`, and it exists for the same reason:
+   * these are absolute ratings with nothing behind them to re-derive from, so a
+   * file written before the scale moved describes players 11 points below the
+   * world it is being imported into. That is worse than it sounds, because the
+   * filler that tops a short squad up is generated ON the current scale — so a
+   * stale file lands real first-teamers *below* their own auto-generated
+   * reserves, and prices them off a wage floor 11 points above where they sit.
+   *
+   * **Absent means 0**, the scale everything predating the shift was authored
+   * on, which covers every file written so far including the hosted "Download
+   * Real Rosters" one. `applyRosterFile` lifts by the difference.
+   *
+   * A number rather than a flag, so the scale can move again without a second
+   * marker — and so a file authored on a LATER scale than the game reading it
+   * is shifted down rather than silently trusted.
+   */
+  ovrScale?: number;
 }
 
 /** What newly written roster files declare. */
@@ -233,6 +255,10 @@ export function buildRosterFile(league: LeagueStore): RosterFile {
   return {
     format: ROSTER_FILE_FORMAT,
     formatVersion: ROSTER_FILE_VERSION,
+    // Stamped so a template exported today is never mistaken for a pre-shift
+    // file and lifted. buildRosterFile emits identities only, so nothing here
+    // carries a rating yet — but the field has to be right the moment it does.
+    ovrScale: OVR_SCALE_SHIFT,
     competitions: league.competitions.map((comp) => ({
       match: comp.name,
       // Stated outright as well as named, so a template survives the divisions
@@ -414,11 +440,69 @@ export function parseRosterFile(text: string): RosterFile {
 
   const nationalities = parseNationalities(obj.nationalities);
 
-  return {
+  // Strict about shape, like every other field: a non-number here means the
+  // author wrote something they did not mean, and silently reading it as "the
+  // old scale" would shift a whole world by 11 without saying so.
+  if (obj.ovrScale !== undefined && typeof obj.ovrScale !== "number") {
+    throw new Error(
+      `Invalid roster file: "ovrScale" must be a number (got ${JSON.stringify(obj.ovrScale)}).`,
+    );
+  }
+
+  // Normalised HERE rather than at import, so everything downstream — combining
+  // several files, retargeting one onto an added league, the picker's preview —
+  // is working in one set of units. Doing it at import instead leaves
+  // `combineRosterFiles` merging competitions out of files on different scales
+  // into one file with a single `ovrScale`, which then lifts half of them wrong.
+  return rescaleRosterFile({
     format: ROSTER_FILE_FORMAT,
     formatVersion: ROSTER_FILE_VERSION,
     competitions,
     ...(nationalities ? { nationalities } : {}),
+    ...(obj.ovrScale === undefined ? {} : { ovrScale: obj.ovrScale }),
+  });
+}
+
+/**
+ * Lift a roster file's absolute ratings onto the game's current scale.
+ *
+ * `overall`, `ratings` and `potential` are raw numbers with nothing behind them
+ * to re-derive from, so a file written before OVR_SCALE_SHIFT describes players
+ * 11 points below the world it is being imported into — and the filler that tops
+ * a short squad up is generated on the CURRENT scale, so a stale file lands real
+ * first-teamers below their own auto-generated reserves and prices them off a
+ * wage floor above where they sit.
+ *
+ * Absent `ovrScale` means 0, which covers every file authored before the shift,
+ * the hosted "Download Real Rosters" one included. A no-op when the scales
+ * already agree, so a file written today passes through untouched — which is
+ * also what makes it safe to call again at import for a hand-built file that
+ * never went through the parser.
+ */
+export function rescaleRosterFile(file: RosterFile): RosterFile {
+  const delta = OVR_SCALE_SHIFT - (file.ovrScale ?? 0);
+  if (delta === 0) return file;
+  const lift = (v: number): number =>
+    Math.round(Math.max(RATING_MIN, Math.min(RATING_MAX, v + delta)));
+  return {
+    ...file,
+    ovrScale: OVR_SCALE_SHIFT,
+    competitions: file.competitions.map((comp) => ({
+      ...comp,
+      clubs: comp.clubs.map((club) => (
+        club.players === undefined ? club : {
+          ...club,
+          players: club.players.map((p) => ({
+            ...p,
+            overall: p.overall === undefined ? undefined : lift(p.overall),
+            potential: p.potential === undefined ? undefined : lift(p.potential),
+            ratings: p.ratings === undefined ? undefined : Object.fromEntries(
+              (Object.keys(p.ratings) as (keyof PlayerRatings)[]).map((k) => [k, lift(p.ratings![k])]),
+            ) as PlayerRatings,
+          })),
+        }
+      )),
+    })),
   };
 }
 

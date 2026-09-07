@@ -394,24 +394,44 @@ function rescaleRatings(league: LeagueStore): LeagueStore {
   // no ratings behind them, so nothing else can recover these. Left alone, every
   // retiree and every past award winner would read 11 points worse than the
   // living players beside them, for the life of the save.
+  //
+  // `finalOvr` is lifted alongside `peakOvr` for exactly that reason: it is the
+  // rating he retired at, stored rather than derived, and it is read on the
+  // retiree's profile and (via awardWinners) on the awards board, where it would
+  // otherwise sit 11 below a correctly-lifted peak on the same card.
   const retiredPlayers = (league.retiredPlayers ?? []).map((r) => ({
     ...r,
     peakOvr: lift(r.peakOvr),
+    finalOvr: lift(r.finalOvr),
     seasons: r.seasons.map((s) => ({ ...s, ovr: lift(s.ovr) })),
   }));
   const seasonHistory = (league.seasonHistory ?? []).map((entry) => ({
     ...entry,
-    ...(entry.awardWinners === undefined ? {} : {
-      awardWinners: Object.fromEntries(
-        Object.entries(entry.awardWinners).map(([pid, w]) => [pid, { ...w, ovr: lift(w.ovr) }]),
-      ),
-    }),
-    ...(entry.retirements === undefined ? {} : {
-      retirements: {
-        ...entry.retirements,
-        notable: entry.retirements.notable.map((r) => ({ ...r, ovr: lift(r.ovr) })),
-      },
-    }),
+    // An ARRAY, not a record. Mapping it through Object.entries/fromEntries
+    // silently produced `{"0": ..., "1": ...}`, which every consumer then
+    // iterates with for...of and throws on -- and because the object is written
+    // straight back to disk on the next save, one load was enough to corrupt the
+    // save permanently. Nothing caught it because the return was cast, so the
+    // cast is gone too; the shape is checked now.
+    awardWinners: entry.awardWinners?.map((w) => ({ ...w, ovr: lift(w.ovr) })),
+    retirements: entry.retirements && {
+      ...entry.retirements,
+      notable: entry.retirements.notable.map((r) => ({ ...r, ovr: lift(r.ovr) })),
+    },
+  }));
+
+  // Every past snapshot is on the rating scale too, and none of it is ever
+  // recomputed — PowerRankings renders past rows in the same table as the live
+  // one, so an unlifted history reads as the whole world dropping 11 points the
+  // moment you look back a season.
+  const powerRankingHistory = (league.powerRankingHistory ?? []).map((snap) => ({
+    ...snap,
+    rows: snap.rows.map((row) => ({
+      ...row,
+      ovr: lift(row.ovr),
+      pot: lift(row.pot),
+      powerScore: lift(row.powerScore),
+    })),
   }));
 
   return {
@@ -420,7 +440,36 @@ function rescaleRatings(league: LeagueStore): LeagueStore {
     players,
     retiredPlayers,
     seasonHistory,
-  } as LeagueStore;
+    powerRankingHistory,
+    international: rescaleInternational(league.international, lift),
+  };
+}
+
+/**
+ * The international state's stored mean OVRs: a nation's squad rating and every
+ * rank in a power snapshot. Same argument as `powerRankingHistory` — derived
+ * once, stored forever, never recomputed, and shown beside live numbers.
+ */
+function rescaleInternational(
+  intl: LeagueStore["international"],
+  lift: (v: number) => number,
+): LeagueStore["international"] {
+  if (!intl) return intl;
+  const squads = <T extends { rating: number }>(rows: T[]): T[] =>
+    rows.map((s) => ({ ...s, rating: lift(s.rating) }));
+  return {
+    ...intl,
+    powerRankings: (intl.powerRankings ?? []).map((snap) => ({
+      ...snap,
+      ranks: snap.ranks.map((r) => ({ ...r, rating: lift(r.rating) })),
+    })),
+    qualifying: intl.qualifying && { ...intl.qualifying, squads: squads(intl.qualifying.squads) },
+    tournament: intl.tournament && { ...intl.tournament, squads: squads(intl.tournament.squads) },
+    confederationCups: (intl.confederationCups ?? []).map((c) => ({
+      ...c,
+      squads: squads(c.squads),
+    })),
+  };
 }
 
 /**

@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { migrateLeague } from "../../src/db/migrate.js";
 import { makeLeague } from "../helpers/league.js";
+import { playSeason } from "../helpers/offseasonLeague.js";
+import { simOffseason } from "../../src/core/offseason.js";
+import { mulberry32 } from "../../src/engine/rng.js";
 import { GEN_OFFSETS } from "../../src/core/players/templates.js";
 import type { SkillKey } from "../../src/core/players/types.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 import {
   OVR_SCALE_SHIFT, DIVISION_2_REFUSAL_OVR_THRESHOLD, PROTECTED_STAR_OVR,
-  WAGE_OVR_FLOOR, GOAT_OVR_BASELINE, AWARD_OVR_BASELINE,
+  WAGE_OVR_FLOOR, GOAT_OVR_BASELINE, AWARD_OVR_BASELINE, RATING_MAX,
 } from "../../src/core/constants.js";
 
 /**
@@ -84,6 +87,68 @@ describe("OVR scale migration", () => {
       expect(twice.players[i].ovr).toBe(once.players[i].ovr);
       expect(twice.players[i].potential).toBe(once.players[i].potential);
     }
+  });
+
+  it("keeps awardWinners an ARRAY, and lifts the history nothing else can recover", () => {
+    // The bug this pins was silent and permanent: mapping awardWinners through
+    // Object.entries/fromEntries turned the array into {"0": ..., "1": ...},
+    // which migrateLeague itself tolerated and then wrote back to disk, and
+    // which every consumer iterates with for...of and throws on. One load was
+    // enough to corrupt the save.
+    // Built from a REAL played season rather than a hand-written entry, because
+    // the shapes migrateFields walks are deep and a thin fixture proves nothing
+    // about the entry a save actually holds. Marking a current save "stale"
+    // lifts it a second time, which is semantically odd and exactly right for
+    // what is being measured: the mechanics of the lift, against a known before.
+    const rng = mulberry32(11);
+    const played = simOffseason(playSeason(makeLeague(0, 3), rng), rng);
+    const stale: LeagueStore = { ...played, meta: { ...played.meta, ovrScale: undefined } };
+
+    const out = migrateLeague(stale);
+    const before = played.seasonHistory[0];
+    const after = out.seasonHistory[0];
+    expect(before.awardWinners!.length).toBeGreaterThan(0);
+
+    expect(Array.isArray(after.awardWinners)).toBe(true);
+    expect(() => [...after.awardWinners!]).not.toThrow();
+    // Clamped, because this fixture deliberately lifts an already-shifted save a
+    // second time and an award winner is by definition near the top of the
+    // scale, so plenty of them land past RATING_MAX.
+    const lifted = (v: number) => Math.min(RATING_MAX, v + OVR_SCALE_SHIFT);
+    expect(after.awardWinners!.map((w) => w.ovr))
+      .toEqual(before.awardWinners!.map((w) => lifted(w.ovr)));
+
+    // Every past power-ranking row is on the rating scale too, is never
+    // recomputed, and is rendered in the same table as the live one — so an
+    // unlifted history reads as the whole world dropping 11 points a season ago.
+    expect(played.powerRankingHistory.length).toBeGreaterThan(0);
+    const rowBefore = played.powerRankingHistory[0].rows[0];
+    const rowAfter = out.powerRankingHistory[0].rows[0];
+    expect(rowAfter.ovr).toBe(lifted(rowBefore.ovr));
+    expect(rowAfter.pot).toBe(lifted(rowBefore.pot));
+    expect(rowAfter.powerScore).toBe(lifted(rowBefore.powerScore));
+  });
+
+  it("lifts finalOvr alongside peakOvr, since neither can be re-derived", () => {
+    // finalOvr is the rating a retiree stopped at, stored with no ratings behind
+    // it. Missed, his profile shows a final rating 11 below a correctly-lifted
+    // peak on the same card, and an old award winner resolved through the
+    // archive lands 11 low on the awards board.
+    const base = preShiftSave();
+    const stale: LeagueStore = {
+      ...base,
+      retiredPlayers: [{
+        ...(makeLeague(0, 1).retiredPlayers[0] ?? {}),
+        pid: 9_000_001,
+        peakOvr: 60,
+        finalOvr: 52,
+        seasons: [{ season: 1, tid: 0, ovr: 58, apps: 30 }],
+      }] as unknown as LeagueStore["retiredPlayers"],
+    };
+    const r = migrateLeague(stale).retiredPlayers[0];
+    expect(r.peakOvr).toBe(60 + OVR_SCALE_SHIFT);
+    expect(r.finalOvr).toBe(52 + OVR_SCALE_SHIFT);
+    expect(r.seasons[0].ovr).toBe(58 + OVR_SCALE_SHIFT);
   });
 
   it("leaves a save already on the current scale untouched", () => {
