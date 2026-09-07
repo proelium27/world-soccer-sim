@@ -50,6 +50,7 @@ import type { Player, SeasonStats } from "../../core/players/types.js";
 import { isSuspended, matchesLabel } from "../../core/suspensions.js";
 import { pointsDeductionMap } from "../../core/finance/debt.js";
 import { userDebtView } from "../userDebt.js";
+import { debtNewsBySeason } from "../../core/debtNews.js";
 
 /**
  * One job's standing, as a single line: who you answer to, a thin bar, and
@@ -306,11 +307,18 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
       ...(promotions.get(league.season - 1) ?? []),
     ];
 
+    // This season's sanction, if there is one. It sorts at the top of the
+    // season (an embargo governs the window about to open), and this panel
+    // reads the END of the timeline, so it shows while the season is young and
+    // ages out as results come in. That is the right behaviour: the standing
+    // warning lives in the Finances card below, which does not age out.
+    const shownSanctions = debtNewsBySeason(league.debtSanctions).get(league.season) ?? [];
+
     const newsTimeline = buildSeasonTimeline(currentSeasonTransfers, currentSeasonEvents, {
       userTid,
       userCompId: comps[userTid],
       compOf: (tid) => comps[tid],
-    }, lastSeasonHonours, shownTrophies, [], shownPromotions);
+    }, lastSeasonHonours, shownTrophies, [], shownPromotions, shownSanctions);
     return [...newsTimeline].slice(-NEWS_TOP_N).reverse();
   }, [
     league.transfers, league.newsEvents, league.season, league.played,
@@ -318,6 +326,7 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
     league.cup, league.cupHistory, league.shield, league.shieldHistory, league.international,
     league.promotionPlayoffs,
     league.superCups,
+    league.debtSanctions,
   ]);
 
   const teamByTid = useMemo(() => new Map(league.teams.map((t) => [t.tid, t])), [league.teams]);

@@ -2320,7 +2320,15 @@ export function Manual() {
             show in the standings as a red figure next to your total, so the table always adds up.
           </p>
           <p>
-            Only your club is ever sanctioned. AI clubs manage their money the way they always have.
+            Both penalties appear in your <strong>news feed</strong> the season they come into
+            force, at the top of that season ahead of the summer window &mdash; which is the right
+            place for them, because an embargo governs the window you are about to trade in. A club
+            in your own league picking one up shows there too.
+          </p>
+          <p>
+            Only your club is ever sanctioned. AI clubs manage their money the way they always
+            have. One wrinkle: a sanction belongs to the <em>club</em>, not to you, so if you take
+            another job the club you left still serves out whatever you left it with.
           </p>
         </Section>
 

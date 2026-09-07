@@ -111,6 +111,27 @@ export function newsHeadlineNode(item: FeedItem, ctx: NewsHeadlineContext): Reac
         return <>{who} makes the {comp ?? "league"} Team of the Season</>;
     }
   }
+  if (item.kind === "debt") {
+    const d = item.data;
+    const club = teamByTid.get(d.tid)?.name ?? "A club";
+    // Two separate sentences rather than one with a clause, because the two
+    // penalties land at different depths and a reader who only ever gets the
+    // embargo should not have to parse around a deduction that did not happen.
+    if (d.pointsDeduction > 0) {
+      return (
+        <>
+          {club} start the season on -{d.pointsDeduction} points and under a transfer
+          embargo, for finishing {currency.format(-d.balance)} overdrawn
+        </>
+      );
+    }
+    return (
+      <>
+        {club} are under a transfer embargo, for finishing{" "}
+        {currency.format(-d.balance)} overdrawn
+      </>
+    );
+  }
   const e = item.data;
   const player = playerByPid.get(e.pid);
   switch (e.type) {
