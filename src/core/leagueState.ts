@@ -28,7 +28,7 @@ import { generateSchedule } from "./schedule.js";
 import { SEASON_MATCHDAYS } from "./calendar.js";
 import { worldCompetitions } from "./competitions.js";
 import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
-import { DEFAULT_DIFFICULTY, type Difficulty } from "./constants.js";
+import { DEFAULT_DIFFICULTY, OVR_SCALE_SHIFT, type Difficulty } from "./constants.js";
 import { isSpectatorTid } from "./spectator.js";
 
 export type { StoredTeam } from "./teams/clubs.js";
@@ -89,6 +89,25 @@ export interface LeagueStore {
      * already means the 2026 those saves have always displayed.
      */
     startYear?: number;
+    /**
+     * Which rating scale this save's stored ratings are on, as the
+     * `OVR_SCALE_SHIFT` in force when they were generated.
+     *
+     * The one piece of version information a save carries about its own
+     * numbers, and it exists because the alternative failed loudly: every
+     * threshold in the game moved +11 with the scale, so a save left on the old
+     * one would field 65-rated players against an 81-rated Division 2 ceiling
+     * and pay wages off a floor 11 points below its own squad — about 5.6x too
+     * cheap. `migrate.ts` compares this against the live constant and lifts the
+     * stored ratings by the difference.
+     *
+     * **Absent means 0**, i.e. a save from before the shift, which is exactly
+     * right: those saves were generated on the unshifted scale. Once migrated
+     * the field is written, so the lift happens once and is not re-applied.
+     * Keeping it as a number rather than a boolean is what lets the scale move
+     * again later without a second marker.
+     */
+    ovrScale?: number;
   };
   /** The leagues in this save's world, one entry per division per country (see competitions.ts). */
   competitions: Competition[];
@@ -396,6 +415,9 @@ export function createLeagueState(
       name: "My League",
       created: Date.now(),
       userTid,
+      // Stamped at creation so this save is never mistaken for a pre-shift one
+      // and lifted a second time. See meta.ovrScale.
+      ovrScale: OVR_SCALE_SHIFT,
     },
     competitions,
     teams,
