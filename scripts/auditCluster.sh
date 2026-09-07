@@ -72,7 +72,12 @@ AGGREGATING="weakLeaguesAudit leagueVolumeProbe positionAwardAudit midVsMidProbe
 # Env knobs the audits actually read (grep for process.env across scripts/).
 # SEEDS is deliberately absent -- it is what gets split. Add to this list when a
 # new audit reads a new variable, or it silently won't reach the remote.
-FORWARD_VARS="SEASONS SEED SHOW RUN RATE N ALL_N COUNTRY"
+# MODEL is weakLeaguesAudit's development-model knob, and it is the sharpest
+# illustration of why this list has to be maintained: unset, the remote half
+# does not fail, it quietly audits the DEFAULT model. Half the seeds would then
+# describe a different game from the other half, pooled into one verdict that
+# looks perfectly well-formed.
+FORWARD_VARS="SEASONS SEED SHOW RUN RATE N ALL_N COUNTRY MODEL"
 
 PER_SEED_ONLY=0
 FORCE_LOCAL=0
