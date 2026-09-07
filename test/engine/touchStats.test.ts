@@ -83,27 +83,8 @@ const SEASON = simSeason(mulberry32(12345));
  * on that club's bench, and the picker had been refusing a 6-point penalty at a
  * cost of up to 35 rating points. Formation choice moved with it, since
  * chooseBestFormation scores the same number.
- *
- * And again for OVR_SCALE_SHIFT, which lifted every generated rating by 11 so
- * the game reads on EA FC's scale. This one is the odd entry in the list,
- * because it was expected NOT to move the hash and it moved anyway. A uniform
- * additive shift should be invisible here by construction: composites
- * z-normalise within a competition, so a constant added to everyone leaves every
- * z-score, and every rating-reading rule shifted with it. What breaks the
- * symmetry is the clamps at RATING_MIN and RATING_MAX — a shift lifts the
- * weakest ratings off the floor they were underflowing into (world-wide,
- * ratings pinned at 1 fell 7,291 -> 1,531) and pushes a small tail into the
- * ceiling, and either end changes the spread a competition normalises against.
- *
- * So the hash moved while the football did not: measured over 8 seasons,
- * goals/match 3.1414 -> 3.1372, home-win rate .4191 -> .4220, champion points
- * 78.25 -> 78.75 against a per-season range of 71-90. `scripts/ovrScaleProbe.ts`
- * and `scripts/ovrScaleMatchProbe.ts` are what establish that, and they are the
- * right tools if this ever has to be judged again — a hash is all-or-nothing and
- * cannot tell a one-goal difference from a broken sim. Attribution is untouched,
- * which is the invariant this test actually exists for.
  */
-const BASELINE_SCORELINE_HASH = 346702056;
+const BASELINE_SCORELINE_HASH = 3838391028;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");

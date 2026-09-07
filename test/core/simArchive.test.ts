@@ -54,32 +54,16 @@ describe("simArchive", () => {
   }, 600_000);
 
   it("detach empties exactly the held-back fields and keeps everything else", () => {
-    // The retiree is SYNTHETIC rather than whatever three seasons happened to
-    // produce, because what this asserts is that detachArchive empties the
-    // field and keeps the rest — a property that has nothing to do with how the
-    // row got there, and everything to lose by depending on it.
-    //
-    // It used to read the simulated archive, and three seasons of this seed
-    // yielded exactly two worthy retirees against an assertion of "more than
-    // zero". `isArchiveWorthy` wants a senior appearance and either a peak ovr
-    // over the bar or 200 games, which almost nobody clears that early, so the
-    // margin was two players out of a whole world. Shifting the rating scale
-    // (OVR_SCALE_SHIFT) perturbed which squads exist, hence which players
-    // retire, and the count went 2 -> 0 — nothing to do with archiving, and it
-    // failed the case as though detach were broken. Seeding the row makes it
-    // say what it means and stops it being hostage to sim luck.
-    const retiree = { pid: -1, totals: { appearances: 300 }, best: {}, seasons: [] } as unknown as ArchivedPlayer;
-    const seeded: LeagueStore = { ...league, retiredPlayers: [...league.retiredPlayers, retiree] };
-    const { payload, archive } = detachArchive(seeded);
+    const { payload, archive } = detachArchive(league);
 
     expect(archive.powerRankingHistory.length).toBeGreaterThan(0);
-    expect(archive.retiredPlayers).toContainEqual(retiree);
+    expect(archive.retiredPlayers.length).toBeGreaterThan(0);
     expect(payload.powerRankingHistory).toEqual([]);
     expect(payload.retiredPlayers).toEqual([]);
 
     // Nothing else may be disturbed — the sim reads the rest.
     const rest = (l: LeagueStore) => ({ ...l, powerRankingHistory: [], retiredPlayers: [] });
-    expect(rest(payload)).toEqual(rest(seeded));
+    expect(rest(payload)).toEqual(rest(league));
   });
 
   it("an offseason on a detached league lands where an undetached one does", () => {
