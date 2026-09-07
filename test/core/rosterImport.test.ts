@@ -19,10 +19,10 @@ function fileWithSquad(players: unknown[], ovrScale: number | null = OVR_SCALE_S
     JSON.stringify({
       format: "world-soccer-sim-roster",
       formatVersion: 1,
-      // Stamped, so these read as files authored TODAY. A file with no
-      // ovrScale is a pre-shift one by definition and is lifted on import --
-      // which is its own case below, not something every other test should be
-      // silently exercising.
+      // Stamped, so these read as files authored TODAY and pass through the
+      // scale logic untouched. The marked-older and unmarked cases are their
+      // own tests below rather than something every other case exercises by
+      // accident.
       //
       // `null` rather than `undefined` is the omit sentinel, because passing
       // `undefined` to a defaulted parameter TRIGGERS the default -- so the
@@ -443,48 +443,65 @@ describe("applyRosterFileToNewLeague", () => {
 describe("applyRosterFile — rating scale", () => {
   /**
    * A roster file's `overall`/`ratings`/`potential` are absolute numbers with
-   * nothing behind them to re-derive from, so a file written before
-   * OVR_SCALE_SHIFT describes players 11 points below the world it lands in.
+   * nothing behind them to re-derive from, so a file has to say which scale it
+   * is on. The rule is NOT the one `meta.ovrScale` uses, and the difference is
+   * what these cases pin:
    *
-   * That is worse than it sounds, and the second case is the one that says why:
-   * the filler topping a short squad up is generated on the CURRENT scale, so an
-   * unlifted file puts real first-teamers BELOW their own auto-generated
-   * reserves, and prices them off a wage floor 11 points above where they sit.
-   * It covers every file authored so far, the hosted "Download Real Rosters" one
-   * included.
+   *  - marked -> lifted by the difference, because the file said what it meant;
+   *  - unmarked -> read literally, because an unmarked file is of unknown
+   *    provenance and a hand- or AI-authored one carries real-world numbers
+   *    rather than this game's.
+   *
+   * Guessing "old game scale" for unmarked files is what a first cut did, and
+   * the last case here is the measurement that killed it.
    */
-  const spec = (name: string, pos: string, overall: number) =>
-    ({ name, pos, age: 24, overall, potential: overall });
+  const spec = (name: string, pos: string, overall: number, potential = overall) =>
+    ({ name, pos, age: 24, overall, potential });
 
-  const ovrOf = (f: RosterFile, name: string) => {
+  const importedByName = (f: RosterFile) => {
     const out = applyRosterFile(league, f).league;
     const team = out.teams.find((t) => t.tid === d1Slot0.tid)!;
     const byPid = new Map(out.players.map((p) => [p.pid, p]));
-    return team.roster.map((pid) => byPid.get(pid)!).find((p) => p.name === name)!.ovr;
+    return new Map(team.roster.map((pid) => byPid.get(pid)!).map((p) => [p.name, p]));
   };
 
-  it("lifts a file with no scale marker onto the current one", () => {
-    const legacy = fileWithSquad([spec("Legacy", "ST", 70)], null);
-    const current = fileWithSquad([spec("Current", "ST", 70 + OVR_SCALE_SHIFT)]);
-    // The same player, authored on either scale, lands on the same rating.
-    expect(ovrOf(legacy, "Legacy")).toBe(ovrOf(current, "Current"));
-    expect(ovrOf(legacy, "Legacy")).toBeGreaterThanOrEqual(70 + OVR_SCALE_SHIFT - 1);
+  it("reads an unmarked file exactly as written", () => {
+    // An unmarked file is of unknown provenance, so the numbers mean what they
+    // say. This is also what the game did before the scale moved, so no file
+    // anyone already has changes behaviour.
+    const p = importedByName(fileWithSquad([spec("Plain", "ST", 74, 82)], null)).get("Plain")!;
+    expect(Math.abs(p.ovr - 74)).toBeLessThanOrEqual(1);
+    expect(p.potential).toBe(82);
   });
 
-  it("keeps a legacy file's first-teamers above the filler generated around them", () => {
-    const out = applyRosterFile(league, fileWithSquad([spec("Star", "ST", 78)], null)).league;
-    const team = out.teams.find((t) => t.tid === d1Slot0.tid)!;
-    const byPid = new Map(out.players.map((p) => [p.pid, p]));
-    const squad = team.roster.map((pid) => byPid.get(pid)!);
-    const star = squad.find((p) => p.name === "Star")!;
-    const filler = squad.filter((p) => p.name !== "Star");
-    expect(filler.length).toBeGreaterThan(0);
-    expect(star.ovr).toBeGreaterThan(Math.max(...filler.map((p) => p.ovr)));
+  it("lifts a file that states an older scale", () => {
+    // Marked as scale 0, i.e. genuinely authored on the pre-shift game scale --
+    // which is what the EA FC converter emitted before it began stamping.
+    const p = importedByName(fileWithSquad([spec("Marked", "ST", 74, 82)], 0)).get("Marked")!;
+    expect(Math.abs(p.ovr - (74 + OVR_SCALE_SHIFT))).toBeLessThanOrEqual(1);
+    expect(p.potential).toBe(Math.min(RATING_MAX, 82 + OVR_SCALE_SHIFT));
   });
 
   it("leaves a file already on the current scale exactly as written", () => {
     const want = Math.min(RATING_MAX, 70 + OVR_SCALE_SHIFT);
-    expect(Math.abs(ovrOf(fileWithSquad([spec("Exact", "ST", want)]), "Exact") - want))
-      .toBeLessThanOrEqual(1);
+    const p = importedByName(fileWithSquad([spec("Exact", "ST", want)])).get("Exact")!;
+    expect(Math.abs(p.ovr - want)).toBeLessThanOrEqual(1);
+  });
+
+  it("does not saturate the potentials of a real-world file at 99", () => {
+    // The regression this exists for. Real-world files state EA-style
+    // potentials, which already sit near the top of a 1-99 scale -- so lifting
+    // an unmarked file pushed them into the clamp. Measured before the fix: an
+    // ordinary 78-95 spread came out with 40% of the squad on potential 99,
+    // every one of them indistinguishable from every other.
+    const players = Array.from({ length: 20 }, (_, i) =>
+      spec(`P${i}`, "CM", 70 + (i % 18), 78 + (i % 18)));
+    const imported = importedByName(fileWithSquad(players, null));
+    const pots = players.map((s) => imported.get(s.name)!.potential);
+
+    expect(pots.filter((v) => v >= RATING_MAX)).toHaveLength(0);
+    // And they stay distinct rather than collapsing onto one number, which is
+    // what a clamp does to a squad and what makes it visible to a player.
+    expect(new Set(pots).size).toBe(new Set(players.map((s) => s.potential)).size);
   });
 });

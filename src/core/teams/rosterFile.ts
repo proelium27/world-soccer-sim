@@ -111,9 +111,12 @@ export interface RosterFile {
    * stale file lands real first-teamers *below* their own auto-generated
    * reserves, and prices them off a wage floor 11 points above where they sit.
    *
-   * **Absent means 0**, the scale everything predating the shift was authored
-   * on, which covers every file written so far including the hosted "Download
-   * Real Rosters" one. `applyRosterFile` lifts by the difference.
+   * **Absent means "read these literally", NOT 0** — the opposite of
+   * `meta.ovrScale`, and deliberately so. A save with no marker was written by
+   * this game and its scale is knowable; a roster file with no marker could be
+   * converter output on the game's own scale or a hand-written file carrying
+   * real-world numbers, and those want opposite treatment. See rescaleRosterFile
+   * for the measurement that settled it.
    *
    * A number rather than a flag, so the scale can move again without a second
    * marker — and so a file authored on a LATER scale than the game reading it
@@ -464,23 +467,36 @@ export function parseRosterFile(text: string): RosterFile {
 }
 
 /**
- * Lift a roster file's absolute ratings onto the game's current scale.
+ * Lift a roster file's absolute ratings onto the game's current scale, when the
+ * file says which scale it is on.
  *
- * `overall`, `ratings` and `potential` are raw numbers with nothing behind them
- * to re-derive from, so a file written before OVR_SCALE_SHIFT describes players
- * 11 points below the world it is being imported into — and the filler that tops
- * a short squad up is generated on the CURRENT scale, so a stale file lands real
- * first-teamers below their own auto-generated reserves and prices them off a
- * wage floor above where they sit.
+ * **An UNMARKED file is left exactly as written, and that is the opposite of
+ * what `meta.ovrScale` does — the asymmetry is the whole point.** A save with no
+ * marker is unambiguous: this game wrote it, on the scale in force at the time,
+ * so absent means 0 and it is lifted. A roster file with no marker is of
+ * *unknown provenance*, and the two kinds in the wild want opposite treatment:
  *
- * Absent `ovrScale` means 0, which covers every file authored before the shift,
- * the hosted "Download Real Rosters" one included. A no-op when the scales
- * already agree, so a file written today passes through untouched — which is
- * also what makes it safe to call again at import for a hand-built file that
- * never went through the parser.
+ *  - The EA FC converter rank-matches onto a freshly generated world, so its
+ *    output is on the game's own scale and a pre-shift one really is 11 low.
+ *  - A hand- or AI-authored real-world file was never on the game's scale at
+ *    all. It carries real-world numbers, which is precisely why the converter
+ *    rank-matches instead of using EA overalls raw — and since the game's scale
+ *    has now MOVED onto EA's, those files are approximately right as written.
+ *
+ * Guessing "old game scale" for both is what a first cut did, and it is wrong in
+ * the direction that shows: measured, a file stating ordinary EA potentials
+ * (78-95) came out with **40% of the squad at potential 99**, because a lift
+ * pushes numbers already near the top of a 1-99 scale into the clamp. Reading an
+ * unmarked file literally is both the safer guess and what the game did before
+ * the scale moved, so no existing file changes behaviour.
+ *
+ * The consequence to know: the hosted "Download Real Rosters" file predates the
+ * marker, so it imports on the old scale until it is regenerated — and a fresh
+ * conversion is stamped, so it only has to be done once.
  */
 export function rescaleRosterFile(file: RosterFile): RosterFile {
-  const delta = OVR_SCALE_SHIFT - (file.ovrScale ?? 0);
+  if (file.ovrScale === undefined) return file;
+  const delta = OVR_SCALE_SHIFT - file.ovrScale;
   if (delta === 0) return file;
   const lift = (v: number): number =>
     Math.round(Math.max(RATING_MIN, Math.min(RATING_MAX, v + delta)));
