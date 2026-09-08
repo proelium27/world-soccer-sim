@@ -13,7 +13,10 @@ import { ClauseLedger } from "../components/ClauseLedger.js";
 import { CompetitionSelect } from "../components/CompetitionSelect.js";
 import { competitionOf, competitionTeamCount } from "../../core/competitions.js";
 import { clausesOwedBy, clausesOwedTo } from "../../core/transfers/clauses.js";
-import { SCOUTING_SPEND_MAX, difficultyProfile } from "../../core/constants.js";
+import {
+  SCOUTING_SPEND_MAX, difficultyProfile, DEBT_INTEREST_RATE, DEBT_DEDUCTION_POINTS,
+  DEBT_DEDUCTION_REPEAT_POINTS, DEBT_DEDUCTION_MAX_POINTS,
+} from "../../core/constants.js";
 import { currency, formatWeeklyWage, ordinal, seasonYear, transferFeeLabel } from "../format.js";
 import { Flag } from "../components/Flag.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
@@ -21,6 +24,16 @@ import { PlayerRefLink, usePlayerRefs } from "../components/PlayerRefLink.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 import { pointsDeductionMap } from "../../core/finance/debt.js";
 import { userDebtView } from "../userDebt.js";
+
+/**
+ * A balance — a position rather than a movement, so it carries no plus sign.
+ * Negative uses the typographic minus rather than `currency.format`'s hyphen,
+ * because these sit directly beside `Amount`'s figures and two different dashes
+ * in one column reads as a rendering bug.
+ */
+function balanceText(value: number): string {
+  return value < 0 ? `\u2212${currency.format(-value)}` : currency.format(value);
+}
 
 /**
  * A signed money amount on the money-year timeline.
@@ -65,7 +78,7 @@ function Line(
       {unknown
         ? <span className="fin-amt fin-amt--none">&mdash;</span>
         : plain
-          ? <span className="fin-amt">{currency.format(amount ?? 0)}</span>
+          ? <span className="fin-amt">{balanceText(amount ?? 0)}</span>
           : <Amount value={amount ?? 0} />}
     </div>
   );
@@ -172,6 +185,7 @@ export function Finance() {
   // so the page that tells you your headroom and the button that refuses the
   // signing can never disagree.
   const debt = userDebtView(league);
+  const interestPct = Math.round(DEBT_INTEREST_RATE * 100);
   const seasonOver = league.phase === "offseason";
 
   // The user's own projection, so it takes the difficulty-aware scale — the
@@ -545,6 +559,86 @@ export function Finance() {
           )}
         </div>
       </div>
+
+      {/* The rules themselves, stated in the club's own money rather than in
+          percentages, and shown whether or not the club is in any trouble. The
+          three alerts at the top of this page only appear once something has
+          already gone wrong, and a rule you can only read once it has bitten
+          you is not one the player can plan around. Every figure here is
+          derived — from `userDebtView` or straight from the constants — so a
+          retune can't leave the copy quoting a threshold that has moved. */}
+      {debt && (
+        <div className="card mb-3">
+          <div className="card-body">
+            <h5 className="card-title">Borrowing and debt</h5>
+            <p className="text-secondary small">
+              Your balance is allowed to go below zero, on purpose. How far depends on what your
+              club earns, so a big side in a rich league has far more room than a small one.{" "}
+              {debt.inDebt
+                ? `You're ${currency.format(-debt.balance)} overdrawn with `
+                  + `${currency.format(debt.headroom)} of room left.`
+                : `You're in credit, with the whole ${currency.format(debt.limit)} available `
+                  + `if you want it.`}
+            </p>
+
+            <ol className="fin-year">
+              <Stage
+                when="Into the overdraft"
+                state={debt.inDebt ? (debt.projected === "clear" ? "now" : "done") : "ahead"}
+                note={
+                  `Sign who you like down to this line. Nothing stops you and nothing tells the `
+                  + `board. Any balance below zero is charged ${interestPct}% interest when the `
+                  + `next season starts, and the interest is added to the debt, so leaving it `
+                  + `alone makes it worse on its own.`
+                }
+              >
+                <Line label="You can spend down to" amount={-debt.limit} plain />
+                <Line
+                  label="Interest on today's balance"
+                  why="Charged when next season starts."
+                  amount={-debt.interestNext}
+                />
+              </Stage>
+
+              <Stage
+                when="Transfer embargo"
+                state={
+                  debt.projected === "embargo"
+                    ? "now"
+                    : debt.projected === "deduction" ? "done" : "ahead"
+                }
+                note={
+                  "Finish a season below this line and you can't buy or sign anyone for the "
+                  + "whole of the next one. You can still sell, promote from your academy and "
+                  + "take on trialists, which is the cheapest way back out."
+                }
+              >
+                <Line label="Finish the season below" amount={debt.embargoAt} plain />
+              </Stage>
+
+              <Stage
+                when="Points deduction"
+                state={debt.projected === "deduction" ? "now" : "ahead"}
+                note={
+                  `Deeper still and the league docks you points as well. Next season starts on `
+                  + `minus ${DEBT_DEDUCTION_POINTS}, climbing by ${DEBT_DEDUCTION_REPEAT_POINTS} `
+                  + `for each season running you stay down here, up to `
+                  + `${DEBT_DEDUCTION_MAX_POINTS}. One season finishing clear of the embargo `
+                  + `line wipes the record.`
+                }
+              >
+                <Line label="Finish the season below" amount={debt.deductionAt} plain />
+              </Stage>
+            </ol>
+
+            <p className="text-secondary small mb-0 mt-3">
+              Your books are read at the final whistle, not in the summer, so a good cup run can
+              rescue you and selling your best player in July can't. That's why the warnings on
+              this page start during the season, while you can still trade your way out of it.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Scouting */}
       <div className="card mb-3">
