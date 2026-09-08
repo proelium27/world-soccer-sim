@@ -800,7 +800,12 @@ export function simMatchDetailed(
     return "none";
   }
 
-  /** An injured player must come off immediately, regardless of energy — unlike attemptSub, the outgoing player is fixed. */
+  /**
+   * An injured player must come off immediately, regardless of energy — unlike a
+   * window, the outgoing player is fixed and the change fires the instant it is
+   * needed rather than at one of the side's opportunities. It still counts
+   * against MAX_SUBS, so a side that has spent all five plays on a man down.
+   */
   function forceInjurySub(side: Side, offPid: number): void {
     const off = onPitch[side].find((p) => p.pid === offPid);
     if (!off) return;
