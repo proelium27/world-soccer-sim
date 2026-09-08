@@ -3,7 +3,7 @@ import { makeLeague } from "../helpers/league.js";
 import {
   PLAYER_DB_PAGE_SIZE, STAT_COLUMNS, buildPlayerRows, careerTotalsIndex, filterPlayerRows,
   filterToSeason, matchesStatus, pageCount, pageOf, playerSortAccessors, seasonStatsIndex,
-  seasonsWithStats,
+  seasonsWithStats, sortKeysFor,
   type PlayerDbFilters,
 } from "../../src/ui/playerDatabase.js";
 import { scopeCompIds, worldCompetitions } from "../../src/core/competitions.js";
@@ -216,6 +216,27 @@ describe("sorting and paging", () => {
     }
     expect(accessors.pot(rows[0])).toBe(rows[0].scoutedPot);
     expect(accessors.speed(rows[0])).toBe(rows[0].player.ratings.speed);
+  });
+
+  it("gives every key a view offers a header for a working accessor", () => {
+    // The two lists are maintained separately (one drives the headers, one the
+    // sorting), so this is what catches a column added to a view and forgotten
+    // in the accessor table — which sorts by nothing while looking like it did.
+    const sets = ["overview", "attributes", "season", "career"] as const;
+    for (const set of sets) {
+      for (const key of sortKeysFor(set)) {
+        expect(accessors[key], `${set} offers ${key}`).toBeTypeOf("function");
+      }
+    }
+  });
+
+  it("keeps the attribute and stat views' key sets apart", () => {
+    // The proof that namespacing worked: the two names that exist in both
+    // vocabularies land in different sets.
+    expect(sortKeysFor("attributes").has("crosses")).toBe(true);
+    expect(sortKeysFor("attributes").has("stat_crosses")).toBe(false);
+    expect(sortKeysFor("season").has("stat_crosses")).toBe(true);
+    expect(sortKeysFor("season").has("crosses")).toBe(false);
   });
 
   it("pages without dropping or repeating a row", () => {

@@ -14,7 +14,7 @@ import {
 } from "../components/PlayerFilterBar.js";
 import { SortableTh, sortRows } from "../components/SortableTable.js";
 import { ClubDatabase } from "./ClubDatabase.js";
-import { ColumnSetPills, useColumnSet } from "./databaseShared.js";
+import { ColumnSetPills, columnSetOf, columnSetParams } from "./databaseShared.js";
 import { defaultView, viewFromParams, viewToParams, type DatabaseView } from "../databaseUrl.js";
 import { usePotentialView } from "../potentialView.js";
 import { currencyCompact, formatWeeklyWage, seasonYear } from "../format.js";
@@ -23,6 +23,7 @@ import { SKILL_KEYS } from "../../core/players/types.js";
 import {
   PLAYER_DB_PAGE_SIZE, STAT_COLUMNS, buildPlayerRows, careerTotalsIndex, filterPlayerRows,
   filterToSeason, pageCount, pageOf, playerSortAccessors, seasonStatsIndex, seasonsWithStats,
+  sortKeysFor,
   type PlayerColumnSet, type PlayerDbRow, type PlayerSortKey, type PlayerStatus,
   type PlayerStatusFilter,
 } from "../playerDatabase.js";
@@ -52,6 +53,9 @@ const COLUMN_SETS: { key: PlayerColumnSet; label: string }[] = [
   { key: "season", label: "Season" },
   { key: "career", label: "Career" },
 ];
+
+/** Derived from the list above, so the two can't fall out of step. */
+const PLAYER_COLUMN_KEYS = COLUMN_SETS.map((c) => c.key);
 
 /** The column the table opens sorted by, and which way. */
 const DEFAULT_SORT: PlayerSortKey = "ovr";
@@ -102,15 +106,13 @@ export function Database() {
 function PlayerDatabase() {
   const { league } = useLeague();
   const potView = usePotentialView();
-  const [columns, setColumns] = useColumnSet<PlayerColumnSet>(
-    ["overview", "attributes", "season", "career"],
-  );
   const [page, setPage] = useState(0);
 
   // Filters, sort and season live in the URL rather than in component state, so
   // a view somebody has narrowed and sorted is a link. Everything at its
   // default is left out of the query string — see databaseUrl.ts.
   const [params, setParams] = useSearchParams();
+  const columns = columnSetOf(params, PLAYER_COLUMN_KEYS);
   const fallback = useMemo(() => defaultView(DEFAULT_SORT, DEFAULT_DIR), []);
   const view = useMemo(() => viewFromParams(params, fallback), [params, fallback]);
   const { filters, name, status } = view;
@@ -129,6 +131,23 @@ function PlayerDatabase() {
         : { sortKey: key, sortDir: defaultDir },
       false,
     );
+  /**
+   * Switching column sets keeps the sort where it still means something and
+   * falls back to the default where it doesn't: a key with no header in the new
+   * set leaves `sortRows` on the natural order, so the table would read as
+   * unsorted rather than say so.
+   *
+   * Both changes go through **one** `setParams`. Two calls in this handler
+   * would each build on this render's params, and the second would silently
+   * discard the first.
+   */
+  const setColumns = (next: PlayerColumnSet) => {
+    const withColumns = columnSetParams(params, PLAYER_COLUMN_KEYS, next);
+    const nextView = sortKeysFor(next).has(sort.key)
+      ? view
+      : { ...view, sortKey: DEFAULT_SORT, sortDir: DEFAULT_DIR };
+    setParams(viewToParams(nextView, fallback, withColumns), { replace: true });
+  };
 
   const competitions = league?.competitions ?? [];
 

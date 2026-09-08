@@ -281,6 +281,32 @@ export const STAT_COLUMNS: {
 ];
 
 /**
+ * The columns a view actually offers a header for.
+ *
+ * Needed because the sort survives a column-set switch: sort by Speed on the
+ * Attributes view, switch to Overview, and that key has no header there — so
+ * `sortRows` leaves the natural order and the table silently reads as unsorted.
+ * The page falls back to its default sort instead, which is a visible answer
+ * rather than an invisible one.
+ */
+export function sortKeysFor(columns: PlayerColumnSet): Set<PlayerSortKey> {
+  const shared: PlayerSortKey[] = ["name", "pos", "age", "club"];
+  switch (columns) {
+    case "overview":
+      return new Set([...shared, "league", "ovr", "pot", "value", "wage", "contract"]);
+    case "attributes":
+      return new Set<PlayerSortKey>([...shared, "ovr", ...SKILL_KEYS]);
+    case "season":
+      return new Set<PlayerSortKey>([...shared, ...STAT_COLUMNS.map((c) => c.key)]);
+    case "career":
+      return new Set<PlayerSortKey>([
+        ...shared,
+        ...STAT_COLUMNS.filter((c) => c.career).map((c) => c.key),
+      ]);
+  }
+}
+
+/**
  * Accessors for every sortable column, in one table so a column added to the
  * header and forgotten here fails to sort rather than sorting by something else.
  *
