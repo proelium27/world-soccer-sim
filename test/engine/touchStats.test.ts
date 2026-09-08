@@ -116,7 +116,10 @@ const SEASON = simSeason(mulberry32(12345));
  * That last one is the number to watch if these constants are ever retuned: it
  * rises monotonically with SUB_LATE_MARGIN (80.0 / 81.4 / 81.9 / 83.3 at 4 / 6 /
  * 8 / 10) because a deep bench gets more out of a late change than a thin one,
- * so the champion pulls away slightly. `scripts/subWindowProbe.ts` reports the
+ * so the champion pulls away slightly. Note this harness is ONE league with no
+ * offseason: over twelve leagues and fifteen seasons of real dynasty the same
+ * metric moves only 66.44 -> 66.85 (slotChurnAudit), so read this as a gate
+ * reading rather than as a description of play. `scripts/subWindowProbe.ts` reports the
  * rate itself: 1.58 -> 4.18 subs per team per match, against a real top-flight
  * ~4.3-4.5, with 56% of sides now using all five.
  */
