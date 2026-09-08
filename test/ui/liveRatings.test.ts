@@ -3,6 +3,8 @@ import { mulberry32 } from "../../src/engine/rng.js";
 import { makeTeam } from "../../src/engine/composites.js";
 import { simMatchDetailed } from "../../src/engine/matchSim.js";
 import type { BoxScore, MatchPlayer, MatchPosition } from "../../src/engine/attribution.js";
+import { emptyLine } from "../../src/engine/attribution.js";
+import { computeMatchRating } from "../../src/engine/matchRating.js";
 import { FORMATIONS } from "../../src/core/lineup/formations.js";
 import { matchLineups } from "../../src/ui/live/lineups.js";
 import { liveMatchState } from "../../src/ui/live/liveRatings.js";
@@ -67,6 +69,32 @@ function playedMatch(seed: number): BoxScore {
 
 const SEEDS = [11, 22, 33, 44, 55, 66, 77, 88];
 const MATCHES = SEEDS.map(playedMatch);
+
+/**
+ * The assumption the whole derivation rests on, asserted where it can say so.
+ *
+ * A `turnover` event names who won the ball but not whether it was a tackle or
+ * an interception, so liveRatings credits every one as a tackle. That is only
+ * sound while the rating weighs the two identically — matchRating.ts aliases
+ * INTERCEPTION_WEIGHT to TACKLE_WEIGHT and its comment asks anyone changing
+ * that to fork the line deliberately.
+ *
+ * The full-time equality below would catch a fork too, but it would report it
+ * as "expected 6.8 to be 6.9" and leave the reader to work out why. This says
+ * it in the test name.
+ */
+describe("the rating cannot tell a tackle from an interception", () => {
+  it("scores them identically at every position, which is what lets a turnover count as either", () => {
+    const positions: MatchPosition[] = ["GK", "CB", "FB", "DM", "CM", "AM", "W", "ST"];
+    for (const pos of positions) {
+      const tackled = { ...emptyLine(1), tackles: 4 };
+      const intercepted = { ...emptyLine(1), interceptions: 4 };
+      expect(computeMatchRating(tackled, pos, 90, 1), pos).toBe(
+        computeMatchRating(intercepted, pos, 90, 1),
+      );
+    }
+  });
+});
 
 describe("a live rating at full time is the rating the engine stored", () => {
   it("agrees for every player of every match, to the decimal", () => {
