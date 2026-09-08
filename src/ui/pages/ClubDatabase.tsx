@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { CompetitionScopeSelect } from "../components/CompetitionScopeSelect.js";
 import { Pagination } from "../components/Pagination.js";
-import { SortableTh, sortRows, useTableSort } from "../components/SortableTable.js";
-import { ColumnSetPills, useColumnSet } from "./databaseShared.js";
+import { SortableTh, sortRows, type SortDir } from "../components/SortableTable.js";
+import { ColumnSetPills, columnSetParams, useColumnSet } from "./databaseShared.js";
 import { currencyCompact } from "../format.js";
 import { getRatingColor } from "../utils/ratingColor.js";
 import { ALL_COMPETITIONS, decodeScope, encodeScope } from "../../core/competitions.js";
 import {
-  CLUB_DB_PAGE_SIZE, buildClubRows, clubSortAccessors, filterClubRows,
+  CLUB_DB_PAGE_SIZE, buildClubRows, clubSortAccessors, clubSortKeysFor, filterClubRows,
   type ClubColumnSet, type ClubDbRow, type ClubSortKey,
 } from "../clubDatabase.js";
 import { pageCount, pageOf } from "../playerDatabase.js";
@@ -25,6 +26,11 @@ import { pageCount, pageOf } from "../playerDatabase.js";
  * this app's one known performance failure.
  */
 
+/** The scope every save opens on, and so the one value left out of the URL. */
+const DEFAULT_SCOPE = encodeScope(ALL_COMPETITIONS);
+const DEFAULT_CLUB_SORT: ClubSortKey = "ovr";
+const CLUB_COLUMN_KEYS: readonly ClubColumnSet[] = ["overview", "finance", "season"];
+
 const CLUB_COLUMN_SETS: { key: ClubColumnSet; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "finance", label: "Finance" },
@@ -33,11 +39,66 @@ const CLUB_COLUMN_SETS: { key: ClubColumnSet; label: string }[] = [
 
 export function ClubDatabase() {
   const { league } = useLeague();
-  const [scopeValue, setScopeValue] = useState(encodeScope(ALL_COMPETITIONS));
-  const [name, setName] = useState("");
-  const [columns, setColumns] = useColumnSet<ClubColumnSet>(["overview", "finance", "season"]);
   const [page, setPage] = useState(0);
-  const { sort, toggle } = useTableSort<ClubSortKey>("ovr", "desc");
+
+  // Scope, name and sort live in the URL, not in component state, for the same
+  // reason the player table's do: a narrowed, sorted view is worth being able to
+  // link to. This table held them in `useState`, so `?sort=wages` was accepted
+  // into the address bar and silently ignored — the one thing a shareable link
+  // must not do. Same parameter names as the player table (`in`, `q`, `sort`,
+  // `dir`), so the two tabs read the same and neither invents a vocabulary.
+  const [params, setParams] = useSearchParams();
+  const [columns] = useColumnSet<ClubColumnSet>(CLUB_COLUMN_KEYS);
+  const accessors = useMemo(() => clubSortAccessors(), []);
+
+  const scopeValue = params.get("in") ?? DEFAULT_SCOPE;
+  const name = params.get("q") ?? "";
+  const sort = useMemo(() => {
+    // An unrecognised key would leave `sortRows` on the natural order — a table
+    // that looks sorted and isn't — so a stale or hand-edited link falls back to
+    // the default rather than to nothing. Same leniency `databaseUrl` promises.
+    const raw = params.get("sort");
+    const key = (raw && raw in accessors ? raw : DEFAULT_CLUB_SORT) as ClubSortKey;
+    return { key, dir: params.get("dir") === "asc" ? "asc" : "desc" } as const;
+  }, [params, accessors]);
+
+  /** Write only what differs from the default, so the query string stays readable. */
+  const writeParams = (
+    next: { scope?: string; name?: string; key?: ClubSortKey; dir?: SortDir },
+    base: URLSearchParams = params,
+  ) => {
+    const out = new URLSearchParams(base);
+    const put = (param: string, value: string, dflt: string) => {
+      if (value === dflt) out.delete(param);
+      else out.set(param, value);
+    };
+    put("in", next.scope ?? scopeValue, DEFAULT_SCOPE);
+    put("q", next.name ?? name, "");
+    put("sort", next.key ?? sort.key, DEFAULT_CLUB_SORT);
+    put("dir", next.dir ?? sort.dir, "desc");
+    setParams(out, { replace: true });
+  };
+  const update = (next: Parameters<typeof writeParams>[0]) => {
+    writeParams(next);
+    setPage(0);
+  };
+  const toggle = (key: ClubSortKey, defaultDir: SortDir = "desc") =>
+    writeParams(key === sort.key
+      ? { dir: sort.dir === "asc" ? "desc" : "asc" }
+      : { key, dir: defaultDir });
+
+  /**
+   * Switching column sets keeps the sort where the new set still has a header
+   * for it and resets it where it doesn't — otherwise the table stays sorted by
+   * a column nobody can see, with no caret to say so. One `setParams`, because
+   * two in a handler both build on this render's params and the second discards
+   * the first (the trap `columnSetParams` exists for).
+   */
+  const changeColumns = (next: ClubColumnSet) => {
+    const withColumns = columnSetParams(params, CLUB_COLUMN_KEYS, next);
+    if (clubSortKeysFor(next).has(sort.key)) setParams(withColumns, { replace: true });
+    else writeParams({ key: DEFAULT_CLUB_SORT, dir: "desc" }, withColumns);
+  };
 
   const competitions = league?.competitions ?? [];
 
@@ -51,7 +112,6 @@ export function ClubDatabase() {
     [rows, scopeValue, name, competitions],
   );
 
-  const accessors = useMemo(() => clubSortAccessors(), []);
   const sorted = useMemo(() => sortRows(filtered, sort, accessors), [filtered, sort, accessors]);
 
   const pages = pageCount(sorted.length, CLUB_DB_PAGE_SIZE);
@@ -72,7 +132,7 @@ export function ClubDatabase() {
             style={{ width: "12rem" }}
             placeholder="Search by name"
             value={name}
-            onChange={(e) => { setName(e.target.value); setPage(0); }}
+            onChange={(e) => update({ name: e.target.value })}
           />
         </div>
         <div>
@@ -81,20 +141,20 @@ export function ClubDatabase() {
             id="cdb-scope"
             competitions={competitions}
             value={decodeScope(scopeValue)}
-            onChange={(s) => { setScopeValue(encodeScope(s)); setPage(0); }}
+            onChange={(s) => update({ scope: encodeScope(s) })}
           />
         </div>
         <button
           type="button"
           className="btn btn-sm btn-outline-secondary"
-          onClick={() => { setScopeValue(encodeScope(ALL_COMPETITIONS)); setName(""); setPage(0); }}
+          onClick={() => update({ scope: DEFAULT_SCOPE, name: "" })}
         >
           Clear filters
         </button>
       </div>
 
       <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
-        <ColumnSetPills options={CLUB_COLUMN_SETS} value={columns} onChange={setColumns} />
+        <ColumnSetPills options={CLUB_COLUMN_SETS} value={columns} onChange={changeColumns} />
         {sorted.length !== rows.length && (
           <span className="text-muted small">
             {sorted.length.toLocaleString()} of {rows.length.toLocaleString()} clubs match

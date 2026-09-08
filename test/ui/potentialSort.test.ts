@@ -33,7 +33,14 @@ describe("no fogged POT column sorts on the true value", () => {
       // of the bug — every one of these pages had exactly that line.
       const raw = src.match(/(pot|potential)\s*:\s*\(\s*\w+\s*\)\s*=>\s*\w+\.potential\b/g);
       expect(raw, `${page} sorts POT by the true value`).toBeNull();
-      expect(src).toContain("potView.ceiling");
+      // Either reading of the band is fine — `ceiling` for a page that only
+      // needs the top, `fogOf` for the database, which also wants the floor to
+      // break ties. What must not vary is that the number comes from the
+      // scouting view rather than off the player.
+      expect(
+        /potView\.(ceiling|fogOf)/.test(src),
+        `${page} does not rank POT through the scouting view`,
+      ).toBe(true);
     });
   }
 });
@@ -54,13 +61,16 @@ describe("the ceiling is a usable sort key", () => {
     }
   });
 
-  it("barely ever clamps, so the top of a sorted list is not a pile of ties", () => {
-    // The clamp at RATING_MAX is the one thing that could collapse the elite
-    // prospects into one indistinguishable block. Measured on a fresh world it
-    // catches a few dozen of 15,650 — if that ever changes materially, the
-    // ceiling has stopped discriminating where it matters most.
+  it("clamps rarely, but often enough that the sort needs a tiebreak", () => {
+    // The clamp at RATING_MAX collapses the best prospects into one block that
+    // all reads "–99". On a fresh world at default scouting it is a few dozen of
+    // 15,650; on a real season-5 save it was **151 of 10,106 (1.5%)**, which is
+    // a page and a half of arbitrarily-ordered rows at the top of a POT sort —
+    // visibly broken, and the reason `scoutedPotFloor` exists. So this bound is
+    // not "the tie block is negligible", it is "the ceiling still separates the
+    // bulk of the world"; the block itself is handled by the tiebreak.
     const clamped = league.players.filter((p) => ceiling(p) >= RATING_MAX).length;
-    expect(clamped / league.players.length).toBeLessThan(0.01);
+    expect(clamped / league.players.length).toBeLessThan(0.05);
   });
 
   it("orders a same-tenure group the same way the midpoint would", () => {

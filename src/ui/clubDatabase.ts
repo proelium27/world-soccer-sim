@@ -223,3 +223,26 @@ export function clubSortAccessors(): Record<ClubSortKey, (row: ClubDbRow) => num
     rating: stat((s) => s.avgRating),
   };
 }
+
+/**
+ * Which sort keys each column set offers a header for.
+ *
+ * Maintained beside the headers rather than derived from them, exactly as the
+ * player table's `sortKeysFor` is, and for the same two reasons: switching
+ * column sets has to know whether the active sort still has a header to show a
+ * caret on, and a test can hold this list against `clubSortAccessors` so a
+ * column added without an accessor fails rather than sorting by nothing.
+ */
+const CLUB_SORT_KEYS: Record<ClubColumnSet, readonly ClubSortKey[]> = {
+  overview: ["ovr", "pot", "power", "squad", "age", "hype"],
+  finance: ["budget", "cap", "wages", "hype", "spent", "received", "net"],
+  season: [
+    "played", "won", "drawn", "lost", "gf", "ga", "gd", "points",
+    "shots", "sot", "xg", "xga", "saves", "tackles", "possession", "rating",
+  ],
+};
+
+/** The keys a given column set can sort by, including the three always shown. */
+export function clubSortKeysFor(set: ClubColumnSet): Set<ClubSortKey> {
+  return new Set<ClubSortKey>(["club", "league", "rank", ...CLUB_SORT_KEYS[set]]);
+}

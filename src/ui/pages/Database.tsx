@@ -167,7 +167,8 @@ function PlayerDatabase() {
     () => (league
       ? buildPlayerRows(
         league,
-        potView.ceiling,
+        // A fully-scouted player has no band; his exact potential is both ends.
+        (p) => potView.fogOf(p) ?? { low: p.potential, high: p.potential },
         (p) => potView.midpoint(p.potential, p.pid, league.season),
       )
       : []),
@@ -202,7 +203,17 @@ function PlayerDatabase() {
 
   // Every season anyone has a stat line for, for the season picker.
   const seasons = useMemo(() => seasonsWithStats(league?.players ?? []), [league?.players]);
-  const season = view.season ?? league?.season ?? 0;
+  // Default to the season being played, but only once it HAS something to show.
+  // `league.played` is emptied at the rollover, so on matchday 1 nobody has a
+  // line for the current season yet: defaulting to it blindly opened the table
+  // empty on a save with four seasons behind it, and — because the picker's
+  // options are exactly the seasons that do have lines — the `<select>` then
+  // fell back to displaying its first option, so it named a different year from
+  // the one the table was showing. Falling back to the newest season on record
+  // is both non-empty and what the picker is already claiming.
+  const season = view.season
+    ?? (league && seasons.includes(league.season) ? league.season : seasons[0])
+    ?? league?.season ?? 0;
 
   // Built only for the view that reads them. The season index is cheap; the
   // career one walks every season line of every player in the world, which on a

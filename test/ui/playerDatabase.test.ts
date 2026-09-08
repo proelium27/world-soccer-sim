@@ -13,7 +13,9 @@ import { totalsOf } from "../../src/core/frivolities/stats.js";
 const league = makeLeague(0, 4);
 /** The database's default view: no fog (this is the pure layer), no filters. */
 const truePot = (p: Player) => p.potential;
-const rows = buildPlayerRows(league, truePot, truePot);
+/** No fog, so the band collapses onto the exact value at both ends. */
+const exactBand = (p: Player) => ({ low: p.potential, high: p.potential });
+const rows = buildPlayerRows(league, exactBand, truePot);
 
 function filters(patch: Partial<PlayerDbFilters> = {}): PlayerDbFilters {
   return {
@@ -50,7 +52,7 @@ describe("buildPlayerRows", () => {
         t.tid === team.tid ? { ...t, roster: t.roster.filter((pid) => pid !== orphan) } : t,
       ),
     };
-    const free = buildPlayerRows(released, truePot, truePot).find((r) => r.player.pid === orphan)!;
+    const free = buildPlayerRows(released, exactBand, truePot).find((r) => r.player.pid === orphan)!;
     expect(free.status).toBe("free");
     expect(free.tid).toBeNull();
     expect(free.compId).toBeNull();
@@ -66,7 +68,7 @@ describe("buildPlayerRows", () => {
   it("prices value on the potential it is handed, not on the true one", () => {
     // The page hands in the *scouted* estimate, so a pessimistic scout must
     // produce a lower valuation — that is the whole reason the accessor exists.
-    const pessimistic = buildPlayerRows(league, truePot, (p) => Math.max(1, p.potential - 20));
+    const pessimistic = buildPlayerRows(league, exactBand, (p) => Math.max(1, p.potential - 20));
     const byPid = new Map(pessimistic.map((r) => [r.player.pid, r]));
     // Somebody in the world has unfulfilled potential to be priced for.
     const moved = rows.filter((r) => byPid.get(r.player.pid)!.value < r.value);
@@ -78,7 +80,7 @@ describe("buildPlayerRows", () => {
     // price is an expected value, so it takes the midpoint. Sharing one accessor
     // would inflate every unscouted player's valuation for no reason beyond
     // nobody having scouted him.
-    const optimistic = buildPlayerRows(league, () => 99, truePot);
+    const optimistic = buildPlayerRows(league, () => ({ low: 99, high: 99 }), truePot);
     const byPid = new Map(rows.map((r) => [r.player.pid, r]));
     for (const row of optimistic) {
       expect(row.scoutedPot).toBe(99);
@@ -118,7 +120,7 @@ describe("filterPlayerRows", () => {
     // A view that reports everyone at 99 must let everyone through a min-99
     // filter, however low their real potential — otherwise the column and the
     // filter beside it would be answering different questions.
-    const optimistic = buildPlayerRows(league, () => 99, truePot);
+    const optimistic = buildPlayerRows(league, () => ({ low: 99, high: 99 }), truePot);
     const out = filterPlayerRows(optimistic, filters({ fields: { minPot: 99 } }), league.season);
     expect(out).toHaveLength(optimistic.length);
 
@@ -166,7 +168,7 @@ describe("season and career views", () => {
         : p.pid === other.pid ? { ...p, stats: [line(3)] }
         : p),
   };
-  const statsRows = buildPlayerRows(withStats, truePot, truePot);
+  const statsRows = buildPlayerRows(withStats, exactBand, truePot);
   const index = seasonStatsIndex(withStats.players, 3);
 
   it("lists the seasons anyone has a line for, newest first", () => {
@@ -228,8 +230,32 @@ describe("sorting and paging", () => {
     for (const key of Object.keys(accessors)) {
       expect(typeof accessors[key as keyof typeof accessors]).toBe("function");
     }
-    expect(accessors.pot(rows[0])).toBe(rows[0].scoutedPot);
+    // Ceiling, with the band's floor divided in to break ties.
+    expect(accessors.pot(rows[0]))
+      .toBe(rows[0].scoutedPot + rows[0].scoutedPotFloor / 100);
     expect(accessors.speed(rows[0])).toBe(rows[0].player.ratings.speed);
+  });
+
+  it("breaks a tied ceiling on the band's floor, so a clamped block still ranks", () => {
+    // Found in the browser: on a real save 151 of 10,106 players clamp at
+    // RATING_MAX, so a POT-descending sort opened with a block of "–99" rows in
+    // arbitrary order — a 33-overall teenager above an 89-overall international.
+    // Both bands top out at 99; the one with the higher floor must come first.
+    const band = (low: number, high: number) => () => ({ low, high });
+    const tight = buildPlayerRows(league, band(88, 99), truePot)[0];
+    const loose = buildPlayerRows(league, band(86, 99), truePot)[0];
+    expect(tight.scoutedPot).toBe(loose.scoutedPot);
+    expect(Number(accessors.pot(tight))).toBeGreaterThan(Number(accessors.pot(loose)));
+  });
+
+  it("never lets a floor tiebreak outrank a genuinely higher ceiling", () => {
+    // The floor is worth less than a point of ceiling, or the tiebreak would
+    // quietly become the sort and a 99-ceiling player could fall below a 98.
+    const band = (low: number, high: number) => () => ({ low, high });
+    const lowerCeiling = buildPlayerRows(league, band(98, 98), truePot)[0];
+    const higherCeiling = buildPlayerRows(league, band(1, 99), truePot)[0];
+    expect(Number(accessors.pot(higherCeiling)))
+      .toBeGreaterThan(Number(accessors.pot(lowerCeiling)));
   });
 
   it("gives every key a view offers a header for a working accessor", () => {

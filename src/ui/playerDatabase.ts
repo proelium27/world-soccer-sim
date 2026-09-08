@@ -43,8 +43,20 @@ export interface PlayerDbRow {
   wage: number;
   /** Seasons left on his deal, floored at 0. */
   contractYears: number;
-  /** The scouting estimate of his potential — what the POT column sorts on. */
+  /** Top of the scouting band — what the POT column shows and filters on. */
   scoutedPot: number;
+  /**
+   * Bottom of the same band, kept only to break ties in the POT sort.
+   *
+   * The ceiling alone is not a fine enough key: the band is clamped at
+   * `RATING_MAX`, so on a real save ~1.5% of the world (151 of 10,106, measured)
+   * reads "–99" and a POT-descending sort opens with a block of them ordered
+   * arbitrarily — a 33-overall teenager above an 89-overall international. The
+   * floor is the other number already printed in the cell, so ordering
+   * "88–99" above "86–99" keeps the promise the ceiling was chosen for: both
+   * numbers a reader can see count down the column.
+   */
+  scoutedPotFloor: number;
 }
 
 /** Which block of columns the table is showing. See DESIGN.md §6. */
@@ -66,8 +78,11 @@ export const PLAYER_DB_PAGE_SIZE = 100;
  */
 export function buildPlayerRows(
   league: LeagueStore,
-  /** Top of the scouting band — what the POT column shows, sorts and filters on. */
-  ceilingOf: (p: Player) => number,
+  /**
+   * The scouting band the POT column shows. Its top is what the column sorts
+   * and filters on; its bottom only breaks ties (see `scoutedPotFloor`).
+   */
+  bandOf: (p: Player) => { low: number; high: number },
   /** Middle of the band — the expected value a price is worked out from. */
   pricedPotOf: (p: Player) => number,
 ): PlayerDbRow[] {
@@ -77,7 +92,7 @@ export function buildPlayerRows(
   const byPid = new Map(league.players.map((p) => [p.pid, p]));
 
   const push = (player: Player, tid: number | null, compId: number | null, status: PlayerStatus) => {
-    const scoutedPot = ceilingOf(player);
+    const band = bandOf(player);
     rows.push({
       player,
       tid,
@@ -87,7 +102,8 @@ export function buildPlayerRows(
       value: Math.round(trueTransferValue({ ...player, potential: pricedPotOf(player) }, season)),
       wage: weeklyWage(player.contract.salary),
       contractYears: Math.max(0, player.contract.expiresSeason - season),
-      scoutedPot,
+      scoutedPot: band.high,
+      scoutedPotFloor: band.low,
     });
   };
 
@@ -360,7 +376,11 @@ export function playerSortAccessors(
     club: (r) => clubName(r.tid),
     league: (r) => leagueName(r.compId),
     ovr: (r) => r.player.ovr,
-    pot: (r) => r.scoutedPot,
+    // Ceiling first, floor to break the tie. The floor is < 100, so dividing it
+    // in orders strictly by (high, low) without a second comparator — and both
+    // halves are numbers printed in the cell, so the column still reads as
+    // sorted rather than ranking on anything hidden. See `scoutedPotFloor`.
+    pot: (r) => r.scoutedPot + r.scoutedPotFloor / 100,
     value: (r) => r.value,
     wage: (r) => r.wage,
     contract: (r) => r.contractYears,
