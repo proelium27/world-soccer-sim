@@ -6,6 +6,7 @@ import {
   ROSTER_COMPOSITION, ROSTER_CAP, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
   ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, PROSPECT_AGE_MAX, YOUTH_TRIAL_SIGN_LIMIT,
   AI_PROSPECT_SLOTS, AI_PROSPECT_MAX_AGE, AI_PROSPECT_MIN_POT,
+  potentialBar, type ProgressionModel,
 } from "./constants.js";
 import {
   contractTerms, extendContract, seasonSalaryForOvr, extendAcademyContract, academyContractTerms,
@@ -140,7 +141,15 @@ export function runAIFreeAgency(
   userTid: number,
   signingOrderTids: number[],
   activeLoans: ActiveLoan[] = [],
+  /**
+   * The save's development model, for the prospect bar only. A steady save
+   * lists lower potentials for the same players (an honest forecast sits below
+   * an optimistic one), so a fixed bar would quietly stop protecting the
+   * wonderkids this pass exists to sign — see `potentialBar`.
+   */
+  model: ProgressionModel = "random",
 ): { teams: StoredTeam[]; players: Player[]; signings: { pid: number; toTid: number }[] } {
+  const prospectPot = potentialBar(AI_PROSPECT_MIN_POT, model);
   const playerMap = new Map(players.map((p) => [p.pid, { ...p }]));
   const teamMap = new Map(teams.map((t) => [t.tid, { ...t, roster: [...t.roster] }]));
 
@@ -283,7 +292,7 @@ export function runAIFreeAgency(
     const held = team.roster
       .map((pid) => playerMap.get(pid)!)
       .filter(
-        (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= AI_PROSPECT_MIN_POT,
+        (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot,
       ).length;
 
     for (let slot = held; slot < AI_PROSPECT_SLOTS; slot++) {
@@ -291,7 +300,7 @@ export function runAIFreeAgency(
       const best = pool
         .map((pid) => playerMap.get(pid)!)
         .filter(
-          (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= AI_PROSPECT_MIN_POT,
+          (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot,
         )
         .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid)[0];
       if (!best) break;
@@ -335,9 +344,12 @@ export function trimRosterSurplus(
   userTid: number,
   season: number,
   activeLoans: ActiveLoan[] = [],
+  /** See `runAIFreeAgency`'s `model`, and `potentialBar`. */
+  model: ProgressionModel = "random",
 ): StoredTeam[] {
   const playerMap = new Map(players.map((p) => [p.pid, p]));
   const onLoan = new Set(activeLoans.map((l) => l.pid));
+  const prospectPot = potentialBar(AI_PROSPECT_MIN_POT, model);
 
   return teams.map((t) => {
     if (t.tid === userTid) return t;
@@ -388,7 +400,7 @@ export function trimRosterSurplus(
         (p) =>
           !kept.has(p.pid)
           && season - p.born <= AI_PROSPECT_MAX_AGE
-          && p.potential >= AI_PROSPECT_MIN_POT,
+          && p.potential >= prospectPot,
       )
       .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid);
     for (const p of prospects.slice(0, AI_PROSPECT_SLOTS)) kept.add(p.pid);

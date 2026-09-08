@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
+import type { ProgressionModel } from "../../core/constants.js";
 import type { SimThrough, IntlMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
 import { saveLeague, loadLeague } from "../../db/leagueDb.js";
@@ -149,6 +150,7 @@ interface LeagueContextValue {
   godModeSwitchClubAction: (tid: number) => Promise<void>;
   /** God Mode: take charge of any country, offer or not. */
   godModeTakeNationalJobAction: (nation: string) => Promise<void>;
+  godModeSetProgressionModelAction: (model: ProgressionModel) => Promise<void>;
   movePlayerToClubAction: (pid: number, tid: number) => Promise<void>;
   releasePlayerGodModeAction: (pid: number) => Promise<void>;
   editPlayerAction: (pid: number, edit: PlayerEdit) => Promise<void>;
@@ -1055,6 +1057,30 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * God Mode: change how this save develops its players (see
+   * `LeagueStore.progressionModel`).
+   *
+   * The one God Mode action that is not really a sandbox liberty. Both the
+   * settings it sits beside on the New League screen are fixed for a save's
+   * lifetime for real reasons, and this one is not: the model scales rng draws
+   * without changing their count, nothing persisted derives from it, and it is
+   * read at one point in the offseason — so flipping it advances the shared
+   * stream identically and simply changes how careers move from the next
+   * offseason on. It lives here rather than on a settings screen only because
+   * God Mode is where a save's own rules are edited, and because someone
+   * twenty seasons into a dynasty who wants the other model should not have to
+   * start again to get it.
+   */
+  const godModeSetProgressionModelAction = useCallback(
+    (model: ProgressionModel) => mutate((l) => {
+      if (!l.godMode) return null;
+      if (l.progressionModel === model) return null;
+      return { ...l, progressionModel: model };
+    }),
+    [mutate],
+  );
+
+  /**
    * God Mode: hand the user any country in the world. The national counterpart
    * of the club switch above, and it removes the same single gate — that a
    * federation actually approached — by calling `takeNationalJob` directly
@@ -1200,6 +1226,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     movePlayerToClubAction,
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
+    godModeSetProgressionModelAction,
     releasePlayerGodModeAction,
     editPlayerAction,
     createPlayerAction,
@@ -1230,6 +1257,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     setGodModeAction, movePlayerToClubAction, releasePlayerGodModeAction,
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
+    godModeSetProgressionModelAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,

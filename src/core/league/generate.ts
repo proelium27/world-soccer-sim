@@ -13,7 +13,7 @@ import {
   NUM_TEAMS, NUM_TEAMS_D2, LEAGUE_BASE, TEAM_STRENGTH_SPREAD, DIVISION_2_OFFSET,
   divisionStrengthOffset,
   ROSTER_COMPOSITION, INITIAL_AGE_MIN, INITIAL_AGE_MAX,
-  CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
+  CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX, type ProgressionModel,
 } from "../constants.js";
 
 const STARTING_SEASON = 1;
@@ -91,6 +91,7 @@ function generateDivisionTeams(
   pidStart: number,
   country: string,
   nationalities: NationalityWeights | null = null,
+  model: ProgressionModel = "random",
 ): { teams: LeagueTeam[]; players: Player[]; nextPid: number } {
   const teams: LeagueTeam[] = [];
   const players: Player[] = [];
@@ -124,7 +125,7 @@ function generateDivisionTeams(
         const age = INITIAL_AGE_MIN
           + Math.floor(rng() * (INITIAL_AGE_MAX - INITIAL_AGE_MIN + 1));
         const p = generatePlayer(
-          rng, pos, base, pid++, age, STARTING_SEASON, genSeed, country, nationalities,
+          rng, pos, base, pid++, age, STARTING_SEASON, genSeed, country, nationalities, model,
         );
         const length = CONTRACT_LENGTH_MIN
           + Math.floor(rng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
@@ -194,6 +195,7 @@ export function generateWorld(
   rng: () => number,
   seed = 0,
   competitions: Competition[] = worldCompetitions(),
+  model: ProgressionModel = "random",
 ): League {
   const genSeed = hashInts(seed, 1);
   const comps = competitions;
@@ -218,7 +220,7 @@ export function generateWorld(
         rng, tidCursor, competitionTeamCount(comp),
         tierOffset + competitionStrengthOffset(comp),
         tierOffset + competitionAcademyOffset(comp),
-        comp.id, genSeed, pid, comp.country, competitionNationalities(comp),
+        comp.id, genSeed, pid, comp.country, competitionNationalities(comp), model,
       );
       pid = result.nextPid;
       tidCursor += competitionTeamCount(comp);

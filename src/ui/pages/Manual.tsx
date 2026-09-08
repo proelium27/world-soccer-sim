@@ -1472,6 +1472,15 @@ export function Manual() {
             over time.
           </p>
           <p>
+            On a <a href="#development">steady careers</a> save that number means something
+            different, and it's worth knowing which. There's far less luck left for it to be
+            guessing at, so the simulated careers nearly all agree with each other and the estimate
+            lands close to what actually happens: the three-in-four rule above stops applying, and
+            POT reads as roughly where a player ends up rather than as an optimistic ceiling he
+            probably won't reach. That makes it a lot more useful, and it makes the scouting fog
+            below most of what still stands between you and the real number.
+          </p>
+          <p>
             <strong>You don't see a player's exact potential. You see a scouting estimate.</strong>{" "}
             Everywhere POT shows up (Roster, prospects, free agents, transfer targets, rival squads,
             player profiles), it's a low&ndash;high band rather than a single number, and the real
@@ -1495,6 +1504,14 @@ export function Manual() {
         </Section>
 
         <Section id="development" title="Player Development & Aging">
+          <p>
+            There are two ways a save can develop its players, and you pick which one when you
+            create it (there's a switch on the New League screen, and you can change your mind
+            later in God Mode &mdash; it takes effect at your next offseason and leaves seasons
+            you've already played exactly as they were). Everything in this section describes the
+            default, <strong>random growth</strong>. The alternative, <strong>steady careers</strong>,
+            is described at the end of it.
+          </p>
           <p>
             Players develop each offseason based on age and randomness, and nothing else. The
             typical arc peaks around <strong>age 26</strong>, but not all of a player at once:
@@ -1574,6 +1591,35 @@ export function Manual() {
             prospect shows. It's a trajectory, not a guarantee, and a rough run of seasons can still leave
             him merely very good, but these are the players your true legends come from. If one lands
             in <em>your</em> academy, treat him accordingly.
+          </p>
+          <p>
+            <strong>Steady careers.</strong> The other setting. Everything above still applies
+            &mdash; physical ratings still go before technical ones, keepers still last longest,
+            the retirement rules are unchanged, generational talents still turn up &mdash; but the
+            summer dice are gone and the shape of the arc is drawn differently.
+            A player improves through his early twenties, holds through his peak years, and starts
+            falling away from about thirty, dropping faster every year after that. He'll still
+            drift a point either way from one season to the next, but he won't lurch: nobody adds
+            eight points out of nowhere at 26, and nobody quietly falls apart for no reason you
+            could ever have seen coming.
+          </p>
+          <p>
+            Players still turn out differently from each other, and by about as much as they do
+            normally. What changes is <em>when</em> that's decided. Under random growth, who ends
+            up elite is settled a summer at a time, so the same prospect can become a star or a
+            journeyman depending on how the next few Julys go. Under steady careers it's settled
+            in the player himself: some are clean developers and some never quite kick on, and
+            that's true of them from the day they're generated. Playing time still matters exactly
+            as much either way &mdash; a kid getting regular minutes really does come on faster
+            than one rotting on the bench.
+          </p>
+          <p>
+            Two things follow from that, and they're the reason to pick it. Your scouting reports
+            are worth far more, because there's a real answer for them to be closing in on: a
+            potential estimate stops being a guess at a dice roll and becomes a genuine read on
+            where a player ends up. And the best players in your league stay recognizable &mdash;
+            they're the ones who were always going to be good, developed by clubs that gave them
+            games, rather than whoever the last few offseasons happened to smile on.
           </p>
         </Section>
 

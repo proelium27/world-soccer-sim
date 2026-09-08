@@ -86,8 +86,8 @@ function fallbackAcademyBase(tid: number): number {
 
 /** A league as it may exist in a save written before M6 added the transfer market, or before the competitions refactor. */
 type LeagueStoreAnyVersion =
-  Omit<LeagueStore, "negotiations" | "inboundOffers" | "transfers" | "winterMarketRunSeason" | "seasonHistory" | "newsEvents" | "competitions" | "activeLoans" | "loanListings" | "loanRejections" | "cup" | "cupHistory" | "domesticCups" | "domesticCupHistory" | "promotionPlayoffs" | "superCups" | "powerRankingHistory" | "godMode" | "international" | "nextPid" | "difficulty" | "aiManagedSeasons" | "manager" | "rollingCoefficients" | "nationalManager" | "watchlist" | "transferClauses"> &
-  Partial<Pick<LeagueStore, "negotiations" | "inboundOffers" | "transfers" | "winterMarketRunSeason" | "seasonHistory" | "newsEvents" | "competitions" | "activeLoans" | "loanListings" | "loanRejections" | "cup" | "cupHistory" | "domesticCups" | "domesticCupHistory" | "promotionPlayoffs" | "superCups" | "powerRankingHistory" | "godMode" | "international" | "nextPid" | "difficulty" | "aiManagedSeasons" | "manager" | "rollingCoefficients" | "nationalManager" | "watchlist" | "transferClauses">>;
+  Omit<LeagueStore, "negotiations" | "inboundOffers" | "transfers" | "winterMarketRunSeason" | "seasonHistory" | "newsEvents" | "competitions" | "activeLoans" | "loanListings" | "loanRejections" | "cup" | "cupHistory" | "domesticCups" | "domesticCupHistory" | "promotionPlayoffs" | "superCups" | "powerRankingHistory" | "godMode" | "international" | "nextPid" | "difficulty" | "aiManagedSeasons" | "manager" | "rollingCoefficients" | "progressionModel" | "nationalManager" | "watchlist" | "transferClauses"> &
+  Partial<Pick<LeagueStore, "negotiations" | "inboundOffers" | "transfers" | "winterMarketRunSeason" | "seasonHistory" | "newsEvents" | "competitions" | "activeLoans" | "loanListings" | "loanRejections" | "cup" | "cupHistory" | "domesticCups" | "domesticCupHistory" | "promotionPlayoffs" | "superCups" | "powerRankingHistory" | "godMode" | "international" | "nextPid" | "difficulty" | "aiManagedSeasons" | "manager" | "rollingCoefficients" | "progressionModel" | "nationalManager" | "watchlist" | "transferClauses">>;
 
 /** A season-stats entry as it may exist in a save written before Match Rating / xG / xGA / per-season team tracking / cards. */
 type SeasonStatsAnyVersion =
@@ -832,6 +832,12 @@ function migrateFields(league: LeagueStore): LeagueStore {
     // it is derived from their own archived cups, so it reads their history
     // correctly from the moment they load.)
     rollingCoefficients: anyVersion.rollingCoefficients ?? true,
+    // "random" is the only development model that has ever existed, so this is
+    // exact rather than a guess: a save written before the setting really was
+    // played on it, and backfilling it changes nothing about how that dynasty
+    // continues. Anyone who wants the other one can switch in God Mode, which
+    // is safe mid-save (see LeagueStore.progressionModel).
+    progressionModel: anyVersion.progressionModel ?? "random",
     manager: anyVersion.manager ?? backfillManager(anyVersion),
   };
 }
