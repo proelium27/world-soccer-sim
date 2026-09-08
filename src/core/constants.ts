@@ -1199,7 +1199,7 @@ export const POTENTIAL_SIM_PERCENTILE = 0.75;
  * How a save develops its players. `"random"` is the model the game has always
  * run: a shared per-group "form" roll every season, big enough that a squad
  * player can genuinely break out or collapse in one summer. `"steady"` is the
- * alternative added 2026-09-07 on player request — the same development model
+ * alternative added 2026-09-08 on player request — the same development model
  * and the same minutes nudge, with the per-season dice turned down and the age
  * curve redrawn, so that a career reads as one continuous arc: grow through the
  * early twenties, hold through the peak years, decline from thirty at an

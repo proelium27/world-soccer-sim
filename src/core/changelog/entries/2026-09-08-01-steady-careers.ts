@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-07",
+  date: "2026-09-08",
   title: "You can turn off random growth",
   items: [
     "New setting on the New League screen: **steady careers**. Leave it off and nothing changes, development works exactly the way it always has. Turn it on and the summer dice go away. Players improve through their early twenties, hold through their peak, and start falling off around thirty, dropping faster every year after that.",
