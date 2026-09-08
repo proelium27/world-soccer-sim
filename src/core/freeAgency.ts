@@ -2,6 +2,7 @@ import type { Player, Position } from "./players/types.js";
 import { POSITIONS } from "./players/types.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import type { ActiveLoan } from "./loans.js";
+import { isBorrowed } from "./loanOwnership.js";
 import {
   ROSTER_COMPOSITION, ROSTER_CAP, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
   ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, PROSPECT_AGE_MAX, YOUTH_TRIAL_SIGN_LIMIT,
@@ -431,16 +432,27 @@ export function keepsDepthFloor(
 
 /**
  * Release a player from a team's roster back to the free agent pool. No-op
- * if the release would take the squad below the positional depth floor.
+ * if the release would take the squad below the positional depth floor, or if
+ * the club doesn't own him.
+ *
+ * The ownership check is what stops a club dumping a player it has in on loan.
+ * His contract belongs to his parent, so "releasing" him would free nobody and
+ * make nobody a free agent — it would drop the pid off this roster while the
+ * loan stayed live, which is a free early recall plus the wage relief that goes
+ * with it, and the loan mechanic deliberately offers neither. It only became
+ * reachable when the user could borrow; `activeLoans` defaults to empty so no
+ * existing caller changes behaviour.
  */
 export function releasePlayer(
   teams: StoredTeam[],
   players: Player[],
   tid: number,
   pid: number,
+  activeLoans: ActiveLoan[] = [],
 ): StoredTeam[] {
   const team = teams.find((t) => t.tid === tid);
   if (!team) return teams;
+  if (isBorrowed(activeLoans, tid, pid)) return teams;
   const playerMap = new Map(players.map((p) => [p.pid, p]));
   if (!keepsDepthFloor(team, playerMap, pid)) return teams;
   return teams.map((t) =>

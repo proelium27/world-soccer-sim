@@ -243,6 +243,19 @@ export function loanOfferCandidates(league: LeagueStore): LoanOfferCandidate[] {
       const buyerCtx = contexts.get(buyer.tid);
       if (!buyerCtx) continue;
       const value = perceivedValueToClub(player, buyerCtx, jitter);
+      // Only a club that would actually play him, the same rule the AI↔AI
+      // market and the user's borrowing side both enforce. This is the half
+      // that matters most to the user, because it is his own stated reason for
+      // lending: a player good enough to develop but not good enough for his
+      // XI, sent somewhere he'll get games. An offer from a club that would
+      // bench him looks like the deal he wanted and delivers nothing — the
+      // player comes back a season older having played as little as if he had
+      // stayed. A weak enough player may now draw no offers at all, which is
+      // the honest answer rather than a broken one.
+      //
+      // After the jitter draw, like the other two, so a filtered buyer doesn't
+      // shift every later buyer's noise.
+      if (player.ovr <= buyerCtx.posWeakestStarterOvr[player.pos]) continue;
       if (value < reservation * (1 + LOAN_MIN_SURPLUS)) continue;
       if (!best || value > best.value) best = { tid: buyer.tid, value };
     }
@@ -442,6 +455,29 @@ export function runAILoanMarket(
         if (
           player.ovr >= divisionRefusalOvr(tierByTid.get(buyer.tid) ?? 1)
         ) continue;
+        // ...and he has to get into their team, which is the whole point of
+        // sending him. A loan exists to convert a benched prospect into
+        // minutes (progression's `minutesFactor` only bites during growth
+        // years), and the surplus test below asks whether the borrower *values*
+        // him — not whether it would *play* him, which is a different question.
+        // Measured before this gate existed (scripts/loanMinutesProbe.ts, seed
+        // 7, 1,110 summer loans followed through a full season): 47% played at
+        // all, 31% made the loanee's XI, and the MEDIAN loanee played zero
+        // games. The two groups separated almost perfectly on exactly this
+        // number — those who never played were a median 16 ovr BELOW the
+        // weakest man in the borrower's XI, those who played were 6 above, and
+        // only 30 of 592 non-players were better than their new club's worst
+        // starter.
+        //
+        // `posWeakestStarterOvr` is the buy-side fix for the same class of
+        // error (posBestOvr assumed one starter per position and left clubs
+        // fielding 40-rated full-backs), pointed at loans. A position the
+        // borrower's shape leaves short reads 0, so an outright hole always
+        // passes — which is right, since an empty slot is a guaranteed game.
+        //
+        // After the jitter draw, for the same RNG-stream reason as the guard
+        // above it.
+        if (player.ovr <= buyerCtx.posWeakestStarterOvr[player.pos]) continue;
         if (value < reservation * (1 + LOAN_MIN_SURPLUS)) continue;
         candidates.push({ pid, sellerTid: seller.tid, buyerTid: buyer.tid, reservation, buyerValue: value, surplus: value - reservation });
       }

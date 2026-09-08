@@ -29,6 +29,7 @@ import { renewalsDue, extendAllContracts } from "../../core/contractRenewal.js";
 import {
   listPlayerForLoan, unlistPlayerForLoan, acceptLoanOffer, rejectLoanOffer,
 } from "../../core/loans.js";
+import { requestLoan } from "../../core/loanSearch.js";
 import { wouldRefuseExtension } from "../../core/ai/breakoutRefusal.js";
 import { applyTeamIdentities, type TeamIdentityEdit } from "../../core/teams/customize.js";
 import {
@@ -112,6 +113,8 @@ interface LeagueContextValue {
   unlistPlayerForLoanAction: (pid: number) => Promise<void>;
   acceptLoanOfferAction: (pid: number) => Promise<void>;
   rejectLoanOfferAction: (pid: number) => Promise<void>;
+  /** Take another club's player on loan for 1-3 seasons (see core/loanSearch.ts). */
+  requestLoanAction: (pid: number, seasons: 1 | 2 | 3) => Promise<void>;
   setTransferListedAction: (pid: number, listed: boolean) => Promise<void>;
   setMoreMinutesAction: (pid: number, enabled: boolean) => Promise<void>;
   /** Star or unstar any player in the world — the /watchlist shortlist. */
@@ -657,6 +660,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     // refusal check is about. Looking him up by roster would ask whether he'd
     // re-sign for the club borrowing him.
     const loan = l.activeLoans.find((a) => a.pid === pid);
+    // ...and a contract the user doesn't own isn't his to extend at all. A
+    // player in on loan is on his roster, so every extend affordance on the
+    // Roster page can reach him; the pages hide the control, this refuses it.
+    if (loan && loan.parentTid !== l.meta.userTid) return null;
     const team = loan
       ? l.teams.find((t) => t.tid === loan.parentTid)
       : l.teams.find((t) => t.roster.includes(pid));
@@ -693,7 +700,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   ), [mutate]);
 
   const releasePlayerAction = useCallback((pid: number) => mutate((l) => {
-    const teams = releasePlayer(l.teams, l.players, l.meta.userTid, pid);
+    const teams = releasePlayer(l.teams, l.players, l.meta.userTid, pid, l.activeLoans);
     if (teams === l.teams) return null;
     trackEvent("player_released");
     return { ...l, teams };
@@ -809,6 +816,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const rejectLoanOfferAction = useCallback((pid: number) => mutate(
     (l) => rejectLoanOffer(l, pid),
+  ), [mutate]);
+
+  const requestLoanAction = useCallback((pid: number, seasons: 1 | 2 | 3) => mutate(
+    (l) => {
+      const updated = requestLoan(l, pid, seasons);
+      if (updated && updated !== l) trackEvent("player_loaned_in", { seasons });
+      return updated;
+    },
   ), [mutate]);
 
   const setLineupAction = useCallback((starters: number[]) => mutate((l) => {
@@ -1214,6 +1229,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     unlistPlayerForLoanAction,
     acceptLoanOfferAction,
     rejectLoanOfferAction,
+    requestLoanAction,
     setTransferListedAction,
     setMoreMinutesAction,
     toggleWatchedAction,
@@ -1253,7 +1269,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     rejectInboundOfferAction, counterInboundOfferAction, extendContractAction,
     extendAllContractsAction,
     listPlayerForLoanAction, unlistPlayerForLoanAction, acceptLoanOfferAction,
-    rejectLoanOfferAction, setTransferListedAction, setMoreMinutesAction, toggleWatchedAction,
+    rejectLoanOfferAction, requestLoanAction, setTransferListedAction, setMoreMinutesAction, toggleWatchedAction,
     setLineupAction, setFormationAction,
     autoPickBestXIAction,
     playSuperCupsAction,

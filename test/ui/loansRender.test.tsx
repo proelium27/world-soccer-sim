@@ -5,6 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 import { makeLeague } from "../helpers/league.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 import { transferWindowState } from "../../src/core/transfers/window.js";
+import { searchLoanTargets, requestLoan } from "../../src/core/loanSearch.js";
+import { ROSTER_CAP } from "../../src/core/constants.js";
 
 /**
  * Render harness for the Loans page, covering the surfaces added when contract
@@ -26,7 +28,9 @@ vi.mock("../../src/ui/context/LeagueContext.js", () => ({
     unlistPlayerForLoanAction: () => {},
     acceptLoanOfferAction: () => {},
     rejectLoanOfferAction: () => {},
+    requestLoanAction: () => {},
     extendContractAction: () => {},
+    extendAllContractsAction: () => {},
     simming: false,
   }),
 }));
@@ -36,6 +40,19 @@ const { Loans } = await import("../../src/ui/pages/Loans.js");
 function render(league: LeagueStore): string {
   leagueRef.current = league;
   return renderToStaticMarkup(createElement(MemoryRouter, null, createElement(Loans)));
+}
+
+/**
+ * The markup of one card, from its title to the next one. The page carries two
+ * loan-duration pickers now — one for sending a player out, one for bringing
+ * someone in — so a bare `toContain("2 seasons")` can't tell which it found.
+ * Slice the card first, then assert.
+ */
+function card(html: string, title: string): string {
+  const start = html.indexOf(title);
+  expect(start, `no card titled "${title}"`).toBeGreaterThan(-1);
+  const next = html.indexOf("card-title", start);
+  return next === -1 ? html.slice(start) : html.slice(start, next);
 }
 
 /** Send one of the user's players out on loan to an AI club. */
@@ -101,9 +118,10 @@ describe("Loans page renders", () => {
       ),
     });
 
-    expect(html).toContain("1 season<");
-    expect(html).not.toContain("2 seasons");
-    expect(html).not.toContain("3 seasons");
+    const listing = card(html, "List a Player for Loan");
+    expect(listing).toContain("1 season<");
+    expect(listing).not.toContain("2 seasons");
+    expect(listing).not.toContain("3 seasons");
   });
 
   it("won't list a player at all once his contract is up", () => {
@@ -122,6 +140,109 @@ describe("Loans page renders", () => {
       ),
     });
 
-    expect(html).toContain("Contract runs out first");
+    expect(card(html, "List a Player for Loan")).toContain("Contract runs out first");
+  });
+});
+
+describe("Loans page: bringing a player in", () => {
+  /**
+   * A second-division club. A club is only offered players who would get into
+   * its team, so the generated default (tid 0, an English top-flight side) can
+   * borrow nobody — the mechanic working, but a fixture that shows nothing.
+   * Same cached world, different club in charge.
+   */
+  function borrower(): LeagueStore {
+    const base = makeLeague(0, 1);
+    const tier2 = new Set(base.competitions.filter((c) => c.tier === 2).map((c) => c.id));
+    const tid = base.teams.find((t) => tier2.has(t.compId))!.tid;
+    return { ...base, meta: { ...base.meta, userTid: tid } };
+  }
+
+  it("lists borrowable players with their club and fee", () => {
+    const league = borrower();
+    const targets = searchLoanTargets(league, 1, { availableOnly: true });
+    expect(targets.length).toBeGreaterThan(0);
+
+    const panel = card(render(league), "Loan a Player In");
+    expect(panel).toContain(targets[0].player.name);
+    expect(panel).toContain("Loan him in");
+  });
+
+  it("names the players in on loan and doesn't offer to extend them", () => {
+    const base = borrower();
+    const target = searchLoanTargets(base, 1, { availableOnly: true })[0];
+    const league = requestLoan(base, target.player.pid, 2);
+    expect(league).not.toBe(base);
+
+    const html = render(league);
+    const panel = card(html, "Players In on Loan");
+    expect(panel).toContain(target.player.name);
+    expect(panel).toContain("Goes back");
+    // He's someone else's player, so there is no Extend control beside him —
+    // that column doesn't exist on this table at all.
+    expect(panel).not.toContain("Extend");
+  });
+
+  it("keeps a player you have IN on loan out of the loan-OUT table", () => {
+    // He sits on the user's roster but belongs to his parent club, and
+    // listPlayerForLoan refuses any pid already in activeLoans — so leaving him
+    // in "List a Player for Loan" is a live button that silently does nothing.
+    const base = borrower();
+    const target = searchLoanTargets(base, 1, { availableOnly: true })[0];
+    const league = requestLoan(base, target.player.pid, 2);
+    expect(league).not.toBe(base);
+    // He really is on the roster, or this test would pass for the wrong reason.
+    const user = league.teams.find((t) => t.tid === league.meta.userTid)!;
+    expect(user.roster).toContain(target.player.pid);
+
+    const html = render(league);
+    expect(card(html, "Players In on Loan")).toContain(target.player.name);
+    expect(card(html, "List a Player for Loan")).not.toContain(target.player.name);
+  });
+
+  it("says the squad is full rather than letting the rows blame other clubs", () => {
+    // Roster room is checked FIRST in the gate, so with the available-only
+    // filter on (the default) it refuses every row at once and the table
+    // empties — the same misdirection the window-cap alert exists to prevent.
+    const base = borrower();
+    const user = base.teams.find((t) => t.tid === base.meta.userTid)!;
+    // Padded from another club's squad: hasRosterRoom only counts the roster,
+    // and the page needs every pid on it to resolve to a real player.
+    const donor = base.teams.find((t) => t.tid !== user.tid)!;
+    const filled = [...user.roster];
+    for (const pid of donor.roster) {
+      if (filled.length >= ROSTER_CAP) break;
+      if (!filled.includes(pid)) filled.push(pid);
+    }
+    expect(filled.length).toBeGreaterThanOrEqual(ROSTER_CAP);
+    const league: LeagueStore = {
+      ...base,
+      teams: base.teams.map((t) => (t.tid === user.tid ? { ...t, roster: filled } : t)),
+    };
+    const panel = card(render(league), "Loan a Player In");
+    expect(panel).toContain("Your squad is full");
+  });
+
+  it("says the club is in the red rather than letting the rows blame other clubs", () => {
+    // Affordability is the one user-side check that depends on which player it
+    // is, so it can't be hoisted in the gate — and on an overall-ranked list
+    // the top rows are refused on price first, so it never reaches a row.
+    const base = makeLeague(0, 1);
+    const league: LeagueStore = {
+      ...base,
+      teams: base.teams.map((t) =>
+        t.tid === base.meta.userTid ? { ...t, budget: -5_000_000 } : t),
+    };
+    const panel = card(render(league), "Loan a Player In");
+    expect(panel).toContain("You&#x27;re in the red");
+  });
+
+  it("explains why a refused player is out of reach when you ask to see them", () => {
+    // The panel filters to the available ones by default precisely because
+    // plenty of rows are refused — most often because he wouldn't get a game.
+    const league = borrower();
+    const refused = searchLoanTargets(league, 1).filter((t) => !t.available);
+    expect(refused.length).toBeGreaterThan(0);
+    expect(refused[0].unavailableReason).toBeTruthy();
   });
 });
