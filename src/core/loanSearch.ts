@@ -52,6 +52,12 @@ import {
  *    `VALUATION_OVR_FLOOR` and a fee is a fraction of it, so more than half the
  *    world would otherwise be free to borrow.
  *
+ * **The floor is taken first and the difficulty scaled over the top of it**, so
+ * the markup reaches the whole range. Scaling only the computed half leaves the
+ * floor flat, and since the floor is what binds for the ~55% of the world that
+ * values at 0, difficulty would be inert for most of the pool while the Manual
+ * and the changelog both say it applies.
+ *
  * **One definition, used by the row, the affordability gate and the charge.** A
  * quoted fee that isn't the fee actually taken out of the budget is the same
  * class of bug as a button the action refuses.
@@ -63,10 +69,11 @@ export function userLoanFee(
   seasons: 1 | 2 | 3,
 ): number {
   const scale = difficultyProfile(league.difficulty).buyPriceScale;
-  return Math.max(
-    Math.round(LOAN_FEE_MIN * LOAN_DURATION_MULTIPLIER[seasons]),
-    Math.round(computeLoanFee(player, season, seasons) * scale),
+  const beforeDifficulty = Math.max(
+    LOAN_FEE_MIN * LOAN_DURATION_MULTIPLIER[seasons],
+    computeLoanFee(player, season, seasons),
   );
+  return Math.round(beforeDifficulty * scale);
 }
 
 /** One borrowable player, with what a loan of a given length would cost. */
@@ -341,22 +348,3 @@ export function requestLoan(league: LeagueStore, pid: number, seasons: 1 | 2 | 3
   );
 }
 
-/** True if this club currently holds the player on loan from someone else. */
-export function isBorrowed(league: LeagueStore, tid: number, pid: number): boolean {
-  return league.activeLoans.some((l) => l.pid === pid && l.loaneeTid === tid && l.parentTid !== tid);
-}
-
-/**
- * The pids on this club's roster it does not own — players in on loan.
- *
- * A user roster containing someone else's player is a state that only became
- * reachable when the user could borrow, and several club actions assume
- * ownership: releasing him, selling him, extending his contract. Each of those
- * screens against this set. Cheap enough to build per call (activeLoans is a
- * handful of rows), so callers needn't thread it around.
- */
-export function borrowedPids(league: LeagueStore, tid: number): Set<number> {
-  return new Set(
-    league.activeLoans.filter((l) => l.loaneeTid === tid && l.parentTid !== tid).map((l) => l.pid),
-  );
-}

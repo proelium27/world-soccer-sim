@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { makeLeague } from "../helpers/league.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 import {
-  searchLoanTargets, requestLoan, loansTakenThisWindow, loanGateFor, borrowedPids,
+  searchLoanTargets, requestLoan, loansTakenThisWindow, loanGateFor, userLoanFee,
 } from "../../src/core/loanSearch.js";
 import { computeLoanFee, processLoanReturns } from "../../src/core/loans.js";
+import { borrowedPids } from "../../src/core/loanOwnership.js";
 import { releasePlayer } from "../../src/core/freeAgency.js";
 import { setTransferListed, inboundOfferCandidates } from "../../src/core/transfers/inboundOffers.js";
 import { renewalsDue } from "../../src/core/contractRenewal.js";
@@ -234,7 +235,7 @@ describe("a borrowed player is not the borrowing club's to dispose of", () => {
     const due = renewalsDue(expiring, "senior");
     expect(due.pids).not.toContain(pid);
     expect(due.refusingPids).not.toContain(pid);
-    expect(borrowedPids(expiring, userTid).has(pid)).toBe(true);
+    expect(borrowedPids(expiring.activeLoans, userTid).has(pid)).toBe(true);
   });
 });
 
@@ -259,12 +260,31 @@ describe("what a loan costs the user", () => {
     // A loan was the one acquisition route buyPriceScale never reached.
     const feeFor = (d: LeagueStore["difficulty"], pid: number) =>
       searchLoanTargets(atDifficulty(d), 1).find((t) => t.player.pid === pid)!.fee;
-    // Someone whose fee is above the floor, or every level reads identically.
     const pricey = searchLoanTargets(atDifficulty("normal"), 1)
       .find((t) => t.fee > LOAN_FEE_MIN * 4)!;
     expect(pricey).toBeDefined();
 
     const fees = DIFFICULTIES.map((d) => feeFor(d, pricey.player.pid));
+    expect(fees[0]).toBeLessThan(fees[1]);   // easy  < normal
+    expect(fees[1]).toBeLessThan(fees[2]);   // normal < hard
+    expect(fees[2]).toBeLessThan(fees[3]);   // hard  < brutal
+  });
+
+  it("scales the FLOOR by difficulty too, not just the computed fee", () => {
+    // The floor is what binds for the ~55% of the world trueTransferValue
+    // prices at 0, so scaling only the computed half leaves difficulty inert
+    // for most of the pool while the Manual and the changelog both say it
+    // applies. This is the case the test above deliberately steps around by
+    // picking a pricey player, and it shipped broken because of that.
+    const league = windowLeague();
+    const cheap = league.players.find((p) => p.ovr <= 40)!;
+    expect(cheap).toBeDefined();
+
+    const fees = DIFFICULTIES.map((d) =>
+      userLoanFee({ ...league, difficulty: d }, cheap, league.season, 1),
+    );
+    // Every one of them is on the floor, and they still differ.
+    expect(fees[1]).toBe(LOAN_FEE_MIN);      // normal is the floor exactly
     expect(fees[0]).toBeLessThan(fees[1]);   // easy  < normal
     expect(fees[1]).toBeLessThan(fees[2]);   // normal < hard
     expect(fees[2]).toBeLessThan(fees[3]);   // hard  < brutal

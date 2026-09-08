@@ -7,6 +7,7 @@ import { transferWindowState } from "../../core/transfers/window.js";
 import type { Player } from "../../core/players/types.js";
 import { loanOfferCandidates, maxLoanSeasons } from "../../core/loans.js";
 import { searchLoanTargets, loansTakenThisWindow } from "../../core/loanSearch.js";
+import { borrowedPids } from "../../core/loanOwnership.js";
 import { WINTER_WINDOW_OPEN_MATCHDAY } from "../../core/calendar.js";
 import { LOAN_MAX_SEASONS, LOAN_IN_MAX_PER_WINDOW, LOAN_AI_MAX_AGE } from "../../core/constants.js";
 import { useDebounced } from "../useDebounced.js";
@@ -15,6 +16,7 @@ import {
   type PlayerFilterState,
 } from "../components/PlayerFilterBar.js";
 import { canExtend } from "../../core/contracts.js";
+import { hasRosterRoom } from "../../core/transfers/negotiation.js";
 import { renewalsDue } from "../../core/contractRenewal.js";
 import { wouldRefuseExtension } from "../../core/ai/breakoutRefusal.js";
 import { currency, formatWeeklyWage, seasonYear } from "../format.js";
@@ -118,10 +120,18 @@ export function Loans() {
   });
 
   const listedPids = new Set(league.loanListings.map((l) => l.pid));
+  // A player in on loan sits on this roster and is not ours to lend on. The
+  // core refuses it (listPlayerForLoan returns the league unchanged for any pid
+  // already in activeLoans), so leaving him here is a live button that silently
+  // does nothing — the exact shape this feature exists to avoid.
+  const borrowed = borrowedPids(league.activeLoans, userTeam.tid);
   const eligible = sortRows(
     userTeam.roster
       .map((pid) => league.players.find((p) => p.pid === pid))
-      .filter((p): p is NonNullable<typeof p> => p != null && !listedPids.has(p.pid)),
+      .filter(
+        (p): p is NonNullable<typeof p> =>
+          p != null && !listedPids.has(p.pid) && !borrowed.has(p.pid),
+      ),
     eligibleSort.sort,
     {
       name: (p) => p.name,
@@ -312,6 +322,16 @@ export function Loans() {
             <div className="alert alert-secondary">
               <strong>That&apos;s your {LOAN_IN_MAX_PER_WINDOW} loans for this window.</strong>{" "}
               You can borrow again when the next one opens.
+            </div>
+          )}
+          {/* The third of the three user-side conditions that refuse every row
+              at once. Same argument as the cap above: it's checked first in the
+              gate, so with the available-only filter on (the default) the table
+              empties and the copy below blames the clubs for a full squad. */}
+          {ws.open && !hasRosterRoom(userTeam) && (
+            <div className="alert alert-secondary">
+              <strong>Your squad is full.</strong> You&apos;ll need to move
+              someone on before you can take anyone in on loan.
             </div>
           )}
           {/* Affordability is the one user-side check that depends on which

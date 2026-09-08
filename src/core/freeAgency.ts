@@ -2,6 +2,7 @@ import type { Player, Position } from "./players/types.js";
 import { POSITIONS } from "./players/types.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import type { ActiveLoan } from "./loans.js";
+import { isBorrowed } from "./loanOwnership.js";
 import {
   ROSTER_COMPOSITION, ROSTER_CAP, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
   ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, PROSPECT_AGE_MAX, YOUTH_TRIAL_SIGN_LIMIT,
@@ -438,7 +439,7 @@ export function releasePlayer(
 ): StoredTeam[] {
   const team = teams.find((t) => t.tid === tid);
   if (!team) return teams;
-  if (activeLoans.some((l) => l.pid === pid && l.parentTid !== tid)) return teams;
+  if (isBorrowed(activeLoans, tid, pid)) return teams;
   const playerMap = new Map(players.map((p) => [p.pid, p]));
   if (!keepsDepthFloor(team, playerMap, pid)) return teams;
   return teams.map((t) =>

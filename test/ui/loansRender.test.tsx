@@ -6,6 +6,7 @@ import { makeLeague } from "../helpers/league.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 import { transferWindowState } from "../../src/core/transfers/window.js";
 import { searchLoanTargets, requestLoan } from "../../src/core/loanSearch.js";
+import { ROSTER_CAP } from "../../src/core/constants.js";
 
 /**
  * Render harness for the Loans page, covering the surfaces added when contract
@@ -180,6 +181,46 @@ describe("Loans page: bringing a player in", () => {
     // He's someone else's player, so there is no Extend control beside him —
     // that column doesn't exist on this table at all.
     expect(panel).not.toContain("Extend");
+  });
+
+  it("keeps a player you have IN on loan out of the loan-OUT table", () => {
+    // He sits on the user's roster but belongs to his parent club, and
+    // listPlayerForLoan refuses any pid already in activeLoans — so leaving him
+    // in "List a Player for Loan" is a live button that silently does nothing.
+    const base = borrower();
+    const target = searchLoanTargets(base, 1, { availableOnly: true })[0];
+    const league = requestLoan(base, target.player.pid, 2);
+    expect(league).not.toBe(base);
+    // He really is on the roster, or this test would pass for the wrong reason.
+    const user = league.teams.find((t) => t.tid === league.meta.userTid)!;
+    expect(user.roster).toContain(target.player.pid);
+
+    const html = render(league);
+    expect(card(html, "Players In on Loan")).toContain(target.player.name);
+    expect(card(html, "List a Player for Loan")).not.toContain(target.player.name);
+  });
+
+  it("says the squad is full rather than letting the rows blame other clubs", () => {
+    // Roster room is checked FIRST in the gate, so with the available-only
+    // filter on (the default) it refuses every row at once and the table
+    // empties — the same misdirection the window-cap alert exists to prevent.
+    const base = borrower();
+    const user = base.teams.find((t) => t.tid === base.meta.userTid)!;
+    // Padded from another club's squad: hasRosterRoom only counts the roster,
+    // and the page needs every pid on it to resolve to a real player.
+    const donor = base.teams.find((t) => t.tid !== user.tid)!;
+    const filled = [...user.roster];
+    for (const pid of donor.roster) {
+      if (filled.length >= ROSTER_CAP) break;
+      if (!filled.includes(pid)) filled.push(pid);
+    }
+    expect(filled.length).toBeGreaterThanOrEqual(ROSTER_CAP);
+    const league: LeagueStore = {
+      ...base,
+      teams: base.teams.map((t) => (t.tid === user.tid ? { ...t, roster: filled } : t)),
+    };
+    const panel = card(render(league), "Loan a Player In");
+    expect(panel).toContain("Your squad is full");
   });
 
   it("says the club is in the red rather than letting the rows blame other clubs", () => {

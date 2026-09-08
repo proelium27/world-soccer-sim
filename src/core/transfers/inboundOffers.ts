@@ -1,4 +1,5 @@
 import type { Player } from "../players/types.js";
+import { isBorrowed, borrowedPids } from "../loanOwnership.js";
 import type { LeagueStore } from "../leagueState.js";
 import type { ClubContext } from "../ai/clubContext.js";
 import type { TransferWindowKind } from "./window.js";
@@ -33,7 +34,7 @@ export function setTransferListed(league: LeagueStore, pid: number, listed: bool
   const userTid = league.meta.userTid;
   // A player in on loan sits on the user's roster but belongs to his parent
   // club, so listing him would advertise someone else's player for sale.
-  if (league.activeLoans.some((l) => l.pid === pid && l.parentTid !== userTid)) return league;
+  if (isBorrowed(league.activeLoans, userTid, pid)) return league;
   return {
     ...league,
     teams: league.teams.map((t) => {
@@ -140,11 +141,7 @@ export function inboundOfferCandidates(league: LeagueStore): InboundOfferCandida
   // the same reason makeTransferOffer refuses to buy one. Without this an AI
   // club could bid for a borrowed player and the user could bank a fee for
   // someone else's asset, orphaning the live loan.
-  const borrowed = new Set(
-    league.activeLoans
-      .filter((l) => l.loaneeTid === userTid && l.parentTid !== userTid)
-      .map((l) => l.pid),
-  );
+  const borrowed = borrowedPids(league.activeLoans, userTid);
 
   const candidates: InboundOfferCandidate[] = [];
   for (const pid of user.roster) {
