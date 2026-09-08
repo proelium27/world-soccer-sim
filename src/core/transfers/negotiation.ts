@@ -22,6 +22,7 @@ import {
   NEGOTIATION_LOWBALL_FACTOR, NEGOTIATION_MAX_ROUNDS,
   COUNTER_PADDING_START, COUNTER_PADDING_DECAY,
 } from "../constants.js";
+import { spendPolicy, affordable } from "../finance/debt.js";
 
 /** One user↔club transfer talk over a player, scoped to a single window. */
 export interface TransferNegotiation {
@@ -385,7 +386,20 @@ export function makeTransferOffer(
   // budget only has to cover what changes hands now, which is the whole point:
   // promising a share of a future sale is exactly how you sign someone you
   // could not have afforded outright.
-  if (offer + wageCharge > user.budget) return league;
+  // The overdraft is what makes an ambitious signing possible at all: the club
+  // may spend into the red up to its own limit, rather than only out of cash in
+  // hand. A registration embargo stops the deal outright, whatever the price —
+  // that is the point of it, and it is why the two are asked separately.
+  const policy = spendPolicy(
+    league.debtSanctions,
+    league.season,
+    user.tid,
+    financeScaleFor(
+      league.competitions, user.compId, user.tid, league.meta.userTid, league.difficulty,
+    ),
+  );
+  if (policy.embargoed) return league;
+  if (!affordable(user.budget, offer + wageCharge, policy)) return league;
   if (!hasRosterRoom(user)) return league;
 
   const playerMap = new Map(league.players.map((p) => [p.pid, p]));

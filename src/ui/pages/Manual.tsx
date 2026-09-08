@@ -33,6 +33,7 @@ const SECTIONS: [id: string, title: string][] = [
   ["loans", "Loans"],
   ["contracts", "Contracts, Wages & Free Agents"],
   ["finance", "Finance"],
+  ["debt", "Debt & Sanctions"],
   ["youth", "The Youth Academy"],
   ["ai", "How AI Clubs Think"],
   ["strategy", "Strategy"],
@@ -299,11 +300,12 @@ export function Manual() {
             take longer to sharpen up, so you're making decisions with worse information.
           </p>
           <p>
-            <strong>You can go broke.</strong> There's no debt system and nobody bails you out. If
-            your balance goes negative you simply can't sign anyone until it's positive again, and
-            your scouting is stuck at zero while you're overdrawn, which makes potential even harder
-            to read. It's recoverable, but you recover by selling. On Brutal that's less a warning
-            than a description of the job.
+            <strong>You can go broke.</strong> Nobody bails you out. You can borrow &mdash; see{" "}
+            <a href="#debt">Debt &amp; Sanctions</a> &mdash; but the overdraft scales with what your
+            club earns, so a harder level shrinks it along with everything else, and your scouting
+            is stuck at zero while you're overdrawn, which makes potential even harder to read. It's
+            recoverable, but you recover by selling. On Brutal that's less a warning than a
+            description of the job.
           </p>
         </Section>
 
@@ -2332,6 +2334,64 @@ export function Manual() {
             Spending below your cap is unrestricted, but you can't bank cash past it &mdash; money
             you would have saved above the line is never paid at all rather than carried over, so if
             you're near the ceiling the page warns you before the next cheque disappears.
+          </p>
+        </Section>
+
+        <Section id="debt" title="Debt &amp; Sanctions">
+          <p>
+            Your balance can go below zero, and going there is a decision rather than an accident.
+            Every club has an <strong>overdraft</strong> worth about nine months of its own income
+            &mdash; roughly <strong>$66M</strong> for a big-four top-flight side, proportionally
+            less for a smaller or lower-division one, and less again on the harder difficulty
+            levels, because it scales with what you earn. You can spend into it freely. Buy the
+            striker you can't quite afford and worry about it later; that's what it's for.
+          </p>
+          <p>
+            Three things happen once you're in the red.
+          </p>
+          <ul>
+            <li>
+              <strong>Interest.</strong> You're charged <strong>10%</strong> of the balance at the
+              start of every season you carry it into, before your new allocation arrives. It
+              compounds, so a debt you ignore gets worse on its own.
+            </li>
+            <li>
+              <strong>A transfer embargo.</strong> End a season more than{" "}
+              <strong>40%</strong> into your overdraft and you can't buy or sign anyone at all next
+              season. You can still sell, still promote from your academy, and still take on
+              trialists &mdash; the ways out stay open, the ways further in don't.
+            </li>
+            <li>
+              <strong>A points deduction.</strong> End it more than <strong>75%</strong> in and
+              you're docked <strong>6 points</strong> from next season's table on top of the
+              embargo. Stay in breach and it climbs by 3 a season, to a maximum of 12. One clear
+              season resets it completely.
+            </li>
+          </ul>
+          <p>
+            <strong>Your books are read at the final whistle, not in the summer.</strong> The check
+            runs on the balance you finish the season with, after prize money and hype revenue have
+            landed &mdash; so a good cup run really can rescue you, and selling your best player in
+            July can't. That's why the Dashboard and the Finance page both start warning you
+            <em>during</em> the season, as soon as today's balance would cost you something. Take
+            the warning seriously; by the time the penalty exists it's too late to trade out of it.
+          </p>
+          <p>
+            A deduction is a sporting penalty and nothing else. Your board doesn't have a separate
+            opinion about your finances &mdash; but the points come off your league table, you
+            finish lower, and the board very much has an opinion about <em>that</em>. Docked points
+            show in the standings as a red figure next to your total, so the table always adds up.
+          </p>
+          <p>
+            Both penalties appear in your <strong>news feed</strong> the season they come into
+            force, at the top of that season ahead of the summer window &mdash; which is the right
+            place for them, because an embargo governs the window you are about to trade in. A club
+            in your own league picking one up shows there too.
+          </p>
+          <p>
+            Only your club is ever sanctioned. AI clubs manage their money the way they always
+            have. One wrinkle: a sanction belongs to the <em>club</em>, not to you, so if you take
+            another job the club you left still serves out whatever you left it with.
           </p>
         </Section>
 

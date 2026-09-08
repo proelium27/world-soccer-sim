@@ -1758,6 +1758,100 @@ export const PRIZE_TOP_10 = 10_000_000;
 export const PRIZE_TOP_5_CUTOFF = 5;
 export const PRIZE_TOP_10_CUTOFF = 10;
 
+/**
+ * ---------------------------------------------------------------------------
+ * Club debt (user's club only)
+ * ---------------------------------------------------------------------------
+ *
+ * A club's `budget` has ALWAYS been able to go negative — `chargeSeasonStart`
+ * subtracts the wage bill with no floor and `clampBudget` is a `Math.min`, so
+ * a negative balance passes straight through and persists. That is exactly
+ * what `weakLeaguesAudit` is reading when it reports an AI club at -£5.1M.
+ * What was missing was never the state; it was the ability to CHOOSE it,
+ * anything that happens as a result, and any way to see it.
+ *
+ * These constants supply the three rungs, in the order real football applies
+ * them: an overdraft you may deliberately spend into, a registration embargo
+ * if you end a season too deep in it, and a points deduction if you end the
+ * season deeper still — escalating for as long as you stay in breach.
+ *
+ * **Every one of these applies to the user's club alone.** That is the same
+ * containment every difficulty lever ships under and it is why this needs no
+ * dynasty audit: nothing here reaches AI↔AI trading, the country strength
+ * ladder or the anti-inflation equilibrium. AI clubs keep going quietly
+ * negative exactly as they do today. Widening any of it world-wide means
+ * running `scripts/weakLeaguesAudit.ts` on both sides first — and note that
+ * per this repo's own history the finance column fails before the ladder
+ * does, and that `main` is currently red on that gate for unrelated reasons.
+ */
+
+/**
+ * How far below zero the user may deliberately spend, as a fraction of his
+ * club's own scaled base income (`BASE_SEASON_BUDGET * financeScaleFor`). At
+ * 0.75 a big-four top-flight club can run about £66M into the red and a
+ * Serbian third-division one about £7.6M — proportional to what the club
+ * earns, so the lever means the same thing everywhere on the ladder, and it
+ * shrinks with difficulty for free because `financeScaleFor` already carries
+ * the user's `budgetScale`.
+ *
+ * **It bounds voluntary spending only, and that asymmetry is the point.**
+ * Wages are charged at season start whatever the balance says, so a club can
+ * still be carried past this line involuntarily by its own wage bill — which
+ * is precisely the "you owe more than you thought" state the sanctions below
+ * exist to price. A hard floor on the balance would instead make the debt
+ * silently disappear, which is the one outcome that teaches the player
+ * nothing.
+ */
+export const OVERDRAFT_LIMIT_FRACTION = 0.75;
+
+/**
+ * Interest charged each season on a negative balance, applied at the
+ * season-start step beside the wage charge. Compounds by construction: it
+ * makes the balance more negative, so next season's charge is larger.
+ *
+ * Higher than real football's cost of borrowing on purpose — a club in the
+ * red has to be visibly losing ground to the interest, or "just carry the
+ * debt" is a free option and the whole ladder below is decoration.
+ */
+export const DEBT_INTEREST_RATE = 0.1;
+
+/**
+ * Sanction thresholds, as fractions of the club's own overdraft limit, read
+ * off the balance at the END of a season (after prize money and hype revenue
+ * have settled) and applied to the season that follows.
+ *
+ * Reading the year-end balance rather than the balance at the moment of the
+ * offseason market is deliberate and is the real dynamic: the accounts close
+ * when the season does, so selling in July does not undo last year's breach.
+ * It gives the player the right instruction — get the books straight BEFORE
+ * the final whistle — and the Dashboard and Finance warnings exist to make
+ * that instruction visible in time to act on it.
+ */
+export const DEBT_EMBARGO_THRESHOLD = 0.4;
+export const DEBT_DEDUCTION_THRESHOLD = 0.75;
+
+/**
+ * The points deduction for ending a season past DEBT_DEDUCTION_THRESHOLD,
+ * and what each further consecutive season in breach adds, capped.
+ *
+ * Sized against the real thing: English clubs have been docked 4-10 points
+ * for profit-and-sustainability breaches and 9-12 for entering
+ * administration. A first offence at 6 is a bad season rather than a ruined
+ * one; staying in breach is what ruins it.
+ *
+ * **A deduction is a SPORTING penalty and never a board-confidence one, and
+ * that distinction is load-bearing.** `deriveExpectations` is built so that
+ * no sequence of transfer decisions can move the bar the board judges you
+ * against — two attempts at a money term were removed for exactly that
+ * reason (see `core/manager/expectation.ts`). A deduction touches none of
+ * that machinery: it makes you genuinely finish lower, and the board then
+ * judges the lower finish through the channel it already had. Wiring debt
+ * into expectations instead would reopen the teardown exploit.
+ */
+export const DEBT_DEDUCTION_POINTS = 6;
+export const DEBT_DEDUCTION_REPEAT_POINTS = 3;
+export const DEBT_DEDUCTION_MAX_POINTS = 12;
+
 /** Hype is tracked on a 0-100 scale. */
 export const HYPE_MIN = 0;
 export const HYPE_MAX = 100;

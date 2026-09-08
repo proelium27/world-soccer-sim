@@ -7,6 +7,11 @@ import type { LeagueStore } from "../../src/core/leagueState.js";
 import { advanceDomesticCup, pendingRound } from "../../src/core/domesticCup/cup.js";
 import type { CupTie } from "../../src/core/cup/types.js";
 import { budgetCap, financeScaleFor } from "../../src/core/finance/budget.js";
+import { overdraftLimit } from "../../src/core/finance/debt.js";
+import { currency } from "../../src/ui/format.js";
+import {
+  DEBT_EMBARGO_THRESHOLD, DEBT_DEDUCTION_THRESHOLD, DEBT_DEDUCTION_POINTS,
+} from "../../src/core/constants.js";
 
 /**
  * Render harness for the Finance page. No DOM test env here, so server
@@ -70,6 +75,27 @@ function withUserBudget(league: LeagueStore, budget: number): LeagueStore {
     ...league,
     teams: league.teams.map((t) => (t.tid === league.meta.userTid ? { ...t, budget } : t)),
   };
+}
+
+
+/**
+ * One stage of a `fin-year` timeline, picked out by its heading. Sliced rather
+ * than matched against the whole page because "You are here" is rendered by
+ * every timeline on the page, so a bare `toContain` would pass on the wrong
+ * one — the money year is always marking a stage of its own.
+ */
+function stageOf(html: string, when: string): string {
+  const chunk = html.split('<li class="fin-stage').find((c) => c.includes(when));
+  expect(chunk, `no stage headed ${when}`).toBeDefined();
+  return chunk!;
+}
+
+/** The user's club's overdraft limit, as the page derives it. */
+function limitOf(league: LeagueStore): number {
+  const team = league.teams.find((t) => t.tid === league.meta.userTid)!;
+  return overdraftLimit(financeScaleFor(
+    league.competitions, team.compId, team.tid, league.meta.userTid, league.difficulty,
+  ));
 }
 
 describe("Finance page", () => {
@@ -149,6 +175,63 @@ describe("Finance page", () => {
     const projected = Number(tile![1].replace(/[$,]/g, ""));
     expect(Number.isFinite(projected)).toBe(true);
     expect(projected).toBeLessThanOrEqual(Math.round(cap));
+  });
+
+  /**
+   * The debt rules are stated whether or not the club is in trouble. The
+   * alerts above only fire once a penalty is coming, and a rule the player can
+   * only read after it has bitten him is one he could never have planned
+   * around — which is the whole reason this section exists.
+   */
+  it("explains the debt rules to a club that is nowhere near them", () => {
+    const base = makeLeague(0, 1);
+    const html = render(withUserBudget(base, 50_000_000));
+    const limit = limitOf(base);
+
+    expect(html).toContain("Borrowing and debt");
+    expect(html).toContain("Into the overdraft");
+    expect(html).toContain("Transfer embargo");
+    expect(html).toContain("Points deduction");
+
+    // The thresholds as money, not as percentages — the point of putting them
+    // on this page rather than in the Manual. Rendered with the typographic
+    // minus, so this also pins that a balance and a movement can't come out
+    // wearing two different dashes in the same column.
+    expect(html).toContain(`\u2212${currency.format(limit)}`);
+    expect(html).toContain(`\u2212${currency.format(limit * DEBT_EMBARGO_THRESHOLD)}`);
+    expect(html).toContain(`\u2212${currency.format(limit * DEBT_DEDUCTION_THRESHOLD)}`);
+
+    // Nothing is in force, so no rung claims to be where the club is.
+    expect(stageOf(html, "Into the overdraft")).not.toContain("You are here");
+    expect(stageOf(html, "Points deduction")).not.toContain("You are here");
+  });
+
+  it("quotes the deduction from the constants rather than a hardcoded 6", () => {
+    const html = render(makeLeague(0, 1));
+    expect(stageOf(html, "Points deduction"))
+      .toContain(`minus ${DEBT_DEDUCTION_POINTS}`);
+  });
+
+  /**
+   * The rung marker has to follow the balance, or the ladder is decoration.
+   * Each case puts the club at a depth the sanction rules read differently and
+   * checks the marker lands on that rung and no other.
+   */
+  it("marks the rung today's balance sits on", () => {
+    const base = makeLeague(0, 1);
+    const limit = limitOf(base);
+
+    const shallow = render(withUserBudget(base, -limit * 0.1));
+    expect(stageOf(shallow, "Into the overdraft")).toContain("You are here");
+    expect(stageOf(shallow, "Transfer embargo")).not.toContain("You are here");
+
+    const embargoed = render(withUserBudget(base, -limit * 0.5));
+    expect(stageOf(embargoed, "Transfer embargo")).toContain("You are here");
+    expect(stageOf(embargoed, "Points deduction")).not.toContain("You are here");
+
+    const docked = render(withUserBudget(base, -limit * 0.9));
+    expect(stageOf(docked, "Points deduction")).toContain("You are here");
+    expect(stageOf(docked, "Transfer embargo")).not.toContain("You are here");
   });
 
   it("does not warn about the ceiling when the club is nowhere near it", () => {

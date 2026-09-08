@@ -11,6 +11,7 @@ import { BackLink } from "../components/BackLink.js";
 import { KEY_EVENTS, TimelineRow } from "../components/matchEvents.js";
 import { LiveMatchOverlay } from "../components/LiveMatchOverlay.js";
 import { liveTableRows, toLiveMatch } from "../live/liveMatch.js";
+import { pointsDeductionMap } from "../../core/finance/debt.js";
 
 
 function ratingClass(rating: number): string {
@@ -334,6 +335,7 @@ export function BoxScore() {
               league.played.filter((m) => m.matchday < match.matchday && inComp.has(m.home)),
               [watchedMatch, ...watchedOthers],
               minute,
+              pointsDeductionMap(league.debtSanctions, league.season),
             )
           }
           onComplete={() => setWatching(false)}
