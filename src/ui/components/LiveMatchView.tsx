@@ -200,10 +200,16 @@ export function LiveMatchView({
   const playback = useMatchPlayback(match.events, { autoStart: true });
   const { minute, finished } = playback;
 
-  // Two elevens side by side need real width, and this column loses a chunk of
-  // it to the sidebar and the rail long before a phone does — so the pitch asks
-  // about its own threshold rather than borrowing the mobile breakpoint.
-  const narrow = useMediaQuery("(max-width: 1199.98px)");
+  // Two elevens side by side need real width, and this column loses ~500px of
+  // it to the sidebar and the rail — so the pitch asks about its own threshold
+  // rather than borrowing the mobile breakpoint.
+  //
+  // 1440 is measured, not guessed: a landscape pitch needs about 870px before
+  // the chips stop colliding (at a 1210 viewport it gets 654 and seven pairs
+  // overlap, by up to 27px; at 1400 it gets 844 and two still touch), and this
+  // is the first width that clears it. Below it the portrait pitch is the better
+  // answer anyway: a half each way gives a chip more room than a half across.
+  const narrow = useMediaQuery("(max-width: 1439.98px)");
 
   // Rebuilt every minute, which is the point: it is a replay of the events up
   // to now, so ratings and marks move as the match does. O(events) on ~200

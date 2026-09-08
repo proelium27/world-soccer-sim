@@ -15,8 +15,8 @@ import { shortName } from "../playerName.js";
  * are the same numbers the Roster page's pitch uses, so a 4-3-3 sits in the
  * same shape on both screens — a second table would drift the moment either was
  * retuned. The layouts are drawn horizontally with x:0 at a side's own goal, so
- * a side occupies a half by halving x, and the away side is rotated 180
- * degrees (both axes) because that is what turning a team round does.
+ * a side occupies a half by scaling x into it (see `place`), and the away side
+ * is rotated 180 degrees because that is what turning a team round does.
  *
  * A pitch is a picture, and this one is on the screen a screen reader user
  * asked for. So it is an ordered list first and a diagram second: chips sit in
@@ -26,6 +26,19 @@ import { shortName } from "../playerName.js";
  * copies of one team sheet means hearing the eleven twice.
  */
 
+/**
+ * How far into its own half a chip sits, at each end.
+ *
+ * A chip is a pill a hundred-odd pixels wide hanging off its own centre, and a
+ * half-pitch is half as wide as the one the Roster page lays the same
+ * coordinates out on — so mapping a side straight onto 0-50 puts the keeper
+ * through the goal and stands the two centre-forwards on top of each other at
+ * the halfway line. Each side gets an inset band instead: the shape is
+ * identical, drawn slightly smaller.
+ */
+const TOUCHLINE_INSET = 4;
+const HALFWAY_INSET = 3;
+
 /** Where a chip sits, as percentages of the pitch box. */
 function place(
   x: number,
@@ -33,18 +46,25 @@ function place(
   side: "home" | "away",
   vertical: boolean,
 ): { left: string; top: string } {
-  // Own half: home takes 0-50 of the attacking axis, away 50-100 reversed.
-  const along = side === "home" ? x / 2 : 100 - x / 2;
+  const span = 50 - TOUCHLINE_INSET - HALFWAY_INSET;
+  const into = TOUCHLINE_INSET + (x / 100) * span;
+  // Home takes the near half attacking away; the away side is the same shape
+  // rotated 180 degrees, which is what turning a team round does.
+  const along = side === "home" ? into : 100 - into;
   const across = side === "home" ? y : 100 - y;
   return vertical
     ? { left: `${across}%`, top: `${100 - along}%` }
     : { left: `${along}%`, top: `${across}%` };
 }
 
-/** Match ratings run 0-10; these are the bands the box score already colours by. */
+/**
+ * Match ratings run 0-10, and the box score already colours them: green at 8,
+ * red under 6. Same bands here, and as TEXT rather than a filled badge, because
+ * that is what the box score does with the same number and what the rest of the
+ * app does with a figure carrying a verdict.
+ */
 function ratingTone(rating: number): string {
   if (rating >= 8) return "mp-rating--great";
-  if (rating >= 7) return "mp-rating--good";
   if (rating < 6) return "mp-rating--poor";
   return "";
 }
@@ -81,25 +101,29 @@ function describe(line: LiveLine, name: string): string {
 function Chip({
   line,
   name,
-  colors,
+  accent,
   style,
 }: {
   line: LiveLine;
   name: string;
-  colors: [string, string];
+  /** The club's primary colour, worn as a leading edge — see the header. */
+  accent: string;
   style: { left: string; top: string };
 }) {
-  // Capped so a hat-trick doesn't push the chip wider than its neighbours; the
+  // Capped so a hat-trick doesn't push one chip wider than its neighbours; the
   // count beside it carries the rest, and the hidden sentence always has it.
-  const balls = Math.min(line.goals, 3);
+  const balls = Math.min(line.goals, 2);
   return (
-    <li className="mp-chip" style={style}>
+    <li className="mp-chip" style={{ ...style, ["--mp-accent" as string]: accent }}>
       <span className="visually-hidden">{describe(line, name)}</span>
-      <span className="mp-shirt" style={{ background: colors[0], borderColor: colors[1] }}>
-        <span className="mp-slot">{line.slot ?? "?"}</span>
+      <span className="mp-pos" aria-hidden="true">
+        {line.slot ?? "?"}
       </span>
+      <Link to={`/player/${line.pid}`} className="mp-name" aria-hidden="true" tabIndex={-1}>
+        {shortName(name)}
+      </Link>
       {line.rating !== null && (
-        <span className={`mp-rating stat-num ${ratingTone(line.rating)}`} aria-hidden="true">
+        <span className={`mp-rating ${ratingTone(line.rating)}`} aria-hidden="true">
           {line.rating.toFixed(1)}
         </span>
       )}
@@ -109,7 +133,7 @@ function Chip({
             <BallIcon size={9} />
           </span>
         ))}
-        {line.goals > 3 && <span className="mp-mark mp-mark--more">x{line.goals}</span>}
+        {line.goals > 2 && <span className="mp-mark mp-mark--more">{line.goals}</span>}
         {line.assists > 0 && (
           <span className="mp-mark mp-mark--assist">
             <BootIcon size={9} />
@@ -132,9 +156,6 @@ function Chip({
           </span>
         )}
       </span>
-      <Link to={`/player/${line.pid}`} className="mp-name" aria-hidden="true" tabIndex={-1}>
-        {shortName(name)}
-      </Link>
     </li>
   );
 }
@@ -163,7 +184,7 @@ function sideChips(
         key={line.pid}
         line={line}
         name={playerName(line.pid)}
-        colors={colors}
+        accent={colors[0]}
         style={place(coord.x, coord.y, which, vertical)}
       />
     );
@@ -196,13 +217,11 @@ export function MatchPitch({
 }) {
   return (
     <div className={`mp-pitch${vertical ? " mp-pitch--vertical" : ""}`}>
-      {/* Markings only. Everything a reader needs is in the chips. */}
-      <div className="mp-markings" aria-hidden="true">
-        <span className="mp-halfway" />
-        <span className="mp-circle" />
-        <span className="mp-box mp-box--home" />
-        <span className="mp-box mp-box--away" />
-      </div>
+      {/* Markings only, and everything a reader needs is in the chips. The
+          halfway line and centre circle are the pitch's own ::before/::after,
+          as on the Roster page, so only the goals need elements of their own. */}
+      <span className="mp-goal mp-goal--home" aria-hidden="true" />
+      <span className="mp-goal mp-goal--away" aria-hidden="true" />
       <ol className="mp-side" aria-label={`${homeName} lineup`}>
         {sideChips(home, homeFormation, "home", vertical, homeColors, playerName)}
       </ol>
