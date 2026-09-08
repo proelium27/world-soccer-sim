@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { Flag } from "../components/Flag.js";
@@ -13,6 +13,8 @@ import {
   type PlayerFilterState,
 } from "../components/PlayerFilterBar.js";
 import { SortableTh, sortRows, useTableSort } from "../components/SortableTable.js";
+import { ClubDatabase } from "./ClubDatabase.js";
+import { ColumnSetPills, useColumnSet } from "./databaseShared.js";
 import { usePotentialView } from "../potentialView.js";
 import { currencyCompact, formatWeeklyWage } from "../format.js";
 import { getRatingColor } from "../utils/ratingColor.js";
@@ -45,6 +47,7 @@ const COLUMN_SETS: { key: PlayerColumnSet; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "attributes", label: "Attributes" },
 ];
+
 
 const STATUS_OPTIONS: { key: PlayerStatusFilter; label: string }[] = [
   { key: "all", label: "Everyone" },
@@ -82,13 +85,9 @@ export function Database() {
           </Link>
         </li>
       </ul>
-      {players ? <PlayerDatabase /> : <ClubsPlaceholder />}
+      {players ? <PlayerDatabase /> : <ClubDatabase />}
     </div>
   );
-}
-
-function ClubsPlaceholder() {
-  return <p className="text-muted">The club table lands next.</p>;
 }
 
 function PlayerDatabase() {
@@ -97,17 +96,9 @@ function PlayerDatabase() {
   const [filters, setFilters] = useState<PlayerFilterState>(EMPTY_PLAYER_FILTERS);
   const [name, setName] = useState("");
   const [status, setStatus] = useState<PlayerStatusFilter>("all");
-  // In the URL rather than in state, so a view can be linked to and — the
-  // reason it went in now — so a render test can reach the widest column set.
-  // Anything unrecognised reads as the overview, never as a blank table.
-  const [params, setParams] = useSearchParams();
-  const columns: PlayerColumnSet = params.get("cols") === "attributes" ? "attributes" : "overview";
-  const setColumns = (next: PlayerColumnSet) => {
-    const updated = new URLSearchParams(params);
-    if (next === "overview") updated.delete("cols");
-    else updated.set("cols", next);
-    setParams(updated, { replace: true });
-  };
+  const [columns, setColumns] = useColumnSet<PlayerColumnSet>(
+    ["overview", "attributes"],
+  );
   const [page, setPage] = useState(0);
   const { sort, toggle } = useTableSort<PlayerSortKey>("ovr", "desc");
 
@@ -213,19 +204,7 @@ function PlayerDatabase() {
       </PlayerFilterBar>
 
       <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
-        <ul className="nav nav-pills">
-          {COLUMN_SETS.map((c) => (
-            <li className="nav-item" key={c.key}>
-              <button
-                type="button"
-                className={`nav-link ${columns === c.key ? "active" : ""}`}
-                onClick={() => setColumns(c.key)}
-              >
-                {c.label}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <ColumnSetPills options={COLUMN_SETS} value={columns} onChange={setColumns} />
         {hasAnyFilter(filters) || name !== "" || status !== "all" ? (
           <span className="text-muted small">
             {sorted.length.toLocaleString()} of {rows.length.toLocaleString()} players match

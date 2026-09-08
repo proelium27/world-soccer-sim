@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { makeLeague } from "../helpers/league.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 import { PLAYER_DB_PAGE_SIZE } from "../../src/ui/playerDatabase.js";
+import { CLUB_DB_PAGE_SIZE } from "../../src/ui/clubDatabase.js";
 
 /**
  * The database page renders the whole world, so its one real failure mode is
@@ -77,8 +78,28 @@ describe("Database page", () => {
     expect(html).toContain(`of ${league.players.length.toLocaleString()} players`);
   });
 
-  it("renders the clubs tab without falling over", () => {
-    expect(render(league, "/database/clubs")).toContain("Clubs");
+  it("renders the clubs tab, one page of the world at a time", () => {
+    const html = render(league, "/database/clubs");
+    expect(html).toContain("Avg age");
+    expect(league.teams.length).toBeGreaterThan(CLUB_DB_PAGE_SIZE);
+    expect(countOf(html, /<tr/g)).toBeLessThanOrEqual(CLUB_DB_PAGE_SIZE + 1); // + header
+    expect(html).toContain(`of ${league.teams.length.toLocaleString()} clubs`);
+  });
+
+  it("keeps the clubs' widest column set bounded too", () => {
+    // Season is 16 numeric columns on top of the identity block — the widest
+    // table either tab draws, and so the one the budget is really for.
+    const html = render(league, "/database/clubs?cols=season");
+    expect(html).toContain("xGA");
+    expect(countOf(html, /<[a-z]/g)).toBeLessThan(3500);
+    // No crest and no flag per row: a club's name is the identity here.
+    expect(countOf(html, /<img/g)).toBe(0);
+  });
+
+  it("shows the finance columns the money questions need", () => {
+    const html = render(league, "/database/clubs?cols=finance");
+    expect(html).toContain("Wage bill");
+    expect(html).toContain("Budget");
   });
 
   it("renders for a save with no user club", () => {
