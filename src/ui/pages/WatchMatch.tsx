@@ -25,6 +25,7 @@ import { LiveMatchPicker } from "../components/LiveMatchPicker.js";
 import { competitionOf } from "../../core/competitions.js";
 import { liveTableRows, toLiveMatch } from "../live/liveMatch.js";
 import { matchLineups } from "../live/lineups.js";
+import { pointsDeductionMap } from "../../core/finance/debt.js";
 
 /** The route the pending-match redirect defends. Exported so the guard can't drift from it. */
 export const WATCH_PATH = "/watch";
@@ -104,7 +105,15 @@ function Rewatch({ matchIndex }: { matchIndex: number }) {
         playerName={playerName}
         competitionName={view.competitionName}
         tableAtMinute={(minute) =>
-          liveTableRows(view.compTeamIds, view.prior, [view.watched, ...view.others], minute)
+          liveTableRows(
+            view.compTeamIds,
+            view.prior,
+            [view.watched, ...view.others],
+            minute,
+            // A club under a points deduction is under it in the replay too,
+            // or the table beside the match disagrees with Standings.
+            pointsDeductionMap(league.debtSanctions, league.season),
+          )
         }
         lineups={view.lineups}
         onComplete={close}

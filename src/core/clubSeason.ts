@@ -8,6 +8,7 @@ import { cupRunSummary } from "./cup/cup.js";
 import { clubDomesticRun, clubDomesticRunLabel } from "./domesticCup/cup.js";
 import { computeTeamRating } from "./teams/teamRating.js";
 import { teamSlots } from "./lineup/formations.js";
+import { pointsDeductionMap } from "./finance/debt.js";
 
 /** A cup or shield run, exactly as ClubSeasonRecord carries it. */
 export type ClubRun = { note: string; isChampion: boolean; isRunnerUp: boolean } | null;
@@ -279,6 +280,7 @@ function currentSeason(league: LeagueStore, tid: number): ClubSeason | null {
   const table = computeStandings(
     compTids,
     league.played.filter((m) => compTidSet.has(m.home)),
+    pointsDeductionMap(league.debtSanctions, season),
   );
   const index = table.findIndex((r) => r.tid === tid);
 

@@ -293,6 +293,14 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
     const hasPlayed = groupPlayed.length > 0;
     const rankByTid = new Map<number, number>();
     if (hasPlayed) {
+      // Deliberately NOT passed a points-deduction map, unlike every other
+      // table in the game. This one is a *form* proxy feeding the AI's own
+      // strength/ambition model, and a financial sanction has not made the
+      // club's football any worse — docking it here would quietly make a fined
+      // club's players cheaper and the club itself less attractive to join,
+      // which is a second-order effect nobody asked for. It would also mean
+      // widening LeagueSnapshot, which is kept minimal on purpose. Every table
+      // a human reads, and every table that decides something, does take them.
       const groupStandings = computeStandings(groupTids, groupPlayed);
       groupStandings.forEach((row, i) => rankByTid.set(row.tid, i + 1));
     }

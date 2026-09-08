@@ -33,6 +33,7 @@ const SECTIONS: [id: string, title: string][] = [
   ["loans", "Loans"],
   ["contracts", "Contracts, Wages & Free Agents"],
   ["finance", "Finance"],
+  ["debt", "Debt & Sanctions"],
   ["youth", "The Youth Academy"],
   ["ai", "How AI Clubs Think"],
   ["strategy", "Strategy"],
@@ -299,11 +300,12 @@ export function Manual() {
             take longer to sharpen up, so you're making decisions with worse information.
           </p>
           <p>
-            <strong>You can go broke.</strong> There's no debt system and nobody bails you out. If
-            your balance goes negative you simply can't sign anyone until it's positive again, and
-            your scouting is stuck at zero while you're overdrawn, which makes potential even harder
-            to read. It's recoverable, but you recover by selling. On Brutal that's less a warning
-            than a description of the job.
+            <strong>You can go broke.</strong> Nobody bails you out. You can borrow &mdash; see{" "}
+            <a href="#debt">Debt &amp; Sanctions</a> &mdash; but the overdraft scales with what your
+            club earns, so a harder level shrinks it along with everything else, and your scouting
+            is stuck at zero while you're overdrawn, which makes potential even harder to read. It's
+            recoverable, but you recover by selling. On Brutal that's less a warning than a
+            description of the job.
           </p>
         </Section>
 
@@ -1494,6 +1496,15 @@ export function Manual() {
             over time.
           </p>
           <p>
+            On a <a href="#development">steady careers</a> save that number means something
+            different, and it's worth knowing which. There's far less luck left for it to be
+            guessing at, so the simulated careers nearly all agree with each other and the estimate
+            lands close to what actually happens: the three-in-four rule above stops applying, and
+            POT reads as roughly where a player ends up rather than as an optimistic ceiling he
+            probably won't reach. That makes it a lot more useful, and it makes the scouting fog
+            below most of what still stands between you and the real number.
+          </p>
+          <p>
             <strong>You don't see a player's exact potential. You see a scouting estimate.</strong>{" "}
             Everywhere POT shows up (Roster, prospects, free agents, transfer targets, rival squads,
             player profiles), it's a low&ndash;high band rather than a single number, and the real
@@ -1517,6 +1528,14 @@ export function Manual() {
         </Section>
 
         <Section id="development" title="Player Development & Aging">
+          <p>
+            There are two ways a save can develop its players, and you pick which one when you
+            create it (there's a switch on the New League screen, and you can change your mind
+            later in God Mode &mdash; it takes effect at your next offseason and leaves seasons
+            you've already played exactly as they were). Everything in this section describes the
+            default, <strong>random growth</strong>. The alternative, <strong>steady careers</strong>,
+            is described at the end of it.
+          </p>
           <p>
             Players develop each offseason based on age and randomness, and nothing else. The
             typical arc peaks around <strong>age 26</strong>, but not all of a player at once:
@@ -1596,6 +1615,35 @@ export function Manual() {
             prospect shows. It's a trajectory, not a guarantee, and a rough run of seasons can still leave
             him merely very good, but these are the players your true legends come from. If one lands
             in <em>your</em> academy, treat him accordingly.
+          </p>
+          <p>
+            <strong>Steady careers.</strong> The other setting. Everything above still applies
+            &mdash; physical ratings still go before technical ones, keepers still last longest,
+            the retirement rules are unchanged, generational talents still turn up &mdash; but the
+            summer dice are gone and the shape of the arc is drawn differently.
+            A player improves through his early twenties, holds through his peak years, and starts
+            falling away from about thirty, dropping faster every year after that. He'll still
+            drift a point either way from one season to the next, but he won't lurch: nobody adds
+            eight points out of nowhere at 26, and nobody quietly falls apart for no reason you
+            could ever have seen coming.
+          </p>
+          <p>
+            Players still turn out differently from each other, and by about as much as they do
+            normally. What changes is <em>when</em> that's decided. Under random growth, who ends
+            up elite is settled a summer at a time, so the same prospect can become a star or a
+            journeyman depending on how the next few Julys go. Under steady careers it's settled
+            in the player himself: some are clean developers and some never quite kick on, and
+            that's true of them from the day they're generated. Playing time still matters exactly
+            as much either way &mdash; a kid getting regular minutes really does come on faster
+            than one rotting on the bench.
+          </p>
+          <p>
+            Two things follow from that, and they're the reason to pick it. Your scouting reports
+            are worth far more, because there's a real answer for them to be closing in on: a
+            potential estimate stops being a guess at a dice roll and becomes a genuine read on
+            where a player ends up. And the best players in your league stay recognizable &mdash;
+            they're the ones who were always going to be good, developed by clubs that gave them
+            games, rather than whoever the last few offseasons happened to smile on.
           </p>
         </Section>
 
@@ -2309,6 +2357,64 @@ export function Manual() {
             Spending below your cap is unrestricted, but you can't bank cash past it &mdash; money
             you would have saved above the line is never paid at all rather than carried over, so if
             you're near the ceiling the page warns you before the next cheque disappears.
+          </p>
+        </Section>
+
+        <Section id="debt" title="Debt &amp; Sanctions">
+          <p>
+            Your balance can go below zero, and going there is a decision rather than an accident.
+            Every club has an <strong>overdraft</strong> worth about nine months of its own income
+            &mdash; roughly <strong>$66M</strong> for a big-four top-flight side, proportionally
+            less for a smaller or lower-division one, and less again on the harder difficulty
+            levels, because it scales with what you earn. You can spend into it freely. Buy the
+            striker you can't quite afford and worry about it later; that's what it's for.
+          </p>
+          <p>
+            Three things happen once you're in the red.
+          </p>
+          <ul>
+            <li>
+              <strong>Interest.</strong> You're charged <strong>10%</strong> of the balance at the
+              start of every season you carry it into, before your new allocation arrives. It
+              compounds, so a debt you ignore gets worse on its own.
+            </li>
+            <li>
+              <strong>A transfer embargo.</strong> End a season more than{" "}
+              <strong>40%</strong> into your overdraft and you can't buy or sign anyone at all next
+              season. You can still sell, still promote from your academy, and still take on
+              trialists &mdash; the ways out stay open, the ways further in don't.
+            </li>
+            <li>
+              <strong>A points deduction.</strong> End it more than <strong>75%</strong> in and
+              you're docked <strong>6 points</strong> from next season's table on top of the
+              embargo. Stay in breach and it climbs by 3 a season, to a maximum of 12. One clear
+              season resets it completely.
+            </li>
+          </ul>
+          <p>
+            <strong>Your books are read at the final whistle, not in the summer.</strong> The check
+            runs on the balance you finish the season with, after prize money and hype revenue have
+            landed &mdash; so a good cup run really can rescue you, and selling your best player in
+            July can't. That's why the Dashboard and the Finance page both start warning you
+            <em>during</em> the season, as soon as today's balance would cost you something. Take
+            the warning seriously; by the time the penalty exists it's too late to trade out of it.
+          </p>
+          <p>
+            A deduction is a sporting penalty and nothing else. Your board doesn't have a separate
+            opinion about your finances &mdash; but the points come off your league table, you
+            finish lower, and the board very much has an opinion about <em>that</em>. Docked points
+            show in the standings as a red figure next to your total, so the table always adds up.
+          </p>
+          <p>
+            Both penalties appear in your <strong>news feed</strong> the season they come into
+            force, at the top of that season ahead of the summer window &mdash; which is the right
+            place for them, because an embargo governs the window you are about to trade in. A club
+            in your own league picking one up shows there too.
+          </p>
+          <p>
+            Only your club is ever sanctioned. AI clubs manage their money the way they always
+            have. One wrinkle: a sanction belongs to the <em>club</em>, not to you, so if you take
+            another job the club you left still serves out whatever you left it with.
           </p>
         </Section>
 

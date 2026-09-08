@@ -15,6 +15,7 @@ import { clubDisplayName, currency, seasonYear } from "../format.js";
 import { Flag } from "../components/Flag.js";
 import { PlayerRefLink, usePlayerRefs } from "../components/PlayerRefLink.js";
 import { NationName } from "./nationalTeams/shared.js";
+import { debtNewsBySeason } from "../../core/debtNews.js";
 
 type ClubFilter = "all" | "user";
 
@@ -194,6 +195,11 @@ export function NewsFeed() {
       ...(league?.seasonHistory ?? []).flatMap((h) => h.promotionPlayoffs ?? []),
     ]);
 
+    // One source, unlike the playoffs above: a sanction lives on the league for
+    // the life of the save rather than being archived onto a season entry, so
+    // there is nothing to merge in.
+    const sanctionsBySeason = debtNewsBySeason(league?.debtSanctions);
+
     const out = new Map<number, FeedItem[]>();
     const seasons = new Set([
       ...transfersBySeason.keys(),
@@ -202,6 +208,7 @@ export function NewsFeed() {
       ...trophiesBySeason.keys(),
       ...continentalBySeason.keys(),
       ...promotionsBySeason.keys(),
+      ...sanctionsBySeason.keys(),
     ]);
     for (const season of seasons) {
       const comps = historyBySeason.get(season) ?? liveComps;
@@ -213,6 +220,7 @@ export function NewsFeed() {
         trophiesBySeason.get(season) ?? [],
         continentalBySeason.get(season) ?? [],
         promotionsBySeason.get(season) ?? [],
+        sanctionsBySeason.get(season) ?? [],
       ));
     }
     return out;
@@ -477,6 +485,34 @@ export function NewsFeed() {
                               <td>{c.country}</td>
                               <td>{compName(c.compId) ?? <span className="text-muted">—</span>}</td>
                               <td className="text-end stat-num">{c.from} → {c.to}</td>
+                            </tr>
+                          );
+                        }
+                        if (item.kind === "debt") {
+                          const d = item.data;
+                          return (
+                            <tr key={`d-${d.tid}-${d.season}-${i}`}
+                                className={highlighted ? "team-highlight" : undefined}>
+                              <td className="small">
+                                {d.pointsDeduction > 0 ? "Points deduction" : "Transfer embargo"}
+                                {d.consecutiveSeasons > 1 && (
+                                  <span className="text-muted">
+                                    {" "}(season {d.consecutiveSeasons} in breach)
+                                  </span>
+                                )}
+                              </td>
+                              {/* The club is the subject here, the way a country
+                                  is for a continental place. The club column
+                                  still carries it, because every other row in
+                                  the table names a club there and a blank cell
+                                  reads as missing data. */}
+                              <td>{currency.format(-d.balance)} overdrawn</td>
+                              <td>{teamCell(d.tid, season)}</td>
+                              <td className="text-end stat-num">
+                                {d.pointsDeduction > 0
+                                  ? `-${d.pointsDeduction} pts`
+                                  : "No signings"}
+                              </td>
                             </tr>
                           );
                         }

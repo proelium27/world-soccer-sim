@@ -37,6 +37,8 @@ export interface GameEvents {
     roster?: boolean; difficulty?: string;
     /** Whether Cup places are re-earned on the country coefficient (the default). */
     rollingCoefficients?: boolean;
+    /** Which development model the save runs (see ProgressionModel). */
+    progressionModel?: string;
   };
   /**
    * The user simulated forward. `through` is how far: a single game, a chosen

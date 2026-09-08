@@ -5,6 +5,7 @@ import type { CupCompetitionId } from "../constants.js";
 import type { QualificationRoute, QualificationContext } from "./qualification.js";
 import { qualificationByTid, domesticCupWinners } from "./qualification.js";
 import { coefficientSlots } from "./coefficients.js";
+import { pointsDeductionMap } from "../finance/debt.js";
 
 /**
  * Who qualified for what, off one season's league tables — the answer the
@@ -39,10 +40,13 @@ function tablesForCurrentSeason(league: LeagueStore): Map<number, StandingsRow[]
     if (bucket) bucket.push(m);
     else matchesByComp.set(compId, [m]);
   }
+  const deductions = pointsDeductionMap(league.debtSanctions, league.season);
   const tables = new Map<number, StandingsRow[]>();
   for (const comp of league.competitions) {
     const tids = league.teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
-    tables.set(comp.id, computeStandings(tids, matchesByComp.get(comp.id) ?? []));
+    tables.set(comp.id, computeStandings(
+      tids, matchesByComp.get(comp.id) ?? [], deductions,
+    ));
   }
   return tables;
 }

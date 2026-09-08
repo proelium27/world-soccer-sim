@@ -1196,6 +1196,236 @@ export const POTENTIAL_SIM_MAX_AGE = 40;
 export const POTENTIAL_SIM_PERCENTILE = 0.75;
 
 /**
+ * How a save develops its players. `"random"` is the model the game has always
+ * run: a shared per-group "form" roll every season, big enough that a squad
+ * player can genuinely break out or collapse in one summer. `"steady"` is the
+ * alternative added 2026-09-08 on player request — the same development model
+ * and the same minutes nudge, with the per-season dice turned down and the age
+ * curve redrawn, so that a career reads as one continuous arc: grow through the
+ * early twenties, hold through the peak years, decline from thirty at an
+ * accelerating rate.
+ *
+ * **The variance is moved, not deleted.** Careers still differ from one
+ * another by roughly as much as they did; what changes is *where the spread
+ * lives*. Under `"random"` most of it is `formSd`, re-rolled every offseason,
+ * so who ends up elite is decided a season at a time and a nobody can arrive
+ * from nowhere at 26. Under `"steady"` most of it is `biasSd` — the fixed,
+ * pid-derived development personality (`developmentBias`) that is the same
+ * number for a player every season of his life. So a prospect's trajectory
+ * becomes a property of *who he is*, settled when he is generated and merely
+ * revealed over time, which is what makes scouting worth paying for and what
+ * stops the league's best players turning over into strangers every few years.
+ */
+export type ProgressionModel = "random" | "steady";
+
+/**
+ * Everything `stepRatings` reads that depends on the model. Bundled into one
+ * record rather than passed as loose numbers so that adding a knob means
+ * adding a field here and filling it in for both models — a model silently
+ * inheriting the other one's value for a new term is the failure this shape
+ * exists to prevent.
+ *
+ * `PROGRESSION_PROFILES.random` restates the shipped constants **by
+ * reference**, never by copying their values, so it cannot drift away from
+ * them: retuning `PROGRESSION_FORM_SD_YOUNG` retunes the random profile with
+ * it, and a save on the default model is provably the game as it was.
+ */
+export interface ProgressionProfile {
+  /** [age - BASE_AGE_CURVE_PEAK, expected mean rating delta] control points. */
+  readonly ageCurve: readonly (readonly [number, number])[];
+  /** Independent per-rating noise, at age 18 and at RETIREMENT_START_AGE. */
+  readonly noiseSdYoung: number;
+  readonly noiseSdOld: number;
+  /** Shared per-group "form" roll — the term that actually swings ovr. */
+  readonly formSdYoung: number;
+  readonly formSdOld: number;
+  /** Fixed per-player development personality, tapering to 0 by peak age. */
+  readonly biasSdYoung: number;
+  /** Growth resistance: ovr at which positive development is damped to `dampingFloor`. */
+  readonly dampingEnd: number;
+  readonly dampingFloor: number;
+  /**
+   * Shift applied to every gate that compares a player's POTENTIAL against a
+   * fixed bar. See `potentialBar`.
+   */
+  readonly potentialBarOffset: number;
+}
+
+/**
+ * A fixed potential threshold, moved onto the model's own distribution.
+ *
+ * **Every potential gate in the game is an absolute number, and an honest
+ * forecast sits lower than an optimistic one, so the steady model slides the
+ * whole distribution out from under all of them at once.** Measured on real
+ * youth intakes across the world's academy anchors (on the pre-`OVR_SCALE_SHIFT`
+ * scale, where the bars read 70 and 65): median listed potential **53 → 42**,
+ * share clearing `AI_PROSPECT_MIN_POT` **18.7% → 7.8%**, share clearing
+ * `RETIREMENT_PROSPECT_POT_THRESHOLD` **24.7% → 11.7%**. Nothing throws; AI clubs
+ * simply stop protecting the wonderkids `AI_PROSPECT_SLOTS` exists to protect,
+ * and more young free agents wash out of the pool — which are the two bugs #318
+ * and the retirement rework were written to fix, half-reopened by a setting that
+ * never mentions either.
+ *
+ * The invariant that has to hold is the **share**, not the number. Both bars are
+ * defined by what they are *for* — "genuine wonderkids, not every teenager",
+ * "a high-ceilinged prospect a club will plainly sign" — which is a statement
+ * about where a player sits in his intake, and that is exactly the
+ * comparable-within-a-population-but-not-across-populations trap this codebase
+ * has hit four times before. `STEADY_POTENTIAL_BAR_OFFSET` is therefore the
+ * shift that reproduces the random model's share on the steady one's
+ * distribution, measured rather than chosen. On the shipped scale that is
+ * **81 → 70 and 76 → 65**, and the two bars agreeing on one number is what a
+ * clean translation of the distribution looks like.
+ *
+ * **It is NOT simply a constant in rating points, and `OVR_SCALE_SHIFT` proved
+ * it.** The gap between the two models' forecasts comes from the *noise*, which
+ * is measured in rating points and did not move when every rating was lifted
+ * +11 — so the offset should have been untouched, and it was −12 before the
+ * lift and re-derives to −11 after. The missing point is the `RATING_MAX`
+ * ceiling: the random model's forecast is the 75th percentile of sixteen noisy
+ * futures, so it is the one with an optimistic upper tail, and lifting the scale
+ * clips that tail against 99 more often than it clips steady's near-deterministic
+ * one. Measured, the median listed potential moved **+10 for random against +11
+ * for steady** — the distributions did not translate by quite the same amount.
+ *
+ * Re-derive it with `scripts/progressionModelProbe.ts` section G after any
+ * change to a `STEADY_*` constant **or to the rating scale**. The re-derivation
+ * reads a percentile off an integer-valued distribution, so expect it to wobble
+ * a point with sample size; take the value both bars agree on.
+ */
+export function potentialBar(bar: number, model: ProgressionModel): number {
+  return bar + PROGRESSION_PROFILES[model].potentialBarOffset;
+}
+
+export const STEADY_POTENTIAL_BAR_OFFSET = -11;
+
+/**
+ * `"steady"`'s own age curve. Same control-point shape as `BASE_AGE_CURVE` and
+ * the same canonical peak, redrawn to the arc the request describes.
+ *
+ * The plateau is the part that needed care, because it cannot be drawn
+ * directly. A rating group reads this curve at a *shifted* age
+ * (`PHYSICAL_AGE_SHIFT` +3, `SKILL_AGE_SHIFT` -1.5), so at any real age the
+ * two groups are sampling points **4.5 years apart** — there is no single flat
+ * window that holds both of them still across ages 24-30. A player's ovr
+ * plateau is therefore not a flat stretch of this curve; it is physicals
+ * already easing off cancelling against skills still inching up, which is what
+ * a real plateau is made of and why the shape below is *widened* around the
+ * peak rather than squared off. Three differences from the shipped curve:
+ *
+ *  1. **A wider, shallower shoulder** either side of the peak (x = -3..+3), so
+ *     the two groups' opposing drifts stay small enough to cancel into an ovr
+ *     that holds rather than crests.
+ *  2. **A later, steeper fall.** Decline starts further out and then drops away
+ *     faster than the shipped curve's near-linear -0.5/year, matching "as they
+ *     age up in their 30s they decline more, and faster".
+ *  3. **The same growth height at the young end**, deliberately untouched:
+ *     `YOUTH_BASE_OFFSET` and the academy anchors are calibrated against how
+ *     far a 16-year-old climbs, and moving that would re-open the
+ *     anti-inflation sweep for nothing the request asks for.
+ *
+ * The area under the two curves is close but not equal, which is the point of
+ * the audit rather than an oversight: what has to hold flat is the
+ * *survival-weighted lifetime delta* (see `PHYSICAL_AGE_SHIFT`), and a curve
+ * that pays out later is worth less than one that pays out early, because
+ * fewer players are still in the game to collect it.
+ *
+ * **The tail was swept, not drawn.** A first hand-drawn tail (gentle into the
+ * early thirties, hard after) held ratings up too long: mean ovr through the
+ * plateau years came out 1.5 above the random model's and the survival-weighted
+ * lifetime drift went from the shipped -2.81 to -0.86, i.e. most of the way from
+ * "slightly deflationary" to "flat", which is the direction that ratchets a
+ * league's mean up over a dynasty. Pulling the mid-30s down (this table) puts
+ * both back: plateau ovr +1.3 and drift -3.87, a shade *more* deflationary than
+ * the shipped model, which is the safe side to miss on. A third, steeper tail
+ * was measured too and overshoots badly (drift -7.27) — `scripts/steadySweep.ts`
+ * keeps all three so the choice stays reproducible.
+ */
+export const STEADY_AGE_CURVE: readonly [number, number][] = [
+  [-8, 3], [-7, 2.7], [-6, 2.2], [-5, 1.7], [-4, 1.2], [-3, 0.7], [-2, 0.35], [-1, 0.15],
+  [0, 0.05], [1, 0], [2, -0.1], [3, -0.4], [4, -1.0], [5, -1.9], [6, -3.0], [7, -4.2],
+  [8, -5.6], [9, -7.1], [10, -8.8],
+];
+
+/**
+ * `"steady"`'s form roll. This is the constant the whole setting is about: the
+ * shared per-group draw is what survives being averaged into ovr (see
+ * `PROGRESSION_FORM_SD_YOUNG`), so shrinking it is what removes breakout and
+ * collapse seasons. Deliberately **not zero** — the request asks for a rating
+ * that can "stay the same or hover", and at exactly 0 every rating in a group
+ * moves in lockstep forever, which reads as a spreadsheet rather than a career.
+ */
+export const STEADY_FORM_SD_YOUNG = 0.9;
+export const STEADY_FORM_SD_OLD = 0.4;
+
+/**
+ * **Everything else about `"steady"` is the shipped model, and that is a
+ * measured result rather than a shortcut.** Five constants were written for this
+ * profile and every one of them was then deleted, because `scripts/steadySweep.ts`
+ * says each should be exactly what the random model already uses.
+ *
+ * The first pair was a trimmed per-rating noise, and it was merely unnecessary:
+ * that term is independent per rating, so it very largely cancels once ~12
+ * ratings are averaged into an ovr — which is the documented reason the shared
+ * form roll had to be invented at all. Leaving it alone therefore costs almost
+ * nothing in ovr stability while keeping the thing that would otherwise be lost,
+ * a player's attribute *profile* continuing to shift over a career instead of
+ * being frozen in shape at generation.
+ *
+ * The other two were wrong rather than redundant, and both are worth recording
+ * because both are the conclusion anyone reasoning from first principles
+ * reaches:
+ *
+ *  1. **"With the form roll gone, careers will all look the same, so widen the
+ *     per-player bias to keep them apart."** Measured, no: the form roll is
+ *     zero-mean and re-rolled every season, so it very largely cancels over a
+ *     career and contributes far less to how careers *end up* than to how they
+ *     *move*. At the shipped bias of 3 the spread is already there: plateau
+ *     ratings hold 92% of the random model's spread, and peak-ovr sd comes out
+ *     13.9 against 13.8. The widened version (bias 5, and with the relaxed
+ *     damping of mistake 2 alongside it) blew the elite tier open instead —
+ *     peak p90 80 → 90, and 19.5% of a cohort peaking at 85+ against 0.9%.
+ *  2. **"`growthDamping` was sized to suppress lucky jumps, so with no luck left
+ *     it will wall the league off below 80."** Measured, the opposite: elite is
+ *     *more* reachable under steady development at the shipped 80 / 0.02, not
+ *     less (80+ in 3.9% of plateau player-seasons against the random model's
+ *     2.7%). A consistent bias pushes through a damping band better than a
+ *     coin-flipping form roll does, because the roll spends half its seasons
+ *     undoing the other half. Relaxing the damping made it worse monotonically
+ *     in the sweep: at bias 3 the 85+ share of plateau player-seasons runs 0.1%
+ *     at the shipped 80 / 0.02 against 5.5% at 90 / 0.25.
+ *
+ * So the whole of `"steady"` is: **the shipped development model, with the form
+ * roll turned down and the age curve redrawn.** Restated by reference below for
+ * the same reason `random` is — a retune of any of these must reach both models
+ * rather than leaving this one holding a stale copy.
+ */
+export const PROGRESSION_PROFILES: Record<ProgressionModel, ProgressionProfile> = {
+  random: {
+    ageCurve: BASE_AGE_CURVE,
+    noiseSdYoung: PROGRESSION_NOISE_SD_YOUNG,
+    noiseSdOld: PROGRESSION_NOISE_SD_OLD,
+    formSdYoung: PROGRESSION_FORM_SD_YOUNG,
+    formSdOld: PROGRESSION_FORM_SD_OLD,
+    biasSdYoung: PROGRESSION_BIAS_SD_YOUNG,
+    dampingEnd: GROWTH_DAMPING_END,
+    dampingFloor: GROWTH_DAMPING_FLOOR,
+    potentialBarOffset: 0,
+  },
+  steady: {
+    ageCurve: STEADY_AGE_CURVE,
+    noiseSdYoung: PROGRESSION_NOISE_SD_YOUNG,
+    noiseSdOld: PROGRESSION_NOISE_SD_OLD,
+    formSdYoung: STEADY_FORM_SD_YOUNG,
+    formSdOld: STEADY_FORM_SD_OLD,
+    biasSdYoung: PROGRESSION_BIAS_SD_YOUNG,
+    dampingEnd: GROWTH_DAMPING_END,
+    dampingFloor: GROWTH_DAMPING_FLOOR,
+    potentialBarOffset: STEADY_POTENTIAL_BAR_OFFSET,
+  },
+};
+
+/**
  * Retirement (reworked 2026-07-28 — was age-only). Two inputs: **age** sets
  * the shape of the curve, **whether a club rostered him last season** sets its
  * scale. Nothing else — not ovr, not potential, not minutes. Roster status is
@@ -1527,6 +1757,100 @@ export const PRIZE_TOP_10 = 10_000_000;
 /** Last league position included in each prize tier. */
 export const PRIZE_TOP_5_CUTOFF = 5;
 export const PRIZE_TOP_10_CUTOFF = 10;
+
+/**
+ * ---------------------------------------------------------------------------
+ * Club debt (user's club only)
+ * ---------------------------------------------------------------------------
+ *
+ * A club's `budget` has ALWAYS been able to go negative — `chargeSeasonStart`
+ * subtracts the wage bill with no floor and `clampBudget` is a `Math.min`, so
+ * a negative balance passes straight through and persists. That is exactly
+ * what `weakLeaguesAudit` is reading when it reports an AI club at -£5.1M.
+ * What was missing was never the state; it was the ability to CHOOSE it,
+ * anything that happens as a result, and any way to see it.
+ *
+ * These constants supply the three rungs, in the order real football applies
+ * them: an overdraft you may deliberately spend into, a registration embargo
+ * if you end a season too deep in it, and a points deduction if you end the
+ * season deeper still — escalating for as long as you stay in breach.
+ *
+ * **Every one of these applies to the user's club alone.** That is the same
+ * containment every difficulty lever ships under and it is why this needs no
+ * dynasty audit: nothing here reaches AI↔AI trading, the country strength
+ * ladder or the anti-inflation equilibrium. AI clubs keep going quietly
+ * negative exactly as they do today. Widening any of it world-wide means
+ * running `scripts/weakLeaguesAudit.ts` on both sides first — and note that
+ * per this repo's own history the finance column fails before the ladder
+ * does, and that `main` is currently red on that gate for unrelated reasons.
+ */
+
+/**
+ * How far below zero the user may deliberately spend, as a fraction of his
+ * club's own scaled base income (`BASE_SEASON_BUDGET * financeScaleFor`). At
+ * 0.75 a big-four top-flight club can run about £66M into the red and a
+ * Serbian third-division one about £7.6M — proportional to what the club
+ * earns, so the lever means the same thing everywhere on the ladder, and it
+ * shrinks with difficulty for free because `financeScaleFor` already carries
+ * the user's `budgetScale`.
+ *
+ * **It bounds voluntary spending only, and that asymmetry is the point.**
+ * Wages are charged at season start whatever the balance says, so a club can
+ * still be carried past this line involuntarily by its own wage bill — which
+ * is precisely the "you owe more than you thought" state the sanctions below
+ * exist to price. A hard floor on the balance would instead make the debt
+ * silently disappear, which is the one outcome that teaches the player
+ * nothing.
+ */
+export const OVERDRAFT_LIMIT_FRACTION = 0.75;
+
+/**
+ * Interest charged each season on a negative balance, applied at the
+ * season-start step beside the wage charge. Compounds by construction: it
+ * makes the balance more negative, so next season's charge is larger.
+ *
+ * Higher than real football's cost of borrowing on purpose — a club in the
+ * red has to be visibly losing ground to the interest, or "just carry the
+ * debt" is a free option and the whole ladder below is decoration.
+ */
+export const DEBT_INTEREST_RATE = 0.1;
+
+/**
+ * Sanction thresholds, as fractions of the club's own overdraft limit, read
+ * off the balance at the END of a season (after prize money and hype revenue
+ * have settled) and applied to the season that follows.
+ *
+ * Reading the year-end balance rather than the balance at the moment of the
+ * offseason market is deliberate and is the real dynamic: the accounts close
+ * when the season does, so selling in July does not undo last year's breach.
+ * It gives the player the right instruction — get the books straight BEFORE
+ * the final whistle — and the Dashboard and Finance warnings exist to make
+ * that instruction visible in time to act on it.
+ */
+export const DEBT_EMBARGO_THRESHOLD = 0.4;
+export const DEBT_DEDUCTION_THRESHOLD = 0.75;
+
+/**
+ * The points deduction for ending a season past DEBT_DEDUCTION_THRESHOLD,
+ * and what each further consecutive season in breach adds, capped.
+ *
+ * Sized against the real thing: English clubs have been docked 4-10 points
+ * for profit-and-sustainability breaches and 9-12 for entering
+ * administration. A first offence at 6 is a bad season rather than a ruined
+ * one; staying in breach is what ruins it.
+ *
+ * **A deduction is a SPORTING penalty and never a board-confidence one, and
+ * that distinction is load-bearing.** `deriveExpectations` is built so that
+ * no sequence of transfer decisions can move the bar the board judges you
+ * against — two attempts at a money term were removed for exactly that
+ * reason (see `core/manager/expectation.ts`). A deduction touches none of
+ * that machinery: it makes you genuinely finish lower, and the board then
+ * judges the lower finish through the channel it already had. Wiring debt
+ * into expectations instead would reopen the teardown exploit.
+ */
+export const DEBT_DEDUCTION_POINTS = 6;
+export const DEBT_DEDUCTION_REPEAT_POINTS = 3;
+export const DEBT_DEDUCTION_MAX_POINTS = 12;
 
 /** Hype is tracked on a 0-100 scale. */
 export const HYPE_MIN = 0;

@@ -27,6 +27,7 @@ import {
   toLiveMatch,
   type LiveMatch,
 } from "./liveMatch.js";
+import { pointsDeductionMap } from "../../core/finance/debt.js";
 
 export interface LiveView {
   match: LiveMatch;
@@ -90,7 +91,10 @@ function leagueCandidate(
       otherMatches,
       competitionName,
       tableAtMinute: (minute) =>
-        liveTableRows(compTeamIds, priorMatches, [match, ...otherMatches], minute),
+        liveTableRows(
+          compTeamIds, priorMatches, [match, ...otherMatches], minute,
+          pointsDeductionMap(before.debtSanctions, before.season),
+        ),
       lineups: matchLineups(played.boxScore),
     },
   };
