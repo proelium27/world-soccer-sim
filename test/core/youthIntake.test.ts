@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { mulberry32 } from "../../src/engine/rng.js";
 import { createLeagueState } from "../../src/core/leagueState.js";
 import { playSeason } from "../helpers/offseasonLeague.js";
@@ -29,11 +29,65 @@ function advance(league: LeagueStore, rng: () => number): LeagueStore {
   return simOffseason(playSeason(league, rng), rng);
 }
 
+/**
+ * Shallow-freeze the parts of a shared league these tests actually touch, so a
+ * test that mutates the fixture in place fails on the line that did it rather
+ * than in whichever unrelated test happens to run next.
+ *
+ * The core is functional by invariant — `test/db/playerIdentity.test.ts` is the
+ * gate for it, and the split-storage dirty-set diff depends on the same thing —
+ * so in a healthy tree there is nothing here to freeze against. That invariant
+ * is exactly what sharing one world across twelve tests now rests on, and this
+ * is the cheap way to keep resting on it. Players are left alone: they are only
+ * ever read here, and there are 15,650 of them.
+ */
+function freezeFixture(league: LeagueStore): LeagueStore {
+  for (const t of league.teams) {
+    Object.freeze(t.roster);
+    Object.freeze(t.academyRoster);
+    if (t.youthTrialists) Object.freeze(t.youthTrialists);
+    Object.freeze(t);
+  }
+  Object.freeze(league.teams);
+  return Object.freeze(league);
+}
+
+/**
+ * The worlds every test below reads, built ONCE.
+ *
+ * Each test used to run `advance(createLeagueState(0, mulberry32(4)), rng)` for
+ * itself, and all twelve used that same seed — so the file built and simmed the
+ * identical 626-club world twelve times over. Measured on CI it was **2,073s in
+ * one file**, against a shard wall clock of 2,114s: one runner spent its last
+ * twenty-two minutes on this file alone while the rest of it idled, and it was
+ * the slowest file in the suite by 2.3x. Nothing about the tests needed that.
+ * They want one world; they now share one.
+ *
+ * `preIntake` is the league as created, before any offseason has run — the
+ * containment test needs it to know which pids already existed. `world` is
+ * after one season and its offseason, which is where a trial group first
+ * appears. `nextWorld` is after a second, which is the only thing any test
+ * wanted a continued rng for; running it here rather than in that test keeps
+ * the rng out of the tests entirely, so nothing depends on the order they run
+ * in.
+ */
+let preIntake: LeagueStore;
+let world: LeagueStore;
+let nextWorld: LeagueStore;
+
+beforeAll(() => {
+  const rng = mulberry32(4);
+  preIntake = createLeagueState(0, rng);
+  world = advance(preIntake, rng);
+  nextWorld = advance(world, rng);
+  freezeFixture(preIntake);
+  freezeFixture(world);
+  freezeFixture(nextWorld);
+});
+
 describe("youth trial group", () => {
   it("hands the user a group to choose from instead of signing his intake for him", () => {
-    const rng = mulberry32(4);
-    const league = advance(createLeagueState(0, rng), rng);
-    const user = league.teams.find((t) => t.tid === league.meta.userTid)!;
+    const user = world.teams.find((t) => t.tid === world.meta.userTid)!;
 
     expect(user.youthTrialists?.length ?? 0).toBeGreaterThanOrEqual(YOUTH_TRIAL_GROUP_MIN);
     expect(user.youthTrialists!.length).toBeLessThanOrEqual(YOUTH_TRIAL_GROUP_MAX);
@@ -41,25 +95,22 @@ describe("youth trial group", () => {
     expect(user.academyRoster).toHaveLength(0);
     expect(user.youthTrialSignings).toBe(0);
 
-    const byPid = new Map(league.players.map((p) => [p.pid, p]));
+    const byPid = new Map(world.players.map((p) => [p.pid, p]));
     for (const pid of user.youthTrialists!) {
-      expect(byPid.get(pid)!.born).toBe(league.season - YOUTH_AGE);
+      expect(byPid.get(pid)!.born).toBe(world.season - YOUTH_AGE);
     }
   });
 
   it("holds trialists out of the free-agent pool while the decision is pending", () => {
     // Or an AI club would sign one out from under the user mid-decision, and
     // the free-agent cull would be free to delete him.
-    const rng = mulberry32(4);
-    const league = advance(createLeagueState(0, rng), rng);
-    const user = league.teams.find((t) => t.tid === league.meta.userTid)!;
-    const fa = freeAgentPids(league.teams, league.players, league.activeLoans);
+    const user = world.teams.find((t) => t.tid === world.meta.userTid)!;
+    const fa = freeAgentPids(world.teams, world.players, world.activeLoans);
     for (const pid of user.youthTrialists!) expect(fa.has(pid)).toBe(false);
   });
 
   it("signs a trialist into the academy and stops at the limit", () => {
-    const rng = mulberry32(4);
-    let league = advance(createLeagueState(0, rng), rng);
+    let league = world;
     const tid = league.meta.userTid;
 
     const group = [...league.teams.find((t) => t.tid === tid)!.youthTrialists!];
@@ -88,29 +139,24 @@ describe("youth trial group", () => {
     // Free Agents no longer filters by age, so you could sign five to the
     // academy and the other seven straight to the senior roster the same day.
     // Undecided trialists simply stay held until the next rollover.
-    const rng = mulberry32(4);
-    const league = advance(createLeagueState(0, rng), rng);
-    const tid = league.meta.userTid;
-    const group = league.teams.find((t) => t.tid === tid)!.youthTrialists!;
-    const fa = freeAgentPids(league.teams, league.players, league.activeLoans);
+    const tid = world.meta.userTid;
+    const group = world.teams.find((t) => t.tid === tid)!.youthTrialists!;
+    const fa = freeAgentPids(world.teams, world.players, world.activeLoans);
     for (const pid of group) expect(fa.has(pid)).toBe(false);
   });
 
   it("replaces an undecided group at the next offseason rather than accumulating", () => {
-    const rng = mulberry32(4);
-    let league = advance(createLeagueState(0, rng), rng);
-    const tid = league.meta.userTid;
-    const first = [...league.teams.find((t) => t.tid === tid)!.youthTrialists!];
+    const tid = world.meta.userTid;
+    const first = world.teams.find((t) => t.tid === tid)!.youthTrialists!;
 
-    league = advance(league, rng);
-    const user = league.teams.find((t) => t.tid === tid)!;
+    const user = nextWorld.teams.find((t) => t.tid === tid)!;
     // The old group is gone rather than appended to — otherwise a user who
     // never opens the screen accumulates a permanent unsignable holding pool.
     expect(user.youthTrialists!.length).toBeLessThanOrEqual(YOUTH_TRIAL_GROUP_MAX);
     for (const pid of first) expect(user.youthTrialists).not.toContain(pid);
     expect(user.youthTrialSignings).toBe(0);
     // And last year's undecided trialists are signable by anyone now.
-    const fa = freeAgentPids(league.teams, league.players, league.activeLoans);
+    const fa = freeAgentPids(nextWorld.teams, nextWorld.players, nextWorld.activeLoans);
     expect(first.some((pid) => fa.has(pid))).toBe(true);
   });
 });
@@ -124,14 +170,10 @@ describe("the trial group's containment", () => {
     // non-user rostered player with and without this feature (identical on
     // seeds 4 and 11, 10,375 and 10,326 players); pinned structurally here so
     // a regression shows up without a two-branch measurement.
-    const rng = mulberry32(4);
-    const before = createLeagueState(0, rng);
-    const league = advance(before, rng);
-
-    const known = new Set(before.players.map((p) => p.pid));
-    const fresh = league.players.filter((p) => !known.has(p.pid));
+    const known = new Set(preIntake.players.map((p) => p.pid));
+    const fresh = world.players.filter((p) => !known.has(p.pid));
     const trialists = new Set(
-      league.teams.find((t) => t.tid === league.meta.userTid)!.youthTrialists!,
+      world.teams.find((t) => t.tid === world.meta.userTid)!.youthTrialists!,
     );
 
     // The user's ordinary intake is drawn inside the main loop and keeps its
@@ -164,8 +206,7 @@ describe("the roster safety net, once the academy stopped filling itself", () =>
   };
 
   it("calls up trialists when the academy is empty", () => {
-    const rng = mulberry32(4);
-    const league = stripSquad(advance(createLeagueState(0, rng), rng), 5);
+    const league = stripSquad(world, 5);
     const tid = league.meta.userTid;
     const before = league.teams.find((t) => t.tid === tid)!.youthTrialists!.length;
 
@@ -181,8 +222,7 @@ describe("the roster safety net, once the academy stopped filling itself", () =>
     // freeAgentPids reads the caller's teams, which the promotion loop doesn't
     // write back, so an already-promoted player still looks unsigned on the
     // next pass. Duplicating a pid leaves selectXI unable to fill a slot.
-    const rng = mulberry32(4);
-    let league = stripSquad(advance(createLeagueState(0, rng), rng), 3);
+    let league = stripSquad(world, 3);
     league = {
       ...league,
       teams: league.teams.map((t) =>
@@ -229,14 +269,12 @@ describe("a trial group is never stranded on a club the user leaves", () => {
   // for the life of the save, never plays again, and (being high-potential)
   // escapes the free-agent cull too.
   it("clears them when the club is handed to the AI", () => {
-    const rng = mulberry32(4);
-    const league = advance(createLeagueState(0, rng), rng);
-    const oldTid = league.meta.userTid;
-    const newTid = league.teams.find((t) => t.tid !== oldTid)!.tid;
-    const stranded = league.teams.find((t) => t.tid === oldTid)!.youthTrialists!;
+    const oldTid = world.meta.userTid;
+    const newTid = world.teams.find((t) => t.tid !== oldTid)!.tid;
+    const stranded = world.teams.find((t) => t.tid === oldTid)!.youthTrialists!;
     expect(stranded.length).toBeGreaterThan(0);
 
-    const after = switchClub(league, newTid, "left");
+    const after = switchClub(world, newTid, "left");
     const left = after.teams.find((t) => t.tid === oldTid)!;
     expect(left.youthTrialists ?? []).toEqual([]);
     expect(left.youthTrialSignings ?? 0).toBe(0);
@@ -249,12 +287,10 @@ describe("a trial group is never stranded on a club the user leaves", () => {
     // During a jump meta.userTid is AUTOPILOT_TID, so the offseason's reset
     // matches no team and the group would survive the whole jump — the user
     // coming back to a page offering 26-year-old "16-year-olds on trial".
-    const rng = mulberry32(4);
-    const league = advance(createLeagueState(0, rng), rng);
-    const tid = league.meta.userTid;
-    expect(league.teams.find((t) => t.tid === tid)!.youthTrialists!.length).toBeGreaterThan(0);
+    const tid = world.meta.userTid;
+    expect(world.teams.find((t) => t.tid === tid)!.youthTrialists!.length).toBeGreaterThan(0);
 
-    const club = beginAutopilot(league).teams.find((t) => t.tid === tid)!;
+    const club = beginAutopilot(world).teams.find((t) => t.tid === tid)!;
     expect(club.youthTrialists ?? []).toEqual([]);
     expect(club.youthTrialSignings ?? 0).toBe(0);
   });
@@ -265,12 +301,10 @@ describe("an emergency call-up off the market is recorded like any other signing
     // Club-by-season history is rebuilt from league.transfers alone, so an
     // unrecorded free arrival keeps displaying whichever club last had a record
     // for him — the bug the FREE_AGENT_TID sentinel record exists to prevent.
-    const rng = mulberry32(4);
-    let league = advance(createLeagueState(0, rng), rng);
-    const tid = league.meta.userTid;
-    league = {
-      ...league,
-      teams: league.teams.map((t) =>
+    const tid = world.meta.userTid;
+    const league = {
+      ...world,
+      teams: world.teams.map((t) =>
         t.tid === tid
           ? { ...t, roster: t.roster.slice(0, 3), academyRoster: [], youthTrialists: [] }
           : t,
@@ -289,13 +323,11 @@ describe("an emergency call-up off the market is recorded like any other signing
   });
 
   it("does not report a player called up from inside the club", () => {
-    const rng = mulberry32(4);
-    const league = advance(createLeagueState(0, rng), rng);
-    const tid = league.meta.userTid;
-    const trial = league.teams.find((t) => t.tid === tid)!.youthTrialists!;
+    const tid = world.meta.userTid;
+    const trial = world.teams.find((t) => t.tid === tid)!.youthTrialists!;
     const thin = {
-      ...league,
-      teams: league.teams.map((t) =>
+      ...world,
+      teams: world.teams.map((t) =>
         t.tid === tid ? { ...t, roster: t.roster.slice(0, 16) } : t,
       ),
     };
