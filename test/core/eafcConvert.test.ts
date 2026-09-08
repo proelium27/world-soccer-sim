@@ -24,6 +24,7 @@ import { parseRosterFile, type RosterFile } from "../../src/core/teams/rosterFil
 import { applyRosterFile } from "../../src/core/teams/rosterImport.js";
 import { mergeRosterFiles } from "../../scripts/eafc/mergeRosterFiles.js";
 import { computeOvr } from "../../src/core/players/ovr.js";
+import { OVR_SCALE_SHIFT } from "../../src/core/constants.js";
 import { mulberry32 } from "../../src/engine/rng.js";
 
 // --- Synthetic EA-style fixture -------------------------------------------
@@ -858,5 +859,81 @@ describe("mergeRosterFiles — filling uncovered slots from a names file", () =>
       roster([{ match: "German Division 1", clubs: [a, b] }]),
     );
     expect(clubNames(file, "German Division 1")).toEqual([a, b]);
+  });
+});
+
+describe("mergeRosterFiles — the merged file stays on the scale the base was on", () => {
+  // The converter rank-matches onto a freshly generated world, so a converted
+  // file is already on the CURRENT scale and stamps `ovrScale` to say so. The
+  // merge step used to rebuild its output as `{format, formatVersion,
+  // competitions}` and drop that stamp, and the failure is silent: nothing
+  // throws, the file parses, and `rescaleRosterFile` then reads it as pre-shift
+  // and lifts every rating a SECOND time. A whole world imports
+  // OVR_SCALE_SHIFT points too strong. This is the shipped pipeline for the
+  // hosted "Download Real Rosters" file, which is converted and then merged.
+  const base = (): RosterFile =>
+    parseRosterFile(
+      JSON.stringify({
+        format: "world-soccer-sim-roster",
+        formatVersion: 1,
+        ovrScale: OVR_SCALE_SHIFT,
+        competitions: [
+          {
+            match: "German Division 1",
+            clubs: [
+              {
+                name: "FC Bayern München",
+                abbrev: "BAY",
+                colors: ["#dc052d", "#ffffff"],
+                players: [
+                  {
+                    name: "Test Keeper",
+                    pos: "GK",
+                    age: 27,
+                    nationality: "Germany",
+                    heightCm: 190,
+                    potential: 88,
+                    ratings: {
+                      speed: 60, strength: 70, stamina: 55, jumping: 72,
+                      shortPass: 62, longPass: 60, crosses: 25, dribbling: 35,
+                      longShot: 20, finishing: 18, tackling: 22, interceptions: 20,
+                      positioning: 90, goalkeeping: 89,
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+  // Identities only, and deliberately carrying no `ovrScale` of its own — a
+  // names file contributes no ratings, so it has no scale to disagree about.
+  const names = (): RosterFile =>
+    parseRosterFile(
+      JSON.stringify({
+        format: "world-soccer-sim-roster",
+        formatVersion: 1,
+        competitions: [
+          {
+            match: "German Division 1",
+            clubs: [{ name: "Borussia Dortmund", abbrev: "DOR", colors: ["#fde100", "#000000"] }],
+          },
+        ],
+      }),
+    );
+
+  it("carries ovrScale across, so re-parsing the merge does not lift it again", () => {
+    const source = base();
+    const { file } = mergeRosterFiles(source, names());
+    expect(file.ovrScale).toBe(OVR_SCALE_SHIFT);
+
+    // The round trip the game performs on a downloaded file.
+    const reparsed = parseRosterFile(JSON.stringify(file));
+    const before = source.competitions[0].clubs[0].players![0];
+    const after = reparsed.competitions[0].clubs[0].players![0];
+    expect(after.ratings).toEqual(before.ratings);
+    expect(after.potential).toBe(before.potential);
   });
 });

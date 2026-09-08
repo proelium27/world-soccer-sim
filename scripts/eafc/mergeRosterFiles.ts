@@ -227,7 +227,22 @@ export function mergeRosterFiles(base: RosterFile, names: RosterFile): MergeResu
   });
 
   return {
-    file: { format: base.format, formatVersion: base.formatVersion, competitions },
+    // `ovrScale` and `nationalities` are carried across from the base, and the
+    // first of those is load-bearing rather than tidiness. The base is a
+    // converted file whose ratings are already on the current scale, and it
+    // says so with `ovrScale`; dropping the stamp here leaves a merged file
+    // that reads as pre-shift, so `rescaleRosterFile` lifts it a SECOND time
+    // and every real player lands OVR_SCALE_SHIFT points above where the
+    // converter put him. Nothing throws — the world simply imports too strong.
+    // The names file cannot disagree about the scale, because it contributes
+    // identities only and carries no ratings to be on a scale at all.
+    file: {
+      format: base.format,
+      formatVersion: base.formatVersion,
+      ...(base.ovrScale === undefined ? {} : { ovrScale: base.ovrScale }),
+      ...(base.nationalities === undefined ? {} : { nationalities: base.nationalities }),
+      competitions,
+    },
     filled,
     unfilled,
     rejected,
