@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { makeLeague } from "../helpers/league.js";
 import {
-  PLAYER_DB_PAGE_SIZE, buildPlayerRows, filterPlayerRows, matchesStatus, pageCount, pageOf,
-  playerSortAccessors,
+  PLAYER_DB_PAGE_SIZE, STAT_COLUMNS, buildPlayerRows, careerTotalsIndex, filterPlayerRows,
+  filterToSeason, matchesStatus, pageCount, pageOf, playerSortAccessors, seasonStatsIndex,
+  seasonsWithStats,
   type PlayerDbFilters,
 } from "../../src/ui/playerDatabase.js";
 import { scopeCompIds, worldCompetitions } from "../../src/core/competitions.js";
-import type { Player } from "../../src/core/players/types.js";
+import { emptySeasonStats, type Player, type SeasonStats } from "../../src/core/players/types.js";
+import { totalsOf } from "../../src/core/frivolities/stats.js";
 
 const league = makeLeague(0, 4);
 /** The database's default view: no fog (this is the pure layer), no filters. */
@@ -127,6 +129,79 @@ describe("filterPlayerRows", () => {
       expect(r.player.pos).toBe("GK");
       expect(r.player.ovr).toBeGreaterThanOrEqual(60);
     }
+  });
+});
+
+describe("season and career views", () => {
+  // Two players given a line for season 3, so the season view has something to
+  // read without paying for a simulated season.
+  const scorer = league.players[0];
+  const other = league.players[1];
+  const line = (goals: number): SeasonStats => ({
+    ...emptySeasonStats(3, 0),
+    appearances: 20,
+    goals,
+    yellowCards: goals,
+    crosses: goals * 2,
+    interceptions: goals * 3,
+  });
+  const withStats = {
+    ...league,
+    players: league.players.map((p) =>
+      p.pid === scorer.pid ? { ...p, stats: [line(12)] }
+        : p.pid === other.pid ? { ...p, stats: [line(3)] }
+        : p),
+  };
+  const statsRows = buildPlayerRows(withStats, truePot);
+  const index = seasonStatsIndex(withStats.players, 3);
+
+  it("lists the seasons anyone has a line for, newest first", () => {
+    expect(seasonsWithStats(withStats.players)).toEqual([3]);
+  });
+
+  it("narrows the table to players the season has a record of", () => {
+    const inSeason = filterToSeason(statsRows, index);
+    expect(inSeason).toHaveLength(2);
+    expect(inSeason.map((r) => r.player.pid).sort()).toEqual([scorer.pid, other.pid].sort());
+  });
+
+  it("sorts a season column by that season's line", () => {
+    const accessors = playerSortAccessors(() => "", () => "", index);
+    const rowOf = (pid: number) => statsRows.find((r) => r.player.pid === pid)!;
+    expect(accessors.stat_goals(rowOf(scorer.pid))).toBe(12);
+    expect(accessors.stat_goals(rowOf(other.pid))).toBe(3);
+    // A player with no line for the season sorts as 0 rather than being dropped
+    // — dropping here would make a sort silently change which rows exist.
+    expect(accessors.stat_goals(statsRows.find((r) => r.player.pid === league.players[5].pid)!))
+      .toBe(0);
+  });
+
+  it("keeps the ATTRIBUTE and the STAT apart for the two names that collide", () => {
+    // `crosses` and `interceptions` name both an attribute and a counted stat.
+    // One flat key space would let a header sort by the other one, silently and
+    // on only two columns of sixteen.
+    const accessors = playerSortAccessors(() => "", () => "", index);
+    const row = statsRows.find((r) => r.player.pid === scorer.pid)!;
+    expect(accessors.crosses(row)).toBe(row.player.ratings.crosses);
+    expect(accessors.stat_crosses(row)).toBe(24);
+    expect(accessors.interceptions(row)).toBe(row.player.ratings.interceptions);
+    expect(accessors.stat_interceptions(row)).toBe(36);
+  });
+
+  it("sorts a career column by career totals, summed the way Frivolities sums them", () => {
+    const totals = careerTotalsIndex(withStats.players);
+    const accessors = playerSortAccessors(() => "", () => "", undefined, totals);
+    const row = statsRows.find((r) => r.player.pid === scorer.pid)!;
+    expect(accessors.stat_goals(row)).toBe(12);
+    expect(totals.get(scorer.pid)!.goals)
+      .toBe(totalsOf(withStats.players.find((p) => p.pid === scorer.pid)!.stats).goals);
+  });
+
+  it("drops the card columns from the career view, which has no total for them", () => {
+    const careerColumns = STAT_COLUMNS.filter((c) => c.career).map((c) => c.key);
+    expect(careerColumns).not.toContain("stat_yellowCards");
+    expect(careerColumns).not.toContain("stat_redCards");
+    expect(careerColumns).toContain("stat_goals");
   });
 });
 

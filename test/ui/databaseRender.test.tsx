@@ -102,6 +102,35 @@ describe("Database page", () => {
     expect(html).toContain("Budget");
   });
 
+  it("opens on the view a shared link describes", () => {
+    // The whole point of the URL state: someone else's filtered, sorted table
+    // has to come back the way they left it.
+    const html = render(league, "/database/players?pos=GK&ovr=60&sort=speed&dir=asc");
+    expect(html).toContain('value="GK"');
+    // Every row really is a keeper, so the filter reached the scan rather than
+    // just the controls.
+    const positions = [...html.matchAll(/<td>(GK|CB|FB|DM|CM|AM|W|ST)<\/td>/g)].map((m) => m[1]);
+    expect(positions.length).toBeGreaterThan(0);
+    expect(new Set(positions)).toEqual(new Set(["GK"]));
+  });
+
+  it("renders the career column set, dropping the stats it can't total", () => {
+    const html = render(league, "/database/players?cols=career");
+    expect(html).toContain("Apps");
+    expect(html).toContain(">G<");
+    // Cards are recorded per season and never summed, so a career view showing
+    // them would be a column of zeros pretending to be a total.
+    expect(html).not.toContain("Yellow cards");
+    expect(countOf(html, /<[a-z]/g)).toBeLessThan(5000);
+  });
+
+  it("renders the season column set with nothing played yet", () => {
+    // A fresh world has no stat lines at all, so the season view is legitimately
+    // empty — it must say so rather than throw or print a page of dashes.
+    const html = render(league, "/database/players?cols=season");
+    expect(html).toContain("No players match these filters.");
+  });
+
   it("renders for a save with no user club", () => {
     // A spectator save browses the world like any other; the page must not
     // assume a user team exists (the potential fog reads as fully unscouted).
