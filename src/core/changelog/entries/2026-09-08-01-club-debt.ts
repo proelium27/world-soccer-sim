@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-07",
+  date: "2026-09-08",
   title: "You can go into debt",
   items: [
     "Your balance can go below zero on purpose now. Every club has an **overdraft** worth about nine months of its own income, so around $66M for a big-four top-flight side and proportionally less for a smaller club or a lower division, and you can spend into it. Buy the striker you can't quite afford and deal with it later. That's what it's there for.",
