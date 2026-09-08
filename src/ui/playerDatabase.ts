@@ -251,6 +251,12 @@ export const STAT_COLUMNS: {
   title: string;
   /** How many decimals to show; 0 for a count. */
   decimals?: number;
+  /**
+   * Show a dash instead of 0. True only where zero means "no reading" rather
+   * than a real zero: a match rating of 0 is a player who was never rated,
+   * where 0 shots or 0.0 xG is a fact about a player who did play.
+   */
+  dashOnZero?: boolean;
   career: boolean;
 }[] = [
   { key: "stat_appearances", label: "Apps", title: "Appearances", career: true },
@@ -268,7 +274,10 @@ export const STAT_COLUMNS: {
   { key: "stat_foulsCommitted", label: "Fls", title: "Fouls committed", career: true },
   { key: "stat_yellowCards", label: "YC", title: "Yellow cards", career: false },
   { key: "stat_redCards", label: "RC", title: "Red cards", career: false },
-  { key: "stat_avgRating", label: "Rtg", title: "Average match rating", decimals: 2, career: true },
+  {
+    key: "stat_avgRating", label: "Rtg", title: "Average match rating",
+    decimals: 2, dashOnZero: true, career: true,
+  },
 ];
 
 /**

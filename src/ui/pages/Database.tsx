@@ -214,6 +214,10 @@ function PlayerDatabase() {
   if (!league) return <p>Loading...</p>;
 
   const onFilters = (next: PlayerFilterState) => update({ filters: next });
+  // "Clear filters" sits at the end of the same bar as the name box and the
+  // status picker, so it clears those too — leaving two of the bar's controls
+  // set after clearing it would read as the button not having worked.
+  const onClear = () => update({ filters: EMPTY_PLAYER_FILTERS, name: "", status: "all" });
 
   return (
     <>
@@ -221,7 +225,7 @@ function PlayerDatabase() {
         idPrefix="db"
         value={filters}
         onChange={onFilters}
-        onClear={() => onFilters(EMPTY_PLAYER_FILTERS)}
+        onClear={onClear}
         nationalities={nationalities}
         competitions={competitions}
       >
@@ -360,10 +364,9 @@ function statColumnsFor(columns: PlayerColumnSet) {
 }
 
 /** One stat cell's text: a count, or a fixed number of decimals for a rate. */
-function statText(value: number, decimals = 0): string {
-  if (decimals === 0) return value.toLocaleString();
-  // An average rating of 0 means "never rated", not "rated zero".
-  return value === 0 ? "—" : value.toFixed(decimals);
+function statText(value: number, decimals = 0, dashOnZero = false): string {
+  if (dashOnZero && value === 0) return "—";
+  return decimals === 0 ? value.toLocaleString() : value.toFixed(decimals);
 }
 
 function PlayerRow({
@@ -434,7 +437,7 @@ function PlayerRow({
         <>
           {statColumnsFor(columns).map((col, i) => (
             <td key={col.key} className={`text-end${i === 0 ? " db-divide" : ""}`}>
-              {statText(statValue(col), col.decimals)}
+              {statText(statValue(col), col.decimals, col.dashOnZero)}
             </td>
           ))}
         </>
