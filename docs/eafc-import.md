@@ -205,6 +205,19 @@ recolor pass runs *before* filling, so an entry describing a club already in the
 world is spent recoloring it rather than left to fill some other slot with a
 second copy.
 
+**The merge carries the base's `ovrScale` across, and forgetting to was a silent
++11 (fixed 2026-09-07).** `mergeRosterFiles` rebuilt its output as `{format,
+formatVersion, competitions}`, which dropped the stamp the converter had just
+written. Nothing throws and the merged file parses cleanly — but `ovrScale`
+absent means "written before `OVR_SCALE_SHIFT`", so `rescaleRosterFile` lifts
+every rating a *second* time and the whole imported world lands 11 points above
+where the rank-match put it. It is the converted-then-merged path that ships as
+"Download Real Rosters", so this was on the shipped pipeline rather than a corner
+of it. The names file cannot disagree about the scale, because it contributes
+identities only and carries no ratings to be on a scale at all — which is why
+taking the base's value unconditionally is right rather than a guess.
+`nationalities` was being dropped by the same line and is carried across too.
+
 **Sourcing the names file got harder on 2026-08-10**: the Leagues page's "Export
 Teams" button (which emitted exactly this — `buildRosterFile`, identities only)
 was replaced by "Export Save", so the game no longer writes one. `buildRosterFile`
