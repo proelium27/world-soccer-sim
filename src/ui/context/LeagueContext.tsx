@@ -44,13 +44,11 @@ import { isManagerDecisionPending } from "../../core/manager/index.js";
 import { isValidStarters } from "../../core/lineup/resolveXI.js";
 import { teamSlots, chooseBestFormation, FORMATIONS, FORMATION_IDS, type FormationId } from "../../core/lineup/formations.js";
 import { SimOverlay } from "../components/SimOverlay.js";
-import { LiveMatchOverlay } from "../components/LiveMatchOverlay.js";
-import { LiveMatchPicker } from "../components/LiveMatchPicker.js";
 import { JumpOverlay, type JumpResult } from "../components/JumpOverlay.js";
+import { LiveMatchRedirect, WATCH_PATH } from "../pages/WatchMatch.js";
 import { liveCandidates, type LiveCandidate } from "../live/liveCandidates.js";
 import { playSuperCups, superCupsPending } from "../../core/superCup/superCup.js";
 import { superCupChampion } from "../../core/superCup/types.js";
-import { usePlayerMap } from "../usePlayerMap.js";
 import type { PlayedMatch } from "../../core/standings.js";
 import { trackEvent } from "../analytics.js";
 
@@ -79,6 +77,20 @@ interface LeagueContextValue {
    * is not committed until the viewer is closed.
    */
   simLiveAction: () => Promise<void>;
+  /**
+   * The uncommitted matchday waiting to be watched, and which of its matches
+   * the user picked. Null whenever nothing is pending.
+   *
+   * Held here rather than on the watch page because it outlives that page's
+   * mount: the result is produced by simLiveAction, which the user can fire
+   * from the top bar of any screen, and it has to survive the navigation to
+   * /watch that follows.
+   */
+  liveMatch: { candidates: LiveCandidate[]; chosen: string | null } | null;
+  /** Watch this one of the matchday's candidates. */
+  chooseLiveMatch: (key: string) => void;
+  /** Commit the watched matchday and leave the viewer. */
+  finishLiveMatch: () => Promise<void>;
   /** Play `seasons` whole seasons with the AI managing the user's club (core/autopilot.ts). */
   jumpSeasonsAction: (seasons: number) => Promise<void>;
   offseasonAction: () => Promise<void>;
@@ -185,6 +197,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     () => getActiveLid() !== null,
   );
   const { sim, runOffseason, runIntlStage, runJump, simming } = useSimWorker();
+  // Declared here rather than beside its first user because two of them —
+  // finishing a jump and opening the live match viewer — sit either side of the
+  // file, and a hook cannot be called twice conditionally.
+  const navigate = useNavigate();
 
   // A multi-season jump owns the screen the same way the sim overlay does, and
   // for the same reason: the league it returns replaces several seasons of
@@ -209,14 +225,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   // happens when the matchday offered more than one.
   const [liveChoice, setLiveChoice] = useState<string | null>(null);
   const liveOpenRef = useRef(false);
-  // The viewer names scorers and bookings, so it needs the pid lookup. Memoized
-  // on the players array, so it is rebuilt once per commit rather than per tick
-  // of the match clock.
-  const playerMap = usePlayerMap(league?.players);
-  const playerName = useCallback(
-    (pid: number) => playerMap.get(pid)?.name ?? `Player ${pid}`,
-    [playerMap],
+  // What /watch reads. Bundled into one object so a consumer that doesn't care
+  // about the live viewer isn't re-rendered by the choice changing, and so the
+  // "is anything pending" test is a single null check everywhere.
+  const liveMatch = useMemo(
+    () => (watchable === null ? null : { candidates: watchable, chosen: liveChoice }),
+    [watchable, liveChoice],
   );
+  const chooseLiveMatch = useCallback((key: string) => setLiveChoice(key), []);
 
   // Every league mutation runs through runExclusive and reads the league from
   // leagueRef at execution time. React state alone isn't enough: a callback
@@ -443,7 +459,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     liveOpenRef.current = false;
     setLiveCandidates(null);
     setLiveChoice(null);
-  }), [runExclusive, commitLeague]);
+    // Clearing the candidates lifts LiveMatchRedirect's hold, but the user is
+    // still standing on /watch, which now has nothing to show. Send them
+    // somewhere that reflects what they just watched.
+    navigate("/dashboard");
+  }), [runExclusive, commitLeague, navigate]);
 
   const simLiveAction = useCallback(() => runExclusive(async () => {
     const current = leagueRef.current;
@@ -477,6 +497,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       setLiveCandidates(candidates);
       // Only ask when there is genuinely a choice to make.
       setLiveChoice(candidates.length === 1 ? candidates[0].key : null);
+      // The viewer is a route now, and this action fires from the top bar of
+      // whatever page you happen to be on, so opening it means going there.
+      navigate(WATCH_PATH);
       trackEvent("season_simmed", { through: "game", live: true });
     } catch (err) {
       pendingResultRef.current = null;
@@ -485,7 +508,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       setLiveChoice(null);
       console.error("Live simulation failed:", err);
     }
-  }), [runExclusive, sim, commitLeague]);
+  }), [runExclusive, sim, commitLeague, navigate]);
 
   /**
    * Jump forward whole seasons with the AI running the club.
@@ -546,7 +569,6 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
    * It also keeps the overlay a presentational component its render test can
    * mount without a router.
    */
-  const navigate = useNavigate();
   const closeJump = useCallback(() => {
     jumpOpenRef.current = false;
     setJumpOpen(false);
@@ -1162,6 +1184,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     customizeTeamsAction,
     simAction,
     simLiveAction,
+    liveMatch,
+    chooseLiveMatch,
+    finishLiveMatch,
     jumpSeasonsAction,
     offseasonAction,
     intlStageAction,
@@ -1213,7 +1238,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     importJSON: doImport,
   }), [
     league, crests, loadingActiveLeague, setLeague, loadLeagueAction, switchLeagueAction,
-    customizeTeamsAction, simAction, simLiveAction, jumpSeasonsAction, offseasonAction,
+    customizeTeamsAction, simAction, simLiveAction, liveMatch, chooseLiveMatch,
+    finishLiveMatch, jumpSeasonsAction, offseasonAction,
     intlStageAction, signFreeAgentAction,
     releasePlayerAction, signToAcademyAction, signTrialistAction,
     setScoutDirectionsAction,
@@ -1255,32 +1281,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         result={jumpResult}
         onClose={closeJump}
       />
-      {/* Two matches on this matchday: ask before playing either. */}
-      {watchable && liveChoice === null && (
-        <LiveMatchPicker
-          open
-          choices={watchable.map((c) => c.choice)}
-          onPick={setLiveChoice}
-          onSkip={finishLiveMatch}
-        />
-      )}
-      {watchable && liveChoice !== null && (() => {
-        const chosen = watchable.find((c) => c.key === liveChoice);
-        if (!chosen) return null;
-        return (
-          <LiveMatchOverlay
-            open
-            match={chosen.view.match}
-            otherMatches={chosen.view.otherMatches}
-            teams={league?.teams ?? []}
-            playerName={playerName}
-            competitionName={chosen.view.competitionName}
-            subtitle={chosen.view.subtitle}
-            tableAtMinute={chosen.view.tableAtMinute}
-            onComplete={finishLiveMatch}
-          />
-        );
-      })()}
+      {/* The match itself is a route (/watch, see WatchMatch.tsx). All that is
+          left here is holding the user on it while the matchday it belongs to
+          is still uncommitted — the one thing the old modal did that a page
+          does not do for free. */}
+      <LiveMatchRedirect active={watchable !== null} />
     </Ctx.Provider>
   );
 }

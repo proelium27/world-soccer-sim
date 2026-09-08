@@ -3120,29 +3120,42 @@ body.nav-drawer-open {
 /* =========================================================================
    Live match viewer
 
-   A full-screen take on the sim overlay: your match replayed a minute at a
-   time on the left, the rest of the matchday landing on the right rail.
-   Reuses the box score's .bs-ev* timeline wholesale so one event never reads
-   two different ways.
+   Your match replayed a minute at a time on the left, the rest of the matchday
+   landing on the right rail. Reuses the box score's .bs-ev* timeline wholesale
+   so one event never reads two different ways.
+
+   It is a PAGE (/watch), not an overlay, so it takes its width from the
+   content column and its height from the content — no viewport-anchored box,
+   and no inner scroll area to trap a keyboard or a screen reader in.
    ========================================================================= */
-.live-panel {
+.watch-topbar {
+  margin-bottom: 0.6rem;
+}
+.live-page {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 232px;
-  width: 1020px;
-  max-width: 96vw;
-  max-height: 92vh;
-  overflow: hidden;
-  box-shadow: var(--sg-shadow);
+  gap: 1rem;
+  align-items: start;
 }
 .live-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 0 1rem 1rem;
-  overflow: hidden;
 }
 .live-scoreboard {
   flex: 0 0 auto;
+  /* The one thing you must not lose while reading down the feed. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--sg-surface);
+}
+/* An h1 in the scoreboard, so the page has a real title — the class was
+   written for a plain div and heading defaults would blow it up. */
+.live-scoreline {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
 }
 .live-score {
   font-size: var(--sg-text-xl);
@@ -3186,11 +3199,7 @@ body.nav-drawer-open {
   border-bottom: 1px solid var(--sg-border);
 }
 .live-feed {
-  flex: 1 1 auto;
-  overflow-y: auto;
   padding-top: 0.5rem;
-  /* Events arrive at the top, so the newest row animates in from above. */
-  scroll-behavior: smooth;
 }
 .live-feed > .bs-ev {
   animation: live-ev-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -3210,13 +3219,78 @@ body.nav-drawer-open {
   }
 }
 
+/* --- lineups ------------------------------------------------------------ */
+.live-lineups {
+  margin-top: 1.1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--sg-border);
+}
+.live-section-head {
+  font-size: var(--sg-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sg-text-faint);
+  margin: 0 0 0.6rem;
+}
+.live-lineups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem 1.5rem;
+}
+.live-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--sg-text-sm);
+  font-weight: var(--sg-weight-medium);
+  margin: 0 0 0.4rem;
+}
+.live-sheet-shape {
+  margin-left: auto;
+  font-size: var(--sg-text-xs);
+  color: var(--sg-text-muted);
+  letter-spacing: 0.04em;
+}
+.live-sheet-subhead {
+  font-size: var(--sg-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sg-text-faint);
+  margin: 0.7rem 0 0.3rem;
+}
+.live-sheet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: var(--sg-text-sm);
+}
+.live-sheet-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.12rem 0;
+}
+/* Fixed width so the names line up into a column — a ragged left edge is what
+   makes a team sheet hard to scan. */
+.live-sheet-slot {
+  flex: 0 0 2.1rem;
+  font-size: var(--sg-text-xs);
+  color: var(--sg-text-muted);
+}
+.live-sheet-for {
+  color: var(--sg-text-muted);
+}
+.live-lineups-note {
+  margin: 0.7rem 0 0;
+}
+
 /* --- right rail --------------------------------------------------------- */
 .live-rail {
   border-left: 1px solid var(--sg-border);
   background: var(--sg-surface-2);
   padding: 0.9rem 0.75rem;
-  overflow-y: auto;
   font-size: var(--sg-text-sm);
+  border-radius: var(--sg-radius);
 }
 .live-rail-head {
   font-size: var(--sg-text-xs);
@@ -3312,39 +3386,27 @@ body.nav-drawer-open {
    The desktop layout is a two-column grid with a fixed 232px rail. At 390px
    that rail is wider than what it sits beside — the match itself got 140px,
    and the timeline (three columns of its own) overflowed inside it. So below
-   the md breakpoint the rail stops being a rail and becomes a section under
-   the match, and the panel fills the screen rather than floating in it.
+   the lg breakpoint the rail stops being a rail and becomes a section under
+   the match.
 
-   The scoreboard and controls stick to the top through all of it: once the
-   whole panel scrolls, the score is the one thing you must not lose while
-   reading down the feed.
+   The scoreboard stays stuck to the top through all of it: the score is the
+   one thing you must not lose while reading down the feed.
    ------------------------------------------------------------------------- */
-@media (max-width: 767.98px) {
-  .live-panel {
+@media (max-width: 991.98px) {
+  /* The rail stops being a rail and becomes a section under the match. */
+  .live-page {
     grid-template-columns: 1fr;
-    width: 100%;
-    max-width: 100%;
-    height: 100dvh;
-    max-height: 100dvh;
+  }
+  .live-rail {
+    border-left: 0;
+    border-top: 1px solid var(--sg-border);
     border-radius: 0;
-    overflow-y: auto;
+    background: none;
+    padding-left: 0;
+    padding-right: 0;
   }
-  .live-main {
-    /* The panel scrolls as one on mobile, so the inner regions must not also
-       scroll — nested scroll areas on a phone are how you get a feed you can
-       never quite reach the bottom of. */
-    overflow: visible;
-    padding: 0 0.6rem 0.6rem;
-  }
-  .live-scoreboard {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    margin-top: 0;
-    /* bs-scoreboard is transparent-cornered by default; it has to be opaque
-       here or the feed shows through as it scrolls underneath. */
-    background: var(--sg-surface);
-  }
+}
+@media (max-width: 767.98px) {
   /* Deliberately NOT sticky. Pinning these under the scoreboard needs its
      measured height, and any hard-coded offset drifts the moment a club name
      wraps to two lines. The scoreline is the thing worth pinning; the controls
@@ -3362,14 +3424,6 @@ body.nav-drawer-open {
     width: 100%;
     justify-content: flex-end;
   }
-  .live-feed {
-    overflow: visible;
-  }
-  .live-rail {
-    border-left: 0;
-    border-top: 1px solid var(--sg-border);
-    overflow: visible;
-  }
   /* Two up on a phone: the rail is a list of short scorelines, and one per
      row wastes most of the width and buries the live table. */
   .live-rail-list {
@@ -3384,9 +3438,7 @@ body.nav-drawer-open {
    where the club has both a league fixture and a cup tie.
    ------------------------------------------------------------------------- */
 .live-picker {
-  width: 460px;
-  max-width: 92vw;
-  box-shadow: var(--sg-shadow);
+  max-width: 460px;
 }
 .live-picker-list {
   display: flex;

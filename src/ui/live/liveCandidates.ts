@@ -17,8 +17,9 @@ import { cupRoundName, koRoundsOf } from "../../core/cup/cup.js";
 import type { DomesticCupState } from "../../core/domesticCup/types.js";
 import { domesticRoundName } from "../../core/domesticCup/cup.js";
 import { leaguePhaseTable } from "../../core/cup/leaguePhase.js";
-import type { LiveTableRow } from "../components/LiveMatchOverlay.js";
+import type { LiveTableRow } from "../components/LiveMatchView.js";
 import type { LiveChoice } from "../components/LiveMatchPicker.js";
+import { matchLineups, type MatchLineups } from "./lineups.js";
 import {
   liveTableRows,
   scoreAtMinute,
@@ -33,6 +34,12 @@ export interface LiveView {
   competitionName: string;
   subtitle?: string;
   tableAtMinute: ((minute: number) => LiveTableRow[]) | null;
+  /**
+   * Both team sheets, derived from the same box score the events came from.
+   * Null only where they cannot be recovered honestly — see the two-legged case
+   * in cupCandidate.
+   */
+  lineups: MatchLineups | null;
 }
 
 export interface LiveCandidate {
@@ -84,6 +91,7 @@ function leagueCandidate(
       competitionName,
       tableAtMinute: (minute) =>
         liveTableRows(compTeamIds, priorMatches, [match, ...otherMatches], minute),
+      lineups: matchLineups(played.boxScore),
     },
   };
 }
@@ -133,6 +141,7 @@ function cupCandidate(
     otherMatches: LiveMatch[],
     subtitle: string,
     tableAtMinute: ((minute: number) => LiveTableRow[]) | null,
+    lineups: MatchLineups | null,
   ): LiveCandidate => ({
     key: "cup",
     choice: {
@@ -140,7 +149,7 @@ function cupCandidate(
       title: competitionName,
       detail: `${subtitle}, ${versus(userTid, match.home, match.away, nameOf)}`,
     },
-    view: { match, otherMatches, competitionName, subtitle, tableAtMinute },
+    view: { match, otherMatches, competitionName, subtitle, tableAtMinute, lineups },
   });
 
   const mine = (home: number, away: number) => home === userTid || away === userTid;
@@ -162,6 +171,7 @@ function cupCandidate(
         today.filter((m) => m !== ours).map(asLive),
         `League phase, round ${ours.round + 1}`,
         (minute) => leaguePhaseRowsAtMinute(cup, matchday, minute),
+        matchLineups(ours.boxScore!),
       );
     }
   }
@@ -182,6 +192,7 @@ function cupCandidate(
         po.ties.filter((t) => t !== ours && t.boxScore).map(asLive),
         "Playoff round",
         null,
+        matchLineups(ours.boxScore),
       );
     }
   }
@@ -202,6 +213,7 @@ function cupCandidate(
         legs.filter((l) => l !== ours).map(asLive),
         `${cupRoundName(ours.round, koRounds)}, first leg`,
         null,
+        matchLineups(ours.boxScore),
       );
     }
   }
@@ -223,6 +235,11 @@ function cupCandidate(
       ties.filter((t) => t !== ours).map(asLive),
       twoLegged(ours) ? `${round}, second leg` : round,
       null,
+      // A two-legged tie keeps ONE merged box score, so its lines are both
+      // legs summed and its substitutions belong to whichever leg made them.
+      // There is no honest way to read the second leg's eleven back out of
+      // that, so the sheet is dropped rather than guessed at.
+      twoLegged(ours) ? null : matchLineups(ours.boxScore!),
     );
   }
 
@@ -270,6 +287,7 @@ function domesticCandidate(
         competitionName: cup.name,
         subtitle,
         tableAtMinute: null,
+        lineups: matchLineups(ours.boxScore),
       },
     };
   }

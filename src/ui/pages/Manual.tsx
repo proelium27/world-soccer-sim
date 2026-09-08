@@ -559,6 +559,15 @@ export function Manual() {
             see one again later, open its box score and hit <strong>Watch it back</strong>.
           </p>
           <p>
+            It's a page of its own rather than a window laid over the game, so it has an address
+            you can link to and go back from, and it reads top to bottom like everything else. Both
+            team sheets are at the bottom: the eleven each side started with, the position every
+            one of them played, and the shape it adds up to. Substitutions get added to the sheet
+            as they're made, so you see the bench arrive in real time. Players who stayed on the
+            bench all game aren't listed &mdash; nothing about them is recorded, since they never
+            played.
+          </p>
+          <p>
             Cup ties can be watched too. Continental Cup rounds land on league matchdays, so on
             one of those you have two matches: the game asks which you'd rather watch, and plays
             both either way &mdash; the one you skip still has its box score. A league-phase match
@@ -569,8 +578,9 @@ export function Manual() {
           <p>
             The match is played the moment you press the button, and what you're watching is the
             recording of it, so watching never changes the result. It also means the matchday isn't
-            saved until you close the viewer: quit halfway and it simply hasn't happened, and
-            playing it again gives you the same match. You can't make substitutions while you watch
+            saved until you're done with it, which is why the game keeps you on that page while
+            it's going &mdash; there's a <strong>Skip the rest</strong> link next to the playback
+            controls if you'd rather get on with it. You can't make substitutions while you watch
             yet, and possession and xG appear only at full time (they aren't tracked minute by
             minute).
           </p>
@@ -1583,6 +1593,7 @@ export function Manual() {
           </p>
           <ul>
             <li><strong>Who gets credited</strong>. Every event is pinned on a real player, picked from who's on the pitch using both his position and how good he is at that particular thing. Goals lean on finishing, assists on passing, tackles and interceptions on tackling and reading the game, corners on heading. Ability counts for a lot in that pick, so your best defender really does top your tackles chart and your playmaker really does rack up the assists, rather than them landing on whoever happened to be nearby. Fouls are the deliberate exception: they're spread by position and not sharpened by ability, because "best defender" and "most booked" shouldn't be the same list. Around a quarter of goals are scored with no assist at all.</li>
+            <li><strong>The position each player played</strong>. The Pos column on a box score is the job he actually did that afternoon, not the position listed on his profile. A winger who filled in at full-back reads as a full-back for that match, which is also what his rating was judged against. It's the same information the lineups on the watch screen are built from.</li>
             <li><strong>Passes, crosses &amp; fouls</strong>. Every box score also carries per-player passing (completed / attempted), crosses, and fouls committed. Central and deep players move the ball most, wide players do most of the crossing. These are just stat-sheet detail, they don't change the scoreline.</li>
             <li><strong>Cards</strong>. Yellows, second yellows, and straight reds. Going a man down is a real hit to your side's strength for the rest of the match, and cards now carry a cost past the final whistle too &mdash; see Suspensions below.</li>
             <li><strong>Set pieces</strong>. Corners, and penalty kicks resolved as a duel between the taker and the keeper (saved, scored, or dragged wide).</li>

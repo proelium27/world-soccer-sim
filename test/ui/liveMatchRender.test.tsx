@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { LiveMatchOverlay } from "../../src/ui/components/LiveMatchOverlay.js";
+import { LiveMatchView } from "../../src/ui/components/LiveMatchView.js";
 import type { MatchEvent } from "../../src/engine/attribution.js";
 import type { StoredTeam } from "../../src/core/teams/clubs.js";
 import type { LiveMatch } from "../../src/ui/live/liveMatch.js";
+import type { MatchLineups } from "../../src/ui/live/lineups.js";
 
 /**
  * Render harness for the live viewer (the pattern from transfersRender.test.tsx:
@@ -42,13 +43,25 @@ function team(tid: number, name: string, abbrev: string): StoredTeam {
 
 const TEAMS = [team(1, "Ashford United", "ASH"), team(2, "Kestrel City", "KES"), team(3, "Marden", "MAR"), team(4, "Thorne", "THO")];
 
+const LINEUPS: MatchLineups = {
+  home: {
+    formation: "4-3-3",
+    starters: [
+      { pid: 10, slot: "GK" },
+      { pid: 11, slot: "CB" },
+    ],
+    // Made at 60', so it must not be showing at kickoff.
+    subs: [{ on: 12, off: 11, minute: 60, slot: "CB" }],
+  },
+  away: { formation: "4-4-2", starters: [{ pid: 20, slot: "GK" }], subs: [] },
+};
+
 function render(node: Parameters<typeof renderToStaticMarkup>[0]): string {
   return renderToStaticMarkup(createElement(MemoryRouter, null, node));
 }
 
-function overlay(over: Record<string, unknown> = {}) {
-  return createElement(LiveMatchOverlay, {
-    open: true,
+function view(over: Record<string, unknown> = {}) {
+  return createElement(LiveMatchView, {
     match: match(),
     otherMatches: [],
     teams: TEAMS,
@@ -60,48 +73,85 @@ function overlay(over: Record<string, unknown> = {}) {
   } as never);
 }
 
-describe("LiveMatchOverlay", () => {
+describe("LiveMatchView", () => {
   it("kicks off goalless rather than showing the final score", () => {
-    const html = render(overlay());
+    const html = render(view());
     expect(html).toContain("0 - 0");
     // The match finished 3-1 and that number is on the object it was handed.
     expect(html).not.toContain("3 - 1");
   });
 
   it("has not revealed any of the match's events at kickoff", () => {
-    const html = render(overlay());
+    const html = render(view());
     expect(html).not.toContain("Goal");
     expect(html).toContain("Just about to kick off");
   });
 
   it("names the competition and matchday", () => {
-    const html = render(overlay());
+    const html = render(view());
     expect(html).toContain("Premier Division");
     expect(html).toContain("Matchday 7");
   });
 
   it("names both clubs", () => {
-    const html = render(overlay());
+    const html = render(view());
     expect(html).toContain("Ashford United");
     expect(html).toContain("Kestrel City");
   });
 
   it("lists other matches on the rail by abbreviation", () => {
     const other = match({ home: 3, away: 4, matchday: 7 });
-    const html = render(overlay({ otherMatches: [other] }));
+    const html = render(view({ otherMatches: [other] }));
     expect(html).toContain("Elsewhere");
     expect(html).toContain("MAR");
     expect(html).toContain("THO");
   });
 
   it("shows a live table covering the whole competition", () => {
-    const html = render(overlay({ otherMatches: [match({ home: 3, away: 4 })] }));
+    const html = render(view({ otherMatches: [match({ home: 3, away: 4 })] }));
     expect(html).toContain("Live table");
     // All four clubs in the competition appear, not just the two on the pitch.
     for (const abbrev of ["ASH", "KES", "MAR", "THO"]) expect(html).toContain(abbrev);
   });
 
-  it("renders nothing at all when closed", () => {
-    expect(render(overlay({ open: false }))).toBe("");
+  /* --- the page, not a dialog ------------------------------------------- */
+
+  it("renders as page content rather than an overlay", () => {
+    const html = render(view());
+    // The class the sim overlay uses to cover the app. A page must not have it.
+    expect(html).not.toContain("sim-overlay");
+    expect(html).toContain("live-page");
+  });
+
+  it("gives the page a heading naming the match", () => {
+    const html = render(view());
+    expect(html).toMatch(/<h1[^>]*>[\s\S]*Ashford United[\s\S]*<\/h1>/);
+  });
+
+  it("carries a polite live region for the running commentary", () => {
+    const html = render(view());
+    expect(html).toContain('aria-live="polite"');
+  });
+
+  /* --- lineups ---------------------------------------------------------- */
+
+  it("shows both team sheets with the shape each side started in", () => {
+    const html = render(view({ lineups: LINEUPS }));
+    expect(html).toContain("Lineups");
+    expect(html).toContain("4-3-3");
+    expect(html).toContain("4-4-2");
+    expect(html).toContain("Player 10");
+    expect(html).toContain("Player 20");
+  });
+
+  it("has not made the 60th-minute substitution at kickoff", () => {
+    const html = render(view({ lineups: LINEUPS }));
+    expect(html).not.toContain("Substitutes used");
+    expect(html).not.toContain("Player 12");
+  });
+
+  it("shows no lineups section at all when they can't be recovered", () => {
+    const html = render(view({ lineups: null }));
+    expect(html).not.toContain("Lineups");
   });
 });
