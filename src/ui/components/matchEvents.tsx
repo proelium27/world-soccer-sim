@@ -29,6 +29,15 @@ export function BallIcon({ size = 11 }: { size?: number }) {
   );
 }
 
+/** Assists. A boot, the way every match graphic marks one. */
+export function BootIcon({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M2 7h6.5l3.2 3.4c1.5 1.6 3.6 2.5 5.8 2.5H21a1 1 0 0 1 1 1v3.6a1.5 1.5 0 0 1-1.5 1.5H3.5A1.5 1.5 0 0 1 2 17.6z" />
+    </svg>
+  );
+}
+
 export function CardIcon({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size * 1.25} viewBox="0 0 16 20" fill="currentColor" aria-hidden="true">

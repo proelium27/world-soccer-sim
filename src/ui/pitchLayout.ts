@@ -247,6 +247,49 @@ export function layoutSlots(formation: FormationId): SlotCoord[] {
 }
 
 /**
+ * Which layout coordinate each of an eleven belongs at.
+ *
+ * The Roster page hands its XI over already index-aligned with the formation,
+ * because that is how selectXI built it. A match lineup is not: it is
+ * reconstructed from a box score and sorted back-to-front for reading (see
+ * live/lineups.ts), so slot i of that list is not layout coordinate i. This
+ * matches them up by slot, first come first served.
+ *
+ * Ties among identical slots are arbitrary and that is fine — two centre-backs
+ * at y 35 and y 65 are the same pair of chips whichever way round they go.
+ * Anything left over (a slot the shape doesn't contain, which only happens when
+ * a formation could not be named at all) falls back to the first free
+ * coordinate, so every player is placed somewhere rather than stacked at the
+ * origin.
+ */
+export function assignLayoutIndices(
+  formationSlots: readonly string[],
+  slots: readonly (string | null)[],
+): number[] {
+  const taken = new Array<boolean>(formationSlots.length).fill(false);
+  const out = new Array<number>(slots.length).fill(-1);
+
+  slots.forEach((slot, i) => {
+    if (slot === null) return;
+    const at = formationSlots.findIndex((f, j) => !taken[j] && f === slot);
+    if (at >= 0) {
+      taken[at] = true;
+      out[i] = at;
+    }
+  });
+  // Whoever the pass above could not place takes the first free coordinate.
+  out.forEach((at, i) => {
+    if (at >= 0) return;
+    const free = taken.findIndex((t) => !t);
+    if (free >= 0) {
+      taken[free] = true;
+      out[i] = free;
+    }
+  });
+  return out;
+}
+
+/**
  * Pitch coordinates for an award XI, index-aligned with TOTS_SLOTS.
  *
  * Its own array rather than a FORMATION_LAYOUTS lookup, for the same reason

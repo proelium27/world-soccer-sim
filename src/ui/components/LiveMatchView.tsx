@@ -5,6 +5,9 @@ import { ClubCrest } from "./ClubCrest.js";
 import { eventSummary, KEY_EVENTS, TimelineRow } from "./matchEvents.js";
 import { useMatchPlayback, type PlaybackSpeed } from "../live/useMatchPlayback.js";
 import type { MatchLineups, SideLineup } from "../live/lineups.js";
+import { liveMatchState } from "../live/liveRatings.js";
+import { MatchPitch } from "./MatchPitch.js";
+import { useMediaQuery } from "../useIsMobile.js";
 import {
   eventMinute,
   eventsThrough,
@@ -129,15 +132,12 @@ function ClubName({ name, abbrev }: { name: string; abbrev: string }) {
 }
 
 /**
- * One side's team sheet.
+ * One side's substitutions, under the pitch.
  *
- * A list rather than a pitch drawing, deliberately. A shape drawn on a pitch is
- * the more attractive answer and it is unreadable to a screen reader without
- * inventing a parallel text version of the same thing, which is how the two
- * fall out of step. The formation is named in words instead, which is what the
- * drawing was going to convey anyway, and the slot sits beside every name.
+ * Only the changes: who is ON the pitch is the pitch's job, and repeating the
+ * eleven here would mean a screen reader hearing each team twice.
  */
-function TeamSheet({
+function SubList({
   tid,
   name,
   colors,
@@ -150,7 +150,7 @@ function TeamSheet({
   colors: [string, string];
   lineup: SideLineup;
   playerName: (pid: number) => string;
-  /** Subs are revealed as they are made, so the sheet tracks the match being watched. */
+  /** Subs are revealed as they are made, so the list tracks the match being watched. */
   minute: number;
 }) {
   const subs = lineup.subs.filter((s) => s.minute <= minute);
@@ -161,15 +161,9 @@ function TeamSheet({
         <span>{name}</span>
         {lineup.formation && <span className="live-sheet-shape">{lineup.formation}</span>}
       </h3>
-      <ol className="live-sheet-list">
-        {lineup.starters.map((p) => (
-          <li key={p.pid}>
-            <span className="live-sheet-slot stat-num">{p.slot ?? "—"}</span>
-            <Link to={`/player/${p.pid}`}>{playerName(p.pid)}</Link>
-          </li>
-        ))}
-      </ol>
-      {subs.length > 0 && (
+      {subs.length === 0 ? (
+        <p className="text-muted small mb-0">No substitutions yet.</p>
+      ) : (
         <>
           <h4 className="live-sheet-subhead">Substitutes used</h4>
           <ul className="live-sheet-list live-sheet-list--subs">
@@ -205,6 +199,19 @@ export function LiveMatchView({
   const [showAllEvents, setShowAllEvents] = useState(true);
   const playback = useMatchPlayback(match.events, { autoStart: true });
   const { minute, finished } = playback;
+
+  // Two elevens side by side need real width, and this column loses a chunk of
+  // it to the sidebar and the rail long before a phone does — so the pitch asks
+  // about its own threshold rather than borrowing the mobile breakpoint.
+  const narrow = useMediaQuery("(max-width: 1199.98px)");
+
+  // Rebuilt every minute, which is the point: it is a replay of the events up
+  // to now, so ratings and marks move as the match does. O(events) on ~200
+  // events, against the feed and rail this screen already re-derives per tick.
+  const live = useMemo(
+    () => (lineups ? liveMatchState(lineups, match.events, minute) : null),
+    [lineups, match.events, minute],
+  );
 
   const teamOf = useMemo(() => {
     const map = new Map<number, StoredTeam>();
@@ -369,11 +376,23 @@ export function LiveMatchView({
           </div>
         </section>
 
-        {lineups && (
+        {lineups && live && (
           <section className="live-lineups">
             <h2 className="live-section-head">Lineups</h2>
+            <MatchPitch
+              home={live.home}
+              away={live.away}
+              homeFormation={lineups.home.formation}
+              awayFormation={lineups.away.formation}
+              homeName={nameOf(match.home)}
+              awayName={nameOf(match.away)}
+              homeColors={homeTeam?.colors ?? ["#888", "#444"]}
+              awayColors={awayTeam?.colors ?? ["#888", "#444"]}
+              playerName={playerName}
+              vertical={narrow}
+            />
             <div className="live-lineups-grid">
-              <TeamSheet
+              <SubList
                 tid={match.home}
                 name={nameOf(match.home)}
                 colors={homeTeam?.colors ?? ["#888", "#444"]}
@@ -381,7 +400,7 @@ export function LiveMatchView({
                 playerName={playerName}
                 minute={minute}
               />
-              <TeamSheet
+              <SubList
                 tid={match.away}
                 name={nameOf(match.away)}
                 colors={awayTeam?.colors ?? ["#888", "#444"]}
@@ -391,6 +410,7 @@ export function LiveMatchView({
               />
             </div>
             <p className="live-lineups-note text-muted small">
+              Ratings update as the match runs, from what each player has actually done so far.
               Substitutes who never came on aren&apos;t recorded, so only the ones used are
               listed.
             </p>

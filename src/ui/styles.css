@@ -3284,6 +3284,226 @@ body.nav-drawer-open {
   margin: 0.7rem 0 0;
 }
 
+/* --- the match pitch ----------------------------------------------------- */
+/* Both elevens on one pitch: home in the left half attacking right, away
+   mirrored into the right half. Chips are absolutely positioned from
+   FORMATION_LAYOUTS (the Roster page's own coordinates), so a shape sits the
+   same way on both screens. */
+.mp-pitch {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 1rem;
+  border: 1px solid var(--sg-border);
+  border-radius: var(--sg-radius);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      oklch(0.30 0.045 152) 0 6.25%,
+      oklch(0.275 0.042 152) 6.25% 12.5%
+    );
+  overflow: hidden;
+}
+/* Portrait when there isn't width for two elevens across: home at the bottom
+   attacking up. Same coordinates, rotated a quarter turn by MatchPitch. */
+.mp-pitch--vertical {
+  aspect-ratio: 3 / 4;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      oklch(0.30 0.045 152) 0 6.25%,
+      oklch(0.275 0.042 152) 6.25% 12.5%
+    );
+}
+.mp-markings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mp-halfway {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: oklch(1 0 0 / 0.16);
+}
+.mp-pitch--vertical .mp-halfway {
+  left: 0;
+  right: 0;
+  top: 50%;
+  bottom: auto;
+  width: auto;
+  height: 1px;
+}
+.mp-circle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 1px solid oklch(1 0 0 / 0.16);
+  border-radius: 50%;
+}
+.mp-pitch--vertical .mp-circle {
+  width: 26%;
+}
+.mp-box {
+  position: absolute;
+  top: 22%;
+  bottom: 22%;
+  width: 9%;
+  border: 1px solid oklch(1 0 0 / 0.16);
+}
+.mp-box--home {
+  left: 0;
+  border-left: 0;
+}
+.mp-box--away {
+  right: 0;
+  border-right: 0;
+}
+.mp-pitch--vertical .mp-box {
+  top: auto;
+  bottom: auto;
+  left: 22%;
+  right: 22%;
+  width: auto;
+  height: 9%;
+}
+.mp-pitch--vertical .mp-box--home {
+  bottom: 0;
+  border-bottom: 0;
+}
+.mp-pitch--vertical .mp-box--away {
+  top: 0;
+  border-top: 0;
+}
+.mp-side {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mp-chip {
+  position: absolute;
+  /* The coordinate is the player's spot, so the chip hangs off its centre. */
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 5.6rem;
+  gap: 0.1rem;
+  text-align: center;
+  line-height: 1.15;
+}
+.mp-shirt {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  border: 2px solid;
+  box-shadow: 0 1px 3px oklch(0.12 0.02 155 / 0.55);
+}
+.mp-slot {
+  font-family: var(--sg-font-mono);
+  font-size: 0.55rem;
+  font-weight: var(--sg-weight-bold);
+  /* The shirt is the club's own colour, which can be anything, so the label
+     leans on a shadow rather than a colour that might match the ground. */
+  color: oklch(1 0 0 / 0.92);
+  text-shadow: 0 1px 2px oklch(0 0 0 / 0.85);
+}
+.mp-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.62rem;
+  color: var(--sg-text);
+  text-decoration: none;
+  text-shadow: 0 1px 2px oklch(0.12 0.02 155 / 0.9);
+}
+.mp-name:hover {
+  color: var(--sg-green-bright);
+}
+/* The rating rides on the shirt's shoulder, which is where every match graphic
+   puts it and keeps the chip one line tall. */
+.mp-rating {
+  position: absolute;
+  top: -0.35rem;
+  right: 50%;
+  margin-right: -1.55rem;
+  min-width: 1.5rem;
+  padding: 0 0.15rem;
+  border-radius: 3px;
+  font-size: 0.58rem;
+  font-weight: var(--sg-weight-bold);
+  color: var(--sg-on-green);
+  background: var(--sg-draw);
+}
+.mp-rating--great {
+  background: var(--sg-win);
+}
+.mp-rating--good {
+  background: var(--sg-green);
+}
+.mp-rating--poor {
+  background: var(--sg-loss);
+  color: oklch(1 0 0 / 0.95);
+}
+.mp-marks {
+  position: absolute;
+  top: -0.3rem;
+  left: 50%;
+  margin-left: -1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  align-items: center;
+}
+.mp-mark {
+  display: grid;
+  place-items: center;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--sg-surface);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.5);
+}
+.mp-mark--goal,
+.mp-mark--assist {
+  color: var(--sg-text);
+}
+.mp-mark--yellow {
+  color: var(--sg-warn);
+}
+.mp-mark--red {
+  color: var(--sg-loss);
+}
+.mp-mark--on {
+  color: var(--sg-win);
+}
+.mp-mark--more {
+  font-family: var(--sg-font-mono);
+  font-size: 0.5rem;
+  font-weight: var(--sg-weight-bold);
+  width: auto;
+  padding: 0 0.15rem;
+  border-radius: 3px;
+}
+/* A pitch has a hard floor on how small a chip can be before names collide;
+   below it the chip keeps the shirt and the rating and drops the name. */
+@media (max-width: 575.98px) {
+  .mp-chip {
+    width: 3.4rem;
+  }
+  .mp-name {
+    font-size: 0.55rem;
+  }
+}
+
 /* --- right rail --------------------------------------------------------- */
 .live-rail {
   border-left: 1px solid var(--sg-border);

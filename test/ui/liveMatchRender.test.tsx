@@ -6,7 +6,12 @@ import { LiveMatchView } from "../../src/ui/components/LiveMatchView.js";
 import type { MatchEvent } from "../../src/engine/attribution.js";
 import type { StoredTeam } from "../../src/core/teams/clubs.js";
 import type { LiveMatch } from "../../src/ui/live/liveMatch.js";
-import type { MatchLineups } from "../../src/ui/live/lineups.js";
+import { matchLineups, type MatchLineups } from "../../src/ui/live/lineups.js";
+import { mulberry32 } from "../../src/engine/rng.js";
+import { makeTeam } from "../../src/engine/composites.js";
+import { simMatchDetailed } from "../../src/engine/matchSim.js";
+import type { MatchPlayer, MatchPosition } from "../../src/engine/attribution.js";
+import { FORMATIONS } from "../../src/core/lineup/formations.js";
 
 /**
  * Render harness for the live viewer (the pattern from transfersRender.test.tsx:
@@ -153,5 +158,88 @@ describe("LiveMatchView", () => {
   it("shows no lineups section at all when they can't be recovered", () => {
     const html = render(view({ lineups: null }));
     expect(html).not.toContain("Lineups");
+  });
+});
+
+/* ---------------------------------------------------------------------------
+   The pitch, against a real simulated match rather than a hand fixture — the
+   chips are positioned from a formation the derivation had to recover, so a
+   fixture would only be testing itself.
+
+   A static render lands on minute 0, so what is provable here is the kickoff
+   frame: everyone on, nothing done yet. That it keeps up as the match runs is
+   liveRatings.test.ts's job, which can walk the clock without a DOM.
+   --------------------------------------------------------------------------- */
+
+function matchPlayer(pid: number, slot: MatchPosition): MatchPlayer {
+  return {
+    pid, pos: slot, slot, secondary: [], ovr: 62,
+    shooting: slot === "ST" ? 75 : 40, dribbling: 55,
+    tackling: slot === "CB" ? 70 : 45, keeping: slot === "GK" ? 80 : 5,
+    positioning: 55, heading: 55, stamina: 14, interceptions: 55, passing: 50,
+  };
+}
+
+const REAL = simMatchDetailed(
+  mulberry32(909),
+  makeTeam("Home"),
+  makeTeam("Away"),
+  (FORMATIONS["4-3-3"] as MatchPosition[]).map((s, i) => matchPlayer(100 + i, s)),
+  (FORMATIONS["4-4-2"] as MatchPosition[]).map((s, i) => matchPlayer(200 + i, s)),
+  (["GK", "CB", "CM", "ST"] as MatchPosition[]).map((s, i) => matchPlayer(150 + i, s)),
+  (["GK", "CB", "CM", "ST"] as MatchPosition[]).map((s, i) => matchPlayer(250 + i, s)),
+).boxScore;
+
+const REAL_LINEUPS = matchLineups(REAL);
+
+function realView() {
+  return view({
+    match: { home: 1, away: 2, matchday: 7, events: REAL.events },
+    lineups: REAL_LINEUPS,
+  });
+}
+
+describe("the match pitch", () => {
+  it("puts all twenty-two starters on it, once each", () => {
+    const html = render(realView());
+    const chips = html.match(/class="mp-chip"/g) ?? [];
+    expect(chips).toHaveLength(22);
+  });
+
+  it("names every starter", () => {
+    const html = render(realView());
+    for (const side of ["home", "away"] as const) {
+      for (const p of REAL_LINEUPS[side].starters) {
+        expect(html, `pid ${p.pid}`).toContain(`Player ${p.pid}`);
+      }
+    }
+  });
+
+  it("gives each chip a sentence rather than leaving the icons to speak", () => {
+    const html = render(realView());
+    // Position, name and a full stop — what a screen reader is handed in place
+    // of a coloured dot at a coordinate.
+    expect(html).toMatch(/GK\. Player 100\./);
+  });
+
+  it("has nobody rated and nothing marked at kickoff", () => {
+    const html = render(realView());
+    expect(html).not.toContain("mp-rating");
+    expect(html).not.toContain("mp-mark--goal");
+    expect(html).not.toContain("mp-mark--yellow");
+  });
+
+  it("did produce a match with goals and subs in it, so that means something", () => {
+    const kinds = new Set(REAL.events.map((e) => e.type));
+    expect(kinds.has("goal")).toBe(true);
+    expect(kinds.has("substitution")).toBe(true);
+  });
+
+  it("does not repeat the eleven as a text list beside the pitch", () => {
+    const html = render(realView());
+    // One mention per starter: the chip. A second list would mean a screen
+    // reader hearing each team twice.
+    const occurrences = html.split("Player 100").length - 1;
+    expect(occurrences).toBe(1);
   });
 });

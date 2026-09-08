@@ -16,16 +16,12 @@ import { ExtendControl } from "./ExtendControl.js";
 import { ListingMenu } from "./ListingMenu.js";
 import { slotFitNote } from "./PositionBadge.js";
 import { suspensionText } from "./SuspensionBadge.js";
+import { shortName } from "../playerName.js";
 
 const DRAG_MIME = "application/x-soccer-gm-pid";
 
 /** Shared empty default for the optional club-only pid sets; never mutated. */
 const EMPTY_PIDS: Set<number> = new Set();
-
-function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts[parts.length - 1];
-}
 
 export interface PitchFieldProps {
   starters: Player[];

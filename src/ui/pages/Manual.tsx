@@ -560,12 +560,24 @@ export function Manual() {
           </p>
           <p>
             It's a page of its own rather than a window laid over the game, so it has an address
-            you can link to and go back from, and it reads top to bottom like everything else. Both
-            team sheets are at the bottom: the eleven each side started with, the position every
-            one of them played, and the shape it adds up to. Substitutions get added to the sheet
-            as they're made, so you see the bench arrive in real time. Players who stayed on the
-            bench all game aren't listed &mdash; nothing about them is recorded, since they never
-            played.
+            you can link to and go back from, and it reads top to bottom like everything else.
+          </p>
+          <p>
+            <strong>The lineups.</strong> Below the commentary both teams are laid out on a pitch,
+            the way the Roster page draws yours: your club in its own half, the opposition mirrored
+            in theirs, each in the shape it started in. Every player carries his{" "}
+            <strong>match rating</strong>, and it moves as the game does &mdash; a goal, an assist,
+            a tackle, a save or a booking all show up the moment they happen. A little icon sits
+            beside anyone who has scored, set one up, been booked or come off the bench. When a
+            substitution is made, the man coming on takes the spot on the pitch, so the shape you're
+            looking at is always the eleven currently playing. The changes are listed underneath.
+          </p>
+          <p>
+            Those ratings are the real thing, not a guess: they're worked out from what each player
+            has actually done so far, using the same sums that produce the rating on the box score
+            at full time. That's also why nobody has a rating before kickoff. Players who stayed on
+            the bench all game aren't shown at all &mdash; nothing about them is recorded, since
+            they never played.
           </p>
           <p>
             Cup ties can be watched too. Continental Cup rounds land on league matchdays, so on
