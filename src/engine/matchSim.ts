@@ -28,7 +28,15 @@ import {
   FATIGUE_PHYSICAL_WEIGHT,
   FATIGUE_TECHNICAL_WEIGHT,
   MAX_SUBS,
-  SUB_CHECKPOINTS_ELAPSED,
+  SUB_WINDOW_MOMENTS_ELAPSED,
+  SUB_WINDOW_HALFTIME_ELAPSED,
+  SUB_WINDOWS_IN_PLAY,
+  SUB_MAX_PER_WINDOW,
+  SUB_LATE_MARGIN,
+  SUB_LATE_MARGIN_EXPONENT,
+  SUB_HALFTIME_MARGIN,
+  SUB_WINDOW_JITTER_SECONDS,
+  SUB_WINDOW_STREAM,
   SUB_RATING_INFLUENCE,
   SUB_FRESHNESS_BONUS,
   SUB_QUALITY_MARGIN,
@@ -60,7 +68,7 @@ import {
   emptyLine,
   attributeTouchStats,
 } from "./attribution.js";
-import { hashInts } from "./rng.js";
+import { hashInts, mulberry32 } from "./rng.js";
 import { computeMatchRating, RATING_BASELINE } from "./matchRating.js";
 
 type Side = "home" | "away";
@@ -422,7 +430,45 @@ export function simMatchDetailed(
   const onPitch: Record<Side, MatchPlayer[]> = { home: [...homePlayers], away: [...awayPlayers] };
   const bench: Record<Side, MatchPlayer[]> = { home: [...homeBench], away: [...awayBench] };
   const subsUsed = { home: 0, away: 0 };
-  const firedCheckpoints = new Set<number>();
+  // In-play substitution opportunities each side has spent. Half-time does not
+  // count against this, per the laws. Injury replacements don't either — they
+  // fire immediately rather than at a window, so they are outside this system.
+  const windowsUsed = { home: 0, away: 0 };
+  /**
+   * When each side may open a window, jittered per match so that not every club
+   * in the world changes its team at the same four minutes. Managers pick their
+   * own moments; without this the minute histogram is a handful of spikes with
+   * nothing between them, which is both unrealistic and glaring in the live
+   * match viewer.
+   *
+   * Drawn on its own hash off match intrinsics (the first man named in each
+   * XI, which in any real lineup is the keeper), NEVER
+   * the shared rng, so the draw order every other outcome depends on is
+   * untouched — the same rule the cup rounds and touch attribution follow. It is
+   * therefore also stable under a re-sim of a single match, which the live
+   * viewer relies on.
+   */
+  function windowMomentsFor(side: Side): number[] {
+    const seed = hashInts(
+      homePlayers[0]?.pid ?? 0,
+      awayPlayers[0]?.pid ?? 0,
+      side === "home" ? 1 : 2,
+      SUB_WINDOW_STREAM,
+    );
+    const draw = mulberry32(seed);
+    return SUB_WINDOW_MOMENTS_ELAPSED
+      // Half-time is a real fixed event and is never jittered; it is prepended
+      // below rather than drawn from this list.
+      .map((m) => m + (draw() * 2 - 1) * SUB_WINDOW_JITTER_SECONDS)
+      .sort((a, b) => a - b);
+  }
+
+  const sideMoments: Record<Side, number[]> = {
+    home: [SUB_WINDOW_HALFTIME_ELAPSED, ...windowMomentsFor("home")],
+    away: [SUB_WINDOW_HALFTIME_ELAPSED, ...windowMomentsFor("away")],
+  };
+  // Fired per SIDE, not globally: the two sides no longer share their moments.
+  const firedCheckpoints: Record<Side, Set<number>> = { home: new Set(), away: new Set() };
 
   const energy = new Map<number, number>();
   for (const p of [...homePlayers, ...awayPlayers, ...homeBench, ...awayBench]) {
@@ -509,30 +555,69 @@ export function simMatchDetailed(
   }
 
   /**
-   * A tired on-pitch player's current value for the sub decision: his ovr, minus
-   * a fatigue relief that grows with his energy deficit (0 when fresh, up to
-   * SUB_FATIGUE_RELIEF when exhausted), plus a form adjustment for how he's
-   * actually playing this match (live match rating vs the 6.0 baseline). A gassed
-   * or poorly-playing starter is "worth less" right now, so a lesser replacement
-   * can justify subbing him; a starter having a great game protects himself.
+   * An on-pitch player's value for the sub decision: his ovr, adjusted for how
+   * he is actually playing this match (live match rating against the 6.0
+   * baseline). Deliberately excludes fatigue, which lives in the allowance
+   * below — a starter having a stormer protects himself, one having a shocker
+   * is easier to justify hooking, at any point in the match.
    */
-  function tiredValue(side: Side, p: MatchPlayer): number {
-    const fatigue = (ENERGY_START - energy.get(p.pid)!) / (ENERGY_START - ENERGY_FLOOR);
+  function gateValueOf(side: Side, p: MatchPlayer): number {
     const form = (liveRatingFor(side, p) - RATING_BASELINE) / 10;
-    return p.ovr - SUB_FATIGUE_RELIEF * fatigue + SUB_GATE_RATING_INFLUENCE * form;
+    return p.ovr + SUB_GATE_RATING_INFLUENCE * form;
   }
 
   /**
-   * Only sub when the fresh replacement roughly matches or beats the tired
-   * starter he'd replace — priced for the SLOT he'd be filling, not in the
-   * abstract. A bench striker who'd have to cover at centre-back has to be
-   * better by more than that costs him, otherwise the tired centre-back stays
-   * on. This must use the same penalty the composite rollup does; if the gate
-   * were cheaper about position than the rollup, the sim would keep making
-   * swaps it then punishes.
+   * How much of a downgrade the side will accept to make this change. In play
+   * that is the standing margin, plus a relief that grows with how gassed the
+   * outgoing player is, plus what the shortness of the remaining match is worth.
+   *
+   * At half-time it is none of those. Nobody is gassed at 45', there is a whole
+   * half still to play, and fresh legs buy nothing against a man who has run for
+   * forty-five minutes — so a half-time change has to be a genuine upgrade
+   * rather than a rest. Without that split the free half-time window is a free
+   * lunch and every side in the world takes it: measured, half-time alone
+   * produced 1.46 changes per team per match against a real rate nearer 0.4.
    */
-  function worthSub(side: Side, on: MatchPlayer, off: MatchPlayer): boolean {
-    return benchValueAt(on, off.slot) >= tiredValue(side, off) - SUB_QUALITY_MARGIN;
+  function subAllowance(p: MatchPlayer, atHalfTime: boolean): number {
+    if (atHalfTime) return SUB_HALFTIME_MARGIN;
+    const fatigue = (ENERGY_START - energy.get(p.pid)!) / (ENERGY_START - ENERGY_FLOOR);
+    return SUB_QUALITY_MARGIN + SUB_FATIGUE_RELIEF * fatigue + lateAllowance();
+  }
+
+  /**
+   * Extra downgrade tolerated because there is little match left to play. The
+   * quality comparison is between two ovr values with no reference to duration,
+   * which silently prices every swap as though the replacement will play the
+   * rest of the match; a man brought on at 85' degrades five minutes of
+   * composites, not forty-five. Growing the tolerance as the clock runs out is
+   * that correction, and it is what produces the ordinary late change for a
+   * fringe player. Clamped at 1 because stoppage pushes elapsed past the 90.
+   */
+  function lateAllowance(): number {
+    const elapsedFraction = clamp((MATCH_SECONDS - clock) / MATCH_SECONDS, 0, 1);
+    return SUB_LATE_MARGIN * elapsedFraction ** SUB_LATE_MARGIN_EXPONENT;
+  }
+
+  /**
+   * Only sub when the fresh replacement roughly matches or beats the man he'd
+   * replace — priced for the SLOT he'd be filling, not in the abstract. A bench
+   * striker who'd have to cover at centre-back has to be better by more than
+   * that costs him, otherwise the tired centre-back stays on. This must use the
+   * same penalty the composite rollup does; if the gate were cheaper about
+   * position than the rollup, the sim would keep making swaps it then punishes.
+   *
+   * The freshness bonus is withdrawn at half-time for the reason the allowance
+   * is: fresh legs are worth something against a tired man, and nothing against
+   * one who is not yet tired.
+   */
+  function worthSub(
+    side: Side,
+    on: MatchPlayer,
+    off: MatchPlayer,
+    atHalfTime: boolean,
+  ): boolean {
+    const onValue = benchValueAt(on, off.slot) - (atHalfTime ? SUB_FRESHNESS_BONUS : 0);
+    return onValue >= gateValueOf(side, off) - subAllowance(off, atHalfTime);
   }
 
   /**
@@ -619,10 +704,53 @@ export function simMatchDetailed(
     events.push({ clock, type: "substitution", side, pids: [off.pid, on.pid] });
   }
 
-  function attemptSub(side: Side, checkpoint: number): void {
-    if (subsUsed[side] >= MAX_SUBS || bench[side].length === 0) return;
+  /**
+   * Open a substitution window for a side and make as many changes as it can
+   * justify, up to SUB_MAX_PER_WINDOW. A window is the unit the laws actually
+   * count: bringing on three players at once costs a manager one opportunity,
+   * not three, which is why this loops rather than making a single swap the way
+   * the old fixed checkpoints did. A window that produces no change costs
+   * nothing — you only spend an opportunity by using it.
+   */
+  function runSubWindow(side: Side, moment: number): void {
+    const halfTime = moment === SUB_WINDOW_HALFTIME_ELAPSED;
+    if (!halfTime && windowsUsed[side] >= SUB_WINDOWS_IN_PLAY) return;
+
+    // Chasing the game is the last roll of the dice, so it belongs to the final
+    // moment only — and a side that has already spent its three opportunities
+    // has nothing left to chase with, which is the cost of using them early.
+    const own = sideMoments[side];
+    const lastMoment = moment === own[own.length - 1];
+
+    let made = 0;
+    // The reshape gamble strips a defender for an attacker; doing it twice in
+    // one window would tear the shape apart, so it is offered once and the rest
+    // of the window falls back to ordinary like-for-like changes.
+    let chaseAllowed = lastMoment;
+    while (
+      made < SUB_MAX_PER_WINDOW &&
+      subsUsed[side] < MAX_SUBS &&
+      bench[side].length > 0
+    ) {
+      const outcome = trySingleSub(side, chaseAllowed, halfTime);
+      if (outcome === "none") break;
+      if (outcome === "chase") chaseAllowed = false;
+      made++;
+    }
+    if (made > 0 && !halfTime) windowsUsed[side]++;
+  }
+
+  /**
+   * One swap inside an open window. Reports which kind of change it made so the
+   * caller can retire the chase-the-game option after it has been taken.
+   */
+  function trySingleSub(
+    side: Side,
+    chaseAllowed: boolean,
+    atHalfTime: boolean,
+  ): "chase" | "normal" | "none" {
     const outfield = onPitch[side].filter((p) => p.slot !== "GK");
-    if (outfield.length === 0) return;
+    if (outfield.length === 0) return "none";
 
     const worstSubPriority = (candidates: MatchPlayer[]): MatchPlayer =>
       candidates.reduce((worst, p) =>
@@ -633,15 +761,16 @@ export function simMatchDetailed(
     // defensive-minded player. This is a deliberate chase-the-game gamble, so it
     // bypasses the quality gate below (you accept a downgrade to add attack).
     const trailing = stat[side].goals < stat[other(side)].goals;
-    if (checkpoint === SUB_CHECKPOINTS_ELAPSED[SUB_CHECKPOINTS_ELAPSED.length - 1] && trailing) {
+    if (chaseAllowed && trailing) {
       const defensive = outfield.filter((p) => p.slot === "CB" || p.slot === "FB" || p.slot === "DM");
       const off = worstSubPriority(defensive.length > 0 ? defensive : outfield);
       const outfieldBench = bench[side].filter((p) => p.pos !== "GK");
       const on = outfieldBench.length > 0
         ? outfieldBench.reduce((best, p) => (p.shooting > best.shooting ? p : best))
         : undefined;
-      if (on) commitSub(side, off, on, true);
-      return;
+      if (!on) return "none";
+      commitSub(side, off, on, true);
+      return "chase";
     }
 
     // "Give more minutes": if the user flagged a bench player, try to get him on
@@ -652,9 +781,9 @@ export function simMatchDetailed(
       const on = flagged.reduce((best, p) => (benchValue(p) > benchValue(best) ? p : best));
       const samePos = outfield.filter((p) => p.slot === on.pos);
       const off = worstSubPriority(samePos.length > 0 ? samePos : outfield);
-      if (worthSub(side, on, off)) {
+      if (worthSub(side, on, off, atHalfTime)) {
         commitSub(side, off, on);
-        return;
+        return "normal";
       }
       // Not worth it even with the boost — fall through to a normal sub.
     }
@@ -664,7 +793,11 @@ export function simMatchDetailed(
     // starter on rather than downgrading itself).
     const off = worstSubPriority(outfield);
     const on = pickReplacement(side, off.slot);
-    if (on && worthSub(side, on, off)) commitSub(side, off, on);
+    if (on && worthSub(side, on, off, atHalfTime)) {
+      commitSub(side, off, on);
+      return "normal";
+    }
+    return "none";
   }
 
   /** An injured player must come off immediately, regardless of energy — unlike attemptSub, the outgoing player is fixed. */
@@ -713,11 +846,12 @@ export function simMatchDetailed(
       }
     }
 
-    for (const cp of SUB_CHECKPOINTS_ELAPSED) {
-      if (!firedCheckpoints.has(cp) && elapsed >= cp) {
-        firedCheckpoints.add(cp);
-        attemptSub("home", cp);
-        attemptSub("away", cp);
+    for (const side of ["home", "away"] as const) {
+      for (const moment of sideMoments[side]) {
+        if (!firedCheckpoints[side].has(moment) && elapsed >= moment) {
+          firedCheckpoints[side].add(moment);
+          runSubWindow(side, moment);
+        }
       }
     }
 
