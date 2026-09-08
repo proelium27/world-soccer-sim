@@ -12,7 +12,7 @@ import { PotHelp } from "../components/HelpHint.js";
 import { ValueHistoryChart } from "../components/ValueHistoryChart.js";
 import { OvrHistoryChart } from "../components/OvrHistoryChart.js";
 import { careerValueHistory } from "../../core/finance/valueHistory.js";
-import { potentialFog } from "../../core/scouting/potentialFog.js";
+import { usePotentialView } from "../potentialView.js";
 import { getRatingColor } from "../utils/ratingColor.js";
 import { Flag } from "../components/Flag.js";
 import { BackLink } from "../components/BackLink.js";
@@ -94,6 +94,11 @@ export function PlayerProfile() {
   const [statsRate, setStatsRate] = useState(false);
   const [careerChart, setCareerChart] = useState<"value" | "ovr">("value");
   const [editing, setEditing] = useState(false);
+  // The user's scouting view of a potential — the band the ratings table shows
+  // and the midpoint the value chart prices on. A hook, so it lives above the
+  // guards below; shared with PotDisplay and the player database so the three
+  // can't disagree about what the user is allowed to know.
+  const potView = usePotentialView();
 
   if (!league || pid === undefined) {
     return <p className="p-3">Loading...</p>;
@@ -189,16 +194,11 @@ export function PlayerProfile() {
   // scouted stays fogged here too (closing the "read the exact number one tab
   // over" leak), while an owned player's estimate clears with tenure exactly
   // as it does everywhere else.
-  const userTeamForFog = league.teams.find((t) => t.tid === league.meta.userTid);
-  const scoutObserved = userTeamForFog?.scoutingObserved?.[player.pid] ?? null;
-  const scoutSpend = userTeamForFog?.scoutingSpend ?? 0;
-
   // How a given season's POT should *read* — the same fogged band the history
   // table below shows, evaluated on that season like the table does.
   const potBandLabel = (potential: number, season: number): string => {
-    if (league.godMode) return String(potential);
-    const fog = potentialFog(potential, player.pid, season, scoutObserved, scoutSpend, league.difficulty);
-    return fog.known ? String(potential) : `${fog.low}–${fog.high}`;
+    const fog = potView.fogFor(potential, player.pid, season);
+    return fog ? `${fog.low}–${fog.high}` : String(potential);
   };
   // The POT the value chart *prices* off. trueTransferValue pays a premium for
   // an unfulfilled potential gap, so feeding it the true number would turn the
@@ -206,11 +206,8 @@ export function PlayerProfile() {
   // band's midpoint instead. The band is taken once, at the current season, so
   // its seeded off-center jitter is a single constant across the career and the
   // value line stays smooth; the hover card still quotes each season's own band.
-  const pricedPotential = (potential: number): number => {
-    if (league.godMode) return potential;
-    const fog = potentialFog(potential, player.pid, league.season, scoutObserved, scoutSpend, league.difficulty);
-    return fog.known ? potential : Math.round((fog.low + fog.high) / 2);
-  };
+  const pricedPotential = (potential: number): number =>
+    potView.midpoint(potential, player.pid, league.season);
 
   const valuePoints = careerValueHistory(player, league.season, (snap) =>
     pricedPotential(snap.potential));
@@ -802,11 +799,11 @@ export function PlayerProfile() {
                       </td>
                       <td className="text-end fw-semibold" style={{ color: getRatingColor(h.ovr) }}>{h.ovr}</td>
                       {(() => {
-                        const fog = potentialFog(h.potential, player.pid, h.season, scoutObserved, scoutSpend, league.difficulty);
-                        const colorAt = fog.known ? h.potential : Math.round((fog.low + fog.high) / 2);
+                        const fog = potView.fogFor(h.potential, player.pid, h.season);
+                        const colorAt = potView.midpoint(h.potential, player.pid, h.season);
                         return (
                           <td className="text-end" style={{ color: getRatingColor(colorAt) }}>
-                            {fog.known ? h.potential : `${fog.low}–${fog.high}`}
+                            {fog ? `${fog.low}–${fog.high}` : h.potential}
                           </td>
                         );
                       })()}

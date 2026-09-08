@@ -3857,3 +3857,36 @@ body.nav-drawer-open {
   color: var(--sg-text-faint);
   letter-spacing: 0.03em;
 }
+
+/* ---------------------------------------------------------------------------
+   Database (/database) — the world's players and clubs in one wide table.
+
+   DESIGN.md §6 applies in full: sixteen numeric columns in the Attributes set
+   read as one undifferentiated wall, so the identity block is split from the
+   numbers with a rule (`.db-divide`) and the stripe is raised on this table
+   only. Rows are text — no crest per row and one flag on the name — because
+   the page shows 100 rows at a time and the app's one known performance
+   failure is DOM weight (see the /transfers freeze in CLAUDE.md).
+--------------------------------------------------------------------------- */
+.db-table {
+  /* Cells hold a rating or a short label, so the table has no reason to
+     stretch a column and every reason to stay narrow. */
+  width: auto;
+  min-width: 100%;
+  /* Stronger than the global stripe: sixteen columns is a long way for the eye
+     to travel along one player, and at the default 0.035 it disappears. Raised
+     here only, never globally. */
+  --bs-table-striped-bg: oklch(0.94 0.007 155 / 0.055);
+}
+.db-table > tbody > tr > td {
+  border-bottom-color: var(--sg-border);
+  white-space: nowrap;
+}
+/* Splits the row in two: who he is, then the numbers. */
+.db-divide {
+  border-left: 1px solid var(--sg-border-strong);
+}
+/* Ratings are read as a column of numbers, so they line up digit for digit. */
+.db-table > tbody > tr > td.text-end {
+  font-variant-numeric: tabular-nums;
+}

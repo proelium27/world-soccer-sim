@@ -1,6 +1,5 @@
 import type { Player } from "../../core/players/types.js";
-import { useLeague } from "../context/LeagueContext.js";
-import { potentialFog } from "../../core/scouting/potentialFog.js";
+import { usePotentialView } from "../potentialView.js";
 
 const FOG_TITLE =
   "Scouting estimate. Sharpens with your scouting spend and how long the player has been on your senior roster.";
@@ -8,22 +7,16 @@ const FOG_TITLE =
 /**
  * Renders a player's potential the way the *user* perceives it: an exact
  * number once fully scouted, otherwise a low–high estimate band (see
- * src/core/scouting/potentialFog.ts). Pulls the user's scouting spend and
- * per-player observation tenure from LeagueContext, so every POT display
- * across the app stays consistent by dropping this in place of `p.potential`.
+ * src/core/scouting/potentialFog.ts). Drop this in place of `p.potential` and
+ * every POT display across the app stays consistent.
+ *
+ * The fog itself lives in {@link usePotentialView}, shared with the player
+ * database's POT sort — a table that ordered rows by the true value while
+ * showing a band here would leak the hidden number without showing it.
  */
 export function PotDisplay({ player }: { player: Player }) {
-  const { league } = useLeague();
-  if (!league) return <>{player.potential}</>;
-  // God Mode is a sandbox — no reason to hide info; show true POT everywhere.
-  if (league.godMode) return <>{player.potential}</>;
-
-  const userTeam = league.teams.find((t) => t.tid === league.meta.userTid);
-  const observed = userTeam?.scoutingObserved?.[player.pid] ?? null;
-  const spend = userTeam?.scoutingSpend ?? 0;
-  const fog = potentialFog(player.potential, player.pid, league.season, observed, spend, league.difficulty);
-
-  if (fog.known) return <>{player.potential}</>;
+  const fog = usePotentialView().fogOf(player);
+  if (!fog) return <>{player.potential}</>;
   return (
     <span title={FOG_TITLE} className="scouting-estimate">
       {fog.low}&ndash;{fog.high}

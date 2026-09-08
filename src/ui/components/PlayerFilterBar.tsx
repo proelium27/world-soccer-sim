@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import type { Competition } from "../../core/competitions.js";
-import type {
-  PlayerFieldFilters,
-  PlayerValueFilters,
-} from "../../core/transfers/recommendations.js";
+import { decodeScope, encodeScope, scopeCompIds, ALL_COMPETITIONS } from "../../core/competitions.js";
+import type { PlayerFieldFilters } from "../../core/players/playerQuery.js";
+import type { PlayerValueFilters } from "../../core/transfers/recommendations.js";
 import { POSITIONS } from "../../core/players/types.js";
+import { CompetitionScopeSelect } from "./CompetitionScopeSelect.js";
 
 /**
  * The scouting filter bar shared by both panels on the Transfers page (the
@@ -21,8 +21,13 @@ import { POSITIONS } from "../../core/players/types.js";
 export interface PlayerFilterState {
   position: string;
   nationality: string;
-  /** A competition id as text (""), so it round-trips through a <select>. */
-  compId: string;
+  /**
+   * Which competitions to look in, as `encodeScope`'s string — "all", one
+   * competition, one country, a whole tier, or the strongest countries' top
+   * flights. A string so it round-trips through a `<select>` (and, on the
+   * database page, a URL query parameter) without a second encoding.
+   */
+  scope: string;
   minOvr: string;
   maxOvr: string;
   minPot: string;
@@ -40,7 +45,7 @@ export interface PlayerFilterState {
 export const EMPTY_PLAYER_FILTERS: PlayerFilterState = {
   position: "",
   nationality: "",
-  compId: "",
+  scope: encodeScope(ALL_COMPETITIONS),
   minOvr: "",
   maxOvr: "",
   minPot: "",
@@ -76,17 +81,33 @@ export function moneyFilter(s: string): number | null {
   return n * mult;
 }
 
-/** True when the user has set anything at all (drives the "no matches" copy). */
+/**
+ * True when the user has set anything at all (drives the "no matches" copy).
+ *
+ * Compared against the empty state field by field rather than against `""`,
+ * because `scope` is not blank when unset — it holds the encoded "everything"
+ * scope, which would otherwise read as a filter on every page load.
+ */
 export function hasAnyFilter(f: PlayerFilterState): boolean {
-  return Object.values(f).some((v) => v !== "");
+  return (Object.keys(f) as (keyof PlayerFilterState)[])
+    .some((k) => f[k] !== EMPTY_PLAYER_FILTERS[k]);
 }
 
-/** Convert the raw text state into the constraints the core search takes. */
-export function toSearchFilters(f: PlayerFilterState): PlayerFieldFilters & PlayerValueFilters {
+/**
+ * Convert the raw text state into the constraints the core search takes.
+ *
+ * Takes the world's competitions because the scope is resolved here: a preset
+ * ("top divisions", "the five strongest countries") is a *set* of competition
+ * ids, and which ids those are is a property of this save's world.
+ */
+export function toSearchFilters(
+  f: PlayerFilterState,
+  competitions: Competition[],
+): PlayerFieldFilters & PlayerValueFilters {
   return {
     position: f.position || undefined,
     nationality: f.nationality || undefined,
-    compId: numFilter(f.compId),
+    compIds: scopeCompIds(competitions, decodeScope(f.scope)),
     minOvr: numFilter(f.minOvr),
     maxOvr: numFilter(f.maxOvr),
     minPot: numFilter(f.minPot),
@@ -209,18 +230,13 @@ export function PlayerFilterBar({
         </select>
       </Field>
       <Field label="League" htmlFor={id("comp")}>
-        <select
+        <CompetitionScopeSelect
           id={id("comp")}
-          className="form-select form-select-sm"
-          style={{ width: "11rem" }}
-          value={value.compId}
-          onChange={(e) => set({ compId: e.target.value })}
-        >
-          <option value="">All</option>
-          {competitions.map((c) => (
-            <option key={c.id} value={String(c.id)}>{c.name}</option>
-          ))}
-        </select>
+          competitions={competitions}
+          value={decodeScope(value.scope)}
+          onChange={(scope) => set({ scope: encodeScope(scope) })}
+          style={{ width: "12rem" }}
+        />
       </Field>
       <RangeField
         label="Overall"
