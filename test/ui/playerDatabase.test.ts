@@ -13,7 +13,7 @@ import { totalsOf } from "../../src/core/frivolities/stats.js";
 const league = makeLeague(0, 4);
 /** The database's default view: no fog (this is the pure layer), no filters. */
 const truePot = (p: Player) => p.potential;
-const rows = buildPlayerRows(league, truePot);
+const rows = buildPlayerRows(league, truePot, truePot);
 
 function filters(patch: Partial<PlayerDbFilters> = {}): PlayerDbFilters {
   return {
@@ -50,7 +50,7 @@ describe("buildPlayerRows", () => {
         t.tid === team.tid ? { ...t, roster: t.roster.filter((pid) => pid !== orphan) } : t,
       ),
     };
-    const free = buildPlayerRows(released, truePot).find((r) => r.player.pid === orphan)!;
+    const free = buildPlayerRows(released, truePot, truePot).find((r) => r.player.pid === orphan)!;
     expect(free.status).toBe("free");
     expect(free.tid).toBeNull();
     expect(free.compId).toBeNull();
@@ -66,11 +66,25 @@ describe("buildPlayerRows", () => {
   it("prices value on the potential it is handed, not on the true one", () => {
     // The page hands in the *scouted* estimate, so a pessimistic scout must
     // produce a lower valuation — that is the whole reason the accessor exists.
-    const pessimistic = buildPlayerRows(league, (p) => Math.max(1, p.potential - 20));
+    const pessimistic = buildPlayerRows(league, truePot, (p) => Math.max(1, p.potential - 20));
     const byPid = new Map(pessimistic.map((r) => [r.player.pid, r]));
     // Somebody in the world has unfulfilled potential to be priced for.
     const moved = rows.filter((r) => byPid.get(r.player.pid)!.value < r.value);
     expect(moved.length).toBeGreaterThan(0);
+  });
+
+  it("keeps the POT column and the price on SEPARATE readings of the band", () => {
+    // The column shows the ceiling, because that is the number on screen; a
+    // price is an expected value, so it takes the midpoint. Sharing one accessor
+    // would inflate every unscouted player's valuation for no reason beyond
+    // nobody having scouted him.
+    const optimistic = buildPlayerRows(league, () => 99, truePot);
+    const byPid = new Map(rows.map((r) => [r.player.pid, r]));
+    for (const row of optimistic) {
+      expect(row.scoutedPot).toBe(99);
+      // ...and the price did not move with it.
+      expect(row.value).toBe(byPid.get(row.player.pid)!.value);
+    }
   });
 });
 
@@ -104,7 +118,7 @@ describe("filterPlayerRows", () => {
     // A view that reports everyone at 99 must let everyone through a min-99
     // filter, however low their real potential — otherwise the column and the
     // filter beside it would be answering different questions.
-    const optimistic = buildPlayerRows(league, () => 99);
+    const optimistic = buildPlayerRows(league, () => 99, truePot);
     const out = filterPlayerRows(optimistic, filters({ fields: { minPot: 99 } }), league.season);
     expect(out).toHaveLength(optimistic.length);
 
@@ -152,7 +166,7 @@ describe("season and career views", () => {
         : p.pid === other.pid ? { ...p, stats: [line(3)] }
         : p),
   };
-  const statsRows = buildPlayerRows(withStats, truePot);
+  const statsRows = buildPlayerRows(withStats, truePot, truePot);
   const index = seasonStatsIndex(withStats.players, 3);
 
   it("lists the seasons anyone has a line for, newest first", () => {

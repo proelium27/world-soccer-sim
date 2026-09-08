@@ -28,10 +28,15 @@ export interface PlayerDbRow {
   age: number;
   status: PlayerStatus;
   /**
-   * Market value, priced on the *scouted* potential rather than the true one —
-   * `trueTransferValue` pays a premium for an unfulfilled potential gap, so
-   * pricing on the truth would turn the dollar figure into an exact read on a
-   * hidden number. Same rule the Player Profile's value chart follows.
+   * Market value, priced on the band's **midpoint** rather than the true
+   * potential — `trueTransferValue` pays a premium for an unfulfilled potential
+   * gap, so pricing on the truth would turn the dollar figure into an exact read
+   * on a hidden number. Same rule the Player Profile's value chart follows.
+   *
+   * Deliberately the midpoint and not the `ceiling` the POT column sorts on: a
+   * price is an expected value, and pricing every unscouted player at his best
+   * case would inflate the column for no reason beyond nobody having scouted
+   * him.
    */
   value: number;
   /** Weekly wage, matching the units the wage column shows. */
@@ -61,7 +66,10 @@ export const PLAYER_DB_PAGE_SIZE = 100;
  */
 export function buildPlayerRows(
   league: LeagueStore,
-  scoutedPotOf: (p: Player) => number,
+  /** Top of the scouting band — what the POT column shows, sorts and filters on. */
+  ceilingOf: (p: Player) => number,
+  /** Middle of the band — the expected value a price is worked out from. */
+  pricedPotOf: (p: Player) => number,
 ): PlayerDbRow[] {
   const season = league.season;
   const rows: PlayerDbRow[] = [];
@@ -69,14 +77,14 @@ export function buildPlayerRows(
   const byPid = new Map(league.players.map((p) => [p.pid, p]));
 
   const push = (player: Player, tid: number | null, compId: number | null, status: PlayerStatus) => {
-    const scoutedPot = scoutedPotOf(player);
+    const scoutedPot = ceilingOf(player);
     rows.push({
       player,
       tid,
       compId,
       age: season - player.born,
       status,
-      value: Math.round(trueTransferValue({ ...player, potential: scoutedPot }, season)),
+      value: Math.round(trueTransferValue({ ...player, potential: pricedPotOf(player) }, season)),
       wage: weeklyWage(player.contract.salary),
       contractYears: Math.max(0, player.contract.expiresSeason - season),
       scoutedPot,

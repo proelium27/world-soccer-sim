@@ -164,7 +164,13 @@ function PlayerDatabase() {
   // replaces it, so this rebuilds exactly when the world actually changed and
   // not on a keystroke.
   const rows = useMemo(
-    () => (league ? buildPlayerRows(league, potView.sortValue) : []),
+    () => (league
+      ? buildPlayerRows(
+        league,
+        potView.ceiling,
+        (p) => potView.midpoint(p.potential, p.pid, league.season),
+      )
+      : []),
     [league, potView],
   );
 
