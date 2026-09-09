@@ -10,6 +10,7 @@ import { formatWeeklyWage, seasonYear } from "../format.js";
 import { Flag } from "../components/Flag.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { PotDisplay } from "../components/PotDisplay.js";
+import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 import { ROSTER_CAP } from "../../core/constants.js";
 import { EmptyState } from "../components/EmptyState.js";
@@ -28,6 +29,9 @@ export function Academy() {
     simming,
   } = useLeague();
   const { sort, toggle } = useTableSort<AcademySortKey>("ovr", "desc");
+  // Academy players are never in `scoutingObserved` (it is reconciled off the
+  // SENIOR roster), so their POT is fogged and the column must sort on the band.
+  const potView = usePotentialView();
   // Walks the whole player pool, so it stays behind a memo rather than
   // re-running on every sort click.
   const renewals = useMemo(
@@ -46,7 +50,7 @@ export function Academy() {
     name: (p) => p.name,
     pos: (p) => p.pos,
     ovr: (p) => p.ovr,
-    pot: (p) => p.potential,
+    pot: (p) => potView.ceiling(p),
     age: (p) => league.season - p.born,
     wage: (p) => p.contract.salary,
     contract: (p) => p.contract.expiresSeason,
