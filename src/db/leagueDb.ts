@@ -1,6 +1,7 @@
 import type { LeagueStore } from "../core/leagueState.js";
 import type { Player } from "../core/players/types.js";
 import type { ArchivedPlayer } from "../core/players/archive.js";
+import type { PlayedMatch } from "../core/standings.js";
 import { getDb, type StoredLeague, type StoredPlayer, type PlayerCareer } from "./database.js";
 import { migrateLeague } from "./migrate.js";
 
@@ -18,6 +19,14 @@ function playerRange(lid: number): IDBKeyRange {
 
 /** Every archived-retiree row for one league. Same key shape as `playerRange`. */
 function retireeRange(lid: number): IDBKeyRange {
+  return IDBKeyRange.bound([lid], [lid, []]);
+}
+
+/**
+ * Every played-match row for one league. Same key shape again, except the
+ * second element is an array index rather than a pid — see database.ts.
+ */
+function playedRange(lid: number): IDBKeyRange {
   return IDBKeyRange.bound([lid], [lid, []]);
 }
 
@@ -73,6 +82,12 @@ let lastWritten: {
    * rows this offseason added and the rows the cap dropped.
    */
   retirees: ArchivedPlayer[];
+  /**
+   * The season's matches as last written, held for the append check in
+   * `playedToWrite`. One more pointer, not a copy: the elements are the very
+   * objects `league.played` holds, which the app is keeping alive anyway.
+   */
+  played: PlayedMatch[];
 } | null = null;
 
 /** Exported for tests: forget what this tab thinks is on disk. */
@@ -185,6 +200,44 @@ function retireesToWrite(
 }
 
 /**
+ * Where a save has to start writing played-match rows, if anywhere.
+ *
+ * Deliberately **not** the identity diff `players` and `retirees` use, and the
+ * difference is the point. Those are pools: a row can change at any position,
+ * so finding what moved costs a map and a per-row comparison. `played` is a
+ * *log* — `simThrough` only ever does `[...league.played, ...newResults]` and
+ * the offseason only ever sets it to `[]` — so the only two shapes it can take
+ * are "what we wrote, plus some" and "something else entirely". That makes the
+ * answer an index rather than a set, and it is what gets the common case to
+ * zero work: a lineup drag or a signing does not touch `played` at all, so
+ * `from === played.length` and nothing is written.
+ *
+ * The append-only claim is checked rather than assumed. A pointer compare per
+ * match with no allocation, ~10.5k of them at the very worst, and anything
+ * unexpected falls back to a full rewrite — the same "cannot prove what is on
+ * disk, so rewrite it" rule the other two diffs open with.
+ */
+function playedToWrite(
+  lid: number,
+  played: PlayedMatch[],
+  storedSeq: number | undefined,
+): { from: number; full: boolean } {
+  const cached = lastWritten;
+  if (!cached || cached.lid !== lid || storedSeq === undefined || cached.seq !== storedSeq) {
+    return { from: 0, full: true };
+  }
+  const prev = cached.played;
+  // Shorter than what we wrote is the offseason rollover, which sets `played`
+  // to []. A full rewrite is the right answer and, at length 0, the range
+  // delete it starts with is also the entire cost of the year's cleanup.
+  if (played.length < prev.length) return { from: 0, full: true };
+  for (let i = 0; i < prev.length; i++) {
+    if (played[i] !== prev[i]) return { from: 0, full: true };
+  }
+  return { from: prev.length, full: false };
+}
+
+/**
  * Save a league into IndexedDB. Returns the lid (key).
  *
  * The league record and the player rows are written in **one** transaction. That
@@ -206,13 +259,17 @@ function retireesToWrite(
  */
 export async function saveLeague(league: LeagueStore): Promise<number> {
   const db = await getDb();
-  const { players, retiredPlayers, ...rest } = league;
+  const { players, retiredPlayers, played, ...rest } = league;
 
-  const tx = db.transaction(["leagues", "players", "careers", "retirees"], "readwrite");
+  const tx = db.transaction(
+    ["leagues", "players", "careers", "retirees", "played"],
+    "readwrite",
+  );
   const leagues = tx.objectStore("leagues");
   const playerStore = tx.objectStore("players");
   const careerStore = tx.objectStore("careers");
   const retireeStore = tx.objectStore("retirees");
+  const playedStore = tx.objectStore("played");
 
   let lid: number;
   let storedSeq: number | undefined;
@@ -248,6 +305,17 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
   const retirees = retireesToWrite(lid, archive, storedSeq);
   if (retirees.full) await retireeStore.delete(retireeRange(lid));
 
+  // Rows are keyed by position, so a full rewrite must clear the range first:
+  // without it a season that shrank (the rollover, or a save loaded from an
+  // export with fewer matches) would leave the tail of the old one behind, and
+  // `loadLeague` reads the range as a dense array.
+  const playedWrite = playedToWrite(lid, played, storedSeq);
+  if (playedWrite.full) await playedStore.delete(playedRange(lid));
+  const playedPuts: Promise<unknown>[] = [];
+  for (let i = playedWrite.from; i < played.length; i++) {
+    playedPuts.push(playedStore.put(played[i], [lid, i]));
+  }
+
   await Promise.all([
     ...remove.map((pid) => playerStore.delete([lid, pid])),
     ...remove.map((pid) => careerStore.delete([lid, pid])),
@@ -255,10 +323,11 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
     ...careers.map((p) => careerStore.put(splitPlayer(p).career, [lid, p.pid])),
     ...retirees.remove.map((pid) => retireeStore.delete([lid, pid])),
     ...retirees.write.map((r) => retireeStore.put(r, [lid, r.pid])),
+    ...playedPuts,
   ]);
 
   await tx.done;
-  lastWritten = { lid, seq, players, retirees: archive };
+  lastWritten = { lid, seq, players, retirees: archive, played };
   return lid;
 }
 
@@ -281,13 +350,20 @@ export async function loadLeague(
 ): Promise<LeagueStore | undefined> {
   const db = await getDb();
 
-  const tx = db.transaction(["leagues", "players", "careers", "retirees"], "readonly");
+  const tx = db.transaction(
+    ["leagues", "players", "careers", "retirees", "played"],
+    "readonly",
+  );
   const stored = await tx.objectStore("leagues").get(lid);
   if (!stored) return undefined;
   const rows = await tx.objectStore("players").getAll(playerRange(lid));
   const careerKeys = await tx.objectStore("careers").getAllKeys(careerRange(lid));
   const careerRows = await tx.objectStore("careers").getAll(careerRange(lid));
   const retireeRows = await tx.objectStore("retirees").getAll(retireeRange(lid));
+  // In key order, which is index order: IDB compares array keys element-wise
+  // and numbers numerically, so [lid, 2] sorts below [lid, 10]. Taken as a
+  // dense array because `saveLeague` keeps it one — see playedToWrite.
+  const playedRows = await tx.objectStore("played").getAll(playedRange(lid));
   await tx.done;
 
   const careerByPid = new Map<number, PlayerCareer>();
@@ -307,7 +383,12 @@ export async function loadLeague(
     } as Player;
   });
 
-  const { players: inline, retiredPlayers: inlineRetirees, ...meta } = stored;
+  const {
+    players: inline,
+    retiredPlayers: inlineRetirees,
+    played: inlinePlayed,
+    ...meta
+  } = stored;
   const assembled = {
     ...meta,
     players: inline ?? joined,
@@ -316,12 +397,18 @@ export async function loadLeague(
     // empty) store read, or a save whose archive is legitimately empty would
     // look unsplit forever and rewrite itself on every load.
     retiredPlayers: inlineRetirees ?? retireeRows,
+    // Same "empty inline still counts as inline" rule as the archive above,
+    // and it bites more often here: a save sitting in the offseason has no
+    // matches at all, so `?? ` rather than a length test is what stops it
+    // looking unsplit forever and rewriting itself on every load.
+    played: inlinePlayed ?? playedRows,
   } as LeagueStore;
 
   const migrated = migrateLeague(assembled);
   if (
     inline !== undefined
     || inlineRetirees !== undefined
+    || inlinePlayed !== undefined
     || inlineCareers
     || shrankOnLoad(assembled, migrated)
     || namedAwardWinners(assembled, migrated)
@@ -391,11 +478,14 @@ export async function listLeagues(): Promise<
   }));
 }
 
-/** Delete a league by lid, along with all of its player, career, retiree and crest rows. */
+/**
+ * Delete a league by lid, along with all of its player, career, retiree, played
+ * and crest rows.
+ */
 export async function deleteLeague(lid: number): Promise<void> {
   const db = await getDb();
   const tx = db.transaction(
-    ["leagues", "players", "careers", "retirees", "crests"],
+    ["leagues", "players", "careers", "retirees", "crests", "played"],
     "readwrite",
   );
   await Promise.all([
@@ -403,6 +493,7 @@ export async function deleteLeague(lid: number): Promise<void> {
     tx.objectStore("players").delete(playerRange(lid)),
     tx.objectStore("careers").delete(careerRange(lid)),
     tx.objectStore("retirees").delete(retireeRange(lid)),
+    tx.objectStore("played").delete(playedRange(lid)),
     // In this transaction rather than through crestDb's own, so a deleted
     // league can never leave its badges behind for a later save to inherit by
     // reusing the lid.
@@ -424,6 +515,12 @@ export async function storedPlayerRows(lid: number): Promise<StoredPlayer[]> {
 export async function storedCareerRows(lid: number): Promise<PlayerCareer[]> {
   const db = await getDb();
   return db.getAll("careers", careerRange(lid));
+}
+
+/** Exported for tests: the played-match rows currently stored for a league. */
+export async function storedPlayedRows(lid: number): Promise<PlayedMatch[]> {
+  const db = await getDb();
+  return db.getAll("played", playedRange(lid));
 }
 
 /** Exported for tests: the archived-retiree rows currently stored for a league. */

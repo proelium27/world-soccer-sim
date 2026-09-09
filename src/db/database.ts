@@ -2,6 +2,7 @@ import { openDB, type IDBPDatabase, type DBSchema } from "idb";
 import type { LeagueStore } from "../core/leagueState.js";
 import type { Player } from "../core/players/types.js";
 import type { ArchivedPlayer } from "../core/players/archive.js";
+import type { PlayedMatch } from "../core/standings.js";
 
 const DB_NAME = "soccer-gm";
 /**
@@ -33,8 +34,34 @@ const DB_NAME = "soccer-gm";
  * cloned to the worker on every sim, so putting them on `LeagueStore` would pay
  * for them on every lineup change and every matchday. In their own store they
  * are written once at import and read once at load, which is what they are.
+ *
+ * 6 split `played` out, and it is the same bug as 2 and 3 with by far the
+ * biggest field. Every one of those entries says the league record "is
+ * rewritten in full on every mutation" — and `played` was sitting in it, which
+ * nothing connected because **`played` is invisible to every save-size probe in
+ * this repo**: they all sample after the offseason, which wipes it (the same
+ * blind spot core/simArchive.ts documents for the worker boundary). Measured on
+ * a *season-1* save on the 626-club world, what one lineup drag wrote:
+ *
+ *     matchday  1 →   6.4 MB     structuredClone   32 ms
+ *     matchday 10 →  63.0 MB                      350 ms
+ *     matchday 19 → 113.1 MB                    1,091 ms
+ *     matchday 28 → 162.3 MB                    1,430 ms
+ *     matchday 38 → 216.6 MB                    2,653 ms
+ *
+ * on a fast desktop, before IndexedDB serialises a byte, against mobile's
+ * documented 5-10x. Real player saves agree (season 47 mid-season: 166.7 MB,
+ * 944 ms). Note what that table is NOT: it is not a save-age curve. `played`
+ * scales with world size and how far into the season you are, so it hits a
+ * season-2 player exactly as hard as a season-60 one, worsens every matchday
+ * and vanishes at the rollover — which is why it reads as "slow on some
+ * devices" rather than "slow on old saves".
+ *
+ * Split out, that same record is 12.5 MB / 117 ms, and a mutation writes **no
+ * played rows at all** — see `playedToWrite` in leagueDb.ts for why the diff is
+ * an append rather than the identity comparison players need.
  */
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 /**
  * A league as it sits on disk.
@@ -76,8 +103,16 @@ export interface PlayerCareer {
   hist: Player["hist"];
 }
 
-export type StoredLeague = Omit<LeagueStore, "players" | "retiredPlayers"> & {
+export type StoredLeague = Omit<LeagueStore, "players" | "retiredPlayers" | "played"> & {
   players?: Player[];
+  /**
+   * Same story again: v5-and-earlier records keep the season's matches inline,
+   * while a v6 record keeps them in the `played` store. Note an *empty* inline
+   * array still counts as inline — a save written in the offseason legitimately
+   * has none, and `loadLeague` has to tell "not split yet" from "split, and
+   * there are none" or it would rewrite itself on every load.
+   */
+  played?: PlayedMatch[];
   /**
    * Same story one field along: v3 records keep the archive in the `retirees`
    * store, while v1/v2 records still carry it inline until `loadLeague` next
@@ -137,6 +172,26 @@ export interface SoccerGMDB extends DBSchema {
     value: ArchivedPlayer;
   };
   /**
+   * One league match, keyed `[lid, matchIndex]`.
+   *
+   * The key's second element is the match's **position in `league.played`**,
+   * not an id — the UI addresses matches by index (`/box-score/:idx`,
+   * `/watch/:matchIndex`, Schedule's rows), so the array's order is itself
+   * load-bearing state. IndexedDB compares array keys element-wise and numbers
+   * numerically, so `[lid, 2]` really does sort below `[lid, 10]` and a
+   * `getAll` over the range comes back in index order. `loadLeague` therefore
+   * takes the rows as-is; density is an invariant `saveLeague` maintains by
+   * falling back to a full rewrite the moment the array is anything but an
+   * extension of what it last wrote.
+   *
+   * Rows per league are bounded by the season, not by save age: the offseason
+   * sets `played` to `[]`, which lands here as one range delete a year.
+   */
+  played: {
+    key: [number, number];
+    value: PlayedMatch;
+  };
+  /**
    * One custom club badge, keyed `[lid, tid]` — the same out-of-line compound
    * key the other three use, so a league's whole set is one range query.
    *
@@ -184,6 +239,13 @@ export function getDb(): Promise<IDBPDatabase<SoccerGMDB>> {
           // custom badges at all, so an empty set is the truth rather than a
           // shape waiting to be split.
           db.createObjectStore("crests");
+        }
+        if (!db.objectStoreNames.contains("played")) {
+          // Out-of-line `[lid, matchIndex]`, and split out of existing league
+          // records lazily in loadLeague like every other store here — a
+          // mid-season record carries ~10.5k matches and a versionchange
+          // transaction is the worst possible place to move them.
+          db.createObjectStore("played");
         }
         if (!db.objectStoreNames.contains("careers")) {
           // Same out-of-line `[lid, pid]` key again, and split out of the
