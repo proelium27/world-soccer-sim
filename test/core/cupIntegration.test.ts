@@ -13,12 +13,33 @@ import {
   CUP_LEAGUE_PHASE_SIZE, CUP_KO_SIZE, cupKnockoutPlan,
 } from "../../src/core/constants.js";
 
+/**
+ * Sim to the end of the season, however many batches that takes.
+ *
+ * `simThrough` HALTS BEFORE THE USER'S CUP FINAL, a courtesy to the live player,
+ * and a club can reach several finals in a season. So the number of calls a
+ * season takes is a property of the WORLD — of how far the unmanaged user club
+ * happens to go — not of this fixture, and asserting "offseason" after exactly
+ * one call is asserting that tid 0 reached no final on this seed. It held until
+ * world generation gained an age model and then didn't, which surfaced three
+ * matchdays away from anything the tests here are about. `simOffseason` silently
+ * returns the league unchanged off-phase, so the symptom is an empty result
+ * rather than an error. Same guard `scripts/weakLeaguesAudit.ts` carries.
+ */
+function finishSeason(league: LeagueStore, rng: () => number): LeagueStore {
+  let out = simThrough(league, "season", rng);
+  for (let i = 0; (out.phase as string) !== "offseason"; i++) {
+    expect(i, `season ${out.season} refuses to finish (phase ${out.phase})`).toBeLessThan(4);
+    out = simThrough(out, "season", rng);
+  }
+  return out;
+}
+
 /** Advance a fresh save to the start of season 2 (regular phase), by which point a cup is seeded. */
 function toSeason2(seed: number, userTid = 0): LeagueStore {
   let league = makeLeague(userTid, 1);
   expect(league.cup).toBeNull(); // season 1 never has a cup
-  league = simThrough(league, "season", mulberry32(seed + 1));
-  expect(league.phase).toBe("offseason");
+  league = finishSeason(league, mulberry32(seed + 1));
   league = simOffseason(league, mulberry32(seed + 2));
   expect(league.season).toBe(2);
   return league;
@@ -54,8 +75,7 @@ describe("Continental Cup — season lifecycle", () => {
       expect(tierOf(league2.competitions, league2.teams.find((t) => t.tid === tid)!.compId)).toBe(1);
     }
 
-    const played = simThrough(league2, "season", mulberry32(99));
-    expect(played.phase).toBe("offseason");
+    const played = finishSeason(league2, mulberry32(99));
     expect(isCupComplete(played.cup!)).toBe(true);
     expect(played.cup!.championTid).not.toBeNull();
     // The whole league phase was played, the playoff filled the bracket, and the
