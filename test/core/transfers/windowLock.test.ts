@@ -4,7 +4,9 @@ import {
   movedThisWindow, makeTransferOffer, acceptCounterOffer, isForSale,
   reservationPrice, FREE_AGENT_TID, type CompletedTransfer,
 } from "../../../src/core/transfers/negotiation.js";
-import { inboundOfferCandidates } from "../../../src/core/transfers/inboundOffers.js";
+import {
+  inboundOfferCandidates, acceptInboundOffer, counterInboundOffer, inboundCeiling,
+} from "../../../src/core/transfers/inboundOffers.js";
 import { saleGateFor } from "../../../src/core/transfers/recommendations.js";
 import { runAITransferMarket } from "../../../src/core/ai/transferMarket.js";
 import { transferWindowState } from "../../../src/core/transfers/window.js";
@@ -45,6 +47,20 @@ function firstTarget(league: LeagueStore): { pid: number; sellerTid: number } {
 function moveRecord(league: LeagueStore, pid: number, fromTid: number, toTid: number): CompletedTransfer {
   const ws = transferWindowState(league);
   return { pid, fromTid, toTid, fee: 1_000_000, season: ws.season!, window: ws.window! };
+}
+
+/**
+ * A refused action must leave the league alone. Asserted as "no transfer was
+ * logged and the pid did not move" rather than `expect(result).toBe(league)`,
+ * because on failure vitest tries to DIFF the two objects — and diffing two
+ * 626-club leagues blows up its IPC with "RangeError: Invalid array length",
+ * so the run reports an unhandled error instead of the assertion that failed.
+ * Small observable facts fail readably.
+ */
+function assertNoOp(before: LeagueStore, after: LeagueStore, pid: number): void {
+  expect(after.transfers.length).toBe(before.transfers.length);
+  const holder = (l: LeagueStore) => l.teams.find((t) => t.roster.includes(pid))?.tid ?? null;
+  expect(holder(after)).toBe(holder(before));
 }
 
 describe("movedThisWindow", () => {
@@ -104,7 +120,7 @@ describe("the user cannot buy a player who has already moved this window", () =>
       ...league,
       transfers: [...league.transfers, moveRecord(league, pid, 99, sellerTid)],
     };
-    expect(makeTransferOffer(settled, pid, price)).toBe(settled);
+    assertNoOp(settled, makeTransferOffer(settled, pid, price), pid);
   });
 
   it("acceptCounterOffer re-checks it, so a move made since the counter still blocks", () => {
@@ -126,7 +142,7 @@ describe("the user cannot buy a player who has already moved this window", () =>
       ...talking,
       transfers: [...talking.transfers, moveRecord(talking, pid, 99, sellerTid)],
     };
-    expect(acceptCounterOffer(settled, pid)).toBe(settled);
+    assertNoOp(settled, acceptCounterOffer(settled, pid), pid);
     // Control: without the record the same counter is accepted.
     expect(acceptCounterOffer(talking, pid).teams.find((t) => t.tid === 0)!.roster).toContain(pid);
   });
@@ -165,6 +181,69 @@ describe("the user cannot sell a player he has just bought", () => {
 
     const offeredPids = new Set(inboundOfferCandidates(settled).map((c) => c.player.pid));
     for (const c of before) expect(offeredPids.has(c.player.pid)).toBe(false);
+  });
+});
+
+describe("a persisted inbound offer is re-checked when it is acted on", () => {
+  // Every sale condition otherwise lives in `inboundOfferCandidates`, and a
+  // stored offer skips that builder — `resolveOpenOffer` returns the row first.
+  // So an offer opened in one state and accepted in another was checked against
+  // nothing at all.
+  function openOfferOn(league: LeagueStore): { league: LeagueStore; pid: number } {
+    const candidate = inboundOfferCandidates(league)[0];
+    const ws = transferWindowState(league);
+    // Ask just above what the buyer will actually pay, so he counters rather
+    // than accepting (which would execute the sale and leave nothing stored).
+    // Read from `inboundCeiling` because that is the number the function itself
+    // uses — the candidate's own ceiling carries opening-offer jitter and is not
+    // the same figure.
+    const ceiling = inboundCeiling(league, candidate.player.pid)!;
+    const withOffer = counterInboundOffer(
+      league, candidate.player.pid, Math.round(ceiling * 1.05),
+    );
+    const stored = withOffer.inboundOffers.find(
+      (o) => o.pid === candidate.player.pid && o.season === ws.season && o.window === ws.window,
+    );
+    expect(stored?.status).toBe("open");
+    return { league: withOffer, pid: candidate.player.pid };
+  }
+
+  it("won't sell a player who has gone out on loan since the offer opened", () => {
+    // The one with teeth: he sits on the LOANEE's roster, and executeTransfer
+    // removes a pid only from the seller's. Accepting would put one pid on two
+    // rosters with a live loan pointing at a third club.
+    const { league, pid } = openOfferOn(windowLeague());
+    const user = league.teams.find((t) => t.tid === 0)!;
+    const loanee = league.teams.find((t) => t.tid !== 0)!;
+    const onLoan: LeagueStore = {
+      ...league,
+      teams: league.teams.map((t) =>
+        t.tid === user.tid ? { ...t, roster: t.roster.filter((p) => p !== pid) }
+        : t.tid === loanee.tid ? { ...t, roster: [...t.roster, pid] }
+        : t,
+      ),
+      activeLoans: [
+        ...league.activeLoans,
+        {
+          pid, parentTid: user.tid, loaneeTid: loanee.tid,
+          startSeason: league.season, seasons: 1, returnSeason: league.season + 1, fee: 0,
+        },
+      ],
+    };
+    assertNoOp(onLoan, acceptInboundOffer(onLoan, pid), pid);
+    assertNoOp(onLoan, counterInboundOffer(onLoan, pid, 1), pid);
+  });
+
+  it("won't sell a player who has already moved this window", () => {
+    const { league, pid } = openOfferOn(windowLeague());
+    const settled: LeagueStore = {
+      ...league,
+      transfers: [...league.transfers, moveRecord(league, pid, 99, 0)],
+    };
+    assertNoOp(settled, acceptInboundOffer(settled, pid), pid);
+    // Control: without the record the same offer is accepted and he leaves.
+    const sold = acceptInboundOffer(league, pid);
+    expect(sold.teams.find((t) => t.tid === 0)!.roster).not.toContain(pid);
   });
 });
 

@@ -6,7 +6,23 @@
  * than that one run: `enforceDivisionCeilings` logs summer-window moves either
  * side of it, and the user's own buying and selling happen in the same window
  * on top. This counts, per (season, window), how many pids carry more than one
- * permanent club-to-club transfer, and attributes each pair to a shape.
+ * permanent club-to-club transfer.
+ *
+ * It should read 0 everywhere. It is kept because the bug it found was
+ * invisible to the test suite: every individual mechanism was internally
+ * consistent, and only the log for a whole window showed the same player moving
+ * twice.
+ *
+ * HOW TO ATTRIBUTE A LEG, if this ever goes non-zero again. Do NOT try to
+ * recognise a mechanism by the shape of its transfer — an earlier version of
+ * this script guessed "sweep" from the destination tier and the player's OVR,
+ * and it sent the investigation to the wrong mechanism twice. Both fields are
+ * read at the END of the run, by which point promotion, relegation and
+ * progression have all moved them, so neither is what it was when the move
+ * happened. What works is tagging the producer: give one mechanism a marker
+ * `window` for a single throwaway run (stamping `enforceDivisionCeilings`'
+ * transfers `"winter"` is the one that cracked it) and see which bucket the
+ * chains land in. That is exact rather than inferred, and it takes one line.
  *
  *   npx tsx scripts/windowDoubleMoveProbe.ts [seasons] [seed]
  */
@@ -81,37 +97,3 @@ for (let s = 1; s <= SEASONS; s++) {
 
 console.log(`\ntotal extra in-window moves: ${seen}`);
 
-// Attribution: the ceiling sweep only ever moves an at-or-over-threshold
-// player from a lower tier up to tier 1, so a leg with that shape is the
-// sweep and anything else is the market.
-import { tierOf } from "../src/core/competitions.js";
-import { DIVISION_2_REFUSAL_OVR_THRESHOLD } from "../src/core/constants.js";
-const tierByTid = new Map(league.teams.map((t) => [t.tid, tierOf(league.competitions, t.compId)]));
-const ovrByPid = new Map(league.players.map((p) => [p.pid, p.ovr]));
-const all = league.transfers.filter(isClubToClub);
-const groups = new Map<string, CompletedTransfer[]>();
-for (const t of all) {
-  const k = `${t.pid}|${t.season}|${t.window}`;
-  const a = groups.get(k) ?? []; a.push(t); groups.set(k, a);
-}
-const shape = (t: CompletedTransfer) => {
-  const up = tierByTid.get(t.toTid) === 1 && (tierByTid.get(t.fromTid) ?? 1) > 1;
-  const ovr = ovrByPid.get(t.pid);
-  return up && ovr !== undefined && ovr >= DIVISION_2_REFUSAL_OVR_THRESHOLD ? "sweep?" : "market";
-};
-const tally = new Map<string, number>();
-let shown = 0;
-for (const [, moves] of groups) {
-  if (moves.length < 2) continue;
-  const key = moves.map(shape).join(" then ");
-  tally.set(key, (tally.get(key) ?? 0) + 1);
-  if (shown < 8) {
-    shown++;
-    console.log(
-      `  pid ${moves[0].pid} ovr ${ovrByPid.get(moves[0].pid)} s${moves[0].season} ${moves[0].window}: ` +
-      moves.map((m) => `${m.fromTid}(t${tierByTid.get(m.fromTid)})->${m.toTid}(t${tierByTid.get(m.toTid)}) $${(m.fee/1e6).toFixed(1)}M`).join("  |  "),
-    );
-  }
-}
-console.log("\nshape tally:");
-for (const [k, v] of [...tally.entries()].sort((a, b) => b[1] - a[1])) console.log(`  ${v.toString().padStart(4)}  ${k}`);
