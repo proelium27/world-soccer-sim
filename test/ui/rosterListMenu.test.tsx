@@ -71,6 +71,29 @@ describe("Roster List menu", () => {
     expect(html).toContain("Remove transfer listing");
   });
 
+  it("says a player who joined this window can't be sold yet, but can still be loaned out", () => {
+    // The sell half of the one-move-per-window rule (movedThisWindow). Without
+    // the label the row simply draws no offers and reads as broken. A loan is
+    // not a change of ownership, so that half stays available — sending a new
+    // signing straight out on loan is ordinary business.
+    const team = base.teams[0];
+    const pid = team.roster[0];
+    const ws = transferWindowState(base);
+    const arrived: LeagueStore = {
+      ...base,
+      transfers: [
+        ...base.transfers,
+        { pid, fromTid: 99, toTid: team.tid, fee: 1_000_000, season: ws.season!, window: ws.window! },
+      ],
+    };
+    const html = render(arrived);
+    expect(html).toContain("Can&#x27;t sell yet (just moved)");
+    expect(html).toContain("already changed clubs this window");
+    // Control: nobody else on the roster is locked, and loans are untouched.
+    expect(html).toContain("List for transfer");
+    expect(html).toContain("List for loan (1 season)");
+  });
+
   it("says why the loan is unavailable when the transfer window is shut", () => {
     // Autumn, after the summer window shuts and before winter opens: the next
     // unplayed matchday is what decides it, so drop the early ones.
