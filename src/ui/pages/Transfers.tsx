@@ -210,7 +210,7 @@ export function Transfers() {
   // redo it; it re-runs only when the league, refresh, or a filter changes.
   const targets = useMemo(() => {
     if (!league) return [];
-    return recommendedTransfers(league, refreshNonce, toSearchFilters(debouncedFilters));
+    return recommendedTransfers(league, refreshNonce, toSearchFilters(debouncedFilters, league.competitions));
   }, [league, refreshNonce, debouncedFilters]);
 
   // Free-form world search: scans every club, so it's memoized to stay off the
@@ -219,7 +219,7 @@ export function Transfers() {
   const searchResults = useMemo(() => {
     if (!league) return [];
     return searchWorldPlayers(league, {
-      ...toSearchFilters(debouncedSearch),
+      ...toSearchFilters(debouncedSearch, league.competitions),
       name: debouncedName,
       forSaleOnly,
     });

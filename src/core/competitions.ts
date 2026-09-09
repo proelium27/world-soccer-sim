@@ -811,6 +811,111 @@ export function countriesOf(competitions: Competition[]): string[] {
   return [...new Set(competitions.map((c) => c.country))];
 }
 
+/**
+ * How many countries "the top leagues" preset covers. Five because that is what
+ * people mean by it, and in the shipped world it lands exactly on the big four
+ * plus France — but it is applied to whatever the world's own strength ladder
+ * says, never to a list of country names (see `strongestCountries`).
+ */
+export const TOP_LEAGUE_COUNTRY_COUNT = 5;
+
+/**
+ * The `count` strongest countries, by the strength offset of their top flight.
+ *
+ * Derived rather than listed, and that is load-bearing: the world is editable
+ * (leagues can be added, renamed and retuned in World setup), so a hardcoded
+ * ["England", "Spain", ...] would go on claiming to be the strongest leagues in
+ * a world where it is not, silently. Ties keep table order, so the shipped big
+ * four — all at offset 0 — come out in the order they are generated in.
+ */
+export function strongestCountries(competitions: Competition[], count: number): string[] {
+  const offsetOf = (country: string): number => {
+    const divisions = divisionsOf(competitions, country);
+    // A country always has a tier-1 division; fall back rather than throw so a
+    // half-built custom world sorts to the bottom instead of breaking the page.
+    return divisions.length > 0 ? competitionStrengthOffset(divisions[0]) : Infinity;
+  };
+  return countriesOf(competitions)
+    .map((country, i) => ({ country, offset: offsetOf(country), i }))
+    .sort((a, b) => a.offset - b.offset || a.i - b.i)
+    .slice(0, Math.max(0, count))
+    .map((e) => e.country);
+}
+
+/**
+ * Which competitions a "where to look" control is pointing at. One control
+ * rather than a country picker beside a tier picker beside a competition
+ * picker: the questions people actually ask ("the top divisions", "the big
+ * five", "the Spanish second tier") are each one choice, and three dropdowns to
+ * express one thought is what makes a filter bar unreadable.
+ */
+export type CompetitionScope =
+  | { kind: "all" }
+  /** Every country's division at this tier — tier 1 is "top flights only". */
+  | { kind: "tier"; tier: number }
+  /** The top flights of the N strongest countries; see `strongestCountries`. */
+  | { kind: "topLeagues"; countries: number }
+  /** Every division of one country. */
+  | { kind: "country"; country: string }
+  | { kind: "competition"; compId: number };
+
+export const ALL_COMPETITIONS: CompetitionScope = { kind: "all" };
+
+/**
+ * The competition ids a scope covers, or **null for "everything"** — null
+ * rather than a set holding every id, so a caller can skip the membership test
+ * altogether on the common case, which is the one that walks 626 rosters.
+ */
+export function scopeCompIds(
+  competitions: Competition[],
+  scope: CompetitionScope,
+): Set<number> | null {
+  switch (scope.kind) {
+    case "all":
+      return null;
+    case "tier":
+      return new Set(competitions.filter((c) => c.tier === scope.tier).map((c) => c.id));
+    case "topLeagues": {
+      const countries = new Set(strongestCountries(competitions, scope.countries));
+      return new Set(
+        competitions.filter((c) => c.tier === 1 && countries.has(c.country)).map((c) => c.id),
+      );
+    }
+    case "country":
+      return new Set(competitions.filter((c) => c.country === scope.country).map((c) => c.id));
+    case "competition":
+      return new Set([scope.compId]);
+  }
+}
+
+/**
+ * A scope as a single string, so it round-trips through a `<select>` value and
+ * a URL query parameter without needing a second encoding for each.
+ */
+export function encodeScope(scope: CompetitionScope): string {
+  switch (scope.kind) {
+    case "all": return "all";
+    case "tier": return `tier:${scope.tier}`;
+    case "topLeagues": return `top:${scope.countries}`;
+    case "country": return `country:${scope.country}`;
+    case "competition": return `comp:${scope.compId}`;
+  }
+}
+
+/** Parse `encodeScope`'s output. Anything unrecognised reads as "everything". */
+export function decodeScope(value: string): CompetitionScope {
+  const sep = value.indexOf(":");
+  if (sep < 0) return ALL_COMPETITIONS;
+  const kind = value.slice(0, sep);
+  const rest = value.slice(sep + 1);
+  const n = Number(rest);
+  if (kind === "tier" && Number.isFinite(n)) return { kind: "tier", tier: n };
+  if (kind === "top" && Number.isFinite(n)) return { kind: "topLeagues", countries: n };
+  if (kind === "comp" && Number.isFinite(n)) return { kind: "competition", compId: n };
+  if (kind === "country" && rest !== "") return { kind: "country", country: rest };
+  return ALL_COMPETITIONS;
+}
+
 export interface CountryClubRange {
   country: string;
   /** Inclusive start tid (== CLUBS index) for this country's block. */

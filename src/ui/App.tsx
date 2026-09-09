@@ -31,6 +31,7 @@ import { PowerRankings } from "./pages/PowerRankings.js";
 import { Schedule } from "./pages/Schedule.js";
 import { Roster } from "./pages/Roster.js";
 import { Leaders } from "./pages/Leaders.js";
+import { Database } from "./pages/Database.js";
 import { BoxScore } from "./pages/BoxScore.js";
 import { WatchMatch } from "./pages/WatchMatch.js";
 import { YouthIntake } from "./pages/YouthIntake.js";
@@ -183,6 +184,10 @@ export function App() {
                 club, which is the same reason switchClub keeps it. */}
             <Route path="/roster" element={<ClubOnly><Roster /></ClubOnly>} />
             <Route path="/leaders" element={<Leaders />} />
+            {/* World info, not club instructions, so it stays outside ClubOnly
+                — a spectator save browses the database like any other. */}
+            <Route path="/database" element={<Navigate to="/database/players" replace />} />
+            <Route path="/database/:tab" element={<Database />} />
             {/* Club-only like the rest of this block: a trial group is an
                 offer to YOUR academy, so a spectator save has none. */}
             <Route path="/youth-intake" element={<ClubOnly><YouthIntake /></ClubOnly>} />

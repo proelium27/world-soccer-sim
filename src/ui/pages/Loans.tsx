@@ -25,6 +25,7 @@ import { ExtendControl } from "../components/ExtendControl.js";
 import { ExtendAllButton } from "../components/ExtendAllButton.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { PotDisplay } from "../components/PotDisplay.js";
+import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 
 const SEASON_OPTIONS = Array.from({ length: LOAN_MAX_SEASONS }, (_, i) => (i + 1) as 1 | 2 | 3);
@@ -42,6 +43,7 @@ export function Loans() {
   const [draftSeasons, setDraftSeasons] = useState<Record<number, 1 | 2 | 3>>({});
   const offerSort = useTableSort<LoanOfferSortKey>("default", "desc");
   const eligibleSort = useTableSort<EligibleSortKey>("ovr", "desc");
+  const potView = usePotentialView();
 
   // The loan-in search. One duration for the whole panel rather than one per
   // row: both the fee and the contract check depend on it, so a per-row picker
@@ -70,7 +72,7 @@ export function Loans() {
   const rawTargets = useMemo(() => {
     if (!league) return [];
     return searchLoanTargets(league, targetSeasons, {
-      ...toSearchFilters(debouncedTargetFilters),
+      ...toSearchFilters(debouncedTargetFilters, league.competitions),
       name: debouncedTargetName,
       availableOnly,
     });
@@ -113,7 +115,7 @@ export function Loans() {
     name: (c) => c.player.name,
     pos: (c) => c.player.pos,
     ovr: (c) => c.player.ovr,
-    pot: (c) => c.player.potential,
+    pot: (c) => potView.ceiling(c.player),
     club: (c) => teamName(c.buyerTid),
     seasons: (c) => c.seasons,
     fee: (c) => c.fee,
@@ -138,7 +140,7 @@ export function Loans() {
       pos: (p) => p.pos,
       age: (p) => league.season - p.born,
       ovr: (p) => p.ovr,
-      pot: (p) => p.potential,
+      pot: (p) => potView.ceiling(p),
       wage: (p) => p.contract.salary,
     },
   );
@@ -153,7 +155,7 @@ export function Loans() {
     pos: (t) => t.player.pos,
     age: (t) => league.season - t.player.born,
     ovr: (t) => t.player.ovr,
-    pot: (t) => t.player.potential,
+    pot: (t) => potView.ceiling(t.player),
     club: (t) => teamName(t.parentTid),
     wage: (t) => t.player.contract.salary,
     fee: (t) => t.fee,

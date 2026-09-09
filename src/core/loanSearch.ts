@@ -21,8 +21,8 @@
 import type { Player } from "./players/types.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import type { LeagueStore } from "./leagueState.js";
-import type { PlayerFieldFilters } from "./transfers/recommendations.js";
-import { playerMatchesFilters, teamMatchesFilters } from "./transfers/recommendations.js";
+import type { PlayerFieldFilters } from "./players/playerQuery.js";
+import { playerMatchesFilters, teamMatchesFilters } from "./players/playerQuery.js";
 import { transferWindowState } from "./transfers/window.js";
 import { acquisitionWageCharge, hasRosterRoom } from "./transfers/negotiation.js";
 import {
