@@ -33,6 +33,7 @@ const SECTIONS: [id: string, title: string][] = [
   ["loans", "Loans"],
   ["contracts", "Contracts, Wages & Free Agents"],
   ["finance", "Finance"],
+  ["debt", "Debt & Sanctions"],
   ["youth", "The Youth Academy"],
   ["ai", "How AI Clubs Think"],
   ["strategy", "Strategy"],
@@ -280,9 +281,9 @@ export function Manual() {
               finishing next to you.
             </li>
             <li>
-              <strong>What you pay</strong>. Asking prices are marked up or down for you. Selling
-              isn't affected, and neither is what anything is worth on paper, just the fee you're
-              asked for when you go and buy someone.
+              <strong>What you pay</strong>. Asking prices are marked up or down for you, and so are
+              loan fees. Selling isn't affected, and neither is what anything is worth on paper,
+              just the fee you're asked for when you go and get someone.
             </li>
             <li>
               <strong>Who'll sell to you</strong>. The best players at the best clubs are already off
@@ -299,11 +300,12 @@ export function Manual() {
             take longer to sharpen up, so you're making decisions with worse information.
           </p>
           <p>
-            <strong>You can go broke.</strong> There's no debt system and nobody bails you out. If
-            your balance goes negative you simply can't sign anyone until it's positive again, and
-            your scouting is stuck at zero while you're overdrawn, which makes potential even harder
-            to read. It's recoverable, but you recover by selling. On Brutal that's less a warning
-            than a description of the job.
+            <strong>You can go broke.</strong> Nobody bails you out. You can borrow &mdash; see{" "}
+            <a href="#debt">Debt &amp; Sanctions</a> &mdash; but the overdraft scales with what your
+            club earns, so a harder level shrinks it along with everything else, and your scouting
+            is stuck at zero while you're overdrawn, which makes potential even harder to read. It's
+            recoverable, but you recover by selling. On Brutal that's less a warning than a
+            description of the job.
           </p>
         </Section>
 
@@ -495,7 +497,7 @@ export function Manual() {
             <li><strong>Transfers</strong>. Recommended targets you can actually afford, plus your live negotiations. Make offers, read counter-offers, close deals.</li>
             <li><strong>Watchlist</strong>. Players you&apos;ve starred to keep an eye on. Click the star beside anyone&apos;s name &mdash; on his profile, in the transfer search, or on the Free Agents and Incoming Talent lists &mdash; and he shows up here with his club, this season&apos;s form, his wage, when his contract runs out, what your scouts think he&apos;s worth, and whether his club would entertain an offer at all. It&apos;s a shortlist and nothing more: watching a player doesn&apos;t scout him, doesn&apos;t tell his club anything, and doesn&apos;t change what he costs. Everything on it is worked out fresh each time you open it, so a name you starred three seasons ago shows the club he&apos;s at today at today&apos;s price. He drops off on his own if he retires.</li>
             <li><strong>Incoming Offers</strong>. AI clubs bidding for <em>your</em> players. Accept, reject, or counter to push the fee upward.</li>
-            <li><strong>Loans</strong>. List your own players for a fixed-length loan, look over AI clubs' incoming loan offers, and keep track of who's currently out on loan.</li>
+            <li><strong>Loans</strong>. List your own players for a fixed-length loan, look over AI clubs' incoming loan offers, borrow other clubs' young players, and keep track of who's out on loan and who you have in.</li>
             <li><strong>Finance</strong>. Budget, the full wage-bill table, a projected (or final) season settlement, your transfer history, and a league-wide money table.</li>
             <li><strong>Youth Intake</strong>. This year's crop from your academy, on trial. Offer a contract to a few of them; the rest leave. Also where you set your scout directions &mdash; which countries your scouts look in, and which positions they look for. Sorting the group by potential ranks them on the top of each scouting estimate, not on what they'll really become: nobody has told you that yet, and picking which ones to keep is the whole point of the screen.</li>
             <li><strong>Free Agents</strong>. Every other unsigned player, sign straight to your senior team. The default view shows the best across every position but caps how many of any one position it lists, so a spot that always has lots of free agents (defensive and attacking mids only get two roster spots per club, so their good extras spill into free agency more often) can't crowd out the rest. Pick a position from the dropdown to see that position's full list.</li>
@@ -560,6 +562,27 @@ export function Manual() {
             see one again later, open its box score and hit <strong>Watch it back</strong>.
           </p>
           <p>
+            It's a page of its own rather than a window laid over the game, so it has an address
+            you can link to and go back from, and it reads top to bottom like everything else.
+          </p>
+          <p>
+            <strong>The lineups.</strong> Below the commentary both teams are laid out on a pitch,
+            the way the Roster page draws yours: your club in its own half, the opposition mirrored
+            in theirs, each in the shape it started in. Every player carries his{" "}
+            <strong>match rating</strong>, and it moves as the game does &mdash; a goal, an assist,
+            a tackle, a save or a booking all show up the moment they happen. A little icon sits
+            beside anyone who has scored, set one up, been booked or come off the bench. When a
+            substitution is made, the man coming on takes the spot on the pitch, so the shape you're
+            looking at is always the eleven currently playing. The changes are listed underneath.
+          </p>
+          <p>
+            Those ratings are the real thing, not a guess: they're worked out from what each player
+            has actually done so far, using the same sums that produce the rating on the box score
+            at full time. That's also why nobody has a rating before kickoff. Players who stayed on
+            the bench all game aren't shown at all &mdash; nothing about them is recorded, since
+            they never played.
+          </p>
+          <p>
             Cup ties can be watched too. Continental Cup rounds land on league matchdays, so on
             one of those you have two matches: the game asks which you'd rather watch, and plays
             both either way &mdash; the one you skip still has its box score. A league-phase match
@@ -570,8 +593,9 @@ export function Manual() {
           <p>
             The match is played the moment you press the button, and what you're watching is the
             recording of it, so watching never changes the result. It also means the matchday isn't
-            saved until you close the viewer: quit halfway and it simply hasn't happened, and
-            playing it again gives you the same match. You can't make substitutions while you watch
+            saved until you're done with it, which is why the game keeps you on that page while
+            it's going &mdash; there's a <strong>Skip the rest</strong> link next to the playback
+            controls if you'd rather get on with it. You can't make substitutions while you watch
             yet, and possession and xG appear only at full time (they aren't tracked minute by
             minute).
           </p>
@@ -1473,6 +1497,15 @@ export function Manual() {
             over time.
           </p>
           <p>
+            On a <a href="#development">steady careers</a> save that number means something
+            different, and it's worth knowing which. There's far less luck left for it to be
+            guessing at, so the simulated careers nearly all agree with each other and the estimate
+            lands close to what actually happens: the three-in-four rule above stops applying, and
+            POT reads as roughly where a player ends up rather than as an optimistic ceiling he
+            probably won't reach. That makes it a lot more useful, and it makes the scouting fog
+            below most of what still stands between you and the real number.
+          </p>
+          <p>
             <strong>You don't see a player's exact potential. You see a scouting estimate.</strong>{" "}
             Everywhere POT shows up (Roster, prospects, free agents, transfer targets, rival squads,
             player profiles), it's a low&ndash;high band rather than a single number, and the real
@@ -1496,6 +1529,14 @@ export function Manual() {
         </Section>
 
         <Section id="development" title="Player Development & Aging">
+          <p>
+            There are two ways a save can develop its players, and you pick which one when you
+            create it (there's a switch on the New League screen, and you can change your mind
+            later in God Mode &mdash; it takes effect at your next offseason and leaves seasons
+            you've already played exactly as they were). Everything in this section describes the
+            default, <strong>random growth</strong>. The alternative, <strong>steady careers</strong>,
+            is described at the end of it.
+          </p>
           <p>
             Players develop each offseason based on age and randomness, and nothing else. The
             typical arc peaks around <strong>age 26</strong>, but not all of a player at once:
@@ -1576,6 +1617,35 @@ export function Manual() {
             him merely very good, but these are the players your true legends come from. If one lands
             in <em>your</em> academy, treat him accordingly.
           </p>
+          <p>
+            <strong>Steady careers.</strong> The other setting. Everything above still applies
+            &mdash; physical ratings still go before technical ones, keepers still last longest,
+            the retirement rules are unchanged, generational talents still turn up &mdash; but the
+            summer dice are gone and the shape of the arc is drawn differently.
+            A player improves through his early twenties, holds through his peak years, and starts
+            falling away from about thirty, dropping faster every year after that. He'll still
+            drift a point either way from one season to the next, but he won't lurch: nobody adds
+            eight points out of nowhere at 26, and nobody quietly falls apart for no reason you
+            could ever have seen coming.
+          </p>
+          <p>
+            Players still turn out differently from each other, and by about as much as they do
+            normally. What changes is <em>when</em> that's decided. Under random growth, who ends
+            up elite is settled a summer at a time, so the same prospect can become a star or a
+            journeyman depending on how the next few Julys go. Under steady careers it's settled
+            in the player himself: some are clean developers and some never quite kick on, and
+            that's true of them from the day they're generated. Playing time still matters exactly
+            as much either way &mdash; a kid getting regular minutes really does come on faster
+            than one rotting on the bench.
+          </p>
+          <p>
+            Two things follow from that, and they're the reason to pick it. Your scouting reports
+            are worth far more, because there's a real answer for them to be closing in on: a
+            potential estimate stops being a guess at a dice roll and becomes a genuine read on
+            where a player ends up. And the best players in your league stay recognizable &mdash;
+            they're the ones who were always going to be good, developed by clubs that gave them
+            games, rather than whoever the last few offseasons happened to smile on.
+          </p>
         </Section>
 
         <Section id="matches" title="The Match Engine">
@@ -1584,6 +1654,7 @@ export function Manual() {
           </p>
           <ul>
             <li><strong>Who gets credited</strong>. Every event is pinned on a real player, picked from who's on the pitch using both his position and how good he is at that particular thing. Goals lean on finishing, assists on passing, tackles and interceptions on tackling and reading the game, corners on heading. Ability counts for a lot in that pick, so your best defender really does top your tackles chart and your playmaker really does rack up the assists, rather than them landing on whoever happened to be nearby. Fouls are the deliberate exception: they're spread by position and not sharpened by ability, because "best defender" and "most booked" shouldn't be the same list. Around a quarter of goals are scored with no assist at all.</li>
+            <li><strong>The position each player played</strong>. The Pos column on a box score is the job he actually did that afternoon, not the position listed on his profile. A winger who filled in at full-back reads as a full-back for that match, which is also what his rating was judged against. It's the same information the lineups on the watch screen are built from.</li>
             <li><strong>Passes, crosses &amp; fouls</strong>. Every box score also carries per-player passing (completed / attempted), crosses, and fouls committed. Central and deep players move the ball most, wide players do most of the crossing. These are just stat-sheet detail, they don't change the scoreline.</li>
             <li><strong>Cards</strong>. Yellows, second yellows, and straight reds. Going a man down is a real hit to your side's strength for the rest of the match, and cards now carry a cost past the final whistle too &mdash; see Suspensions below.</li>
             <li><strong>Set pieces</strong>. Corners, and penalty kicks resolved as a duel between the taker and the keeper (saved, scored, or dragged wide).</li>
@@ -2110,7 +2181,11 @@ export function Manual() {
             same deal he left with. AI clubs also loan players to each other in the background, and
             they stick strictly to real-football logic: <strong>only young players who aren't in
             their club's starting XI</strong> go out on loan. A starter is already getting his
-            minutes at home, so he's never loaned, whatever the numbers say. A club will let a
+            minutes at home, so he's never loaned, whatever the numbers say. The club taking him
+            has to be one that would <strong>actually play him</strong> &mdash; he has to be better
+            than the weakest man in their first eleven at his position. That's the whole point of
+            the move, and it's why a weak player can sit listed and draw no offers at all: nobody
+            wants to develop someone who'd be on their bench too. A club will let a
             prospect it rates highly go out, though, as long as someone else rates him more, so the
             players moving are genuinely ones worth watching rather than only the ones nobody wanted.
             Second-division clubs can't take a loan of a player good enough that the top flight would
@@ -2130,6 +2205,43 @@ export function Manual() {
             each deal expires and lets you extend him from there, one at a time or all at once,
             which is the only place you can &mdash; he isn't on your Roster page while he's gone,
             so the Roster page's own Extend all button can't reach him.
+          </p>
+          <p>
+            <strong>You can borrow players too.</strong> The <strong>Loan a Player In</strong> panel
+            on the Loans page searches the whole world for players another club would lend you, and
+            you can take up to <strong>2 a window</strong>. The rules are the
+            same ones the AI plays by: a club will only lend someone{" "}
+            <strong>23 or under</strong> who <strong>isn&apos;t in its starting
+            eleven</strong>, whose contract covers the loan, and who it can spare without leaving
+            itself thin at his position &mdash; only to a club he&apos;d be worth more to than
+            he is to them, and only if he&apos;d <strong>get into your team</strong>. That last
+            condition is the one that shapes the list: he has to be better than the weakest man in
+            your first eleven at his position, because a club lends a young player to get him games,
+            not to have him sit on someone else&apos;s bench. A strong enough squad will find
+            nobody offered at all. You pay the flat fee up front and his wages for the whole loan. The fee
+            is a fraction of what he&apos;d cost to buy outright, with a small minimum so borrowing
+            is never free, and it&apos;s marked up or down by your difficulty the same way an asking
+            price is.
+          </p>
+          <p>
+            That&apos;s what decides how good a loan you can get, and it isn&apos;t a dial anyone
+            set &mdash; it falls out of how strong your own eleven is. The better your squad, the
+            fewer players clear it: the very best sides in the world are offered nobody, a
+            mid-table top-flight club gets a short list, and a second- or third-division club can
+            borrow players who&apos;d walk straight into its team. Loans are how a small club
+            punches up, which is exactly what they&apos;re for in real football. The panel shows
+            the players you can actually take by default; turn the switch off to see everyone you
+            looked at and the reason each club said no.
+          </p>
+          <p>
+            A borrowed player is <strong>yours to pick, not yours to keep</strong>. He shows up on
+            your Roster page with an <strong>On loan</strong> badge, plays and picks up cards and
+            injuries exactly like anyone else, and counts against your squad cap. But his contract
+            belongs to his parent club, so you can&apos;t sell him, release him, loan him on, or
+            re-sign him, and no club will bid for him. When the loan runs out he goes home, whether
+            you wanted him to or not &mdash; there's no option to buy him or keep him on. The{" "}
+            <strong>Players In on Loan</strong> list at the bottom of the Loans page shows who
+            you&apos;re borrowing and when you lose them.
           </p>
         </Section>
 
@@ -2287,6 +2399,64 @@ export function Manual() {
             Spending below your cap is unrestricted, but you can't bank cash past it &mdash; money
             you would have saved above the line is never paid at all rather than carried over, so if
             you're near the ceiling the page warns you before the next cheque disappears.
+          </p>
+        </Section>
+
+        <Section id="debt" title="Debt &amp; Sanctions">
+          <p>
+            Your balance can go below zero, and going there is a decision rather than an accident.
+            Every club has an <strong>overdraft</strong> worth about nine months of its own income
+            &mdash; roughly <strong>$66M</strong> for a big-four top-flight side, proportionally
+            less for a smaller or lower-division one, and less again on the harder difficulty
+            levels, because it scales with what you earn. You can spend into it freely. Buy the
+            striker you can't quite afford and worry about it later; that's what it's for.
+          </p>
+          <p>
+            Three things happen once you're in the red.
+          </p>
+          <ul>
+            <li>
+              <strong>Interest.</strong> You're charged <strong>10%</strong> of the balance at the
+              start of every season you carry it into, before your new allocation arrives. It
+              compounds, so a debt you ignore gets worse on its own.
+            </li>
+            <li>
+              <strong>A transfer embargo.</strong> End a season more than{" "}
+              <strong>40%</strong> into your overdraft and you can't buy or sign anyone at all next
+              season. You can still sell, still promote from your academy, and still take on
+              trialists &mdash; the ways out stay open, the ways further in don't.
+            </li>
+            <li>
+              <strong>A points deduction.</strong> End it more than <strong>75%</strong> in and
+              you're docked <strong>6 points</strong> from next season's table on top of the
+              embargo. Stay in breach and it climbs by 3 a season, to a maximum of 12. One clear
+              season resets it completely.
+            </li>
+          </ul>
+          <p>
+            <strong>Your books are read at the final whistle, not in the summer.</strong> The check
+            runs on the balance you finish the season with, after prize money and hype revenue have
+            landed &mdash; so a good cup run really can rescue you, and selling your best player in
+            July can't. That's why the Dashboard and the Finance page both start warning you
+            <em>during</em> the season, as soon as today's balance would cost you something. Take
+            the warning seriously; by the time the penalty exists it's too late to trade out of it.
+          </p>
+          <p>
+            A deduction is a sporting penalty and nothing else. Your board doesn't have a separate
+            opinion about your finances &mdash; but the points come off your league table, you
+            finish lower, and the board very much has an opinion about <em>that</em>. Docked points
+            show in the standings as a red figure next to your total, so the table always adds up.
+          </p>
+          <p>
+            Both penalties appear in your <strong>news feed</strong> the season they come into
+            force, at the top of that season ahead of the summer window &mdash; which is the right
+            place for them, because an embargo governs the window you are about to trade in. A club
+            in your own league picking one up shows there too.
+          </p>
+          <p>
+            Only your club is ever sanctioned. AI clubs manage their money the way they always
+            have. One wrinkle: a sanction belongs to the <em>club</em>, not to you, so if you take
+            another job the club you left still serves out whatever you left it with.
           </p>
         </Section>
 

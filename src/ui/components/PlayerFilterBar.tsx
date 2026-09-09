@@ -189,12 +189,19 @@ interface PlayerFilterBarProps {
   /** Nationalities present in this world, alphabetical — see nationalitiesInWorld. */
   nationalities: string[];
   competitions: Competition[];
+  /**
+   * Show the scout-value range. On by default; off for the loan search, where a
+   * fee is a fixed fraction of market value and the panel never asks about
+   * value at all — a control that filtered nothing would be worse than absent.
+   */
+  showValue?: boolean;
   /** Panel-specific controls (the search's name box and for-sale toggle). */
   children?: ReactNode;
 }
 
 export function PlayerFilterBar({
-  idPrefix, value, onChange, onClear, nationalities, competitions, children,
+  idPrefix, value, onChange, onClear, nationalities, competitions,
+  showValue = true, children,
 }: PlayerFilterBarProps) {
   const set = (patch: Partial<PlayerFilterState>) => onChange({ ...value, ...patch });
   const id = (name: string) => `${idPrefix}-${name}`;
@@ -262,16 +269,18 @@ export function PlayerFilterBar({
         onMin={(v) => set({ minAge: v })}
         onMax={(v) => set({ maxAge: v })}
       />
-      <RangeField
-        label="Scout value"
-        idBase={id("value")}
-        min={value.minValue}
-        max={value.maxValue}
-        onMin={(v) => set({ minValue: v })}
-        onMax={(v) => set({ maxValue: v })}
-        width="6rem"
-        placeholder={["1m", "50m"]}
-      />
+      {showValue && (
+        <RangeField
+          label="Scout value"
+          idBase={id("value")}
+          min={value.minValue}
+          max={value.maxValue}
+          onMin={(v) => set({ minValue: v })}
+          onMax={(v) => set({ maxValue: v })}
+          width="6rem"
+          placeholder={["1m", "50m"]}
+        />
+      )}
       <Field label="Max wage" htmlFor={id("wage")}>
         <input
           id={id("wage")}

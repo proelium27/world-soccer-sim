@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
+import type { ProgressionModel } from "../../core/constants.js";
 import type { SimThrough, IntlMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
 import { saveLeague, loadLeague } from "../../db/leagueDb.js";
@@ -28,6 +29,7 @@ import { renewalsDue, extendAllContracts } from "../../core/contractRenewal.js";
 import {
   listPlayerForLoan, unlistPlayerForLoan, acceptLoanOffer, rejectLoanOffer,
 } from "../../core/loans.js";
+import { requestLoan } from "../../core/loanSearch.js";
 import { wouldRefuseExtension } from "../../core/ai/breakoutRefusal.js";
 import { applyTeamIdentities, type TeamIdentityEdit } from "../../core/teams/customize.js";
 import {
@@ -44,15 +46,14 @@ import { isManagerDecisionPending } from "../../core/manager/index.js";
 import { isValidStarters } from "../../core/lineup/resolveXI.js";
 import { teamSlots, chooseBestFormation, FORMATIONS, FORMATION_IDS, type FormationId } from "../../core/lineup/formations.js";
 import { SimOverlay } from "../components/SimOverlay.js";
-import { LiveMatchOverlay } from "../components/LiveMatchOverlay.js";
-import { LiveMatchPicker } from "../components/LiveMatchPicker.js";
 import { JumpOverlay, type JumpResult } from "../components/JumpOverlay.js";
+import { LiveMatchRedirect, WATCH_PATH } from "../pages/WatchMatch.js";
 import { liveCandidates, type LiveCandidate } from "../live/liveCandidates.js";
 import { playSuperCups, superCupsPending } from "../../core/superCup/superCup.js";
 import { superCupChampion } from "../../core/superCup/types.js";
-import { usePlayerMap } from "../usePlayerMap.js";
 import type { PlayedMatch } from "../../core/standings.js";
 import { trackEvent } from "../analytics.js";
+import { userSpendPolicy } from "../userDebt.js";
 
 interface LeagueContextValue {
   league: LeagueStore | null;
@@ -79,6 +80,20 @@ interface LeagueContextValue {
    * is not committed until the viewer is closed.
    */
   simLiveAction: () => Promise<void>;
+  /**
+   * The uncommitted matchday waiting to be watched, and which of its matches
+   * the user picked. Null whenever nothing is pending.
+   *
+   * Held here rather than on the watch page because it outlives that page's
+   * mount: the result is produced by simLiveAction, which the user can fire
+   * from the top bar of any screen, and it has to survive the navigation to
+   * /watch that follows.
+   */
+  liveMatch: { candidates: LiveCandidate[]; chosen: string | null } | null;
+  /** Watch this one of the matchday's candidates. */
+  chooseLiveMatch: (key: string) => void;
+  /** Commit the watched matchday and leave the viewer. */
+  finishLiveMatch: () => Promise<void>;
   /** Play `seasons` whole seasons with the AI managing the user's club (core/autopilot.ts). */
   jumpSeasonsAction: (seasons: number) => Promise<void>;
   offseasonAction: () => Promise<void>;
@@ -110,6 +125,8 @@ interface LeagueContextValue {
   unlistPlayerForLoanAction: (pid: number) => Promise<void>;
   acceptLoanOfferAction: (pid: number) => Promise<void>;
   rejectLoanOfferAction: (pid: number) => Promise<void>;
+  /** Take another club's player on loan for 1-3 seasons (see core/loanSearch.ts). */
+  requestLoanAction: (pid: number, seasons: 1 | 2 | 3) => Promise<void>;
   setTransferListedAction: (pid: number, listed: boolean) => Promise<void>;
   setMoreMinutesAction: (pid: number, enabled: boolean) => Promise<void>;
   /** Star or unstar any player in the world — the /watchlist shortlist. */
@@ -149,6 +166,7 @@ interface LeagueContextValue {
   godModeSwitchClubAction: (tid: number) => Promise<void>;
   /** God Mode: take charge of any country, offer or not. */
   godModeTakeNationalJobAction: (nation: string) => Promise<void>;
+  godModeSetProgressionModelAction: (model: ProgressionModel) => Promise<void>;
   movePlayerToClubAction: (pid: number, tid: number) => Promise<void>;
   releasePlayerGodModeAction: (pid: number) => Promise<void>;
   editPlayerAction: (pid: number, edit: PlayerEdit) => Promise<void>;
@@ -185,6 +203,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     () => getActiveLid() !== null,
   );
   const { sim, runOffseason, runIntlStage, runJump, simming } = useSimWorker();
+  // Declared here rather than beside its first user because two of them —
+  // finishing a jump and opening the live match viewer — sit either side of the
+  // file, and a hook cannot be called twice conditionally.
+  const navigate = useNavigate();
 
   // A multi-season jump owns the screen the same way the sim overlay does, and
   // for the same reason: the league it returns replaces several seasons of
@@ -209,14 +231,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   // happens when the matchday offered more than one.
   const [liveChoice, setLiveChoice] = useState<string | null>(null);
   const liveOpenRef = useRef(false);
-  // The viewer names scorers and bookings, so it needs the pid lookup. Memoized
-  // on the players array, so it is rebuilt once per commit rather than per tick
-  // of the match clock.
-  const playerMap = usePlayerMap(league?.players);
-  const playerName = useCallback(
-    (pid: number) => playerMap.get(pid)?.name ?? `Player ${pid}`,
-    [playerMap],
+  // What /watch reads. Bundled into one object so a consumer that doesn't care
+  // about the live viewer isn't re-rendered by the choice changing, and so the
+  // "is anything pending" test is a single null check everywhere.
+  const liveMatch = useMemo(
+    () => (watchable === null ? null : { candidates: watchable, chosen: liveChoice }),
+    [watchable, liveChoice],
   );
+  const chooseLiveMatch = useCallback((key: string) => setLiveChoice(key), []);
 
   // Every league mutation runs through runExclusive and reads the league from
   // leagueRef at execution time. React state alone isn't enough: a callback
@@ -443,7 +465,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     liveOpenRef.current = false;
     setLiveCandidates(null);
     setLiveChoice(null);
-  }), [runExclusive, commitLeague]);
+    // Clearing the candidates lifts LiveMatchRedirect's hold, but the user is
+    // still standing on /watch, which now has nothing to show. Send them
+    // somewhere that reflects what they just watched.
+    navigate("/dashboard");
+  }), [runExclusive, commitLeague, navigate]);
 
   const simLiveAction = useCallback(() => runExclusive(async () => {
     const current = leagueRef.current;
@@ -477,6 +503,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       setLiveCandidates(candidates);
       // Only ask when there is genuinely a choice to make.
       setLiveChoice(candidates.length === 1 ? candidates[0].key : null);
+      // The viewer is a route now, and this action fires from the top bar of
+      // whatever page you happen to be on, so opening it means going there.
+      navigate(WATCH_PATH);
       trackEvent("season_simmed", { through: "game", live: true });
     } catch (err) {
       pendingResultRef.current = null;
@@ -485,7 +514,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       setLiveChoice(null);
       console.error("Live simulation failed:", err);
     }
-  }), [runExclusive, sim, commitLeague]);
+  }), [runExclusive, sim, commitLeague, navigate]);
 
   /**
    * Jump forward whole seasons with the AI running the club.
@@ -546,7 +575,6 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
    * It also keeps the overlay a presentational component its render test can
    * mount without a router.
    */
-  const navigate = useNavigate();
   const closeJump = useCallback(() => {
     jumpOpenRef.current = false;
     setJumpOpen(false);
@@ -600,6 +628,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       l.season,
       l.phase,
       l.activeLoans,
+      userSpendPolicy(l),
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("free_agent_signed");
@@ -653,6 +682,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     // refusal check is about. Looking him up by roster would ask whether he'd
     // re-sign for the club borrowing him.
     const loan = l.activeLoans.find((a) => a.pid === pid);
+    // ...and a contract the user doesn't own isn't his to extend at all. A
+    // player in on loan is on his roster, so every extend affordance on the
+    // Roster page can reach him; the pages hide the control, this refuses it.
+    if (loan && loan.parentTid !== l.meta.userTid) return null;
     const team = loan
       ? l.teams.find((t) => t.tid === loan.parentTid)
       : l.teams.find((t) => t.roster.includes(pid));
@@ -689,7 +722,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   ), [mutate]);
 
   const releasePlayerAction = useCallback((pid: number) => mutate((l) => {
-    const teams = releasePlayer(l.teams, l.players, l.meta.userTid, pid);
+    const teams = releasePlayer(l.teams, l.players, l.meta.userTid, pid, l.activeLoans);
     if (teams === l.teams) return null;
     trackEvent("player_released");
     return { ...l, teams };
@@ -698,6 +731,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const signToAcademyAction = useCallback((pid: number) => mutate((l) => {
     const { teams, players } = signToAcademy(
       l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, l.activeLoans,
+      userSpendPolicy(l),
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("player_signed_to_academy");
@@ -719,7 +753,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const signTrialistAction = useCallback((pid: number) => mutate((l) => {
     const { teams, players } = signTrialist(
-      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase,
+      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, userSpendPolicy(l),
     );
     if (teams === l.teams && players === l.players) return null;
     // Reuses the academy event rather than adding one: the analytics set is
@@ -765,7 +799,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const promoteFromAcademyAction = useCallback((pid: number) => mutate((l) => {
     const { teams, players } = promoteFromAcademy(
-      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase,
+      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, userSpendPolicy(l),
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("player_promoted_from_academy");
@@ -804,6 +838,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const rejectLoanOfferAction = useCallback((pid: number) => mutate(
     (l) => rejectLoanOffer(l, pid),
+  ), [mutate]);
+
+  const requestLoanAction = useCallback((pid: number, seasons: 1 | 2 | 3) => mutate(
+    (l) => {
+      const updated = requestLoan(l, pid, seasons);
+      if (updated && updated !== l) trackEvent("player_loaned_in", { seasons });
+      return updated;
+    },
   ), [mutate]);
 
   const setLineupAction = useCallback((starters: number[]) => mutate((l) => {
@@ -1055,6 +1097,30 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * God Mode: change how this save develops its players (see
+   * `LeagueStore.progressionModel`).
+   *
+   * The one God Mode action that is not really a sandbox liberty. Both the
+   * settings it sits beside on the New League screen are fixed for a save's
+   * lifetime for real reasons, and this one is not: the model scales rng draws
+   * without changing their count, nothing persisted derives from it, and it is
+   * read at one point in the offseason — so flipping it advances the shared
+   * stream identically and simply changes how careers move from the next
+   * offseason on. It lives here rather than on a settings screen only because
+   * God Mode is where a save's own rules are edited, and because someone
+   * twenty seasons into a dynasty who wants the other model should not have to
+   * start again to get it.
+   */
+  const godModeSetProgressionModelAction = useCallback(
+    (model: ProgressionModel) => mutate((l) => {
+      if (!l.godMode) return null;
+      if (l.progressionModel === model) return null;
+      return { ...l, progressionModel: model };
+    }),
+    [mutate],
+  );
+
+  /**
    * God Mode: hand the user any country in the world. The national counterpart
    * of the club switch above, and it removes the same single gate — that a
    * federation actually approached — by calling `takeNationalJob` directly
@@ -1162,6 +1228,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     customizeTeamsAction,
     simAction,
     simLiveAction,
+    liveMatch,
+    chooseLiveMatch,
+    finishLiveMatch,
     jumpSeasonsAction,
     offseasonAction,
     intlStageAction,
@@ -1185,6 +1254,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     unlistPlayerForLoanAction,
     acceptLoanOfferAction,
     rejectLoanOfferAction,
+    requestLoanAction,
     setTransferListedAction,
     setMoreMinutesAction,
     toggleWatchedAction,
@@ -1200,6 +1270,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     movePlayerToClubAction,
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
+    godModeSetProgressionModelAction,
     releasePlayerGodModeAction,
     editPlayerAction,
     createPlayerAction,
@@ -1213,7 +1284,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     importJSON: doImport,
   }), [
     league, crests, loadingActiveLeague, setLeague, loadLeagueAction, switchLeagueAction,
-    customizeTeamsAction, simAction, simLiveAction, jumpSeasonsAction, offseasonAction,
+    customizeTeamsAction, simAction, simLiveAction, liveMatch, chooseLiveMatch,
+    finishLiveMatch, jumpSeasonsAction, offseasonAction,
     intlStageAction, signFreeAgentAction,
     releasePlayerAction, signToAcademyAction, signTrialistAction,
     setScoutDirectionsAction,
@@ -1223,13 +1295,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     rejectInboundOfferAction, counterInboundOfferAction, extendContractAction,
     extendAllContractsAction,
     listPlayerForLoanAction, unlistPlayerForLoanAction, acceptLoanOfferAction,
-    rejectLoanOfferAction, setTransferListedAction, setMoreMinutesAction, toggleWatchedAction,
+    rejectLoanOfferAction, requestLoanAction, setTransferListedAction, setMoreMinutesAction, toggleWatchedAction,
     setLineupAction, setFormationAction,
     autoPickBestXIAction,
     playSuperCupsAction,
     setGodModeAction, movePlayerToClubAction, releasePlayerGodModeAction,
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
+    godModeSetProgressionModelAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,
@@ -1255,32 +1328,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         result={jumpResult}
         onClose={closeJump}
       />
-      {/* Two matches on this matchday: ask before playing either. */}
-      {watchable && liveChoice === null && (
-        <LiveMatchPicker
-          open
-          choices={watchable.map((c) => c.choice)}
-          onPick={setLiveChoice}
-          onSkip={finishLiveMatch}
-        />
-      )}
-      {watchable && liveChoice !== null && (() => {
-        const chosen = watchable.find((c) => c.key === liveChoice);
-        if (!chosen) return null;
-        return (
-          <LiveMatchOverlay
-            open
-            match={chosen.view.match}
-            otherMatches={chosen.view.otherMatches}
-            teams={league?.teams ?? []}
-            playerName={playerName}
-            competitionName={chosen.view.competitionName}
-            subtitle={chosen.view.subtitle}
-            tableAtMinute={chosen.view.tableAtMinute}
-            onComplete={finishLiveMatch}
-          />
-        );
-      })()}
+      {/* The match itself is a route (/watch, see WatchMatch.tsx). All that is
+          left here is holding the user on it while the matchday it belongs to
+          is still uncommitted — the one thing the old modal did that a page
+          does not do for free. */}
+      <LiveMatchRedirect active={watchable !== null} />
     </Ctx.Provider>
   );
 }

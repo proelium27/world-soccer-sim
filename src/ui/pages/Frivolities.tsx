@@ -33,6 +33,7 @@ import { Panel, Empty, ClubCell, PlayerCell, RankTable } from "../components/boa
 import { GoatBreakdown, partLabel } from "../components/GoatBreakdown.js";
 import { currency, seasonYear } from "../format.js";
 import { isSpectator } from "../../core/spectator.js";
+import { shortName } from "../playerName.js";
 
 type Tab = "goat" | "awards" | "records" | "leaders" | "international" | "bios" | "clubs";
 
@@ -245,11 +246,6 @@ function BallonDOrBreakdown({ row }: { row: BallonDOrSeason }) {
 const XI_COORDS = layoutSlots("4-3-3");
 
 /** Surname only — a full name doesn't fit in a pitch chip. */
-function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts[parts.length - 1];
-}
-
 /** How a slot's pick was selected, in words. */
 function selectionSummary(pick: AwardXISlot["pick"]): string {
   if (!pick) return "";

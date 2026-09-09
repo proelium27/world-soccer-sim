@@ -43,12 +43,29 @@
  *
  * **That has stopped being true, and the next person to raise the shard count
  * should know it.** The 626-club world (#308) grew the sim files by roughly the
- * same 49% the world grew, and the slowest single file,
- * `test/core/offseasonRetirement.test.ts`, runs 1359-1481s on CI against a
- * measured per-shard wall clock of 1245-1802s at six shards. So the one-file
- * floor now sits *inside* the range the shards actually finish in: a seventh
- * shard buys essentially nothing, and the lever is splitting that file (or
- * making its seven cases share a world) rather than adding runners.
+ * same 49% the world grew, and the one-file floor rose with them until it sat
+ * *inside* the range the shards actually finish in. A seventh shard therefore
+ * buys essentially nothing; the lever is the heaviest file.
+ *
+ * **The last time it was pulled the answer was a shared fixture rather than a
+ * split, and that is worth reading before reaching for either.**
+ * `test/core/youthIntake.test.ts` measured **2,073s on CI** (run 34169962576)
+ * against that shard's total wall clock of 2,114s — one file was 98% of a
+ * runner, and it was the slowest in the suite by 2.3x over
+ * `offseasonRetirement` at 907s. The cause was not that the file did too much:
+ * twelve of its fifteen tests each ran `advance(createLeagueState(0,
+ * mulberry32(4)), rng)` for themselves, all on the same seed, so it built and
+ * simmed the identical world twelve times to assert twelve things about it.
+ * Sharing one world through `beforeAll` was the whole fix, and it needed no
+ * test to change what it asserts: 13 season+offseason runs became 2, and the
+ * file went from ~1382s to **186s** locally with all 15 tests unchanged.
+ *
+ * So: **before splitting a heavy file, check whether it is repeating one
+ * world.** A split divides the same work across runners and adds files to keep
+ * in step; sharing removes the work. `scoutDirections.test.ts` is the case that
+ * genuinely cannot share — its three worlds differ in the directions they were
+ * built with, which is the thing under test — and it already memoises across
+ * the four cases that do want the same one.
  *
  * Note CI runners are ~1.5x slower than a dev machine here
  * (`offseason.test.ts` was ~1276s locally against ~1933s on CI), so the weights
@@ -148,15 +165,25 @@
 // run, per the warning above about solo timings: being wrong here costs shard
 // balance, never correctness.
 export const FILE_WEIGHTS_SECONDS: Readonly<Record<string, number>> = {
-  // The youth trial group and the scout directions beside it, both new on
-  // this branch and both on the same basis as everything else here: taken
-  // from one green CI run (33688034353) and divided by the ~1.5x CI-to-dev
-  // factor. Worth knowing that the solo timings these were first entered at
-  // (664s and 192s, scaled by the old 1.57x rule) put scoutDirections at 301
-  // against a real 860 — under by 2.9x, and exactly the mixed-basis error the
-  // note above warns about. youthIntake is now the suite's slowest single
-  // file, which is the number CI's wall-clock floor is set by.
-  "test/core/youthIntake.test.ts": 1217,
+  // The youth trial group and the scout directions beside it, both on the same
+  // basis as everything else here: taken from one green CI run (33688034353)
+  // and divided by the ~1.5x CI-to-dev factor. Worth knowing that the solo
+  // timings these were first entered at (664s and 192s, scaled by the old 1.57x
+  // rule) put scoutDirections at 301 against a real 860 — under by 2.9x, and
+  // exactly the mixed-basis error the note above warns about.
+  //
+  // youthIntake was the suite's slowest single file at 1217 here (2073s on CI)
+  // until it stopped rebuilding one world twelve times over; see the fixture
+  // note at the top of this file. 190 is a directly measured local run of the
+  // shared-fixture version (186s, with an unrelated vitest run competing for
+  // the machine, so on this table's contended basis rather than a solo one).
+  // Deriving it instead from the CI arithmetic — 13 season+offseason runs became
+  // 2, so ~1 generation plus 2 of the ~149s units the old number implies, ~308s
+  // CI, ~205 here — lands within 10% of that, which is the check that the two
+  // bases still agree. Worth refreshing from the first green CI run that carries
+  // it; an under-estimate is the harmful direction, since that is what let this
+  // file dominate a shard unnoticed.
+  "test/core/youthIntake.test.ts": 190,
   "test/core/offseasonRetirement.test.ts": 906,
   "test/core/scoutDirections.test.ts": 860,
   "test/core/internationalCampaign.test.ts": 845,
@@ -185,6 +212,13 @@ export const FILE_WEIGHTS_SECONDS: Readonly<Record<string, number>> = {
   "test/core/transfers/clauseOffseason.test.ts": 167,
   "test/core/transfers/inboundOffers.test.ts": 154,
   "test/core/generate.test.ts": 55,
+  // Measured at ~50s locally rather than from a CI run, so it is entered
+  // unscaled and is an UNDER-estimate by roughly the 1.5x CI factor. Being low
+  // costs balance only, never correctness, and it is better than the 10s
+  // default this would otherwise take: most of the file's cost is the two
+  // whole-world builds and the intake sweeps, which do not shrink on CI.
+  // Re-take it from the next green run, the way the note above describes.
+  "test/core/progressionModel.test.ts": 50,
   "test/core/autopilot.test.ts": 141,
   "test/core/nationalManager.test.ts": 114,
   "test/core/ai/transferMarket.test.ts": 45,

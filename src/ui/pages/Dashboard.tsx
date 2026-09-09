@@ -48,6 +48,9 @@ import { Flag } from "../components/Flag.js";
 import { ClubCrest } from "../components/ClubCrest.js";
 import type { Player, SeasonStats } from "../../core/players/types.js";
 import { isSuspended, matchesLabel } from "../../core/suspensions.js";
+import { pointsDeductionMap } from "../../core/finance/debt.js";
+import { userDebtView } from "../userDebt.js";
+import { debtNewsBySeason } from "../../core/debtNews.js";
 
 /**
  * One job's standing, as a single line: who you answer to, a thin bar, and
@@ -195,6 +198,10 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
     setScoutingDraft(null);
   };
 
+  // Shared with the Finance page and the spending actions, so the warning here
+  // and the button that refuses the signing can never disagree.
+  const debt = userDebtView(league);
+
   // Compute standings (user's own division) and find user's row
   const { userRow, leaguePosition, standingsTop, userInTop } = useMemo(() => {
     const divisionTids = league.teams.filter((t) => t.compId === userTeam.compId).map((t) => t.tid);
@@ -204,6 +211,7 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
         const home = league.teams.find((t) => t.tid === m.home);
         return home?.compId === userTeam.compId;
       }),
+      pointsDeductionMap(league.debtSanctions, league.season),
     );
     const userRow = standings.find((r) => r.tid === league.meta.userTid);
     const leaguePosition = standings.findIndex((r) => r.tid === league.meta.userTid) + 1;
@@ -299,11 +307,18 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
       ...(promotions.get(league.season - 1) ?? []),
     ];
 
+    // This season's sanction, if there is one. It sorts at the top of the
+    // season (an embargo governs the window about to open), and this panel
+    // reads the END of the timeline, so it shows while the season is young and
+    // ages out as results come in. That is the right behaviour: the standing
+    // warning lives in the Finances card below, which does not age out.
+    const shownSanctions = debtNewsBySeason(league.debtSanctions).get(league.season) ?? [];
+
     const newsTimeline = buildSeasonTimeline(currentSeasonTransfers, currentSeasonEvents, {
       userTid,
       userCompId: comps[userTid],
       compOf: (tid) => comps[tid],
-    }, lastSeasonHonours, shownTrophies, [], shownPromotions);
+    }, lastSeasonHonours, shownTrophies, [], shownPromotions, shownSanctions);
     return [...newsTimeline].slice(-NEWS_TOP_N).reverse();
   }, [
     league.transfers, league.newsEvents, league.season, league.played,
@@ -311,6 +326,7 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
     league.cup, league.cupHistory, league.shield, league.shieldHistory, league.international,
     league.promotionPlayoffs,
     league.superCups,
+    league.debtSanctions,
   ]);
 
   const teamByTid = useMemo(() => new Map(league.teams.map((t) => [t.tid, t])), [league.teams]);
@@ -810,11 +826,33 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
 
               <h5 className="card-title text-start">Finances</h5>
               <div className="text-start">
-                {userTeam.budget < 0 && (
+                {debt?.sanction && (
                   <div className="alert alert-danger py-2 text-start" role="alert">
-                    You're in the red, so you can't sign anyone and your scouting is switched
-                    off until you're back in the black. <Link to="/finance">See the finances</Link>
-                    {" "}or sell someone you can do without.
+                    {debt.sanction.pointsDeduction > 0
+                      ? `You're under a transfer embargo and started the season on `
+                        + `-${debt.sanction.pointsDeduction} points.`
+                      : "You're under a transfer embargo and can't sign anyone this season."}
+                    {" "}<Link to="/finance">See the finances</Link>.
+                  </div>
+                )}
+                {/* The one warning that has to arrive DURING the season: the
+                    books are read at the final whistle, so by the time the
+                    penalty exists it is too late to trade out of it. */}
+                {debt && !debt.sanction && debt.projected !== "clear" && (
+                  <div className="alert alert-warning py-2 text-start" role="alert">
+                    Finish the season this far overdrawn and you'll start next season with a
+                    transfer embargo
+                    {debt.projected === "deduction" && " and a points deduction"}.
+                    {" "}<Link to="/finance">See the finances</Link>{" "}
+                    or sell someone you can do without.
+                  </div>
+                )}
+                {debt?.inDebt && debt.projected === "clear" && (
+                  <div className="alert alert-secondary py-2 text-start" role="alert">
+                    You're in the red. That's allowed, and you can borrow up to{" "}
+                    {currency.format(debt.limit)}, but it costs interest every season and your
+                    scouting stays switched off while you're overdrawn.
+                    {" "}<Link to="/finance">See the finances</Link>.
                   </div>
                 )}
                 <p className="card-text mb-2">

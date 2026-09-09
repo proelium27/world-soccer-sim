@@ -234,10 +234,11 @@ export function liveTableRows(
   priorMatches: MatchScore[],
   todayMatches: LiveMatch[],
   minute: number,
+  deductions?: ReadonlyMap<number, number>,
 ): StandingsRow[] {
   const inProgress: MatchScore[] = todayMatches.map((m) => {
     const score = scoreAtMinute(m.events, minute);
     return { home: m.home, away: m.away, homeGoals: score.home, awayGoals: score.away };
   });
-  return computeStandings(teamIds, [...priorMatches, ...inProgress]);
+  return computeStandings(teamIds, [...priorMatches, ...inProgress], deductions);
 }

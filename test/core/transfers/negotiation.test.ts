@@ -6,6 +6,8 @@ import {
 } from "../../../src/core/transfers/negotiation.js";
 import { transferWindowState } from "../../../src/core/transfers/window.js";
 import { trueTransferValue } from "../../../src/core/finance/valuation.js";
+import { financeScaleFor } from "../../../src/core/finance/budget.js";
+import { overdraftLimit, minimumBalance } from "../../../src/core/finance/debt.js";
 import { type LeagueStore } from "../../../src/core/leagueState.js";
 import {
   RESERVATION_FACTOR_MIN, RESERVATION_FACTOR_MAX,
@@ -216,22 +218,49 @@ describe("makeTransferOffer / acceptCounterOffer", () => {
     expect(retry).toBe(collapsed);
   });
 
-  it("is a no-op outside a window, over budget, or for the user's own player", () => {
+  it("is a no-op outside a window, past the overdraft, or for the user's own player", () => {
     const closed = { ...windowLeague(), schedule: makeLeague(0, 1).schedule.filter((g) => g.matchday >= 10) };
     expect(transferWindowState(closed).open).toBe(false);
     const { pid } = firstTarget(closed);
     expect(makeTransferOffer(closed, pid, 1_000_000)).toBe(closed);
 
     const league = windowLeague();
-    const poor = {
-      ...league,
-      teams: league.teams.map((t) => (t.tid === 0 ? { ...t, budget: 1000 } : t)),
-    };
-    const target = firstTarget(poor);
-    expect(makeTransferOffer(poor, target.pid, 1_000_000)).toBe(poor);
+    const setBudget = (l: LeagueStore, budget: number): LeagueStore => ({
+      ...l,
+      teams: l.teams.map((t) => (t.tid === 0 ? { ...t, budget } : t)),
+    });
+    const scale = financeScaleFor(league.competitions, 0, 0, 0, league.difficulty);
+
+    // Already at the bottom of its overdraft, so any fee at all breaches it.
+    const spent = setBudget(league, minimumBalance(scale));
+    expect(makeTransferOffer(spent, firstTarget(spent).pid, 1_000_000)).toBe(spent);
+
+    // And past it outright, from a healthy balance.
+    const overreaching = setBudget(league, 1000);
+    const tooBig = Math.round(overdraftLimit(scale)) + 1_000_000;
+    expect(makeTransferOffer(overreaching, firstTarget(overreaching).pid, tooBig))
+      .toBe(overreaching);
 
     const ownPid = league.teams[0].roster[0];
     expect(makeTransferOffer(league, ownPid, 1_000_000)).toBe(league);
+  });
+
+  /**
+   * The overdraft's whole point: a club with almost nothing in the bank can
+   * still buy, by borrowing against its own income. This used to be a no-op
+   * and the case above used to pin it as one.
+   */
+  it("lets a club with an empty bank buy into its overdraft", () => {
+    const league = windowLeague();
+    const broke = {
+      ...league,
+      teams: league.teams.map((t) => (t.tid === 0 ? { ...t, budget: 1000 } : t)),
+    };
+    const { pid } = firstTarget(broke);
+
+    const after = makeTransferOffer(broke, pid, 1_000_000);
+    expect(after).not.toBe(broke);
+    expect(currentNegotiations(after).some((n) => n.pid === pid)).toBe(true);
   });
 
   it("lets the user buy a Division 2 breakout player even though he fails the normal depth-floor for-sale check", () => {

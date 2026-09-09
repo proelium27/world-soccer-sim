@@ -111,6 +111,21 @@ export interface PlayerMatchLine {
   yellowCards: number;
   redCards: number;
   minutesPlayed: number;
+  /**
+   * The formation slot he actually played, which is what he was rated as (see
+   * matchSim's finishLines) and what the lineup surfaces read to name a shape.
+   *
+   * Deliberately the SLOT, not his listed position: a winger filling in at
+   * full-back played full-back, and a match report that called him a winger
+   * would be describing the squad rather than the game. A substitute carries
+   * the slot he inherited; a player who never came on carries his own position,
+   * which is why "did he play" is answered by minutesPlayed and the
+   * substitution events, never by this.
+   *
+   * Optional because a box score written before it existed has none — every
+   * reader falls back to the player's listed position rather than guessing.
+   */
+  slot?: MatchPosition;
   /** FotMob-style 1-10 match performance rating; see engine/matchRating.ts. */
   rating: number;
 }

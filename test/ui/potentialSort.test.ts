@@ -31,7 +31,11 @@ describe("no fogged POT column sorts on the true value", () => {
       const src = readFileSync(page, "utf8");
       // A sort accessor reading `.potential` straight off a player is the shape
       // of the bug — every one of these pages had exactly that line.
-      const raw = src.match(/(pot|potential)\s*:\s*\(\s*\w+\s*\)\s*=>\s*\w+\.potential\b/g);
+      // `[\w.]+` rather than `\w+`, so a nested accessor is caught too. The
+      // narrow version missed `pot: (c) => c.player.potential` on the loan
+      // tables, which arrived from a PR that merged after the original fix —
+      // the guard passed while two surfaces were leaking.
+      const raw = src.match(/(pot|potential)\s*:\s*\(\s*\w+\s*\)\s*=>\s*[\w.]+\.potential\b/g);
       expect(raw, `${page} sorts POT by the true value`).toBeNull();
       // Either reading of the band is fine — `ceiling` for a page that only
       // needs the top, `fogOf` for the database, which also wants the floor to

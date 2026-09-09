@@ -53,9 +53,28 @@ import { createLeagueState, type LeagueStore } from "../src/core/leagueState.js"
 import { simThrough } from "../src/core/simThrough.js";
 import { simOffseason } from "../src/core/offseason.js";
 import { competitionOf } from "../src/core/competitions.js";
-import { countryStrengthOffset } from "../src/core/constants.js";
+import { countryStrengthOffset, type ProgressionModel } from "../src/core/constants.js";
 
 const SEASONS = Number(process.env.SEASONS ?? 20);
+
+/**
+ * Which development model the audited worlds run (`MODEL=steady`).
+ *
+ * Defaults to `"random"`, so every existing invocation of this script — and
+ * every number recorded against it in CLAUDE.md — measures exactly what it
+ * measured before. The reason it is a knob at all is that `"steady"` is a
+ * different progression model, and progression is what the country ladder and
+ * the weak leagues' solvency both rest on; a mode that quietly bankrupted
+ * Serbia would be no better for being opt-in.
+ *
+ * Note the two models are NOT comparable run for run: they are different worlds
+ * from the first offseason, so read each against its own gates rather than
+ * against the other's numbers.
+ */
+const MODEL = (process.env.MODEL ?? "random") as ProgressionModel;
+if (MODEL !== "random" && MODEL !== "steady") {
+  throw new Error(`MODEL must be "random" or "steady"; got "${process.env.MODEL}"`);
+}
 // Overridable so a tuning change can be checked against worlds it was not
 // tuned on — fitting a constant to seeds 1 and 2 and then reporting seeds 1
 // and 2 measures the sample, not the mechanism.
@@ -276,7 +295,9 @@ const endSpreadAcrossSeeds: number[] = [];
 
 for (const seed of SEEDS) {
   console.log(`\n=== seed ${seed} (${SEASONS} seasons) ===`);
-  let league = createLeagueState(USER_TID, mulberry32(seed));
+  let league = createLeagueState(
+    USER_TID, mulberry32(seed), 0, undefined, undefined, true, null, MODEL,
+  );
 
   let worstDeficitCount = 0;
   let worstDeficitClubs = 0;

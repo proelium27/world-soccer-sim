@@ -16,16 +16,12 @@ import { ExtendControl } from "./ExtendControl.js";
 import { ListingMenu } from "./ListingMenu.js";
 import { slotFitNote } from "./PositionBadge.js";
 import { suspensionText } from "./SuspensionBadge.js";
+import { shortName } from "../playerName.js";
 
 const DRAG_MIME = "application/x-soccer-gm-pid";
 
 /** Shared empty default for the optional club-only pid sets; never mutated. */
 const EMPTY_PIDS: Set<number> = new Set();
-
-function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts[parts.length - 1];
-}
 
 export interface PitchFieldProps {
   starters: Player[];
@@ -45,6 +41,13 @@ export interface PitchFieldProps {
    */
   releasablePids?: Set<number>;
   refusingPids?: Set<number>;
+  /**
+   * Players in on loan. They belong to another club, so their chip offers none
+   * of the ownership actions (extend / list / release) — the same rule the
+   * Roster table applies, kept in step with it because both draw the same
+   * squad and a control on one and not the other reads as a bug.
+   */
+  borrowedPids?: Set<number>;
   transferListedPids?: Set<number>;
   loanListedPids?: Set<number>;
   /** Loans can only be listed while a transfer window is open, same as the Loans page. */
@@ -69,6 +72,7 @@ export function PitchField({
   season,
   releasablePids = EMPTY_PIDS,
   refusingPids = EMPTY_PIDS,
+  borrowedPids = EMPTY_PIDS,
   transferListedPids = EMPTY_PIDS,
   loanListedPids = EMPTY_PIDS,
   windowOpen = false,
@@ -263,9 +267,11 @@ export function PitchField({
                 </div>
                 <div className="pitch-chip-actions-meta">
                   {formatWeeklyWage(p.contract.salary)} &middot;{" "}
-                  {p.contract.expiresSeason <= season
-                    ? "Final year"
-                    : `Through ${seasonYear(p.contract.expiresSeason)}`}
+                  {borrowedPids.has(p.pid)
+                    ? "On loan"
+                    : p.contract.expiresSeason <= season
+                      ? "Final year"
+                      : `Through ${seasonYear(p.contract.expiresSeason)}`}
                 </div>
                 {p.injury && (
                   <div className="pitch-chip-actions-meta text-danger">
@@ -277,7 +283,12 @@ export function PitchField({
                   <div className="pitch-chip-actions-meta text-danger">{suspensionText(p)}</div>
                 )}
                 <div className="d-flex flex-wrap gap-1 mt-2">
-                  {onExtend && canExtend(p, season) && (
+                  {borrowedPids.has(p.pid) && (
+                    <span className="text-muted small fst-italic">
+                      In on loan &mdash; not yours to sell, release or re-sign.
+                    </span>
+                  )}
+                  {!borrowedPids.has(p.pid) && onExtend && canExtend(p, season) && (
                     refusingPids.has(p.pid) ? (
                       <span
                         className="text-muted small fst-italic text-nowrap"
@@ -296,7 +307,7 @@ export function PitchField({
                       />
                     )
                   )}
-                  {onToggleTransferListed && onToggleLoanListed && (
+                  {!borrowedPids.has(p.pid) && onToggleTransferListed && onToggleLoanListed && (
                     <ListingMenu
                       player={p}
                       season={season}
@@ -308,7 +319,7 @@ export function PitchField({
                       onToggleLoanListed={onToggleLoanListed}
                     />
                   )}
-                  {onRelease && (
+                  {!borrowedPids.has(p.pid) && onRelease && (
                     <button
                       className="btn btn-sm btn-outline-danger"
                       onClick={() => {

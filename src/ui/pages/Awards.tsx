@@ -19,14 +19,10 @@ import { Flag } from "../components/Flag.js";
 import { GoldenBootIcon } from "../components/GoldenBootIcon.js";
 import { CompetitionSelect } from "../components/CompetitionSelect.js";
 import { seasonYear } from "../format.js";
+import { shortName } from "../playerName.js";
 
 const SLOTS = TOTS_SLOTS;
 const COORDS = TOTS_LAYOUT;
-
-function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts[parts.length - 1];
-}
 
 /**
  * A winner as this page needs him — live or long retired.

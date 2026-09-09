@@ -33,6 +33,7 @@ import { Roster } from "./pages/Roster.js";
 import { Leaders } from "./pages/Leaders.js";
 import { Database } from "./pages/Database.js";
 import { BoxScore } from "./pages/BoxScore.js";
+import { WatchMatch } from "./pages/WatchMatch.js";
 import { YouthIntake } from "./pages/YouthIntake.js";
 import { FreeAgents } from "./pages/FreeAgents.js";
 import { Academy } from "./pages/Academy.js";
@@ -169,6 +170,12 @@ export function App() {
             <Route path="/season-preview" element={<SeasonPreview />} />
             <Route path="/set-scouting" element={<ClubOnly><SetScouting /></ClubOnly>} />
             <Route path="/box-score/:matchIndex" element={<BoxScore />} />
+            {/* Watching a match is a page, not a modal — see WatchMatch.tsx.
+                No ClubOnly: the live form answers "nothing to watch" for a
+                spectator on its own, and replaying a stored match is something
+                any save can do. */}
+            <Route path="/watch" element={<WatchMatch />} />
+            <Route path="/watch/:matchIndex" element={<WatchMatch />} />
             {/* Club-only. A spectator reaches these by URL alone (the sidebar
                 drops them), and ClubOnly answers with "you're spectating"
                 rather than the "Team not found." each page would otherwise

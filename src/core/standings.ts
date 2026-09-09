@@ -29,6 +29,17 @@ export interface StandingsRow {
   ga: number;
   gd: number;
   points: number;
+  /**
+   * Points docked from this club by a sanction, as a positive number, already
+   * subtracted from `points`.
+   *
+   * Present only on a club that was actually docked, so it is absent on every
+   * row of every ordinary table and on every table stored before sanctions
+   * existed. It has to be carried rather than left implicit: a table whose
+   * points column does not reconcile with its own W/D/L reads as a bug, so
+   * every surface that renders a table needs to be able to say why.
+   */
+  deducted?: number;
 }
 
 /** A club's aggregated box-score totals for one season, for the Team Stat Leaders history. */
@@ -169,7 +180,11 @@ export function computeTeamSeasonStats(teamIds: number[], matches: PlayedMatch[]
 }
 
 /** Build a league table (3/1/0), sorted by points, then GD, then GF, then tid. */
-export function computeStandings(teamIds: number[], matches: MatchScore[]): StandingsRow[] {
+export function computeStandings(
+  teamIds: number[],
+  matches: MatchScore[],
+  deductions?: ReadonlyMap<number, number>,
+): StandingsRow[] {
   const rows = new Map<number, StandingsRow>();
   for (const tid of teamIds)
     rows.set(tid, { tid, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 });
@@ -188,6 +203,20 @@ export function computeStandings(teamIds: number[], matches: MatchScore[]): Stan
   for (const m of matches) {
     record(m.home, m.homeGoals, m.awayGoals);
     record(m.away, m.awayGoals, m.homeGoals);
+  }
+
+  // Sanctions come off AFTER every match is counted and BEFORE the sort, so a
+  // docked club really does sit where its docked total puts it — in the table
+  // the user reads, in the final table that decides promotion, prize money and
+  // European places, and in the finish the board judges. Omitting `deductions`
+  // leaves every row untouched, so all 24 existing call sites are unchanged.
+  if (deductions) {
+    for (const [tid, points] of deductions) {
+      const r = rows.get(tid);
+      if (!r || !(points > 0)) continue;
+      r.points -= points;
+      r.deducted = points;
+    }
   }
 
   return [...rows.values()].sort(

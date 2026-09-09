@@ -4,6 +4,7 @@ import type { StoredTeam } from "./teams/clubs.js";
 import type { ScheduleGame } from "./schedule.js";
 import type { CompletedTransfer, TransferNegotiation } from "./transfers/negotiation.js";
 import type { TransferClause } from "./transfers/clauses.js";
+import type { DebtSanction } from "./finance/debt.js";
 import type { InboundOffer } from "./transfers/inboundOffers.js";
 import type { NewsEvent } from "./newsEvents.js";
 import type { ArchivedPlayer } from "./players/archive.js";
@@ -28,7 +29,9 @@ import { generateSchedule } from "./schedule.js";
 import { SEASON_MATCHDAYS } from "./calendar.js";
 import { worldCompetitions } from "./competitions.js";
 import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
-import { DEFAULT_DIFFICULTY, OVR_SCALE_SHIFT, type Difficulty } from "./constants.js";
+import {
+  DEFAULT_DIFFICULTY, OVR_SCALE_SHIFT, type Difficulty, type ProgressionModel,
+} from "./constants.js";
 import { isSpectatorTid } from "./spectator.js";
 
 export type { StoredTeam } from "./teams/clubs.js";
@@ -283,6 +286,22 @@ export interface LeagueStore {
    */
   superCups: SuperCupTie[];
   /**
+   * Financial sanctions against the user's club, one record per season it
+   * ended too deep in the red — a registration embargo, and past a further
+   * threshold a points deduction on top.
+   *
+   * Appended in the offseason from the balance the club ended the season on
+   * (after prize money settles), and read for the season each record names.
+   * Nothing else in the sim writes here and AI clubs are never assessed, which
+   * is what keeps this off the strength ladder and out of the dynasty audits —
+   * see the DEBT_* block in constants.ts.
+   *
+   * Optional: absent on every save written before debt existed, and
+   * `migrate.ts` backfills `[]`. Absent is exact rather than a guess — those
+   * saves could not be sanctioned, because nothing was assessing them.
+   */
+  debtSanctions?: DebtSanction[];
+  /**
    * National-team football, played entirely inside the offseason on a two-year
    * cycle (odd seasons qualify, even seasons play the tournament). Starts empty
    * on a new save and fills from the first offseason onward; see
@@ -368,6 +387,22 @@ export interface LeagueStore {
    * so no dynasty in progress changes.
    */
   rollingCoefficients: boolean;
+
+  /**
+   * How this save develops its players — see `ProgressionModel`.
+   *
+   * Unlike `difficulty` and `rollingCoefficients` beside it, this one is **safe
+   * to change mid-save**, and God Mode offers exactly that. It is read at one
+   * point (the offseason's progression pass, plus the generation paths that
+   * forecast a potential off the same model) and it scales rng draws without
+   * changing their count, so flipping it advances the shared stream identically
+   * and merely changes how careers move from the next offseason on. Nothing
+   * persisted derives from it, so there is no stale state to unwind either way.
+   *
+   * Migrated to `"random"` for old saves, which is the only model that has ever
+   * existed, so no dynasty in progress changes.
+   */
+  progressionModel: ProgressionModel;
 }
 
 export function createLeagueState(
@@ -392,8 +427,16 @@ export function createLeagueState(
    * differ only in this are the same world.
    */
   userNation: string | null = null,
+  /**
+   * How careers develop (see `LeagueStore.progressionModel`). Passed into
+   * generation as well as stored, so the world's opening potentials are a
+   * forecast of the model the save will actually run — a steady save whose
+   * first squad was scouted on the random model would over-rate every prospect
+   * in it until his first offseason re-estimate.
+   */
+  progressionModel: ProgressionModel = "random",
 ): LeagueStore {
-  const league = generateWorld(rng, seed, competitions);
+  const league = generateWorld(rng, seed, competitions, progressionModel);
   // Each AI club lines up in the formation that fields its strongest XI; the
   // user's club keeps the neutral 4-3-3 default and picks its own on the Roster page.
   const teams = assignAIFormations(
@@ -455,6 +498,7 @@ export function createLeagueState(
     promotionPlayoffs: [],
     // Season 1 has no super cups: nothing has been won yet to contest one.
     superCups: [],
+    debtSanctions: [],
     international: emptyInternationalState(),
     godMode: false,
     manager: emptyManagerState(userTid, 1),
@@ -472,5 +516,6 @@ export function createLeagueState(
     nextPid: Math.max(0, ...league.players.map((p) => p.pid)) + 1,
     aiManagedSeasons: [],
     rollingCoefficients,
+    progressionModel,
   };
 }

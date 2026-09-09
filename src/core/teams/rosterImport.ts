@@ -18,6 +18,7 @@ import { emptyCareerSummary } from "../players/careerSummary.js";
 import {
   LEAGUE_BASE, RATING_MIN, RATING_MAX, ROSTER_COMPOSITION,
   INITIAL_AGE_MIN, INITIAL_AGE_MAX, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
+  type ProgressionModel,
 } from "../constants.js";
 
 /**
@@ -77,6 +78,8 @@ interface MaterializeCtx {
    * unaffected either way.
    */
   nationalities: NationalityWeights | null;
+  /** The save's development model, for the `estimatePotential` fallback below. */
+  model: ProgressionModel;
 }
 
 /** Turn one authored player spec into a full engine Player. */
@@ -86,7 +89,7 @@ function materializePlayer(spec: RosterFilePlayer, ctx: MaterializeCtx): Player 
   // and a country-appropriate default nationality — all overridable below.
   const archetype = generatePlayer(
     ctx.rng, spec.pos, LEAGUE_BASE, ctx.pid, age, ctx.season, ctx.genSeed,
-    ctx.country, ctx.nationalities,
+    ctx.country, ctx.nationalities, ctx.model,
   );
   const heightCm = spec.heightCm != null ? clampInt(spec.heightCm, 150, 220) : archetype.heightCm;
 
@@ -98,7 +101,7 @@ function materializePlayer(spec: RosterFilePlayer, ctx: MaterializeCtx): Player 
   const potential =
     spec.potential != null
       ? clampInt(spec.potential, ovr, RATING_MAX)
-      : estimatePotential(ctx.rng, ratings, ovr, age, spec.pos, heightCm, ctx.pid);
+      : estimatePotential(ctx.rng, ratings, ovr, age, spec.pos, heightCm, ctx.pid, ctx.model);
   const length = CONTRACT_LENGTH_MIN + Math.floor(ctx.rng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
 
   return {
@@ -130,7 +133,7 @@ function materializePlayer(spec: RosterFilePlayer, ctx: MaterializeCtx): Player 
 function makeFiller(pos: Position, base: number, ctx: MaterializeCtx): Player {
   const age = INITIAL_AGE_MIN + Math.floor(ctx.rng() * (INITIAL_AGE_MAX - INITIAL_AGE_MIN + 1));
   const p = generatePlayer(
-    ctx.rng, pos, base, ctx.pid, age, ctx.season, ctx.genSeed, ctx.country, ctx.nationalities,
+    ctx.rng, pos, base, ctx.pid, age, ctx.season, ctx.genSeed, ctx.country, ctx.nationalities, ctx.model,
   );
   const length = CONTRACT_LENGTH_MIN + Math.floor(ctx.rng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
   p.contract.expiresSeason = ctx.season + length;
@@ -150,12 +153,13 @@ function materializeSquad(
   startPid: number,
   competitionCountry: string,
   competitionNats: NationalityWeights | null,
+  model: ProgressionModel,
 ): { players: Player[]; nextPid: number } {
   const rng = mulberry32(hashInts(team.tid, season, startPid, 0x5c0));
   const genSeed = hashInts(team.tid, season, 0xf1);
   let pid = startPid;
   const mkCtx = (): MaterializeCtx => ({
-    pid, season, rng, genSeed, country: competitionCountry, nationalities: competitionNats,
+    pid, season, rng, genSeed, country: competitionCountry, nationalities: competitionNats, model,
   });
 
   const real = specs.map((spec) => {
@@ -310,6 +314,7 @@ export function applyRosterFile(league: LeagueStore, rawFile: RosterFile): Roste
 
     const built = materializeSquad(
       club.players, team, season, nextPid, comp.country, competitionNationalities(comp),
+      league.progressionModel,
     );
     nextPid = built.nextPid;
 
