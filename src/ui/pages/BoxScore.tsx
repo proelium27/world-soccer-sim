@@ -9,9 +9,6 @@ import { Flag } from "../components/Flag.js";
 import { ClubCrest } from "../components/ClubCrest.js";
 import { BackLink } from "../components/BackLink.js";
 import { KEY_EVENTS, TimelineRow } from "../components/matchEvents.js";
-import { LiveMatchOverlay } from "../components/LiveMatchOverlay.js";
-import { liveTableRows, toLiveMatch } from "../live/liveMatch.js";
-import { pointsDeductionMap } from "../../core/finance/debt.js";
 
 
 function ratingClass(rating: number): string {
@@ -178,7 +175,12 @@ function TeamBoxTable({
         </thead>
         <tbody>
           {lines.map((line) => {
-            const isKeeper = playerPos(line.pid) === "GK";
+            // The job he did, not the kind of player he is: a winger who filled
+            // in at full-back is a full-back for this match, which is also what
+            // his rating was computed against. Falls back to his listed
+            // position on a box score written before slots were recorded.
+            const played = line.slot ?? playerPos(line.pid);
+            const isKeeper = played === "GK";
             const nat = playerNationality(line.pid);
             return (
               <tr key={line.pid} className={line.pid === motmPid ? "bs-row-motm" : undefined}>
@@ -191,7 +193,7 @@ function TeamBoxTable({
                   <Link to={`/player/${line.pid}`}>{playerName(line.pid)}</Link>
                   {nat && <Flag nationality={nat} />}
                 </td>
-                <td className="bs-pos">{playerPos(line.pid)}</td>
+                <td className="bs-pos">{played}</td>
                 <td className="text-end">{line.minutesPlayed}</td>
                 <td className="text-end bs-group">{line.goals || ""}</td>
                 <td className="text-end">{line.assists || ""}</td>
@@ -244,9 +246,6 @@ export function BoxScore() {
   const { league } = useLeague();
   const playerMap = usePlayerMap(league?.players);
   const [showAllEvents, setShowAllEvents] = useState(false);
-  // Rewatching an old match is the same viewer as a live one, minus the commit:
-  // the events it replays are the ones already stored on this box score.
-  const [watching, setWatching] = useState(false);
 
   if (!league || matchIndex === undefined) {
     return <p className="p-3">Loading...</p>;
@@ -294,54 +293,16 @@ export function BoxScore() {
     // The clock counts down, so descending clock is chronological order.
     .sort((a, b) => b.clock - a.clock);
 
-  // Same competition, same matchday — the rail the viewer shows alongside.
-  const compTeamIds = league.teams
-    .filter((t) => t.compId === homeTeam?.compId)
-    .map((t) => t.tid);
-  const inComp = new Set(compTeamIds);
-  const sameMatchday = league.played.filter(
-    (m) => m.matchday === match.matchday && inComp.has(m.home),
-  );
-  const watchedMatch = toLiveMatch(match);
-  const watchedOthers = sameMatchday.filter((m) => m !== match).map(toLiveMatch);
-
   return (
     <div className="container-fluid p-3 bs-page">
       <div className="bs-topbar">
         <BackLink fallback="/schedule" className="bs-back" />
-        <button
-          type="button"
-          className="btn btn-sm btn-outline-secondary"
-          onClick={() => setWatching(true)}
-        >
+        {/* A link rather than a button opening an overlay: the viewer is its
+            own route, so this match's replay has a URL and a back button. */}
+        <Link to={`/watch/${matchIndex}`} className="btn btn-sm btn-outline-secondary">
           Watch it back
-        </button>
+        </Link>
       </div>
-
-      {watching && (
-        <LiveMatchOverlay
-          open
-          match={watchedMatch}
-          otherMatches={watchedOthers}
-          teams={league.teams}
-          playerName={playerName}
-          competitionName={compName ?? ""}
-          tableAtMinute={(minute) =>
-            liveTableRows(
-              compTeamIds,
-              // The table as it stood going INTO this matchday, so it climbs
-              // the same way it did on the day rather than starting from
-              // today's finished position.
-              league.played.filter((m) => m.matchday < match.matchday && inComp.has(m.home)),
-              [watchedMatch, ...watchedOthers],
-              minute,
-              pointsDeductionMap(league.debtSanctions, league.season),
-            )
-          }
-          onComplete={() => setWatching(false)}
-          completeLabel="Close"
-        />
-      )}
 
       <header className="bs-scoreboard">
         <div className="bs-eyebrow">

@@ -22,11 +22,7 @@ import { ClubCrest } from "../components/ClubCrest.js";
 import { CompetitionSelect } from "../components/CompetitionSelect.js";
 import { DivisionBadge } from "../components/DivisionBadge.js";
 import { sortByPosThenOvr } from "./Roster.js";
-
-function shortName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts[parts.length - 1];
-}
+import { shortName } from "../playerName.js";
 
 /** The stored snapshot immediately preceding `snapshot` within the same season, for rank-movement arrows. */
 function previousSnapshot(

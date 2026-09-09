@@ -1048,6 +1048,10 @@ export function simMatchDetailed(
         // is: a defender who spent 20 minutes at centre-forward is rated as a
         // centre-forward for those minutes.
         const slot = slotPlayed.get(p.pid) ?? p.slot;
+        // Recorded, not merely used: the lineup surfaces name a formation from
+        // the starters' slots, and nothing else in the save remembers what
+        // shape a club lined up in on the day.
+        line.slot = slot;
         if (slot === "GK") {
           line.goalsAgainst = teamGoalsAgainst;
           line.xga = teamXga;
