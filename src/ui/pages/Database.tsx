@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { Flag } from "../components/Flag.js";
@@ -12,19 +12,23 @@ import {
   EMPTY_PLAYER_FILTERS, PlayerFilterBar, hasAnyFilter, moneyFilter, toSearchFilters,
   type PlayerFilterState,
 } from "../components/PlayerFilterBar.js";
-import { SortableTh, sortRows, useTableSort } from "../components/SortableTable.js";
+import { SortableTh, sortRows } from "../components/SortableTable.js";
 import { ClubDatabase } from "./ClubDatabase.js";
-import { ColumnSetPills, useColumnSet } from "./databaseShared.js";
+import { ColumnSetPills, columnSetOf, columnSetParams } from "./databaseShared.js";
+import { defaultView, viewFromParams, viewToParams, type DatabaseView } from "../databaseUrl.js";
 import { usePotentialView } from "../potentialView.js";
-import { currencyCompact, formatWeeklyWage } from "../format.js";
+import { currencyCompact, formatWeeklyWage, seasonYear } from "../format.js";
 import { getRatingColor } from "../utils/ratingColor.js";
 import { SKILL_KEYS } from "../../core/players/types.js";
 import {
-  PLAYER_DB_PAGE_SIZE, buildPlayerRows, filterPlayerRows, pageCount, pageOf,
-  playerSortAccessors,
+  PLAYER_DB_PAGE_SIZE, STAT_COLUMNS, buildPlayerRows, careerTotalsIndex, filterPlayerRows,
+  filterToSeason, pageCount, pageOf, playerSortAccessors, seasonStatsIndex, seasonsWithStats,
+  sortKeysFor,
   type PlayerColumnSet, type PlayerDbRow, type PlayerSortKey, type PlayerStatus,
   type PlayerStatusFilter,
 } from "../playerDatabase.js";
+import type { SeasonStats } from "../../core/players/types.js";
+import type { AllTimeStatKey, StatTotals } from "../../core/players/careerSummary.js";
 
 /**
  * The world in a table: every player, and (from the Clubs tab) every club,
@@ -46,7 +50,16 @@ import {
 const COLUMN_SETS: { key: PlayerColumnSet; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "attributes", label: "Attributes" },
+  { key: "season", label: "Season" },
+  { key: "career", label: "Career" },
 ];
+
+/** Derived from the list above, so the two can't fall out of step. */
+const PLAYER_COLUMN_KEYS = COLUMN_SETS.map((c) => c.key);
+
+/** The column the table opens sorted by, and which way. */
+const DEFAULT_SORT: PlayerSortKey = "ovr";
+const DEFAULT_DIR = "desc" as const;
 
 
 const STATUS_OPTIONS: { key: PlayerStatusFilter; label: string }[] = [
@@ -93,14 +106,48 @@ export function Database() {
 function PlayerDatabase() {
   const { league } = useLeague();
   const potView = usePotentialView();
-  const [filters, setFilters] = useState<PlayerFilterState>(EMPTY_PLAYER_FILTERS);
-  const [name, setName] = useState("");
-  const [status, setStatus] = useState<PlayerStatusFilter>("all");
-  const [columns, setColumns] = useColumnSet<PlayerColumnSet>(
-    ["overview", "attributes"],
-  );
   const [page, setPage] = useState(0);
-  const { sort, toggle } = useTableSort<PlayerSortKey>("ovr", "desc");
+
+  // Filters, sort and season live in the URL rather than in component state, so
+  // a view somebody has narrowed and sorted is a link. Everything at its
+  // default is left out of the query string — see databaseUrl.ts.
+  const [params, setParams] = useSearchParams();
+  const columns = columnSetOf(params, PLAYER_COLUMN_KEYS);
+  const fallback = useMemo(() => defaultView(DEFAULT_SORT, DEFAULT_DIR), []);
+  const view = useMemo(() => viewFromParams(params, fallback), [params, fallback]);
+  const { filters, name, status } = view;
+  const sort = useMemo(
+    () => ({ key: view.sortKey as PlayerSortKey, dir: view.sortDir }),
+    [view.sortKey, view.sortDir],
+  );
+  const update = (patch: Partial<DatabaseView>, resetPage = true) => {
+    setParams(viewToParams({ ...view, ...patch }, fallback, params), { replace: true });
+    if (resetPage) setPage(0);
+  };
+  const toggle = (key: PlayerSortKey, defaultDir: "asc" | "desc" = "desc") =>
+    update(
+      key === sort.key
+        ? { sortDir: sort.dir === "asc" ? "desc" : "asc" }
+        : { sortKey: key, sortDir: defaultDir },
+      false,
+    );
+  /**
+   * Switching column sets keeps the sort where it still means something and
+   * falls back to the default where it doesn't: a key with no header in the new
+   * set leaves `sortRows` on the natural order, so the table would read as
+   * unsorted rather than say so.
+   *
+   * Both changes go through **one** `setParams`. Two calls in this handler
+   * would each build on this render's params, and the second would silently
+   * discard the first.
+   */
+  const setColumns = (next: PlayerColumnSet) => {
+    const withColumns = columnSetParams(params, PLAYER_COLUMN_KEYS, next);
+    const nextView = sortKeysFor(next).has(sort.key)
+      ? view
+      : { ...view, sortKey: DEFAULT_SORT, sortDir: DEFAULT_DIR };
+    setParams(viewToParams(nextView, fallback, withColumns), { replace: true });
+  };
 
   const competitions = league?.competitions ?? [];
 
@@ -117,7 +164,14 @@ function PlayerDatabase() {
   // replaces it, so this rebuilds exactly when the world actually changed and
   // not on a keystroke.
   const rows = useMemo(
-    () => (league ? buildPlayerRows(league, potView.sortValue) : []),
+    () => (league
+      ? buildPlayerRows(
+        league,
+        // A fully-scouted player has no band; his exact potential is both ends.
+        (p) => potView.fogOf(p) ?? { low: p.potential, high: p.potential },
+        (p) => potView.midpoint(p.potential, p.pid, league.season),
+      )
+      : []),
     [league, potView],
   );
 
@@ -147,9 +201,44 @@ function PlayerDatabase() {
     );
   }, [league, rows, filters, competitions, status, name]);
 
+  // Every season anyone has a stat line for, for the season picker.
+  const seasons = useMemo(() => seasonsWithStats(league?.players ?? []), [league?.players]);
+  // Default to the season being played, but only once it HAS something to show.
+  // `league.played` is emptied at the rollover, so on matchday 1 nobody has a
+  // line for the current season yet: defaulting to it blindly opened the table
+  // empty on a save with four seasons behind it, and — because the picker's
+  // options are exactly the seasons that do have lines — the `<select>` then
+  // fell back to displaying its first option, so it named a different year from
+  // the one the table was showing. Falling back to the newest season on record
+  // is both non-empty and what the picker is already claiming.
+  const season = view.season
+    ?? (league && seasons.includes(league.season) ? league.season : seasons[0])
+    ?? league?.season ?? 0;
+
+  // Built only for the view that reads them. The season index is cheap; the
+  // career one walks every season line of every player in the world, which on a
+  // long dynasty is the difference between opening instantly and pausing first.
+  const seasonStats = useMemo(
+    () => (columns === "season" ? seasonStatsIndex(league?.players ?? [], season) : undefined),
+    [league?.players, season, columns],
+  );
+  const careerTotals = useMemo(
+    () => (columns === "career" ? careerTotalsIndex(league?.players ?? []) : undefined),
+    [league?.players, columns],
+  );
+
+  // The season view has nothing to say about a player the season has no record
+  // of, so it narrows the table rather than printing a row of dashes.
+  const inView = useMemo(
+    () => (seasonStats ? filterToSeason(filtered, seasonStats) : filtered),
+    [filtered, seasonStats],
+  );
+
   const sorted = useMemo(
-    () => sortRows(filtered, sort, playerSortAccessors(clubName, leagueName)),
-    [filtered, sort, clubName, leagueName],
+    () => sortRows(
+      inView, sort, playerSortAccessors(clubName, leagueName, seasonStats, careerTotals),
+    ),
+    [inView, sort, clubName, leagueName, seasonStats, careerTotals],
   );
 
   // A filter change can leave the current page past the end; clamp rather than
@@ -160,10 +249,11 @@ function PlayerDatabase() {
 
   if (!league) return <p>Loading...</p>;
 
-  const onFilters = (next: PlayerFilterState) => {
-    setFilters(next);
-    setPage(0);
-  };
+  const onFilters = (next: PlayerFilterState) => update({ filters: next });
+  // "Clear filters" sits at the end of the same bar as the name box and the
+  // status picker, so it clears those too — leaving two of the bar's controls
+  // set after clearing it would read as the button not having worked.
+  const onClear = () => update({ filters: EMPTY_PLAYER_FILTERS, name: "", status: "all" });
 
   return (
     <>
@@ -171,7 +261,7 @@ function PlayerDatabase() {
         idPrefix="db"
         value={filters}
         onChange={onFilters}
-        onClear={() => onFilters(EMPTY_PLAYER_FILTERS)}
+        onClear={onClear}
         nationalities={nationalities}
         competitions={competitions}
       >
@@ -184,7 +274,7 @@ function PlayerDatabase() {
             style={{ width: "11rem" }}
             placeholder="Search by name"
             value={name}
-            onChange={(e) => { setName(e.target.value); setPage(0); }}
+            onChange={(e) => update({ name: e.target.value })}
           />
         </div>
         <div>
@@ -194,7 +284,7 @@ function PlayerDatabase() {
             className="form-select form-select-sm"
             style={{ width: "9rem" }}
             value={status}
-            onChange={(e) => { setStatus(e.target.value as PlayerStatusFilter); setPage(0); }}
+            onChange={(e) => update({ status: e.target.value as PlayerStatusFilter })}
           >
             {STATUS_OPTIONS.map((o) => (
               <option key={o.key} value={o.key}>{o.label}</option>
@@ -205,7 +295,20 @@ function PlayerDatabase() {
 
       <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
         <ColumnSetPills options={COLUMN_SETS} value={columns} onChange={setColumns} />
-        {hasAnyFilter(filters) || name !== "" || status !== "all" ? (
+        {columns === "season" && seasons.length > 0 && (
+          <select
+            className="form-select form-select-sm"
+            style={{ width: "auto" }}
+            aria-label="Season"
+            value={season}
+            onChange={(e) => update({ season: Number(e.target.value) })}
+          >
+            {seasons.map((s) => (
+              <option key={s} value={s}>{seasonYear(s)}</option>
+            ))}
+          </select>
+        )}
+        {hasAnyFilter(filters) || name !== "" || status !== "all" || columns === "season" ? (
           <span className="text-muted small">
             {sorted.length.toLocaleString()} of {rows.length.toLocaleString()} players match
           </span>
@@ -221,7 +324,7 @@ function PlayerDatabase() {
               <SortableTh sortKey="pos" sort={sort} onSort={toggle} defaultDir="asc">Pos</SortableTh>
               <SortableTh sortKey="age" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Age</SortableTh>
               <SortableTh sortKey="club" sort={sort} onSort={toggle} defaultDir="asc">Club</SortableTh>
-              {columns === "overview" ? (
+              {columns === "overview" && (
                 <>
                   <SortableTh sortKey="league" sort={sort} onSort={toggle} defaultDir="asc" className="db-divide">League</SortableTh>
                   <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end">Ovr</SortableTh>
@@ -230,7 +333,8 @@ function PlayerDatabase() {
                   <SortableTh sortKey="wage" sort={sort} onSort={toggle} className="text-end">Wage</SortableTh>
                   <SortableTh sortKey="contract" sort={sort} onSort={toggle} className="text-end">Yrs</SortableTh>
                 </>
-              ) : (
+              )}
+              {columns === "attributes" && (
                 <>
                   <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end db-divide">Ovr</SortableTh>
                   {SKILL_KEYS.map((key) => (
@@ -246,6 +350,21 @@ function PlayerDatabase() {
                   ))}
                 </>
               )}
+              {(columns === "season" || columns === "career") && (
+                <>
+                  {statColumnsFor(columns).map((col, i) => (
+                    <SortableTh
+                      key={col.key}
+                      sortKey={col.key}
+                      sort={sort}
+                      onSort={toggle}
+                      className={`text-end${i === 0 ? " db-divide" : ""}`}
+                    >
+                      <abbr title={col.title}>{col.label}</abbr>
+                    </SortableTh>
+                  ))}
+                </>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -256,6 +375,8 @@ function PlayerDatabase() {
                 columns={columns}
                 season={league.season}
                 leagueName={leagueName(row.compId)}
+                stats={seasonStats?.get(row.player.pid)}
+                career={careerTotals?.get(row.player.pid)}
               />
             ))}
           </tbody>
@@ -273,17 +394,42 @@ function PlayerDatabase() {
   );
 }
 
+/** The stat columns a view shows — the career one drops what it can't total. */
+function statColumnsFor(columns: PlayerColumnSet) {
+  return columns === "career" ? STAT_COLUMNS.filter((c) => c.career) : STAT_COLUMNS;
+}
+
+/** One stat cell's text: a count, or a fixed number of decimals for a rate. */
+function statText(value: number, decimals = 0, dashOnZero = false): string {
+  if (dashOnZero && value === 0) return "—";
+  return decimals === 0 ? value.toLocaleString() : value.toFixed(decimals);
+}
+
 function PlayerRow({
-  row, columns, season, leagueName,
+  row, columns, season, leagueName, stats, career,
 }: {
   row: PlayerDbRow;
   columns: PlayerColumnSet;
   season: number;
   /** Resolved by the parent — a lookup per row would be a hook per row. */
   leagueName: string;
+  /** The chosen season's line, on the season view only. */
+  stats?: SeasonStats;
+  /** Career totals, on the career view only. */
+  career?: StatTotals;
 }) {
   const p = row.player;
   const badge = STATUS_BADGE[row.status];
+  // On a past season the club that matters is the one he played for then, which
+  // his stat line records — his club today would be a different claim entirely.
+  const clubTid = stats && stats.tid >= 0 ? stats.tid : row.tid;
+  const statValue = (col: (typeof STAT_COLUMNS)[number]): number => {
+    if (col.key === "stat_yellowCards") return stats?.yellowCards ?? 0;
+    if (col.key === "stat_redCards") return stats?.redCards ?? 0;
+    const key = col.key.slice("stat_".length) as AllTimeStatKey;
+    if (career) return career[key] ?? 0;
+    return stats ? stats[key] : 0;
+  };
   return (
     <tr>
       <td><WatchToggle pid={p.pid} name={p.name} /></td>
@@ -296,16 +442,16 @@ function PlayerRow({
       <td>{p.pos}</td>
       <td className="text-end">{row.age}</td>
       <td>
-        {row.tid === null
+        {clubTid === null
           ? <span className="text-muted small">{badge}</span>
           : (
             <>
-              <ClubLink tid={row.tid} season={season} />
-              {badge && <span className="text-muted small"> ({badge})</span>}
+              <ClubLink tid={clubTid} season={stats?.season ?? season} />
+              {badge && !stats && <span className="text-muted small"> ({badge})</span>}
             </>
           )}
       </td>
-      {columns === "overview" ? (
+      {columns === "overview" && (
         <>
           <td className="db-divide small text-muted">{leagueName || "—"}</td>
           <td className="text-end fw-semibold" style={{ color: getRatingColor(p.ovr) }}>{p.ovr}</td>
@@ -314,11 +460,21 @@ function PlayerRow({
           <td className="text-end">{formatWeeklyWage(p.contract.salary)}</td>
           <td className="text-end">{row.tid === null ? "—" : row.contractYears}</td>
         </>
-      ) : (
+      )}
+      {columns === "attributes" && (
         <>
           <td className="text-end fw-semibold db-divide" style={{ color: getRatingColor(p.ovr) }}>{p.ovr}</td>
           {SKILL_KEYS.map((key) => (
             <td key={key} className="text-end">{p.ratings[key]}</td>
+          ))}
+        </>
+      )}
+      {(columns === "season" || columns === "career") && (
+        <>
+          {statColumnsFor(columns).map((col, i) => (
+            <td key={col.key} className={`text-end${i === 0 ? " db-divide" : ""}`}>
+              {statText(statValue(col), col.decimals, col.dashOnZero)}
+            </td>
           ))}
         </>
       )}

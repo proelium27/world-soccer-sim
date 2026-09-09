@@ -17,6 +17,7 @@ import { ExtendControl } from "../components/ExtendControl.js";
 import { ExtendAllButton } from "../components/ExtendAllButton.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { PotDisplay } from "../components/PotDisplay.js";
+import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 
 const SEASON_OPTIONS = Array.from({ length: LOAN_MAX_SEASONS }, (_, i) => (i + 1) as 1 | 2 | 3);
@@ -33,6 +34,7 @@ export function Loans() {
   const [draftSeasons, setDraftSeasons] = useState<Record<number, 1 | 2 | 3>>({});
   const offerSort = useTableSort<LoanOfferSortKey>("default", "desc");
   const eligibleSort = useTableSort<EligibleSortKey>("ovr", "desc");
+  const potView = usePotentialView();
 
   const rawOffers = useMemo(() => (league ? loanOfferCandidates(league) : []), [league]);
   // Walks the whole player pool, like rawOffers above: memoized so the
@@ -84,7 +86,7 @@ export function Loans() {
       pos: (p) => p.pos,
       age: (p) => league.season - p.born,
       ovr: (p) => p.ovr,
-      pot: (p) => p.potential,
+      pot: (p) => potView.ceiling(p),
       wage: (p) => p.contract.salary,
     },
   );

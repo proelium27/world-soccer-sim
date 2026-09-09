@@ -11,6 +11,7 @@ import { Flag } from "../components/Flag.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { WatchToggle } from "../components/WatchToggle.js";
 import { PotDisplay } from "../components/PotDisplay.js";
+import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 import { ROSTER_CAP } from "../../core/constants.js";
 
@@ -40,6 +41,7 @@ export function FreeAgents() {
   const { league, signFreeAgentAction, simming } = useLeague();
   const [posFilter, setPosFilter] = useState<Position | "ALL">("ALL");
   const { sort, toggle } = useTableSort<FaSortKey>("ovr", "desc");
+  const potView = usePotentialView();
 
   if (!league) {
     return <p className="p-3">Loading...</p>;
@@ -55,9 +57,16 @@ export function FreeAgents() {
   // by the next season-start charge.
   const midSeason = league.phase === "regular";
 
-  // Pool: the top players by OVR+POT (caps the render size). Sorting below only
-  // reorders this shown set, so a re-sort never surfaces a 40-ovr filler player.
-  availablePlayers.sort((a, b) => b.ovr + b.potential - (a.ovr + a.potential));
+  // Pool: the top players by OVR + scouted ceiling (caps the render size).
+  // Sorting below only reorders this shown set, so a re-sort never surfaces a
+  // 40-ovr filler player.
+  //
+  // The ceiling rather than the true potential, and here that matters more than
+  // it does for a column heading: this rule decides *who is listed at all*, so
+  // ranking it on the truth would have handed the reader the genuinely best
+  // free agents while the POT column beside them showed only an estimate.
+  availablePlayers.sort((a, b) =>
+    b.ovr + potView.ceiling(b) - (a.ovr + potView.ceiling(a)));
   const filtered =
     posFilter === "ALL"
       ? availablePlayers
@@ -84,7 +93,7 @@ export function FreeAgents() {
     name: (p) => p.name,
     pos: (p) => p.pos,
     ovr: (p) => p.ovr,
-    pot: (p) => p.potential,
+    pot: (p) => potView.ceiling(p),
     age: (p) => league.season - p.born,
   });
 

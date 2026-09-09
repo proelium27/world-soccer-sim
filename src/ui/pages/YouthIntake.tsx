@@ -7,6 +7,7 @@ import { Flag } from "../components/Flag.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { WatchToggle } from "../components/WatchToggle.js";
 import { PotDisplay } from "../components/PotDisplay.js";
+import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 import { trialSigningsLeft } from "../../core/freeAgency.js";
 import {
@@ -37,6 +38,12 @@ type IntakeSortKey = "name" | "pos" | "ovr" | "pot";
 export function YouthIntake() {
   const { league, signTrialistAction, simming } = useLeague();
   const { sort, toggle } = useTableSort<IntakeSortKey>("pot", "desc");
+  // A trialist has never been on the senior roster, so his POT is at maximum
+  // fog — which is the whole reason picking five of twelve is a decision. This
+  // table therefore sorts on the band the reader can see, never on the true
+  // value: opening it sorted by the truth would have ranked the group in exact
+  // order of who to sign.
+  const potView = usePotentialView();
 
   if (!league) {
     return <p className="p-3">Loading...</p>;
@@ -57,7 +64,7 @@ export function YouthIntake() {
     name: (p) => p.name,
     pos: (p) => p.pos,
     ovr: (p) => p.ovr,
-    pot: (p) => p.potential,
+    pot: (p) => potView.ceiling(p),
   });
 
   return (
