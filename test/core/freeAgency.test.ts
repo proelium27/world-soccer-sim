@@ -8,7 +8,9 @@ import {
 } from "../../src/core/freeAgency.js";
 import {
   ROSTER_COMPOSITION, ROSTER_CAP, ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR,
+  PROSPECT_AGE_MAX,
 } from "../../src/core/constants.js";
+import type { Player } from "../../src/core/players/types.js";
 
 describe("freeAgentPids", () => {
   it("is empty when every player is rostered", () => {
@@ -545,5 +547,105 @@ describe("freeAgencySigningOrder", () => {
   it("is the raw-points order within one division, so uniform worlds are untouched", () => {
     const rows = [row(1, 38, 70), row(2, 38, 40), row(3, 38, 55), row(4, 38, 40)];
     expect(freeAgencySigningOrder(rows)).toEqual([2, 4, 3, 1]);
+  });
+});
+
+describe("signFreeAgent player will", () => {
+  // A free transfer used to be the one route around the player-will module:
+  // a player who would flatly refuse to be *bought* by a club would happily
+  // *sign* for it, which is how a third-tier side assembled a top-flight squad
+  // for nothing. See refusesFreeAgentSigning.
+  const setup = () => {
+    const league = makeLeague(0, 1);
+    // A weak club, and a star released by a strong one.
+    const clubs = [...league.teams].sort(
+      (a, b) => strengthOf(a, league.players) - strengthOf(b, league.players),
+    );
+    const weak = clubs[0];
+    const strong = clubs[clubs.length - 1];
+    const star = league.players.find((p) => p.pid === strong.roster[0])!;
+    // Release him from the strong club, leaving the stats line that records
+    // where he played — the only trace of a departure into free agency.
+    const teams = league.teams.map((t) =>
+      t.tid === strong.tid ? { ...t, roster: t.roster.filter((pid) => pid !== star.pid) } : t,
+    );
+    const players = league.players.map((p) =>
+      p.pid === star.pid
+        // 82, not something absurd: abilityStature clamps at the top of the
+        // squad-strength band, so a 95 is beyond what any club in a fresh world
+        // justifies and nobody could sign him — which is correct, and useless
+        // as a positive control.
+        ? { ...p, ovr: 82, stats: [{ season: 1, tid: strong.tid } as never] }
+        : p,
+    );
+    return { league, teams, players, star, weak, strong };
+  };
+  const strengthOf = (t: { roster: number[] }, players: Player[]) => {
+    const byPid = new Map(players.map((p) => [p.pid, p]));
+    const r = t.roster.map((pid) => byPid.get(pid)!).filter(Boolean).map((p) => p.ovr);
+    return r.reduce((a, b) => a + b, 0) / Math.max(1, r.length);
+  };
+
+  it("refuses to put a star at a club far below the one that released him", () => {
+    const { teams, players, star, weak } = setup();
+    const out = signFreeAgent(teams, players, weak.tid, star.pid, 1, "offseason");
+    expect(out.teams.find((t) => t.tid === weak.tid)!.roster).not.toContain(star.pid);
+  });
+
+  it("still lets a club of his own level sign him", () => {
+    const { teams, players, star, strong } = setup();
+    const out = signFreeAgent(teams, players, strong.tid, star.pid, 1, "offseason");
+    expect(out.teams.find((t) => t.tid === strong.tid)!.roster).toContain(star.pid);
+  });
+
+  it("gates the academy route too, which has an age cap but no rating cap", () => {
+    // Otherwise the identical exploit runs through a flat stipend instead of
+    // an ovr-cubic wage — a cheaper door to the same place.
+    const { teams, players, star, weak } = setup();
+    const young = players.map((p) =>
+      p.pid === star.pid ? { ...p, born: 1 - PROSPECT_AGE_MAX } : p,
+    );
+    const out = signToAcademy(teams, young, weak.tid, star.pid, 1, "offseason");
+    expect(out.teams.find((t) => t.tid === weak.tid)!.academyRoster).not.toContain(star.pid);
+  });
+});
+
+describe("runAIFreeAgency poolMinOvr", () => {
+  // The post-trim mop-up (offseason step 6.05) passes MOP_UP_MIN_OVR so it takes
+  // the elite tail out of the pool and leaves the rest for the user. Without a
+  // floor it does not thin the pool, it empties it: ~25 good free agents a year
+  // against 626 clubs clears every time, whatever quality bar is used.
+  const freeUp = (league: ReturnType<typeof makeLeague>, count: number) => {
+    const donor = league.teams[1];
+    const pids = donor.roster.slice(0, count);
+    const teams = league.teams.map((t) =>
+      t.tid === donor.tid ? { ...t, roster: t.roster.filter((p) => !pids.includes(p)) } : t,
+    );
+    const order = teams.map((t) => t.tid).filter((tid) => tid !== league.meta.userTid);
+    return { pids, teams, order };
+  };
+
+  it("signs nobody below the floor, and still takes those above it", () => {
+    const league = makeLeague(0, 1);
+    const { pids: [elitePid, fillerPid], teams, order } = freeUp(league, 2);
+    const players = league.players.map((p) =>
+      p.pid === elitePid ? { ...p, ovr: 95 } : p.pid === fillerPid ? { ...p, ovr: 55 } : p,
+    );
+    const out = runAIFreeAgency(
+      teams, players, 2, mulberry32(1), league.meta.userTid, order, [], "random", 80,
+    );
+    const signed = new Set(out.signings.map((s) => s.pid));
+    expect(signed.has(elitePid)).toBe(true);
+    expect(signed.has(fillerPid)).toBe(false);
+  });
+
+  it("defaults to no floor, so the step-4 pass is unchanged", () => {
+    const league = makeLeague(0, 1);
+    const { pids: [pid], teams, order } = freeUp(league, 1);
+    const players = league.players.map((p) => (p.pid === pid ? { ...p, ovr: 55 } : p));
+    const out = runAIFreeAgency(
+      teams, players, 2, mulberry32(1), league.meta.userTid, order, [], "random",
+    );
+    expect(out.signings.some((s) => s.pid === pid)).toBe(true);
   });
 });

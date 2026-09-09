@@ -5034,6 +5034,39 @@ export const YOUTH_TRIAL_SIGN_LIMIT = 5;
 export const YOUTH_TRIAL_STREAM = 88;
 
 /**
+ * Seeded-stream tag for the second AI free-agency pass (offseason step 6.05),
+ * which shops the pool `trimRosterSurplus` has just created.
+ *
+ * Its own stream rather than the shared rng, so re-running free agency cannot
+ * shift a single downstream draw whatever it signs. The poach and prospect
+ * passes already seed contract length per signing, but the shortfall pass uses
+ * the rng it is handed — see the step's own note for why relying on that pass
+ * being inert would be the fragile version of this.
+ */
+export const MOP_UP_FA_STREAM = 89;
+
+/**
+ * The mop-up pass (offseason step 6.05) only chases free agents at or above
+ * this rating. Below it, the pool is left alone for the user to shop.
+ *
+ * **This is the only lever that tempers the mop-up, and two others were built
+ * and measured first.** A quality *margin* over the club's weakest player at a
+ * position does nothing: for a 70-rated free agent to go unsigned every one of
+ * 626 clubs would have to fail the bar, and a third-division squad's weakest
+ * man sits in the 30s, so somebody always qualifies. Measured across margins 0,
+ * 6, 12, 18 and 25, the best free agent left in the world came out 27, 28, 28,
+ * 28, 28. Capping the *share of clubs* that take part fails for the same
+ * arithmetic: at 12% participation, 75 clubs still clear a pool of ~25.
+ *
+ * A quality floor works because it changes what is contested rather than who
+ * contests it, and it is the realistic reading anyway: a free 85 is worth
+ * reopening your recruitment for in August, a squad player is not. The elite
+ * tail that made a promoted club a title contender for nothing is gone, and the
+ * low-70s depth a small club actually needs is still there.
+ */
+export const MOP_UP_MIN_OVR = 80;
+
+/**
  * How far a well-run academy moves the quality of the user's trial group,
  * in ovr points added to his academy anchor at intake time.
  *

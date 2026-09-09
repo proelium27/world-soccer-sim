@@ -6,6 +6,7 @@ import {
   PLAYER_WILL_CARE_FLOOR, PLAYER_WILL_CARE_CEILING,
   PLAYER_WILL_DROP_STRENGTH, PLAYER_WILL_REFUSAL_DROP, PLAYER_WILL_RISE_BONUS,
   PLAYER_SETTLED_BONUS, PLAYER_SETTLED_SEASONS,
+  STATURE_STRENGTH_HI,
 } from "../constants.js";
 
 /**
@@ -103,6 +104,142 @@ export function refusesMoveToClub(
     clubStature(rosterOf(seller), seller.hype),
     clubStature(rosterOf(buyer), buyer.hype),
   );
+}
+
+/**
+ * The tid of the last club this player was on the books at, or null if he has
+ * never been on any.
+ *
+ * `SeasonStats.tid` is the only place a *departure* into free agency is written
+ * down. `league.transfers` deliberately records free-agent arrivals and not
+ * releases (see negotiation.ts), so the transfer log cannot answer this — but
+ * `accumulateStats` opens a row for every player in a matchday squad, appearance
+ * or not, which makes the stats array the game's per-season record of who he
+ * belonged to.
+ */
+export function lastClubTid(player: Player): number | null {
+  const stats = player.stats ?? [];
+  return stats.length > 0 ? stats[stats.length - 1].tid : null;
+}
+
+/**
+ * The stature a player's own ability entitles him to, on the same 0..1 scale
+ * `clubStature` produces — his rating normalized against the band a club's
+ * squad strength is normalized against.
+ *
+ * Needed because the club he last played for is NOT a sufficient measure of
+ * what he'll accept, and measuring proved it: on the save that prompted this,
+ * an 85-rated free agent had last played for a club of stature 0.158, so
+ * joining a second-division side was a step *up* and nothing gated it. Good
+ * players sit at small clubs all the time, especially in a world where the
+ * pool is stocked by clubs releasing whoever they are deepest at.
+ *
+ * **The band is an individual's, not a squad's, and getting that wrong is the
+ * easy mistake here.** `clubStature` normalizes a club's top-16 MEAN against
+ * STATURE_STRENGTH_LO..HI; feeding one player's rating through that same band
+ * systematically overstates him, because a squad averaging 89 contains players
+ * well above 89. Measured, it put an ovr-95 free agent at a flat 1.0, which no
+ * club in the world can clear — nobody could sign him at all.
+ *
+ * So it runs from the rating at which a player starts caring where he plays up
+ * to the top of the squad-strength band, where an individual really does belong
+ * at the best club there is. Both ends are taken BY REFERENCE from the
+ * constants that already state those two things, so the relationship survives a
+ * retune of either rather than silently drifting. (They currently make this
+ * numerically identical to `statureSensitivity`, which reads well — how much he
+ * cares and how high he expects to be are the same ramp — but that is a
+ * consequence, not the definition.)
+ *
+ * Deliberately the top of what his ability implies rather than the median club
+ * that employs players of his rating (measured at ~0.43 for an 85). This is a
+ * hard gate against skipping the ladder, and it should key off what he *is*,
+ * not off where players of his standard happen to have washed up in a world
+ * whose market has been leaving them lying around.
+ */
+export function abilityStature(playerOvr: number): number {
+  return clamp01(
+    (playerOvr - PLAYER_WILL_CARE_FLOOR) / (STATURE_STRENGTH_HI - PLAYER_WILL_CARE_FLOOR),
+  );
+}
+
+/**
+ * What a free agent measures an offer against: the higher of where he last
+ * played and what his ability entitles him to.
+ *
+ * The max is the load-bearing part. Either half alone has a hole: his last club
+ * misses the 85 who was at a small club, and his ability alone would ignore a
+ * modest player who has spent a career at a giant.
+ */
+function freeAgentFromStature(player: Player, lastClub: number | null): number {
+  const ability = abilityStature(player.ovr);
+  return lastClub == null ? ability : Math.max(lastClub, ability);
+}
+
+/**
+ * Would this free agent turn down a move to `buyer`?
+ *
+ * `signFreeAgent` used to skip the player-will module entirely, which made a
+ * free transfer the one route around a gate this file's own header calls the
+ * fix for "the single worst realism bug in the game": a player who would flatly
+ * refuse to be *bought* by a club would happily *sign* for it, so a third-tier
+ * side could assemble a top-flight squad for nothing. The pool is stocked by
+ * `trimRosterSurplus`, which releases whoever a club is deepest at rather than
+ * whoever is bad, so the players sitting in it are routinely better than the
+ * club shopping for them.
+ *
+ * `from` is `freeAgentFromStature` — the higher of the club that released him
+ * and what his own ability entitles him to. Measuring the last club alone was
+ * tried first and leaks badly; see that function.
+ *
+ * A player at `statureSensitivity` 0 always passes: a squad filler goes
+ * wherever there is a game, which is the care ramp doing its job rather than a
+ * special case.
+ *
+ * Pure, no rng draw. `refusesMoveToClub`'s note applies unchanged: this binds
+ * the user exactly as it binds an AI club.
+ */
+export function refusesFreeAgentSigning(
+  player: Player,
+  buyer: StoredTeam,
+  teams: StoredTeam[],
+  players: Player[],
+): boolean {
+  // Checked before the roster indexes are built: most of a real pool is below
+  // the care floor, and this is on the click path of a page listing thousands.
+  if (statureSensitivity(player.ovr) <= 0) return false;
+  const byPid = new Map(players.map((p) => [p.pid, p]));
+  const rosterOf = (t: StoredTeam): Player[] =>
+    t.roster.map((pid) => byPid.get(pid)).filter((p): p is Player => p != null);
+  const lastTid = lastClubTid(player);
+  const last = lastTid == null ? undefined : teams.find((t) => t.tid === lastTid);
+  const from = freeAgentFromStature(
+    player, last ? clubStature(rosterOf(last), last.hype) : null,
+  );
+  return refusesMove(player.ovr, from, clubStature(rosterOf(buyer), buyer.hype));
+}
+
+/**
+ * `refusesFreeAgentSigning` against a precomputed stature map.
+ *
+ * The club-object form above rebuilds a league-wide player index on every call,
+ * so a per-row loop over a listing page is quadratic — the same trap
+ * `clubStatures` exists to let callers avoid. Build the map once per league and
+ * use this per row.
+ *
+ * A last club the map doesn't know (a tid no longer in the world) reads as no
+ * gate, matching the object form.
+ */
+export function refusesFreeAgentSigningWith(
+  player: Player,
+  buyerStature: number,
+  statureByTid: Map<number, number>,
+): boolean {
+  if (statureSensitivity(player.ovr) <= 0) return false;
+  const lastTid = lastClubTid(player);
+  const from = freeAgentFromStature(
+    player, lastTid == null ? null : statureByTid.get(lastTid) ?? null,
+  );
+  return refusesMove(player.ovr, from, buyerStature);
 }
 
 /** `moveAppeal` for a concrete pair of clubs. */

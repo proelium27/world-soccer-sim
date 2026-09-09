@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { HelpHint, PotHelp } from "../components/HelpHint.js";
@@ -14,6 +14,8 @@ import { PotDisplay } from "../components/PotDisplay.js";
 import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 import { ROSTER_CAP } from "../../core/constants.js";
+import { clubStatures } from "../../core/ai/clubContext.js";
+import { refusesFreeAgentSigningWith } from "../../core/transfers/playerWill.js";
 
 const MAX_LISTED = 25;
 // On the unfiltered "all positions" view, cap how many of any one position can
@@ -42,6 +44,13 @@ export function FreeAgents() {
   const [posFilter, setPosFilter] = useState<Position | "ALL">("ALL");
   const { sort, toggle } = useTableSort<FaSortKey>("ovr", "desc");
   const potView = usePotentialView();
+  // One pass per league rather than per row: the object form of the refusal
+  // rebuilds a league-wide player index on every call, which on a 25-row table
+  // over a 19,000-player pool is the quadratic case clubStatures warns about.
+  const statures = useMemo(
+    () => (league ? clubStatures(league.teams, league.players) : new Map<number, number>()),
+    [league],
+  );
 
   if (!league) {
     return <p className="p-3">Loading...</p>;
@@ -104,7 +113,9 @@ export function FreeAgents() {
         <HelpHint>
           Unsigned players you can add on a free transfer (no fee), at a wage based on their
           rating. Released veterans and youngsters nobody kept both end up here. Your own academy's
-          crop is on the Youth Intake page.
+          crop is on the Youth Intake page. A free transfer still has to appeal to the player:
+          someone who was a regular at a much bigger club won't drop to you just because there's no
+          fee, so build the club up and he'll take the call.
         </HelpHint>
       </h4>
       {atCap && (
@@ -153,6 +164,11 @@ export function FreeAgents() {
             {shownPlayers.map((p) => {
               const terms = contractTerms(p, league.season);
               const unaffordable = midSeason && terms.salary > (userTeam?.budget ?? 0);
+              // Shown rather than hidden, so the reason a good player is out of
+              // reach is legible instead of the list just being mysteriously
+              // short — same call the Transfers page makes for a protected star.
+              const refuses = userTeam != null
+                && refusesFreeAgentSigningWith(p, statures.get(userTeam.tid) ?? 0, statures);
               return (
                 <tr key={p.pid}>
                   <td><WatchToggle pid={p.pid} name={p.name} /></td>
@@ -167,18 +183,24 @@ export function FreeAgents() {
                   <td className="text-end"><PotDisplay player={p} /></td>
                   <td className="text-end">{league.season - p.born}</td>
                   <td className="text-end">
-                    <button
-                      className="btn btn-sm btn-primary text-nowrap"
-                      disabled={simming || atCap || unaffordable}
-                      title={
-                        unaffordable
-                          ? "Mid-season signings charge the season's wages up front"
-                          : undefined
-                      }
-                      onClick={() => signFreeAgentAction(p.pid)}
-                    >
-                      Sign {terms.lengthSeasons}y &middot; {formatWeeklyWage(terms.salary)}
-                    </button>
+                    {refuses ? (
+                      <span className="text-muted small text-nowrap">
+                        Won&apos;t drop to your level
+                      </span>
+                    ) : (
+                      <button
+                        className="btn btn-sm btn-primary text-nowrap"
+                        disabled={simming || atCap || unaffordable}
+                        title={
+                          unaffordable
+                            ? "Mid-season signings charge the season's wages up front"
+                            : undefined
+                        }
+                        onClick={() => signFreeAgentAction(p.pid)}
+                      >
+                        Sign {terms.lengthSeasons}y &middot; {formatWeeklyWage(terms.salary)}
+                      </button>
+                    )}
                   </td>
                 </tr>
               );

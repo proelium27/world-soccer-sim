@@ -606,7 +606,7 @@ export function Manual() {
             <li>Every player ages a year and develops (or declines) per the <a href="#development">development model</a>.</li>
             <li>Retirements: veterans from the mid-30s onward, plus players nobody has signed (<a href="#development">details</a>).</li>
             <li>The youth academy delivers each club's new intake (<a href="#youth">details</a>).</li>
-            <li>AI clubs sign free agents, both to fill holes and to poach any that upgrade a spot they're already stocked at, then trim their squads back to 25.</li>
+            <li>AI clubs sign free agents, both to fill holes and to poach any that upgrade a spot they're already stocked at, then trim their squads back to 25 &mdash; and then go round the pool a second time, because that trim is what puts most of the year's free agents there in the first place.</li>
             <li>The summer transfer window opens and the AI-to-AI market runs.</li>
             <li>New season: budgets get settled, base allocation in and the full season's wages out (<a href="#finance">details</a>).</li>
           </ol>
@@ -2304,10 +2304,27 @@ export function Manual() {
           <p>
             Don't count on picking up a gem for free, though. Each offseason the AI clubs work the
             free-agent pool before you do, and they don't just fill holes: any club will grab a
-            genuinely useful free agent to upgrade a spot it's already stocked at. By the time you
-            get to the Free Agents page, most of the good ones are gone and what's left skews toward
-            squad filler and reclamation projects. A real bargain still turns up now and then, but
-            it's the exception.
+            genuinely useful free agent to upgrade a spot it's already stocked at. They now get that
+            look <em>after</em> the squad trimming that fills the pool in the first place, which is
+            the point &mdash; most of a year's free agents are players a club released for being
+            surplus at a position rather than for being bad, and those used to sit untouched until
+            the following summer with you the only manager in the world able to sign them. By the
+            time you get to the Free Agents page the genuinely elite ones are gone. What's left is
+            usually ten to thirty players in the 70s, which is real depth for most clubs and a
+            proper signing for a small one, but nobody who'd walk into a good top-division eleven.
+            For that, use loans or the transfer market.
+          </p>
+          <p>
+            <strong>A free transfer still has to appeal to the player.</strong> No fee doesn't mean
+            no persuading: a good player won't drop to your level just because he's available,
+            exactly as he'd refuse a move there if you tried to buy him. It's judged against
+            whichever is higher, the club that released him or the level his ability entitles him
+            to &mdash; both matter, because a very good player who happens to have been at a small
+            club is still a very good player. How much he cares scales with how good he is, so
+            squad players go wherever there's a game and only real quality turns anyone down. The
+            Free Agents page tells you when that's what's stopping a signing, and the answer is to
+            build the club up: the same player will take your call once you've got somewhere worth
+            joining.
           </p>
           <p>
             The pool also doesn't just pile up anymore. A player who goes a full season with nobody

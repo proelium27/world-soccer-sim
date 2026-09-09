@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   statureSensitivity, refusesMove, moveAppeal, settledMultiplier, joinedSeasons,
+  refusesFreeAgentSigning, refusesFreeAgentSigningWith,
 } from "../../../src/core/transfers/playerWill.js";
+import { clubStatures } from "../../../src/core/ai/clubContext.js";
+import type { Player } from "../../../src/core/players/types.js";
+import type { StoredTeam } from "../../../src/core/teams/clubs.js";
 import {
   PLAYER_WILL_CARE_FLOOR, PLAYER_WILL_CARE_CEILING, PLAYER_SETTLED_SEASONS,
 } from "../../../src/core/constants.js";
@@ -88,5 +92,79 @@ describe("joinedSeasons", () => {
       { pid: 1, season: 8, loanReturn: true },
     ]);
     expect(joined.get(1)).toBe(3);
+  });
+});
+
+describe("refusesFreeAgentSigning", () => {
+  // The pool is stocked by trimRosterSurplus, which releases whoever a club is
+  // deepest at rather than whoever is bad — so it routinely holds players
+  // better than the club shopping for them. Before this gate a free transfer
+  // was the one route around the whole module.
+  const bigTid = 1;
+  const smallTid = 2;
+
+  /** A world of two clubs: one strong and hyped, one weak, plus one free agent. */
+  const world = (faOvr: number, lastTid: number | null) => {
+    const mk = (pid: number, ovr: number): Player => ({
+      pid, name: `p${pid}`, pos: "CM", nationality: "England", born: 0, ovr,
+      potential: ovr, ratings: {} as never, contract: { salary: 1, expiresSeason: 9 },
+      stats: [], hist: [],
+    } as unknown as Player);
+    const big = { tid: bigTid, hype: 90, roster: [] as number[] } as unknown as StoredTeam;
+    const small = { tid: smallTid, hype: 5, roster: [] as number[] } as unknown as StoredTeam;
+    const players: Player[] = [];
+    for (let i = 0; i < 20; i++) { const p = mk(100 + i, 88); big.roster.push(p.pid); players.push(p); }
+    for (let i = 0; i < 20; i++) { const p = mk(200 + i, 45); small.roster.push(p.pid); players.push(p); }
+    const fa = mk(999, faOvr);
+    // The stats line is how a free agent's last club is recovered at all.
+    if (lastTid != null) (fa as { stats: { tid: number }[] }).stats = [{ tid: lastTid } as never];
+    players.push(fa);
+    return { teams: [big, small], players, fa, big, small };
+  };
+
+  it("keeps a star released by a big club out of a small one", () => {
+    const w = world(PLAYER_WILL_CARE_CEILING + 5, bigTid);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(true);
+  });
+
+  it("lets that same star join a club of his own level", () => {
+    const w = world(PLAYER_WILL_CARE_CEILING + 5, bigTid);
+    expect(refusesFreeAgentSigning(w.fa, w.big, w.teams, w.players)).toBe(false);
+  });
+
+  it("leaves a squad filler free to join anyone", () => {
+    // The care ramp, not a special case: a fringe player takes the game time.
+    const w = world(PLAYER_WILL_CARE_FLOOR - 1, bigTid);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(false);
+  });
+
+  it("judges a player with no senior career on his ability alone", () => {
+    // He still has a level even with nowhere to have played it. On the save
+    // that prompted this an 81-rated free agent had no club on record and
+    // signed for a third-division side; ability is what stops that.
+    const w = world(PLAYER_WILL_CARE_CEILING + 5, null);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(true);
+    expect(refusesFreeAgentSigning(w.fa, w.big, w.teams, w.players)).toBe(false);
+  });
+
+  it("takes the higher of his last club and his ability, not just the last club", () => {
+    // The hole this closes, measured on a real save: an 85-rated free agent
+    // had last played for a club of stature 0.158, so joining a second-division
+    // side read as a step UP and nothing gated it. Good players sit at small
+    // clubs, especially in a world whose pool is stocked by clubs releasing
+    // whoever they are deepest at.
+    const w = world(PLAYER_WILL_CARE_CEILING + 5, smallTid);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(true);
+  });
+
+  it("agrees with the precomputed-stature form, which is what listing pages use", () => {
+    // Two implementations of one rule is exactly how a page and the action
+    // behind its button start disagreeing.
+    const w = world(PLAYER_WILL_CARE_CEILING + 5, bigTid);
+    const statures = clubStatures(w.teams, w.players);
+    for (const buyer of w.teams) {
+      expect(refusesFreeAgentSigningWith(w.fa, statures.get(buyer.tid)!, statures))
+        .toBe(refusesFreeAgentSigning(w.fa, buyer, w.teams, w.players));
+    }
   });
 });

@@ -14,6 +14,7 @@ import {
 } from "./contracts.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
 import { affordable, type SpendPolicy } from "./finance/debt.js";
+import { refusesFreeAgentSigning } from "./transfers/playerWill.js";
 
 /**
  * True while a player the user signed from free agency is inside his
@@ -150,12 +151,22 @@ export function runAIFreeAgency(
    * wonderkids this pass exists to sign — see `potentialBar`.
    */
   model: ProgressionModel = "random",
+  /**
+   * Only consider free agents at or above this rating. 0 is the shipped
+   * behaviour and the default, so the step-4 call is byte for byte what it
+   * always was; the post-trim mop-up (offseason step 6.05) passes
+   * MOP_UP_MIN_OVR so it hoovers up the elite tail and leaves the rest of the
+   * pool for the user. See that constant for why a quality floor is the only
+   * lever here that works.
+   */
+  poolMinOvr = 0,
 ): { teams: StoredTeam[]; players: Player[]; signings: { pid: number; toTid: number }[] } {
   const prospectPot = potentialBar(AI_PROSPECT_MIN_POT, model);
   const playerMap = new Map(players.map((p) => [p.pid, { ...p }]));
   const teamMap = new Map(teams.map((t) => [t.tid, { ...t, roster: [...t.roster] }]));
 
-  let pool = [...freeAgentPids(teams, players, activeLoans)];
+  let pool = [...freeAgentPids(teams, players, activeLoans)]
+    .filter((pid) => (playerMap.get(pid)?.ovr ?? 0) >= poolMinOvr);
   // Each free-agent arrival is logged by the caller as a fee-0 transfer (see
   // offseason.ts) so the player's club-by-season history registers the move.
   const signings: { pid: number; toTid: number }[] = [];
@@ -493,6 +504,12 @@ export function signFreeAgent(
   // one however little it costs. Absent policy = the old cash-in-hand rule, so
   // nothing that does not pass one changes behaviour.
   if (spend?.embargoed) return { teams, players };
+  // A good player will not drop down for a free transfer any more than he will
+  // for a fee. Without this, free agency is the one route around the player-will
+  // module (see refusesFreeAgentSigning), and it is the route the pool is
+  // stocked for: trimRosterSurplus releases whoever a club is deepest at, not
+  // whoever is worst.
+  if (refusesFreeAgentSigning(player, team, teams, players)) return { teams, players };
   const wageCharge = phase === "regular" ? contractTerms(player, season).salary : 0;
   if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
@@ -549,6 +566,11 @@ export function signToAcademy(
   if (!team || team.academyRoster.length >= ACADEMY_ROSTER_CAP) {
     return { teams, players };
   }
+  // The same gate signFreeAgent takes, and it is needed here for a sharper
+  // reason: this route has an age cap and NO rating cap, so without it the
+  // academy is a cheaper door to the identical exploit — a 21-year-old free
+  // agent of any rating parked on a flat stipend instead of an ovr-cubic wage.
+  if (refusesFreeAgentSigning(player, team, teams, players)) return { teams, players };
   const wageCharge = phase === "regular" ? academyContractTerms(season).salary : 0;
   // Payable out of the overdraft, and deliberately NOT gated on the embargo:
   // a club barred from the transfer market can still run its own academy, which
