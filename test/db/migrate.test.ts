@@ -265,6 +265,26 @@ describe("migrateLeague", () => {
     expect(migrated.played).toEqual(league.played);
   });
 
+  it("keeps the whistle on a box score, rather than rebuilding it away", () => {
+    const league = simThrough(makeLeague(0, 1), "game", mulberry32(8));
+    const migrated = migrateLeague(league);
+    const played = league.played.filter((m) => m.boxScore.finalClock !== undefined);
+    // Guard against passing because the engine stopped recording it at all.
+    expect(played.length).toBeGreaterThan(0);
+    for (const [i, m] of migrated.played.entries()) {
+      expect(m.boxScore.finalClock, `match ${i}`).toBe(league.played[i].boxScore.finalClock);
+    }
+  });
+
+  /**
+   * The test above exists because `migrateLeague` rebuilds each box score, and
+   * a rebuild that lists its keys is a whitelist: every field added to
+   * `BoxScore` later is dropped on load, silently and for every save. The
+   * generic deep-equality test above did catch it, but it reports
+   * "expected Array(291) to deeply equal Array(291)" and leaves the reader to
+   * find which key went missing — the same reason `liveRatings.test.ts` names
+   * the tackle/interception alias in a test of its own.
+   */
   it("backfills academyRoster to [] on pre-Academy saves", () => {
     const league = makeLeague(0, 1);
     const preAcademy = {
