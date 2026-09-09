@@ -10,6 +10,7 @@ export {
   storedPlayerRows,
   storedCareerRows,
   storedRetireeRows,
+  storedPlayedRows,
 } from "./leagueDb.js";
 
 export { loadCrests, saveCrests, deleteCrests } from "./crestDb.js";

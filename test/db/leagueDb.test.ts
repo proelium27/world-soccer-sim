@@ -77,6 +77,7 @@ beforeEach(async () => {
   await db.clear("players");
   await db.clear("careers");
   await db.clear("retirees");
+  await db.clear("played");
   // Otherwise this tab still believes the pool it wrote in the previous test is
   // on disk, and would write only a diff against a store that was just wiped.
   resetWriteCache();
