@@ -94,10 +94,28 @@ describe("AI prospect retention", () => {
     const prospects = Array.from({ length: AI_PROSPECT_SLOTS + 1 }, (_, i) =>
       makeProspect(9_100_000 + i, season, AI_PROSPECT_MIN_POT + i),
     );
-    const players = [...league.players, ...prospects];
+    // A full depth chart at CB, guaranteed rather than assumed.
+    //
+    // The allowance is AI_PROSPECT_SLOTS **beyond** the chart, so a prospect the
+    // chart takes on merit spends no slot and the club legitimately carries more
+    // than the bare constant. Stripping the club's own prospects can leave it
+    // short of `ROSTER_COMPOSITION.CB` real centre-backs, at which point one of
+    // these ovr-30 synthetics fills the chart and six survive — correct
+    // behaviour that reads exactly like the cap having failed. It happened: the
+    // count of prospects `cleanTarget` removes moved from 10 to 6 when world
+    // generation gained an age model, and this assertion had been resting on it.
+    const squadCbs = Array.from({ length: ROSTER_COMPOSITION.CB }, (_, i) =>
+      ({
+        ...makeProspect(9_200_000 + i, season, AI_PROSPECT_MIN_POT - 20),
+        born: season - 26,
+        ovr: 60,
+      }) as Player,
+    );
+    const filler = [...squadCbs, ...prospects];
+    const players = [...league.players, ...filler];
     const teams = league.teams.map((t) =>
       t.tid === target.tid
-        ? { ...target, roster: [...target.roster, ...prospects.map((p) => p.pid)] }
+        ? { ...target, roster: [...target.roster, ...filler.map((p) => p.pid)] }
         : t,
     );
 

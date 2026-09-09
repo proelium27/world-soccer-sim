@@ -161,6 +161,8 @@ export function drawGenerationAge(r: number): number {
  */
 type AgeOffsets = { physical: Map<number, number>; skill: Map<number, number> };
 const ageOffsetCache = new Map<string, AgeOffsets>();
+/** Module scope: `generatePlayer` runs ~15,650 times per world. */
+const PHYSICAL_KEY_SET: ReadonlySet<string> = new Set(PHYSICAL_KEYS);
 
 function ageCurveOffsets(model: ProgressionModel, gkShift: number): AgeOffsets {
   const key = `${model}:${gkShift}`;
@@ -276,11 +278,10 @@ export function generatePlayer(
   const groupBase = ageAdjusted
     ? generationBaseForAge(base, age, pos, model)
     : { physical: base, skill: base };
-  const physical = new Set<string>(PHYSICAL_KEYS);
   const ratings = {} as PlayerRatings;
   for (const key of SKILL_KEYS as readonly SkillKey[]) {
     ratings[key] = rollRating(
-      rng, tiers[key], physical.has(key) ? groupBase.physical : groupBase.skill, spread,
+      rng, tiers[key], PHYSICAL_KEY_SET.has(key) ? groupBase.physical : groupBase.skill, spread,
     );
   }
 
