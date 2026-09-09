@@ -5,7 +5,7 @@ import type { NationalityWeights } from "./nationalities.js";
 import {
   YOUTH_AGE, YOUTH_INTAKE_MIN, YOUTH_INTAKE_MAX, YOUTH_BASE_OFFSET,
   YOUTH_CONTRACT_LENGTH, ROSTER_COMPOSITION,
-  YOUTH_BASE_FLOOR, YOUTH_BASE_SOFTNESS, SCOUT_POSITION_SHARE,
+  YOUTH_BASE_FLOOR, YOUTH_BASE_SOFTNESS, SCOUT_POSITION_SHARE, type ProgressionModel,
 } from "../constants.js";
 
 /**
@@ -131,6 +131,14 @@ export function generateYouthIntake(
    * that runs on the shared stream re-rolls the world.
    */
   directions?: { positions?: readonly Position[] },
+  /**
+   * The save's development model. Matters more here than anywhere else it is
+   * threaded: a trialist's listed potential is the *only* thing the Youth
+   * Intake screen gives the user to choose five of twelve on, and he is not
+   * re-estimated until the end of his first offseason — i.e. long after the
+   * decision. Scaling a draw, never the count, so this cannot re-roll a world.
+   */
+  model: ProgressionModel = "random",
 ): { players: Player[]; nextPid: number } {
   const count = countOverride ?? YOUTH_INTAKE_MIN
     + Math.floor(rng() * (YOUTH_INTAKE_MAX - YOUTH_INTAKE_MIN + 1));
@@ -142,7 +150,7 @@ export function generateYouthIntake(
   for (let i = 0; i < count; i++) {
     const pos = weightedPosition(rng(), cdf);
     const p = generatePlayer(
-      rng, pos, base, pid++, YOUTH_AGE, season, genSeed, homeCountry, nationalities,
+      rng, pos, base, pid++, YOUTH_AGE, season, genSeed, homeCountry, nationalities, model,
     );
     p.contract.expiresSeason = season + YOUTH_CONTRACT_LENGTH;
     players.push(p);

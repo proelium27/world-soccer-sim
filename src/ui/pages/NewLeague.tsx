@@ -8,6 +8,7 @@ import { useLeague } from "../context/LeagueContext.js";
 import { readLeagueFileText } from "../../db/exportImport.js";
 import {
   DIFFICULTIES, DIFFICULTY_ORDER, DEFAULT_DIFFICULTY, INTL_MIN_POOL, type Difficulty,
+  type ProgressionModel,
 } from "../../core/constants.js";
 import { confederationOf, isEligibleNation } from "../../core/international/index.js";
 import { PICKABLE_NATIONALITIES } from "../components/NationalityEditor.js";
@@ -186,6 +187,11 @@ export function NewLeague() {
   // lifetime like the difficulty above, because turning it off mid-dynasty
   // would freeze an allocation the league had already earned its way into.
   const [rollingCoefficients, setRollingCoefficients] = useState(true);
+  // Whether careers follow a predictable arc or are re-rolled every summer.
+  // Offered here because it shapes what the whole save feels like, but unlike
+  // the two settings above it is NOT fixed for the save's lifetime — it scales
+  // rng draws without changing their count, so God Mode can flip it later.
+  const [progressionModel, setProgressionModel] = useState<ProgressionModel>("random");
   const [pending, setPending] = useState<LeagueStore | null>(null);
   const [saving, setSaving] = useState(false);
   // Every path on this page that writes a save goes through one gate. Building a
@@ -390,6 +396,7 @@ export function NewLeague() {
     const rng = mulberry32(seed);
     const generated = createLeagueState(
       tid, rng, seed, difficulty, world.competitions, rollingCoefficients, userNation,
+      progressionModel,
     );
     // A roster import is orthogonal to who manages: it replaces squads, and a
     // spectator watching real clubs is exactly as sensible as managing one.
@@ -480,7 +487,7 @@ export function NewLeague() {
           setPending(league);
           return;
         }
-        trackEvent("league_created", { country, tier: startTier, spectate, roster: !!activeRoster, difficulty, rollingCoefficients });
+        trackEvent("league_created", { country, tier: startTier, spectate, roster: !!activeRoster, difficulty, rollingCoefficients, progressionModel });
         await setLeague(league, crestsFor(league));
         navigate("/dashboard");
       } finally {
@@ -494,7 +501,7 @@ export function NewLeague() {
     await gate.run(async () => {
       setSaving(true);
       try {
-        trackEvent("league_created", { country, tier: startTier, spectate, roster: !!activeRoster, difficulty, rollingCoefficients });
+        trackEvent("league_created", { country, tier: startTier, spectate, roster: !!activeRoster, difficulty, rollingCoefficients, progressionModel });
         const customized = applyTeamIdentities(pending, teams);
         // Resolved after the rename, not before: this screen is where a club
         // gets the name a badge was picked for.
@@ -1224,6 +1231,43 @@ export function NewLeague() {
             ? "Your league sends more clubs when they do well in Europe, fewer when they don't."
             : "Every country keeps the same number of places forever."}{" "}
           Fixed once you start.
+        </p>
+      </div>
+
+      <div className="mb-3">
+        <h6 className="text-muted text-uppercase small fw-semibold mb-2">
+          How players develop{" "}
+          <HelpHint label="What changes?">
+            Normally a player's summer is a roll of the dice: a squad player can add
+            eight points out of nowhere, and a prospect can go backwards for no reason
+            you'll ever see. Steady careers take the dice out. Everyone still improves
+            through their early twenties, holds through their peak, and falls away from
+            thirty — faster every year after that — but a player follows his own arc
+            instead of lurching about. How much he plays still speeds it up or slows it
+            down, and players still turn out differently from each other; the difference
+            is that who a player becomes is settled in his talent rather than re-rolled
+            every summer, so your scouting reports are worth a lot more.
+          </HelpHint>
+        </h6>
+        <div className="form-check form-switch">
+          <input
+            type="checkbox"
+            className="form-check-input"
+            id="steady-progression"
+            checked={progressionModel === "steady"}
+            onChange={(e) => setProgressionModel(e.target.checked ? "steady" : "random")}
+          />
+          <label className="form-check-label" htmlFor="steady-progression">
+            Steady careers, no random growth
+          </label>
+        </div>
+        {/* Unlike the two settings above, this one really can be changed later, so
+            the line says so rather than repeating "fixed once you start". */}
+        <p className="text-muted small mt-2 mb-0">
+          {progressionModel === "steady"
+            ? "Players follow their own arc. No more nobody-to-superstar summers."
+            : "Players can break out or fall apart in a single summer."}{" "}
+          You can change this later in God Mode.
         </p>
       </div>
 

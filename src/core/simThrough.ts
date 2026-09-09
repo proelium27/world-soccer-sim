@@ -39,6 +39,7 @@ import { initInternationalCampaign } from "./international/index.js";
 import { reviewSeason, tablesByCompetition } from "./manager/index.js";
 import { playPromotionPlayoffs } from "./promotionPlayoff.js";
 import { POWER_SNAPSHOT_INTERVAL } from "./constants.js";
+import { pointsDeductionMap } from "./finance/debt.js";
 
 /**
  * Salt for the per-league-match rng stream, keeping it clear of every other
@@ -643,7 +644,10 @@ export function simThrough(
   const promotionPlayoffs = enteringOffseason
     ? playPromotionPlayoffs(
       league.competitions, currentTeams, currentPlayers,
-      tablesByCompetition(currentTeams, league.competitions, allPlayed),
+      tablesByCompetition(
+        currentTeams, league.competitions, allPlayed,
+        pointsDeductionMap(league.debtSanctions, league.season),
+      ),
       league.lid, league.season,
     )
     : league.promotionPlayoffs;

@@ -29,6 +29,15 @@ export function BallIcon({ size = 11 }: { size?: number }) {
   );
 }
 
+/** Assists. A boot, the way every match graphic marks one. */
+export function BootIcon({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M2 7h6.5l3.2 3.4c1.5 1.6 3.6 2.5 5.8 2.5H21a1 1 0 0 1 1 1v3.6a1.5 1.5 0 0 1-1.5 1.5H3.5A1.5 1.5 0 0 1 2 17.6z" />
+    </svg>
+  );
+}
+
 export function CardIcon({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size * 1.25} viewBox="0 0 16 20" fill="currentColor" aria-hidden="true">
@@ -215,24 +224,82 @@ export function EventBody({
   }
 }
 
+/**
+ * The same event as a plain sentence.
+ *
+ * Two callers, and both are about being read rather than looked at: the live
+ * viewer announces the newest event to a screen reader, and every timeline row
+ * carries one as its hidden label — the visual row says which club it belongs
+ * to by which column it sits in, which conveys nothing to someone who cannot
+ * see the columns.
+ *
+ * Kept beside EventBody deliberately. They describe the same event and would
+ * drift apart the moment they lived in different files.
+ */
+export function eventSummary(
+  event: MatchEvent,
+  playerName: (pid: number) => string,
+  clubName?: string,
+): string {
+  const who = (i: number) => playerName(event.pids[i]);
+  const club = clubName ? `${clubName}. ` : "";
+  const at = `${formatClock(event.clock)} ${club}`;
+  switch (event.type) {
+    case "goal":
+      return `${at}Goal, ${who(0)}${event.pids[1] !== undefined ? `, assisted by ${who(1)}` : ""}.`;
+    case "yellow_card":
+      return `${at}Yellow card, ${who(0)}.`;
+    case "red_card":
+      return `${at}Red card, ${who(0)}.`;
+    case "substitution":
+      return `${at}Substitution, ${who(1)} on for ${who(0)}.`;
+    case "penalty":
+      return `${at}Penalty, ${who(0)} steps up.`;
+    case "injury":
+      return `${at}Injury, ${who(0)} goes down.`;
+    case "corner":
+      return `${at}Corner.`;
+    case "shot_saved":
+      return `${at}Shot saved, ${who(0)}.`;
+    case "shot_blocked":
+      return `${at}Shot blocked, ${who(0)}.`;
+    case "shot_off_target":
+      return `${at}Shot off target, ${who(0)}.`;
+    default:
+      return "";
+  }
+}
+
 export function TimelineRow({
   event,
   playerName,
+  clubName,
 }: {
   event: MatchEvent;
   playerName: (pid: number) => string;
+  /** Which club this belongs to. Sighted readers get it from the column; nobody else does. */
+  clubName?: string;
 }) {
   const body = <EventBody event={event} playerName={playerName} />;
   if (!body) return null;
+  // The clock chip is real text in the middle column, so the hidden summary
+  // deliberately leads with the club rather than repeating the minute.
+  const label = clubName ? <span className="visually-hidden">{clubName}. </span> : null;
+  const cell = (
+    <>
+      {label}
+      {body}
+    </>
+  );
   return (
     <div className={`bs-ev bs-ev--${event.side}`}>
-      <div className="bs-ev-cell bs-ev-cell--home">{event.side === "home" && body}</div>
+      <div className="bs-ev-cell bs-ev-cell--home">{event.side === "home" && cell}</div>
       <div className="bs-ev-spine">
         <span className={`bs-ev-chip stat-num ${chipTone(event.type)}`}>
           {formatClock(event.clock)}
         </span>
       </div>
-      <div className="bs-ev-cell bs-ev-cell--away">{event.side === "away" && body}</div>
+      <div className="bs-ev-cell bs-ev-cell--away">{event.side === "away" && cell}</div>
     </div>
   );
 }

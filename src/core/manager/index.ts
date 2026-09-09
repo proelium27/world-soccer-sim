@@ -30,6 +30,7 @@ import { deriveExpectations, actualFinish } from "./expectation.js";
 import { judgeSeason, type SeasonVerdict } from "./confidence.js";
 import { generateJobOffers, managerReputation, type OfferMoves } from "./jobOffers.js";
 import { currentStint, type ManagerState } from "./types.js";
+import { pointsDeductionMap } from "../finance/debt.js";
 
 export * from "./types.js";
 export * from "./expectation.js";
@@ -42,12 +43,13 @@ export function tablesByCompetition(
   teams: Pick<StoredTeam, "tid" | "compId">[],
   competitions: Competition[],
   played: PlayedMatch[],
+  deductions?: ReadonlyMap<number, number>,
 ): Map<number, StandingsRow[]> {
   const out = new Map<number, StandingsRow[]>();
   for (const comp of competitions) {
     const tids = teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
     const tidSet = new Set(tids);
-    out.set(comp.id, computeStandings(tids, played.filter((m) => tidSet.has(m.home))));
+    out.set(comp.id, computeStandings(tids, played.filter((m) => tidSet.has(m.home)), deductions));
   }
   return out;
 }
@@ -113,7 +115,15 @@ export function reviewSeason(input: ReviewInput): ManagerReview {
   // would belong to a season the user is no longer in. Pinned by a test.
   if (!mine || !stint) return { manager, verdict: null };
 
-  const tables = tablesByCompetition(teams, league.competitions, played);
+  // With the deduction applied, so the board judges the finish the club
+  // actually recorded. That is the whole reason a sanction is sporting rather
+  // than a direct hit on confidence: it reaches the board through the finish,
+  // and `deriveExpectations` — which must stay unmovable by any transfer
+  // decision — needs no knowledge of it at all.
+  const tables = tablesByCompetition(
+    teams, league.competitions, played,
+    pointsDeductionMap(league.debtSanctions, league.season),
+  );
   const table = tables.get(mine.compId);
   const finish = table ? actualFinish(table, userTid) : null;
   // No matches played (a save advanced straight through, or a world with an

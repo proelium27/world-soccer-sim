@@ -241,7 +241,15 @@ describe("simArchive career windows", () => {
     const rng = mulberry32(88);
     aged = createLeagueState(0, rng, 0, "normal", englandCompetitions());
     for (let i = 0; i < 3; i++) {
-      aged = simThrough(aged, "season", rng);
+      // playSeason, not a bare simThrough: simThrough HALTS before the user's
+      // own cup final, so a single call finishes a season only when his club
+      // didn't reach one. Left bare, an unfinished season hands simOffseason a
+      // league still in the regular phase, it silently does nothing, and the
+      // fixture quietly ends up a season short. That is invisible here until
+      // it isn't: with two seasons instead of three nobody accumulates more
+      // history than the window, detachCareer finds nothing to cut, and this
+      // block's first test fails on an empty map far from the cause.
+      aged = playSeason(aged, rng);
       aged = simOffseason(aged, rng);
     }
   }, 600_000);
@@ -293,7 +301,8 @@ describe("simArchive news and cup histories", () => {
     const rng = mulberry32(95);
     aged = createLeagueState(0, rng, 0, "normal", englandCompetitions());
     for (let i = 0; i < 3; i++) {
-      aged = simThrough(aged, "season", rng);
+      // See the note on the career fixture above — same hazard, same fix.
+      aged = playSeason(aged, rng);
       aged = simOffseason(aged, rng);
     }
   }, 600_000);

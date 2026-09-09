@@ -5,6 +5,8 @@ import { FREE_AGENT_TID } from "../../src/core/transfers/negotiation.js";
 import type { NewsEvent } from "../../src/core/newsEvents.js";
 import type { AwardNews } from "../../src/core/awardNews.js";
 import type { TrophyNews } from "../../src/core/trophyNews.js";
+import type { DebtSanction } from "../../src/core/finance/debt.js";
+import { debtNewsBySeason } from "../../src/core/debtNews.js";
 import {
   NEWS_WORLD_TRANSFER_FEE,
   NEWS_WORLD_CAREER_GOALS,
@@ -266,5 +268,79 @@ describe("continental reallocation in the feed", () => {
     if (item?.kind !== "continental") throw new Error("expected a continental item");
     expect(item.data.from).toBe(4);
     expect(item.data.to).toBe(3);
+  });
+});
+
+describe("financial sanctions in the feed", () => {
+  const sanction = (over: Partial<DebtSanction> = {}): DebtSanction => ({
+    season: 2026, tid: USER_TID, balance: -50_000_000, limit: 60_000_000,
+    embargo: true, pointsDeduction: 0, consecutiveSeasons: 1, ...over,
+  });
+
+  it("reports your own club's sanction", () => {
+    const timeline = buildSeasonTimeline([], [], audience, [], [], [], [], [sanction()]);
+    expect(timeline.map((i) => i.kind)).toEqual(["debt"]);
+  });
+
+  /**
+   * A sanction is only ever handed to the user's club, but it belongs to the
+   * CLUB — so one he ran into trouble and then left still serves it, and a club
+   * in your league starting on minus six is news whoever manages it.
+   */
+  it("reports one in your league, and ignores one somewhere else", () => {
+    const timeline = buildSeasonTimeline(
+      [], [], audience, [], [], [], [],
+      [sanction({ tid: 3 }), sanction({ tid: 9 })],
+    );
+    const tids = timeline.flatMap((i) => (i.kind === "debt" ? [i.data.tid] : []));
+    expect(tids).toEqual([3]);
+  });
+
+  /**
+   * An embargo governs the summer window that is about to open, so it has to be
+   * read before the business it forbids rather than filed with the season that
+   * caused it.
+   */
+  it("opens the season, ahead of the summer window", () => {
+    const transfers: CompletedTransfer[] = [
+      { pid: 1, fromTid: 1, toTid: 0, fee: 2000, season: 2026, window: "summer" },
+    ];
+    const events: NewsEvent[] = [
+      { type: "hattrick", pid: 2, tid: 0, season: 2026, matchday: 10, detail: 3 },
+    ];
+    const timeline = buildSeasonTimeline(
+      transfers, events, audience, [], [], [], [], [sanction()],
+    );
+    expect(timeline.map((i) => i.kind)).toEqual(["debt", "transfer", "news"]);
+  });
+
+  it("carries the depth and the deduction, so the row can say which penalty it is", () => {
+    const timeline = buildSeasonTimeline(
+      [], [], audience, [], [], [], [],
+      [sanction({ pointsDeduction: 9, consecutiveSeasons: 2 })],
+    );
+    const item = timeline.find((i) => i.kind === "debt");
+    if (item?.kind !== "debt") throw new Error("expected a debt item");
+    expect(item.data.pointsDeduction).toBe(9);
+    expect(item.data.consecutiveSeasons).toBe(2);
+    expect(item.data.balance).toBe(-50_000_000);
+  });
+});
+
+describe("debtNewsBySeason", () => {
+  it("buckets by the season the sanction applies to", () => {
+    const rows: DebtSanction[] = [
+      { season: 3, tid: 0, balance: -1, limit: 2, embargo: true, pointsDeduction: 0, consecutiveSeasons: 1 },
+      { season: 4, tid: 0, balance: -2, limit: 2, embargo: true, pointsDeduction: 6, consecutiveSeasons: 2 },
+    ];
+    const map = debtNewsBySeason(rows);
+    expect(map.get(3)?.[0].consecutiveSeasons).toBe(1);
+    expect(map.get(4)?.[0].pointsDeduction).toBe(6);
+    expect(map.get(5)).toBeUndefined();
+  });
+
+  it("is empty for a save that has never been in the red", () => {
+    expect(debtNewsBySeason(undefined).size).toBe(0);
+    expect(debtNewsBySeason([]).size).toBe(0);
   });
 });

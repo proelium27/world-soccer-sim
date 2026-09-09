@@ -7,6 +7,7 @@ import { awardNewsScope } from "../core/awardNews.js";
 import type { TrophyNews } from "../core/trophyNews.js";
 import type { PromotionNews } from "../core/promotionNews.js";
 import type { ContinentalNews } from "../core/continentalNews.js";
+import type { DebtSanction } from "../core/finance/debt.js";
 import { WINTER_WINDOW_OPEN_MATCHDAY } from "../core/calendar.js";
 import { NEWS_WORLD_TRANSFER_FEE } from "../core/constants.js";
 
@@ -16,7 +17,8 @@ export type FeedItem =
   | { kind: "trophy"; order: number; data: TrophyNews }
   | { kind: "promotion"; order: number; data: PromotionNews }
   | { kind: "award"; order: number; data: AwardNews }
-  | { kind: "continental"; order: number; data: ContinentalNews };
+  | { kind: "continental"; order: number; data: ContinentalNews }
+  | { kind: "debt"; order: number; data: DebtSanction };
 
 /**
  * Trophies and honours are settled once the football is over, so they sort
@@ -92,6 +94,7 @@ export function buildSeasonTimeline(
   trophies: TrophyNews[] = [],
   continental: ContinentalNews[] = [],
   promotions: PromotionNews[] = [],
+  sanctions: DebtSanction[] = [],
 ): FeedItem[] {
   const { userTid, userCompId, compOf } = audience;
 
@@ -166,13 +169,28 @@ export function buildSeasonTimeline(
       .filter((p) => userCompId !== undefined
         && (p.d1CompId === userCompId || p.d2CompId === userCompId))
       .map((p): FeedItem => ({ kind: "promotion", order: SEASON_END_ORDER, data: p })),
+    // A sanction is in force from the moment the season opens, so it sorts at
+    // the top of it rather than at the end of the season that caused it — and
+    // ahead of the summer window (RANK below), because an embargo governs the
+    // business the player is about to try to do.
+    //
+    // Shown for the user's club and for anyone in his competition. Only his
+    // club is ever assessed, so the second half looks redundant and is not: a
+    // sanction belongs to the CLUB, so one he ran into trouble and then left
+    // still serves it, and a club in your league starting on minus six is news
+    // whoever manages it. At most one row a season either way, so unlike the
+    // transfers and honours above there is no volume here to tier for.
+    ...sanctions
+      .filter((d) => d.tid === userTid || inUserComp(d.tid))
+      .map((d): FeedItem => ({ kind: "debt", order: PRESEASON_ORDER, data: d })),
   ];
 
-  // Within one order key, business comes before what happened on the pitch,
-  // and a season ends in the order the story does: who won what, then who was
-  // best, then what it changed about next season'''s competition.
+  // Within one order key: what you are allowed to do first, then business, then
+  // what happened on the pitch. A season ends in the order the story does: who
+  // won what, then who was best, then what it changed about next season's
+  // competition.
   const RANK: Record<FeedItem["kind"], number> = {
-    transfer: 0, news: 1, trophy: 2, promotion: 3, award: 4, continental: 5,
+    debt: 0, transfer: 1, news: 2, trophy: 3, promotion: 4, award: 5, continental: 6,
   };
   const rank = (item: FeedItem) => RANK[item.kind];
 

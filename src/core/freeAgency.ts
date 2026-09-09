@@ -2,15 +2,18 @@ import type { Player, Position } from "./players/types.js";
 import { POSITIONS } from "./players/types.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import type { ActiveLoan } from "./loans.js";
+import { isBorrowed } from "./loanOwnership.js";
 import {
   ROSTER_COMPOSITION, ROSTER_CAP, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
   ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, PROSPECT_AGE_MAX, YOUTH_TRIAL_SIGN_LIMIT,
   AI_PROSPECT_SLOTS, AI_PROSPECT_MAX_AGE, AI_PROSPECT_MIN_POT,
+  potentialBar, type ProgressionModel,
 } from "./constants.js";
 import {
   contractTerms, extendContract, seasonSalaryForOvr, extendAcademyContract, academyContractTerms,
 } from "./contracts.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
+import { affordable, type SpendPolicy } from "./finance/debt.js";
 
 /**
  * True while a player the user signed from free agency is inside his
@@ -140,7 +143,15 @@ export function runAIFreeAgency(
   userTid: number,
   signingOrderTids: number[],
   activeLoans: ActiveLoan[] = [],
+  /**
+   * The save's development model, for the prospect bar only. A steady save
+   * lists lower potentials for the same players (an honest forecast sits below
+   * an optimistic one), so a fixed bar would quietly stop protecting the
+   * wonderkids this pass exists to sign — see `potentialBar`.
+   */
+  model: ProgressionModel = "random",
 ): { teams: StoredTeam[]; players: Player[]; signings: { pid: number; toTid: number }[] } {
+  const prospectPot = potentialBar(AI_PROSPECT_MIN_POT, model);
   const playerMap = new Map(players.map((p) => [p.pid, { ...p }]));
   const teamMap = new Map(teams.map((t) => [t.tid, { ...t, roster: [...t.roster] }]));
 
@@ -283,7 +294,7 @@ export function runAIFreeAgency(
     const held = team.roster
       .map((pid) => playerMap.get(pid)!)
       .filter(
-        (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= AI_PROSPECT_MIN_POT,
+        (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot,
       ).length;
 
     for (let slot = held; slot < AI_PROSPECT_SLOTS; slot++) {
@@ -291,7 +302,7 @@ export function runAIFreeAgency(
       const best = pool
         .map((pid) => playerMap.get(pid)!)
         .filter(
-          (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= AI_PROSPECT_MIN_POT,
+          (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot,
         )
         .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid)[0];
       if (!best) break;
@@ -335,9 +346,12 @@ export function trimRosterSurplus(
   userTid: number,
   season: number,
   activeLoans: ActiveLoan[] = [],
+  /** See `runAIFreeAgency`'s `model`, and `potentialBar`. */
+  model: ProgressionModel = "random",
 ): StoredTeam[] {
   const playerMap = new Map(players.map((p) => [p.pid, p]));
   const onLoan = new Set(activeLoans.map((l) => l.pid));
+  const prospectPot = potentialBar(AI_PROSPECT_MIN_POT, model);
 
   return teams.map((t) => {
     if (t.tid === userTid) return t;
@@ -388,7 +402,7 @@ export function trimRosterSurplus(
         (p) =>
           !kept.has(p.pid)
           && season - p.born <= AI_PROSPECT_MAX_AGE
-          && p.potential >= AI_PROSPECT_MIN_POT,
+          && p.potential >= prospectPot,
       )
       .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid);
     for (const p of prospects.slice(0, AI_PROSPECT_SLOTS)) kept.add(p.pid);
@@ -418,16 +432,27 @@ export function keepsDepthFloor(
 
 /**
  * Release a player from a team's roster back to the free agent pool. No-op
- * if the release would take the squad below the positional depth floor.
+ * if the release would take the squad below the positional depth floor, or if
+ * the club doesn't own him.
+ *
+ * The ownership check is what stops a club dumping a player it has in on loan.
+ * His contract belongs to his parent, so "releasing" him would free nobody and
+ * make nobody a free agent — it would drop the pid off this roster while the
+ * loan stayed live, which is a free early recall plus the wage relief that goes
+ * with it, and the loan mechanic deliberately offers neither. It only became
+ * reachable when the user could borrow; `activeLoans` defaults to empty so no
+ * existing caller changes behaviour.
  */
 export function releasePlayer(
   teams: StoredTeam[],
   players: Player[],
   tid: number,
   pid: number,
+  activeLoans: ActiveLoan[] = [],
 ): StoredTeam[] {
   const team = teams.find((t) => t.tid === tid);
   if (!team) return teams;
+  if (isBorrowed(activeLoans, tid, pid)) return teams;
   const playerMap = new Map(players.map((p) => [p.pid, p]));
   if (!keepsDepthFloor(team, playerMap, pid)) return teams;
   return teams.map((t) =>
@@ -453,6 +478,7 @@ export function signFreeAgent(
   season: number,
   phase: "regular" | "offseason",
   activeLoans: ActiveLoan[] = [],
+  spend?: SpendPolicy,
 ): { teams: StoredTeam[]; players: Player[] } {
   if (!freeAgentPids(teams, players, activeLoans).has(pid)) {
     return { teams, players };
@@ -463,8 +489,12 @@ export function signFreeAgent(
   }
   const player = players.find((p) => p.pid === pid);
   if (!player) return { teams, players };
+  // A free transfer is still a registration, so an embargoed club cannot make
+  // one however little it costs. Absent policy = the old cash-in-hand rule, so
+  // nothing that does not pass one changes behaviour.
+  if (spend?.embargoed) return { teams, players };
   const wageCharge = phase === "regular" ? contractTerms(player, season).salary : 0;
-  if (wageCharge > team.budget) return { teams, players };
+  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
   // The one-season transfer hold is keyed to the season the player actually
   // joins the XI: a mid-season signing plays this season; an offseason signing
@@ -506,6 +536,7 @@ export function signToAcademy(
   season: number,
   phase: "regular" | "offseason",
   activeLoans: ActiveLoan[] = [],
+  spend?: SpendPolicy,
 ): { teams: StoredTeam[]; players: Player[] } {
   if (!freeAgentPids(teams, players, activeLoans).has(pid)) {
     return { teams, players };
@@ -519,7 +550,11 @@ export function signToAcademy(
     return { teams, players };
   }
   const wageCharge = phase === "regular" ? academyContractTerms(season).salary : 0;
-  if (wageCharge > team.budget) return { teams, players };
+  // Payable out of the overdraft, and deliberately NOT gated on the embargo:
+  // a club barred from the transfer market can still run its own academy, which
+  // is both how real sanctions work and the one route out of trouble that
+  // costs almost nothing.
+  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
   return {
     teams: teams.map((t) =>
@@ -548,6 +583,7 @@ export function promoteFromAcademy(
   pid: number,
   season: number,
   phase: "regular" | "offseason",
+  spend?: SpendPolicy,
 ): { teams: StoredTeam[]; players: Player[] } {
   const team = teams.find((t) => t.tid === tid);
   if (!team || !team.academyRoster.includes(pid) || team.roster.length >= ROSTER_CAP) {
@@ -556,7 +592,10 @@ export function promoteFromAcademy(
   const player = players.find((p) => p.pid === pid);
   if (!player) return { teams, players };
   const wageCharge = phase === "regular" ? contractTerms(player, season).salary : 0;
-  if (wageCharge > team.budget) return { teams, players };
+  // A promotion is not a new registration — he is already at the club — so
+  // this takes the overdraft and ignores the embargo, or a sanction would
+  // strand a club's own graduates in the academy.
+  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
   return {
     teams: teams.map((t) =>
@@ -757,6 +796,7 @@ export function signTrialist(
   pid: number,
   season: number,
   phase: "regular" | "offseason" = "offseason",
+  spend?: SpendPolicy,
 ): { teams: StoredTeam[]; players: Player[] } {
   const team = teams.find((t) => t.tid === tid);
   if (!team || !(team.youthTrialists ?? []).includes(pid)) return { teams, players };
@@ -770,7 +810,8 @@ export function signTrialist(
   // and picks him up with everyone else, but nothing stops the page being
   // opened in March: the trial list survives until the next rollover.
   const wageCharge = phase === "regular" ? terms.salary : 0;
-  if (wageCharge > team.budget) return { teams, players };
+  // Overdraft yes, embargo no — see signToAcademy.
+  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
   return {
     teams: teams.map((t) =>
