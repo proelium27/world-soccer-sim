@@ -1211,6 +1211,7 @@ export function simMatchDetailed(
       home: homeLines,
       away: awayLines,
       events,
+      finalClock,
     },
   };
 }

@@ -36,6 +36,7 @@ import { emptyLine } from "../../engine/attribution.js";
 import { computeMatchRating } from "../../engine/matchRating.js";
 import type { MatchLineups, SideLineup } from "./lineups.js";
 import { eventMinute } from "./liveMatch.js";
+import { MATCH_SECONDS } from "../../engine/constants.js";
 
 /** One player's afternoon so far. */
 export interface LiveLine {
@@ -87,6 +88,7 @@ function sideState(
   side: "home" | "away",
   events: MatchEvent[],
   minute: number,
+  finalClock?: number,
 ): LiveSide {
   // Everyone who appears in the box score is a starter or came on for one, so
   // the team sheet already names the whole cast and no second input is needed.
@@ -95,9 +97,27 @@ function sideState(
   for (const s of lineup.starters) slotOf.set(s.pid, s.slot);
   for (const s of lineup.subs) slotOf.set(s.on, s.slot);
 
+  // Two parallel records, and the distinction between them is the whole reason
+  // the live rating used to disagree with the box score it sits beside.
+  //
+  // `from`/`until` are MINUTE LABELS, for display: the minute a change is
+  // reported at, which is `eventMinute`'s ceiling of elapsed time.
+  //
+  // `fromClock`/`untilClock` are the raw countdown clocks, for ARITHMETIC.
+  // Minutes played has to be `round((enter - exit) / 60)` — the engine's
+  // `minutesFor` rounds the DURATION — and subtracting one ceiled label from
+  // another is not that number. A man withdrawn at 45:10 is reported in the
+  // 46th minute and has played 45 minutes; `46 - 0` says 46, the rating is
+  // damped by minutes, and the two surfaces printed different numbers for one
+  // afternoon.
   const from = new Map<number, number>();
   const until = new Map<number, number>();
-  for (const s of lineup.starters) from.set(s.pid, 0);
+  const fromClock = new Map<number, number>();
+  const untilClock = new Map<number, number>();
+  for (const s of lineup.starters) {
+    from.set(s.pid, 0);
+    fromClock.set(s.pid, MATCH_SECONDS);
+  }
 
   const lines = new Map<number, PlayerMatchLine>();
   for (const pid of pids) lines.set(pid, emptyLine(pid));
@@ -157,14 +177,21 @@ function sideState(
         if (mine) {
           const sent = line(e.pids[0]);
           if (sent) sent.redCards++;
-          if (!until.has(e.pids[0])) until.set(e.pids[0], at);
+          if (!until.has(e.pids[0])) {
+            until.set(e.pids[0], at);
+            untilClock.set(e.pids[0], e.clock);
+          }
         }
         break;
       case "substitution":
         if (mine) {
           const [off, on] = e.pids;
-          if (!until.has(off)) until.set(off, at);
+          if (!until.has(off)) {
+            until.set(off, at);
+            untilClock.set(off, e.clock);
+          }
           from.set(on, at);
+          fromClock.set(on, e.clock);
         }
         break;
       default:
@@ -172,11 +199,25 @@ function sideState(
     }
   }
 
+  // Where the clock stands for a man who is still on. During playback that is
+  // simply the minute being watched; once playback reaches the whistle it has to
+  // be the whistle itself, since stoppage runs past the final event and the
+  // engine measured him to the whistle. Without a recorded `finalClock` (a box
+  // score written before 2026-09-09) the playback clock is the best answer
+  // available and runs a little short, exactly as it always did.
+  const playbackClock = MATCH_SECONDS - minute * 60;
+  const stillOnClock =
+    finalClock !== undefined && minute >= eventMinute(finalClock) ? finalClock : playbackClock;
+
   const build = (pid: number): LiveLine | null => {
     const start = from.get(pid);
     if (start === undefined) return null; // Hasn't come on yet.
     const left = until.get(pid) ?? null;
-    const minutesPlayed = Math.max(0, (left ?? minute) - start);
+    // The engine's own arithmetic (`minutesFor`): round the duration, never the
+    // endpoints. See the comment on `fromClock` above.
+    const enter = fromClock.get(pid) ?? MATCH_SECONDS;
+    const exit = untilClock.get(pid) ?? stillOnClock;
+    const minutesPlayed = Math.max(0, Math.round((enter - exit) / 60));
     const line = lines.get(pid)!;
     line.minutesPlayed = minutesPlayed;
     const slot = slotOf.get(pid) ?? null;
@@ -241,10 +282,11 @@ export function liveMatchState(
   lineups: MatchLineups,
   events: MatchEvent[],
   minute: number,
+  finalClock?: number,
 ): LiveMatchState {
   return {
-    home: sideState(lineups.home, "home", events, minute),
-    away: sideState(lineups.away, "away", events, minute),
+    home: sideState(lineups.home, "home", events, minute, finalClock),
+    away: sideState(lineups.away, "away", events, minute, finalClock),
   };
 }
 

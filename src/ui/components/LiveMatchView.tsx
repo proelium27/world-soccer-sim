@@ -197,7 +197,10 @@ export function LiveMatchView({
   skipLabel,
 }: LiveMatchViewProps) {
   const [showAllEvents, setShowAllEvents] = useState(true);
-  const playback = useMatchPlayback(match.events, { autoStart: true });
+  const playback = useMatchPlayback(match.events, {
+    autoStart: true,
+    finalClock: match.finalClock,
+  });
   const { minute, finished } = playback;
 
   // Two elevens side by side need real width, and this column loses ~500px of
@@ -215,8 +218,8 @@ export function LiveMatchView({
   // to now, so ratings and marks move as the match does. O(events) on ~200
   // events, against the feed and rail this screen already re-derives per tick.
   const live = useMemo(
-    () => (lineups ? liveMatchState(lineups, match.events, minute) : null),
-    [lineups, match.events, minute],
+    () => (lineups ? liveMatchState(lineups, match.events, minute, match.finalClock) : null),
+    [lineups, match.events, match.finalClock, minute],
   );
 
   const teamOf = useMemo(() => {

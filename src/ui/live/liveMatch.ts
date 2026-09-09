@@ -29,11 +29,19 @@ export interface LiveMatch {
   away: number;
   matchday: number;
   events: MatchEvent[];
+  /** The whistle, when the box score recorded it. See `BoxScore.finalClock`. */
+  finalClock?: number;
 }
 
 /** A league fixture as something the viewer can play. */
 export function toLiveMatch(m: PlayedMatch): LiveMatch {
-  return { home: m.home, away: m.away, matchday: m.matchday, events: m.boxScore.events };
+  return {
+    home: m.home,
+    away: m.away,
+    matchday: m.matchday,
+    events: m.boxScore.events,
+    finalClock: m.boxScore.finalClock,
+  };
 }
 
 /** Regulation length. Stoppage pushes real matches past this. */
@@ -55,11 +63,20 @@ export function eventMinute(clock: number): number {
 
 /**
  * The last minute playback has to reach: 90, or later when stoppage ran long.
- * Read off the events rather than assumed, since stoppage length varies with
- * how eventful the half was.
+ *
+ * Prefers the whistle itself (`BoxScore.finalClock`) and falls back to the last
+ * event, which is all a box score written before 2026-09-09 offers. The fallback
+ * systematically runs SHORT — stoppage carries on past the final event, measured
+ * by up to two minutes — so playback stopped before the whistle and a player
+ * still on the pitch was credited only as far as the last thing that happened.
+ * See `liveRatings`, which has to reproduce the stored minutes exactly.
  */
-export function finalMinute(events: MatchEvent[]): number {
+export function finalMinute(events: MatchEvent[], finalClock?: number): number {
   let last = REGULATION_MINUTES;
+  if (finalClock !== undefined) {
+    const m = eventMinute(finalClock);
+    if (m > last) last = m;
+  }
   for (const e of events) {
     const m = eventMinute(e.clock);
     if (m > last) last = m;
