@@ -6,7 +6,9 @@ import {
 import type { StoredTeam } from "../teams/clubs.js";
 import type { LeagueStore } from "../leagueState.js";
 import { transferWindowState } from "./window.js";
-import { departsAtRollover, isForSale, isForSaleOrRefusing, scoutedValue, windowSeed } from "./negotiation.js";
+import {
+  departsAtRollover, isForSale, isForSaleOrRefusing, movedThisWindow, scoutedValue, windowSeed,
+} from "./negotiation.js";
 import { scoutingNoiseSd } from "../finance/scouting.js";
 import { resolveXI } from "../lineup/resolveXI.js";
 import { teamSlots } from "../lineup/formations.js";
@@ -120,6 +122,10 @@ export function recommendedTransfers(
   const statures = clubStatures(league.teams, league.players);
   const userStature = statures.get(user.tid) ?? 0;
 
+  // Nor is anyone who has already moved clubs this window — the offer engine
+  // would refuse him, and a recommendation it refuses is a dead end.
+  const moved = movedThisWindow(league.transfers, ws.season, ws.window);
+
   const candidates: TransferTarget[] = [];
   for (const team of league.teams) {
     if (team.tid === user.tid) continue;
@@ -132,6 +138,7 @@ export function recommendedTransfers(
       // considers, so changing a filter surfaces a genuinely new list. Checked
       // before the gates below because they're plain field comparisons.
       if (!playerMatchesFilters(player, filters, ws.season)) continue;
+      if (moved.has(pid)) continue;
       if (protectedPids.has(pid)) continue;
       // Nor does anyone who'd simply turn this club down (see playerWill.ts) —
       // recommending a target the offer engine will refuse is just a dead end.
@@ -255,6 +262,13 @@ export function saleGateFor(
   playerMap: Map<number, Player>,
 ): (player: Player, team: StoredTeam) => string | null {
   const loanedPids = new Set(league.activeLoans.map((l) => l.pid));
+  // Empty with both windows shut, which is the honest answer: the Watchlist is
+  // readable then and nothing is locked, it is simply that nothing can move at
+  // all. Whether a window is open is gated at the offer, not here.
+  const gateWindow = transferWindowState(league);
+  const movedPids = gateWindow.open
+    ? movedThisWindow(league.transfers, gateWindow.season, gateWindow.window)
+    : new Set<number>();
   const protectedPids = protectedStarPids(
     lastCompletedSeason(league), league.teams, league.players, league.competitions, user.tid,
     userProtectedStarBar(league.difficulty),
@@ -265,6 +279,10 @@ export function saleGateFor(
 
   return (player, team) => {
     if (loanedPids.has(player.pid)) return "Out on loan";
+    // Before the judgement calls below, because this one is a plain fact about
+    // what just happened rather than a view his club holds — and it tells the
+    // reader something useful, that waiting for the next window is the move.
+    if (movedPids.has(player.pid)) return "Just moved clubs this window";
     if (departsAtRollover(league, player)) return "Free agent at season's end";
     if (protectedPids.has(player.pid)) return protectedReason;
     if (!isForSaleOrRefusing(team, playerMap, player.pid, league.competitions)) {

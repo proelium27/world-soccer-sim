@@ -8,6 +8,7 @@ import type { ActiveLoan } from "../loans.js";
 import { deriveLeagueContexts } from "./clubContext.js";
 import { keepValueToClub, perceivedValueToClub, hasPositionalGap } from "./evaluate.js";
 import { moveAppealBetween, settledMultiplier, joinedSeasons } from "../transfers/playerWill.js";
+import { movedThisWindow } from "../transfers/negotiation.js";
 import { trueTransferValue } from "../finance/valuation.js";
 import { clampBudget, financeScale, financeScaleFor } from "../finance/budget.js";
 import { tierOf } from "../competitions.js";
@@ -20,7 +21,7 @@ import {
   AI_MARKET_MAX_BUYS, AI_MARKET_MAX_SELLS,
   AI_MARKET_RESERVE_FRACTION_MIN, AI_MARKET_RESERVE_FRACTION_MAX,
   AI_NEED_BUY_MIN_SURPLUS, AI_NEED_BUY_RESERVE_RELIEF,
-  DIVISION_2_REFUSAL_OVR_THRESHOLD,
+  divisionRefusalOvr,
 } from "../constants.js";
 import type { Difficulty } from "../constants.js";
 import type { TransferClause } from "../transfers/clauses.js";
@@ -196,18 +197,27 @@ export function runAITransferMarket(
         // zero here and simply never clears the reservation — this is what
         // stops world-class players pouring downhill into weak clubs.
         const jittered = rawJittered * moveAppealBetween(player, sellerCtx, buyerCtx);
-        // A tier-2 club never buys a player at or above the Division 2
-        // ceiling threshold — the ceiling sweep would just confiscate him
-        // back to a tier-1 club the same offseason (summer) or he'd sit
-        // illegally in Division 2 for half a season (winter). Prevention
+        // A club below the top flight never buys a player at or above its own
+        // tier's ceiling threshold — the ceiling sweep would just confiscate
+        // him straight back up the same offseason (summer) or he'd sit
+        // illegally below the line for half a season (winter). Prevention
         // beats correction: a 15-season audit found 44% of all sweep moves
         // were players this market had sold into Division 2 that same
         // window. Guard placed AFTER the jitter draw — skipping the draw
         // for filtered buyers would shift every subsequent buyer's jitter
         // (see the documented RNG-stream-order lesson).
+        //
+        // Reads `divisionRefusalOvr(tier)`, which answers Infinity at tier 1,
+        // rather than testing for tier 2 against the tier-2 constant. It was
+        // written the second way when two divisions were all there were, and
+        // was the one buy path left behind when third divisions landed (#308)
+        // — `inboundOffers` and `runAILoanMarket` were both generalized then.
+        // The gap was not cosmetic: it left tier-3 buyers entirely unguarded,
+        // so the market sold over-ceiling players into third divisions all
+        // summer and the post-market sweep hauled them back up, which is where
+        // most of the game's move-twice-in-one-window chains came from.
         if (
-          tierByTid.get(buyer.tid) === 2 &&
-          player.ovr >= DIVISION_2_REFUSAL_OVR_THRESHOLD
+          player.ovr >= divisionRefusalOvr(tierByTid.get(buyer.tid) ?? 1)
         ) continue;
         // A club filling a genuine positional gap doesn't hold out for the usual
         // bargain margin — it'll pay a fair price (down to the seller's full
@@ -256,7 +266,19 @@ export function runAITransferMarket(
   const hypeByTid = new Map(teams.map((t) => [t.tid, t.hype]));
   const buys = new Map<number, number>();
   const sells = new Map<number, number>();
-  const moved = new Set<number>();
+  // One move per player per window. Seeded from anything already logged for
+  // this window rather than starting empty, because this run is not the whole
+  // window: `enforceDivisionCeilings` moves players immediately before and
+  // after it, and the user trades in the same window afterwards. Without the
+  // seed a player swept up a division in the morning could be sold on in the
+  // afternoon (see movedThisWindow for the measurements).
+  //
+  // Seeded here rather than filtered out of the candidate loop above, and that
+  // placement is load-bearing: every jitter draw happens while candidates are
+  // assembled, so skipping a player up there would shift the draws for every
+  // player after him (the RNG-stream-order rule). By the time this set is
+  // read, all randomness is already spent.
+  const moved = movedThisWindow(transfers, season, window);
   const executed: CompletedTransfer[] = [];
 
   for (const c of candidates) {

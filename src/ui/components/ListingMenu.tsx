@@ -10,6 +10,12 @@ export interface ListingMenuProps {
   loanListed: boolean;
   /** False when loaning him out would drop the squad below the depth floor at his position. */
   keepsDepthFloor: boolean;
+  /**
+   * True when he has already changed clubs in the open window, so nobody will
+   * bid until the next one (see movedThisWindow). Loaning him out is still
+   * fine — a loan isn't a transfer of ownership.
+   */
+  movedThisWindow?: boolean;
   /** Loan listings are only accepted while a transfer window is open, same as the Loans page. */
   windowOpen: boolean;
   onToggleTransferListed: (pid: number, listed: boolean) => void;
@@ -32,9 +38,17 @@ export interface ListingMenuProps {
  */
 export function ListingMenu({
   player, season, transferListed, loanListed, keepsDepthFloor, windowOpen,
+  movedThisWindow = false,
   onToggleTransferListed, onToggleLoanListed,
 }: ListingMenuProps) {
-  const saleLocked = faTransferLocked(player, season);
+  const faLocked = faTransferLocked(player, season);
+  const saleLocked = faLocked || movedThisWindow;
+  const saleLockedLabel = faLocked
+    ? "Can't sell yet (just signed)"
+    : "Can't sell yet (just moved)";
+  const saleLockedTitle = faLocked
+    ? `You signed him from free agency, so he can't be sold until ${seasonYear(player.faSignedSeason! + 1)}.`
+    : "He's already changed clubs this window, so nobody will bid until the next one opens.";
   const listed = transferListed || loanListed;
   const listedWhat = transferListed && loanListed
     ? "Listed for transfer and for loan."
@@ -64,9 +78,9 @@ export function ListingMenu({
             type="button"
             className="dropdown-item"
             disabled
-            title={`You signed him from free agency, so he can't be sold until ${seasonYear(player.faSignedSeason! + 1)}.`}
+            title={saleLockedTitle}
           >
-            Can&apos;t sell yet (just signed)
+            {saleLockedLabel}
           </button>
         </li>
       ) : (

@@ -8,6 +8,7 @@ import { transferWindowState } from "./window.js";
 import { faTransferLocked } from "../freeAgency.js";
 import {
   windowSeed, departsAtRollover, acquisitionWageCharge, hasRosterRoom, executeTransfer,
+  movedThisWindow,
 } from "./negotiation.js";
 import { deriveLeagueContexts } from "../ai/clubContext.js";
 import type { ProposedClause } from "./clauses.js";
@@ -143,6 +144,11 @@ export function inboundOfferCandidates(league: LeagueStore): InboundOfferCandida
   // someone else's asset, orphaning the live loan.
   const borrowed = borrowedPids(league.activeLoans, userTid);
 
+  // Anyone who has already changed clubs this window is settled until it shuts,
+  // which on this side of the market is what stops the user buying a player
+  // cheap and selling him on in the same window (see movedThisWindow).
+  const moved = movedThisWindow(league.transfers, ws.season, ws.window);
+
   const candidates: InboundOfferCandidate[] = [];
   for (const pid of user.roster) {
     if (borrowed.has(pid)) continue;
@@ -152,6 +158,7 @@ export function inboundOfferCandidates(league: LeagueStore): InboundOfferCandida
     // A free agent the user just signed is under a one-season transfer hold —
     // no club can bid on him until it clears (see faTransferLocked).
     if (faTransferLocked(player, league.season)) continue;
+    if (moved.has(pid)) continue;
 
     // Keep-side, exactly as an AI seller prices its own players, plus the
     // settling-in premium (see ValuationSide / playerWill.ts). The user's stars

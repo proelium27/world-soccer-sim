@@ -3,7 +3,9 @@ import { makeLeague } from "../../helpers/league.js";
 import type { LeagueStore } from "../../../src/core/leagueState.js";
 import { runAITransferMarket } from "../../../src/core/ai/transferMarket.js";
 import { keepsDepthFloor } from "../../../src/core/freeAgency.js";
-import { ROSTER_CAP, DIVISION_2_REFUSAL_OVR_THRESHOLD } from "../../../src/core/constants.js";
+import {
+  ROSTER_CAP, DIVISION_2_REFUSAL_OVR_THRESHOLD, divisionRefusalOvr,
+} from "../../../src/core/constants.js";
 import { tierOf } from "../../../src/core/competitions.js";
 import type { StoredTeam } from "../../../src/core/teams/clubs.js";
 import type { Player } from "../../../src/core/players/types.js";
@@ -156,30 +158,40 @@ describe("runAITransferMarket", () => {
     expect(guarded.transfers.some((t) => t.pid === victim.pid)).toBe(false);
   });
 
-  it("never sells a player at/above the D2 ceiling threshold to a tier-2 club", () => {
-    // Prevention twin of the ceiling sweep: a tier-2 club buying a >=70 ovr
-    // player would just have him confiscated back to tier 1 (summer) or host
-    // him illegally for half a season (winter). Verified load-bearing by
-    // neutering the guard: without it this same fresh-league market sells
-    // ~40 elite players into tier-2 clubs per window; with it, zero.
+  it("never sells a player at/above his buyer's OWN tier's ceiling, at any tier", () => {
+    // Prevention twin of the ceiling sweep: a club below the top flight buying
+    // a player over its tier's line would just have him confiscated straight
+    // back up (summer) or host him illegally for half a season (winter).
+    // Verified load-bearing by neutering the guard: without it this same
+    // fresh-league market sells ~40 elite players into tier-2 clubs per window;
+    // with it, zero.
+    //
+    // Asserted against `divisionRefusalOvr(tier)` for EVERY tier rather than
+    // against the tier-2 constant for tier-2 buyers, which is what this test
+    // used to do. That narrower version is why the market kept its
+    // two-divisions-only guard through #308: third-division buyers were
+    // entirely unchecked and the test could not see it. A tier-scoped
+    // assertion is vacuous for exactly the tier nobody remembered to add.
     const { league, result } = runOnFresh(7);
     const ovrByPid = new Map(league.players.map((p) => [p.pid, p.ovr]));
     const tierOfTid = (tid: number) =>
       tierOf(league.competitions, league.teams.find((t) => t.tid === tid)!.compId);
 
-    const eliteToT2 = result.transfers.filter(
-      (t) => (ovrByPid.get(t.pid) ?? 0) >= DIVISION_2_REFUSAL_OVR_THRESHOLD && tierOfTid(t.toTid) === 2,
+    const overCeiling = result.transfers.filter(
+      (t) => (ovrByPid.get(t.pid) ?? 0) >= divisionRefusalOvr(tierOfTid(t.toTid)),
     );
-    expect(eliteToT2).toEqual([]);
+    expect(overCeiling).toEqual([]);
 
-    // Non-vacuous: elite players do move (to tier-1 clubs), and tier-2 clubs
-    // do actively buy (sub-threshold players) — only the combination is banned.
+    // Non-vacuous three ways: elite players do move (to tier-1 clubs, which
+    // have no ceiling), lower-tier clubs do actively buy (sub-threshold
+    // players), and the world really does have a third division to guard.
     expect(result.transfers.some(
       (t) => (ovrByPid.get(t.pid) ?? 0) >= DIVISION_2_REFUSAL_OVR_THRESHOLD && tierOfTid(t.toTid) === 1,
     )).toBe(true);
     expect(result.transfers.some(
       (t) => (ovrByPid.get(t.pid) ?? 0) < DIVISION_2_REFUSAL_OVR_THRESHOLD && tierOfTid(t.toTid) === 2,
     )).toBe(true);
+    expect(result.transfers.some((t) => tierOfTid(t.toTid) === 3)).toBe(true);
   });
 
   it("routes a clearly-surplus striker to a club that badly needs one", () => {

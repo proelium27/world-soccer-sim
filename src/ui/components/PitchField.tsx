@@ -40,6 +40,8 @@ export interface PitchFieldProps {
    * what a pitch is for.
    */
   releasablePids?: Set<number>;
+  /** Pids that have already changed clubs in the open window (see movedThisWindow). */
+  movedPids?: Set<number>;
   refusingPids?: Set<number>;
   /**
    * Players in on loan. They belong to another club, so their chip offers none
@@ -71,6 +73,7 @@ export function PitchField({
   showDepthChart,
   season,
   releasablePids = EMPTY_PIDS,
+  movedPids = EMPTY_PIDS,
   refusingPids = EMPTY_PIDS,
   borrowedPids = EMPTY_PIDS,
   transferListedPids = EMPTY_PIDS,
@@ -314,6 +317,7 @@ export function PitchField({
                       transferListed={transferListedPids.has(p.pid)}
                       loanListed={loanListedPids.has(p.pid)}
                       keepsDepthFloor={releasablePids.has(p.pid)}
+                      movedThisWindow={movedPids.has(p.pid)}
                       windowOpen={windowOpen}
                       onToggleTransferListed={onToggleTransferListed}
                       onToggleLoanListed={onToggleLoanListed}

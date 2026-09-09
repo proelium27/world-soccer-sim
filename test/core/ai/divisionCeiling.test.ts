@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { makeLeague } from "../../helpers/league.js";
-import { enforceDivisionCeilings } from "../../../src/core/ai/divisionCeiling.js";
+import { enforceDivisionCeilings, landingTierFor } from "../../../src/core/ai/divisionCeiling.js";
 import {
   ROSTER_CAP, DIVISION_2_REFUSAL_OVR_THRESHOLD, divisionRefusalOvr,
 } from "../../../src/core/constants.js";
@@ -9,6 +9,24 @@ import { createLeagueState } from "../../../src/core/leagueState.js";
 import { mulberry32 } from "../../../src/engine/rng.js";
 
 const USER_TID = 0;
+
+describe("landingTierFor", () => {
+  it("stops at the deepest division whose own ceiling he does not clear", () => {
+    // Under tier 3's bar: he stays put.
+    expect(landingTierFor(divisionRefusalOvr(3) - 1, 3)).toBe(3);
+    // Over tier 3's but under tier 2's: one division, no further.
+    expect(landingTierFor(divisionRefusalOvr(3), 3)).toBe(2);
+    // Over both: straight to the top flight, because there is no division in
+    // between he would be allowed to stay in.
+    expect(landingTierFor(divisionRefusalOvr(2), 3)).toBe(1);
+  });
+
+  it("always terminates, because tier 1 has no ceiling", () => {
+    // divisionRefusalOvr(1) is Infinity, so no rating walks past the top flight.
+    expect(landingTierFor(Number.MAX_SAFE_INTEGER, 3)).toBe(1);
+    expect(landingTierFor(Number.MAX_SAFE_INTEGER, 1)).toBe(1);
+  });
+});
 
 describe("enforceDivisionCeilings", () => {
   it("moves an AI Division 2 player at/above the OVR threshold to a Division 1 club", () => {
@@ -249,6 +267,44 @@ describe("enforceDivisionCeilings", () => {
     // ceiling exists to prevent.
     const landed = teams.find((t) => t.roster.includes(star.pid))!;
     expect(tierOf(league.competitions, landed.compId)).toBe(1);
+  });
+
+  it("records that as ONE transfer, and leaves the division it passed over untouched", () => {
+    // A sweep spanning two divisions used to log a transfer and bank a fee per
+    // rung, which is the one place in the game a player still changed clubs
+    // twice inside a single window (see movedThisWindow). The intermediate club
+    // could not affect where he ended up — the receiving pool is drawn from the
+    // seller's country, which never changes on the way up — so it was an
+    // artifact of the loop, and one that pocketed the difference between a
+    // second-tier fee and a top-flight one for holding him no time at all.
+    const league = threeTierLeague();
+    const d3 = league.competitions.find((c) => c.tier === 3)!;
+    const d2 = league.competitions.find((c) => c.tier === 2)!;
+    const d3Team = league.teams.find((t) => t.compId === d3.id && t.tid !== USER_TID)!;
+    const target = league.players.find((p) => d3Team.roster.includes(p.pid))!;
+    const star = { ...target, ovr: divisionRefusalOvr(2) };
+    const players = league.players.map((p) => (p.pid === target.pid ? star : p));
+
+    const { teams, transfers } = enforceDivisionCeilings(
+      league.teams, players, league.activeLoans, league.transfers, league.season,
+      USER_TID, league.competitions,
+    );
+
+    const his = transfers.filter((t) => t.pid === star.pid);
+    expect(his).toHaveLength(1);
+    expect(his[0].fromTid).toBe(d3Team.tid);
+    expect(tierOf(league.competitions, teams.find((t) => t.tid === his[0].toTid)!.compId)).toBe(1);
+
+    // No second-division club paid for him, was paid for him, or briefly held
+    // him — the money is one payment from the club that actually got him.
+    const d2Before = new Map(
+      league.teams.filter((t) => t.compId === d2.id).map((t) => [t.tid, t]),
+    );
+    for (const after of teams.filter((t) => t.compId === d2.id)) {
+      const before = d2Before.get(after.tid)!;
+      expect(after.budget).toBe(before.budget);
+      expect(after.roster).toEqual(before.roster);
+    }
   });
 
   it("leaves a third-division player below his own tier's bar where he is", () => {

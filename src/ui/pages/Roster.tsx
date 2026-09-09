@@ -22,6 +22,7 @@ import { ExtendAllButton } from "../components/ExtendAllButton.js";
 import { renewalsDue } from "../../core/contractRenewal.js";
 import { ListingMenu } from "../components/ListingMenu.js";
 import { transferWindowState } from "../../core/transfers/window.js";
+import { movedThisWindow } from "../../core/transfers/negotiation.js";
 import { Flag } from "../components/Flag.js";
 import { InjuryBadge } from "../components/InjuryBadge.js";
 import { SuspensionBadge } from "../components/SuspensionBadge.js";
@@ -47,6 +48,8 @@ interface RosterTableProps {
   onRelease: (pid: number) => void;
   onExtend: (pid: number, lengthSeasons: number) => void;
   releasablePids: Set<number>;
+  /** Pids that have already changed clubs in the open window (see movedThisWindow). */
+  movedPids: Set<number>;
   refusingPids: Set<number>;
   transferListedPids: Set<number>;
   onToggleTransferListed: (pid: number, listed: boolean) => void;
@@ -77,6 +80,7 @@ function RosterTable({
   onRelease,
   onExtend,
   releasablePids,
+  movedPids,
   refusingPids,
   transferListedPids,
   onToggleTransferListed,
@@ -255,6 +259,7 @@ function RosterTable({
                       transferListed={transferListedPids.has(p.pid)}
                       loanListed={loanListedPids.has(p.pid)}
                       keepsDepthFloor={releasablePids.has(p.pid)}
+                      movedThisWindow={movedPids.has(p.pid)}
                       windowOpen={windowOpen}
                       onToggleTransferListed={onToggleTransferListed}
                       onToggleLoanListed={onToggleLoanListed}
@@ -344,9 +349,16 @@ export function Roster() {
     const releasablePids = new Set(
       players.filter((p) => keepsDepthFloor(userTeam, playerMap, p.pid)).map((p) => p.pid),
     );
+    // Players who have already changed clubs this window, so no club will bid
+    // until the next one opens (see movedThisWindow). Walks the transfer log,
+    // hence it belongs behind this memo like everything else here.
+    const gw = transferWindowState(league);
+    const movedPids = gw.open
+      ? movedThisWindow(league.transfers, gw.season, gw.window)
+      : new Set<number>();
     return {
       players, slots, xi, starterPids, bench, teamRating,
-      playerMap, releasablePids,
+      playerMap, releasablePids, movedPids,
       // Also pool-scale (it walks every player in the world), so it belongs
       // behind this memo for the same reason everything else here does: a
       // dragover fires a render per pixel.
@@ -378,7 +390,7 @@ export function Roster() {
 
   const {
     players, slots, xi, starterPids, bench, teamRating,
-    playerMap, releasablePids, renewals, borrowedFrom,
+    playerMap, releasablePids, movedPids, renewals, borrowedFrom,
   } = derived;
   // The pitch chips only need to know *whether* he's borrowed, not the details.
   const borrowedPidSet = new Set(borrowedFrom.keys());
@@ -556,6 +568,7 @@ export function Roster() {
             showDepthChart={showDepthChart}
             season={league.season}
             releasablePids={releasablePids}
+            movedPids={movedPids}
             refusingPids={refusingPids}
             transferListedPids={transferListedPids}
             onRelease={releasePlayerAction}
@@ -578,6 +591,7 @@ export function Roster() {
             onRelease={releasePlayerAction}
             onExtend={extendContractAction}
             releasablePids={releasablePids}
+            movedPids={movedPids}
             refusingPids={refusingPids}
             transferListedPids={transferListedPids}
             onToggleTransferListed={setTransferListedAction}
@@ -602,6 +616,7 @@ export function Roster() {
               onRelease={releasePlayerAction}
               onExtend={extendContractAction}
               releasablePids={releasablePids}
+              movedPids={movedPids}
               refusingPids={refusingPids}
               transferListedPids={transferListedPids}
               onToggleTransferListed={setTransferListedAction}

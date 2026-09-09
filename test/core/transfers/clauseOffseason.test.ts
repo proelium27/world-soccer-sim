@@ -5,6 +5,10 @@ import { simOffseason } from "../../../src/core/offseason.js";
 import type { LeagueStore } from "../../../src/core/leagueState.js";
 import type { TransferClause } from "../../../src/core/transfers/clauses.js";
 import { BONUS_APPEARANCE_THRESHOLD } from "../../../src/core/constants.js";
+import { clampBudget, financeScale } from "../../../src/core/finance/budget.js";
+
+/** The bonus every case here attaches; also the headroom bar for a beneficiary. */
+const BONUS_AMOUNT = 1_000_000;
 
 /**
  * The offseason half of transfer clauses, end to end through a real
@@ -42,21 +46,42 @@ describe("bonuses settle through a real offseason", () => {
     const target = earnedIt(base);
     expect(target).not.toBeNull();
 
-    // A third club is owed the bonus by the club he plays for.
-    const beneficiaryTid = base.teams.find(
-      (t) => t.tid !== target!.tid && t.tid !== base.meta.userTid,
-    )!.tid;
+    const budgetOf = (l: LeagueStore, tid: number) => l.teams.find((t) => t.tid === tid)!.budget;
+    // The control run, first, because it is also how the beneficiary is chosen.
+    const without = simOffseason(base, mulberry32(22));
+
+    // A third club is owed the bonus by the club he plays for — and one with
+    // room under its SAVINGS CEILING to actually bank it, measured where the
+    // ceiling actually bites: at the END of the offseason, after season-end
+    // settlement and the season-start wage charge have both moved it.
+    //
+    // That qualifier is load-bearing rather than fussy. `clampBudget` caps
+    // every credit in the game and destroys the excess by design, so a
+    // beneficiary sitting on its cap banks part of the bonus and the rest
+    // evaporates — the obligor still pays in full, so the money is simply gone.
+    // This used to take the first club that wasn't the obligor, which on this
+    // fixture finishes the offseason with **zero** headroom: it banked $225,059
+    // of a $1M bonus, and the assertion below passed only because that club
+    // happened to have exactly that much room left. Any change anywhere in the
+    // offseason that moves it by a pound moves this number, which reads as a
+    // failure about a payment that was in fact made in full (measured: the
+    // obligor's side was exactly -$1M throughout, and the two runs produced
+    // identical rosters and transfer counts). Picking a club with headroom is
+    // what makes the exact assertion mean what it claims.
+    const beneficiaryTid = without.teams.find((t) => {
+      if (t.tid === target!.tid || t.tid === base.meta.userTid) return false;
+      const cap = clampBudget(
+        Number.MAX_SAFE_INTEGER, financeScale(without.competitions, t.compId), t.hype,
+      );
+      return cap - t.budget > BONUS_AMOUNT * 2;
+    })!.tid;
     const clause: TransferClause = {
       kind: "bonus", pid: target!.pid,
       beneficiaryTid, obligorTid: target!.tid,
       season: base.season, expires: base.season + 3,
-      trigger: "appearances", amount: 1_000_000,
+      trigger: "appearances", amount: BONUS_AMOUNT,
     };
-    const league: LeagueStore = { ...base, transferClauses: [clause] };
-
-    const budgetOf = (l: LeagueStore, tid: number) => l.teams.find((t) => t.tid === tid)!.budget;
-    const withClause = simOffseason(league, mulberry32(22));
-    const without = simOffseason(base, mulberry32(22));
+    const withClause = simOffseason({ ...base, transferClauses: [clause] }, mulberry32(22));
 
     // The clause is spent, not carried forward.
     expect(withClause.transferClauses).toEqual([]);

@@ -1998,6 +1998,15 @@ export function Manual() {
             <li><strong>Winter</strong>. Matchdays 18&ndash;22 (mid-December to late January). Matchday 22 is <strong>deadline day</strong>, and simming to matchday 21 lands you on it with the window still open.</li>
           </ul>
           <p>
+            <strong>A player only moves once per window.</strong> Once a club has bought him he's
+            theirs until the window shuts, so there's no buying somebody cheap and selling him on a
+            week later, and nobody else can come and take him off you either. If you go looking for
+            a player who's already moved, the search says so rather than quietly swallowing your
+            offer, and one who's just joined you shows &quot;Can't sell yet&quot; on his roster row.
+            Loans are the exception: a loan isn't a change of ownership, so you can still send a new
+            signing straight out on one.
+          </p>
+          <p>
             <strong>Keeping a shortlist.</strong> The star beside a player's name puts him on your{" "}
             <strong>Watchlist</strong>, which is just a list of names you're keeping an eye on. It
             shows each of them with his club, his form this season, his wage and contract, what your
