@@ -2,7 +2,16 @@ import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../../src/engine/rng.js";
 import { makeTeam } from "../../src/engine/composites.js";
 import { simMatchDetailed } from "../../src/engine/matchSim.js";
-import { MAX_SUBS } from "../../src/engine/constants.js";
+import {
+  MAX_SUBS,
+  SUB_WINDOWS_IN_PLAY,
+  SUB_MAX_PER_WINDOW,
+  SUB_WINDOW_MOMENTS_ELAPSED,
+  SUB_WINDOW_HALFTIME_ELAPSED,
+  SUB_WINDOW_JITTER_SECONDS,
+  MATCH_SECONDS,
+  MAX_DT,
+} from "../../src/engine/constants.js";
 import type { MatchPlayer } from "../../src/engine/attribution.js";
 
 function makeSquad(pidOffset: number, stamina = 50): MatchPlayer[] {
@@ -48,7 +57,7 @@ function makeBench(pidOffset: number, stamina = 50): MatchPlayer[] {
 }
 
 describe("fatigue + substitutions", () => {
-  it("makes exactly one sub per side at each of the 60'/75' checkpoints when a bench is available", () => {
+  it("substitutes in windows: several changes at once, capped by MAX_SUBS and the window budget", () => {
     const rng = mulberry32(1);
     const result = simMatchDetailed(
       rng,
@@ -59,12 +68,66 @@ describe("fatigue + substitutions", () => {
       makeBench(1000),
       makeBench(2000),
     );
-    const homeSubs = result.boxScore.events.filter((e) => e.type === "substitution" && e.side === "home");
-    const awaySubs = result.boxScore.events.filter((e) => e.type === "substitution" && e.side === "away");
-    // Two checkpoints (60', 75'), each subs off the lowest-energy outfield player — well
-    // under MAX_SUBS (5), so both checkpoints should fire for both sides.
-    expect(homeSubs).toHaveLength(2);
-    expect(awaySubs).toHaveLength(2);
+
+    for (const side of ["home", "away"] as const) {
+      const subs = result.boxScore.events.filter(
+        (e) => e.type === "substitution" && e.side === side,
+      );
+      const injuries = new Set(
+        result.boxScore.events
+          .filter((e) => e.type === "injury" && e.side === side)
+          .map((e) => e.pids[0]),
+      );
+      // Injury replacements fire the instant they are needed rather than at a
+      // window, so they are outside the budget this test is about.
+      const planned = subs.filter((e) => !injuries.has(e.pids[0]));
+
+      // Never more than the laws allow, however deep the bench.
+      expect(subs.length).toBeLessThanOrEqual(MAX_SUBS);
+
+      // Every change made inside one window is committed on the same tick, so an
+      // exact clock value identifies the window. Matching against the nominal
+      // minutes would not work: the in-play moments are jittered per side.
+      const clocks = planned.map((e) => e.clock);
+
+      // Each in-play window lands within the jitter of one of the nominal
+      // moments (plus a tick, since a moment fires on the first tick past it).
+      for (const c of clocks) {
+        const elapsed = MATCH_SECONDS - c;
+        if (Math.abs(elapsed - SUB_WINDOW_HALFTIME_ELAPSED) <= MAX_DT) continue;
+        const near = SUB_WINDOW_MOMENTS_ELAPSED.some(
+          (m) =>
+            elapsed >= m - SUB_WINDOW_JITTER_SECONDS &&
+            elapsed <= m + SUB_WINDOW_JITTER_SECONDS + MAX_DT,
+        );
+        expect(near).toBe(true);
+      }
+
+      // The budget is on OPPORTUNITIES, not on players: at most three in-play
+      // windows (half-time is free and additional), and at most
+      // SUB_MAX_PER_WINDOW changes inside any one of them.
+      const inPlayWindows = new Set(
+        clocks.filter(
+          (c) => MATCH_SECONDS - c > SUB_WINDOW_HALFTIME_ELAPSED + MAX_DT,
+        ),
+      );
+      expect(inPlayWindows.size).toBeLessThanOrEqual(SUB_WINDOWS_IN_PLAY);
+      for (const c of new Set(clocks)) {
+        const inThisWindow = clocks.filter((x) => x === c).length;
+        expect(inThisWindow).toBeLessThanOrEqual(SUB_MAX_PER_WINDOW);
+      }
+    }
+
+    // The point of a window: this bench is deep enough and this squad tired
+    // enough that at least one side gets more than the two changes the old
+    // fixed-checkpoint model could ever make.
+    const perSide = (["home", "away"] as const).map(
+      (side) =>
+        result.boxScore.events.filter(
+          (e) => e.type === "substitution" && e.side === side,
+        ).length,
+    );
+    expect(Math.max(...perSide)).toBeGreaterThan(2);
   });
 
   it("box score includes subbed-on bench players who accumulate stats", () => {
@@ -244,7 +307,14 @@ describe("fatigue + substitutions", () => {
     );
     expect(homeSubs.length).toBeGreaterThanOrEqual(1);
     expect(xiSizes.length).toBeGreaterThanOrEqual(homeSubs.length);
-    for (const n of xiSizes) expect(n).toBe(11);
+    // The hook always sees the side's real on-pitch group. That is eleven, except
+    // where an injury went unreplaced and the side plays on with ten — reachable
+    // now that a side can spend all five subs and then lose someone, which is the
+    // genuine risk of emptying your bench.
+    for (const n of xiSizes) {
+      expect(n).toBeGreaterThanOrEqual(10);
+      expect(n).toBeLessThanOrEqual(11);
+    }
 
     // Behavior check: a hook that upgrades the on-pitch side after subs must
     // shift outcomes — aggregate home shots rise vs. the identical no-hook run.

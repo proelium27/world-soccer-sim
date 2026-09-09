@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../../src/engine/rng.js";
+import { MAX_SUBS } from "../../src/engine/constants.js";
 import { makeTeam } from "../../src/engine/composites.js";
 import { simMatchDetailed } from "../../src/engine/matchSim.js";
 import type { MatchPlayer } from "../../src/engine/attribution.js";
@@ -47,8 +48,9 @@ function makeBench(pidOffset: number): MatchPlayer[] {
 }
 
 describe("injuries", () => {
-  it("an injured player is immediately replaced from the bench when one is available", () => {
-    let injuryCount = 0;
+  it("an injured player is immediately replaced while the side still has a sub left", () => {
+    let replaced = 0;
+    let playedOnShort = 0;
     for (let seed = 1; seed <= 500; seed++) {
       const rng = mulberry32(seed);
       const result = simMatchDetailed(
@@ -59,15 +61,34 @@ describe("injuries", () => {
       for (let i = 0; i < events.length; i++) {
         const e = events[i];
         if (e.type !== "injury") continue;
-        injuryCount++;
         const injuredPid = e.pids[0];
-        // Should be followed immediately by a substitution taking the injured player off.
+
+        // How many changes this side had already made when the injury struck.
+        // A side that has spent all five cannot replace him and plays on a man
+        // down — the real cost of emptying your bench, and reachable only since
+        // substitution windows made all five actually usable.
+        const usedBefore = events
+          .slice(0, i)
+          .filter((x) => x.type === "substitution" && x.side === e.side).length;
+
         const next = events[i + 1];
-        expect(next.type).toBe("substitution");
-        expect(next.pids[0]).toBe(injuredPid);
+        if (usedBefore < MAX_SUBS) {
+          expect(next.type).toBe("substitution");
+          expect(next.pids[0]).toBe(injuredPid);
+          replaced++;
+        } else {
+          // Nothing may come on for him.
+          expect(
+            next?.type === "substitution" && next.pids[0] === injuredPid,
+          ).toBe(false);
+          playedOnShort++;
+        }
       }
     }
-    expect(injuryCount).toBeGreaterThan(0);
+    expect(replaced).toBeGreaterThan(0);
+    // The man-down case must actually be exercised, or this test silently stops
+    // covering the branch it was rewritten for.
+    expect(playedOnShort).toBeGreaterThan(0);
   });
 
   it("does not crash when no bench is available for an injury", () => {

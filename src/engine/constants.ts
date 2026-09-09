@@ -161,9 +161,54 @@ export const STAMINA_DECAY_SPREAD = 0.5;
 export const FATIGUE_PHYSICAL_WEIGHT = 0.25;
 export const FATIGUE_TECHNICAL_WEIGHT = 0.1;
 
-// AI subs: 5 per side, at the 60' and 75' game-clock checkpoints (elapsed seconds).
+// AI subs: 5 per side, made across a limited number of substitution WINDOWS —
+// the real law, and the reason this is a window model rather than a list of
+// moments. A manager may bring on several players at once, and doing so costs
+// him one opportunity rather than one per player; half-time is an extra
+// opportunity that doesn't count against the three.
+//
+// MAX_SUBS has been 5 since M5 and was unreachable until windows landed: there
+// were exactly two checkpoints (60' and 75') and each made at most ONE sub, so
+// the ceiling was 2. Measured on a full season of the 626-club world before the
+// change: 1.58 subs per team per match, 12% of team-matches making none at all,
+// and the minute histogram showing 13,368 subs at exactly 60' and 13,499 at
+// exactly 75' against a scatter of ~40/minute elsewhere (those are the
+// injury-forced ones). Real top-flight football runs ~4.5.
 export const MAX_SUBS = 5;
-export const SUB_CHECKPOINTS_ELAPSED = [3600, 4500] as const;
+
+// Candidate moments (elapsed seconds) at which a side may open an in-play
+// window. Deliberately MORE moments than SUB_WINDOWS_IN_PLAY allows, so the
+// budget actually binds and sides diverge in when they use it — with exactly
+// three moments for three windows the constraint would be inert and every club
+// in the world would sub at the same three minutes, which is the artefact this
+// replaces. Half-time is handled separately (SUB_WINDOW_HALFTIME_ELAPSED).
+export const SUB_WINDOW_MOMENTS_ELAPSED = [3600, 4200, 4680, 5100] as const;
+
+// Half-time. A free opportunity under the laws, and it stays free here. It
+// fires rarely on its own merits, which is correct: nobody is gassed at 45', so
+// only a genuine quality upgrade or the user's "more minutes" flag clears the
+// gate — matching real half-time subs being tactical rather than fitness-driven.
+export const SUB_WINDOW_HALFTIME_ELAPSED = 2700;
+
+// How many in-play opportunities a side gets. Half-time is additional.
+export const SUB_WINDOWS_IN_PLAY = 3;
+
+// Every moment a window may open at, ascending — half-time first. Derived so
+// the two lists above cannot drift out of order; the match loop fires a moment
+// the first tick that reaches it, so ascending order is what keeps half-time
+// from being considered after the hour.
+export const SUB_WINDOW_ALL_MOMENTS = [
+  SUB_WINDOW_HALFTIME_ELAPSED,
+  ...SUB_WINDOW_MOMENTS_ELAPSED,
+] as const;
+
+// Most subs a side will make in a single window. The laws impose no such cap —
+// this is a behaviour bound, not a rule: a triple change is a real and fairly
+// common move, emptying the entire bench in one go is not, and without a cap a
+// side with a strong bench would make all five at the first window and have
+// nothing left to respond with. Injury replacements are not affected (they fire
+// immediately, outside the window system entirely).
+export const SUB_MAX_PER_WINDOW = 3;
 
 // How much a player's live match rating (see engine/matchRating.ts) sways who gets
 // subbed off, alongside fatigue: a below-baseline rating (deficit/10, roughly -0.4..0.6)
@@ -195,6 +240,55 @@ export const SUB_RATING_INFLUENCE = 0.5;
 export const SUB_FRESHNESS_BONUS = 1.5;
 export const SUB_QUALITY_MARGIN = 2.5;
 export const SUB_FATIGUE_RELIEF = 2.5;
+
+// How much extra downgrade a side will accept purely because the match is
+// nearly over, scaled by the fraction of the match already gone:
+//   SUB_LATE_MARGIN × elapsedFraction
+// This is the gate learning something true rather than a fudge to raise the
+// sub count. The gate above prices a downgrade as though the replacement will
+// play the rest of the match; a substitute brought on at 85' degrades five
+// minutes of composites, not forty-five, so the real cost of the swap shrinks
+// with the clock. Pricing it correctly is what produces the familiar late
+// change for a fringe player, and it is self-limiting — the tolerance is
+// largest exactly when what it buys is smallest.
+//
+// It only ever LOOSENS the gate (the term is 0..1 and is added to the
+// allowance), so an early-window sub is judged on exactly the terms it was
+// before this existed.
+export const SUB_LATE_MARGIN = 10;
+
+// The late margin is applied as elapsedFraction ** SUB_LATE_MARGIN_EXPONENT,
+// i.e. it stays near zero for most of the match and climbs sharply at the end,
+// rather than growing linearly. Linear is the wrong shape and would show up at
+// half-time first: at 45' it would hand out half the full tolerance (~3 ovr on
+// top of the ~5 the base gate already allows), which is more than the gap
+// between a starter and a typical bench player, so nearly every side in the
+// world would make a half-time change. Real half-time subs are tactical and
+// uncommon. A cubic keeps 45' worth ~0.75 ovr, 75' ~3.5 and 85' ~5.1, which is
+// the shape the reasoning above actually implies — the swap only becomes cheap
+// once there is genuinely little match left to play.
+export const SUB_LATE_MARGIN_EXPONENT = 3;
+
+// The whole allowance at half-time, standing in for the quality margin, the
+// fatigue relief and the late margin together (none of which applies at the
+// break). Small on purpose: a half-time change should be a genuine upgrade on
+// someone who has had a poor half, not a routine rest, which is what real
+// half-time substitutions are.
+export const SUB_HALFTIME_MARGIN = 1.5;
+
+// How far either side of its nominal minute a side's in-play window may fall.
+// Managers pick their own moments; without a jitter every club in the world
+// changes its team at the same four minutes, which is glaring in the live match
+// viewer and was the most visible artefact of the old fixed checkpoints (13,368
+// substitutions at exactly the 60th minute in one measured season, against a
+// scatter of ~40 a minute everywhere else). Kept under half the smallest gap
+// between two moments so a jittered pair cannot cross and reorder.
+export const SUB_WINDOW_JITTER_SECONDS = 180;
+
+// Stream tag for that jitter. It is drawn off match intrinsics rather than the
+// shared rng, so it perturbs no other outcome — the rule cup rounds and touch
+// attribution already follow.
+export const SUB_WINDOW_STREAM = 87;
 
 // How much the outgoing starter's live match rating (see engine/matchRating.ts)
 // shifts the worth-it gate above, on top of his ovr and fatigue: a player above

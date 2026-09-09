@@ -556,8 +556,16 @@ function migrateFields(league: LeagueStore): LeagueStore {
         ...m,
         // Pre-M3 saves have played matches with no boxScore at all; an empty
         // one degrades to "No events recorded" instead of failing to load.
+        // Spread FIRST, then override the three fields this actually migrates.
+        // Listing the keys instead makes this a whitelist, and a whitelist
+        // silently drops every field added to BoxScore afterwards — which is
+        // what happened to `finalClock`: nothing threw, no type complained, and
+        // every save simply lost the whistle on load, so the live viewer fell
+        // back to reading the end off the last event. Same shape as the
+        // `mergeRosterFiles`/`ovrScale` trap in CLAUDE.md.
         boxScore: boxScore
           ? {
+              ...boxScore,
               events: boxScore.events ?? [],
               home: boxScore.home.map(migrateLine),
               away: boxScore.away.map(migrateLine),

@@ -102,8 +102,28 @@ const SEASON = simSeason(mulberry32(12345));
  * right tools if this ever has to be judged again — a hash is all-or-nothing and
  * cannot tell a one-goal difference from a broken sim. Attribution is untouched,
  * which is the invariant this test actually exists for.
+ *
+ * REBASED AGAIN (2026-09-08) for substitution windows. Subs used to fire at two
+ * fixed checkpoints, one player each, so no side could ever make more than two;
+ * they now open at half-time and at up to three of four jittered in-play moments,
+ * and may bring on several players at once. Who is on the pitch changes, so
+ * composites change and so do results — an intended outcome change, not an
+ * attribution regression. Measured the same way over the same 8 seasons:
+ * goals/match 3.1372 -> 3.1697 and home-win rate .4220 -> .4112 (both barely
+ * moved, and the home-win rate stays well inside the M1 gate's 38-46% band),
+ * champion points 78.75 -> 83.25 against that gate's 78-94.
+ *
+ * That last one is the number to watch if these constants are ever retuned: it
+ * rises monotonically with SUB_LATE_MARGIN (80.0 / 81.4 / 81.9 / 83.3 at 4 / 6 /
+ * 8 / 10) because a deep bench gets more out of a late change than a thin one,
+ * so the champion pulls away slightly. Note this harness is ONE league with no
+ * offseason: over twelve leagues and fifteen seasons of real dynasty the same
+ * metric moves only 66.44 -> 66.85 (slotChurnAudit), so read this as a gate
+ * reading rather than as a description of play. `scripts/subWindowProbe.ts` reports the
+ * rate itself: 1.58 -> 4.18 subs per team per match, against a real top-flight
+ * ~4.3-4.5, with 56% of sides now using all five.
  */
-const BASELINE_SCORELINE_HASH = 346702056;
+const BASELINE_SCORELINE_HASH = 2426966974;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");

@@ -71,6 +71,21 @@ const SEEDS = [11, 22, 33, 44, 55, 66, 77, 88];
 const MATCHES = SEEDS.map(playedMatch);
 
 /**
+ * The match as it stood at the final whistle.
+ *
+ * `finalClock` has to reach BOTH calls, and that is why this is a helper rather
+ * than each case spelling it out. Stoppage runs on past the last event, so
+ * reading the end off the events alone stops the clock short — measured, by up
+ * to two minutes — and a player still on the pitch is then credited with fewer
+ * minutes than the engine gave him. The rating is damped by minutes, so it
+ * comes out wrong.
+ */
+function atFullTime(box: BoxScore, lineups = matchLineups(box)) {
+  const last = finalMinute(box.events, box.finalClock);
+  return liveMatchState(lineups, box.events, last, box.finalClock);
+}
+
+/**
  * The assumption the whole derivation rests on, asserted where it can say so.
  *
  * A `turnover` event names who won the ball but not whether it was a tackle or
@@ -101,12 +116,20 @@ describe("a live rating at full time is the rating the engine stored", () => {
     let checked = 0;
     for (const box of MATCHES) {
       const lineups = matchLineups(box);
-      const state = liveMatchState(lineups, box.events, finalMinute(box.events));
+      const state = atFullTime(box, lineups);
       for (const side of ["home", "away"] as const) {
         const stored = new Map(box[side].map((l) => [l.pid, l]));
         for (const live of state[side].all) {
           const line = stored.get(live.pid);
           expect(line, `pid ${live.pid} is missing from the box score`).toBeDefined();
+          // Minutes are asserted directly, because the rating is a far weaker
+          // gate on them than it looks: it damps by minutes on a curve that is
+          // flat near 90, so a wrong figure only moves the rounded rating when
+          // the player sits on the steep part of it. Measured when this was
+          // found, 140 wrong minute figures were surfacing as 6 wrong ratings —
+          // so the ratings alone would let a one-minute error back in
+          // everywhere except the handful of cases that cross a 0.05 boundary.
+          expect(live.minutesPlayed, `minutes, pid ${live.pid}`).toBe(line!.minutesPlayed);
           expect(live.rating, `pid ${live.pid}`).toBe(line!.rating);
           checked++;
         }
@@ -118,7 +141,7 @@ describe("a live rating at full time is the rating the engine stored", () => {
 
   it("recovered every goal, assist and card the box score recorded", () => {
     for (const box of MATCHES) {
-      const state = liveMatchState(matchLineups(box), box.events, finalMinute(box.events));
+      const state = atFullTime(box);
       for (const side of ["home", "away"] as const) {
         const stored = new Map(box[side].map((l) => [l.pid, l]));
         for (const live of state[side].all) {
@@ -134,7 +157,7 @@ describe("a live rating at full time is the rating the engine stored", () => {
 
   it("saw the same players play as the box score did", () => {
     for (const box of MATCHES) {
-      const state = liveMatchState(matchLineups(box), box.events, finalMinute(box.events));
+      const state = atFullTime(box);
       for (const side of ["home", "away"] as const) {
         expect(new Set(state[side].all.map((l) => l.pid))).toEqual(
           new Set(box[side].map((l) => l.pid)),
@@ -145,7 +168,7 @@ describe("a live rating at full time is the rating the engine stored", () => {
 
   it("found cards and substitutions across the sample, so the above means something", () => {
     const totals = MATCHES.flatMap((box) => {
-      const state = liveMatchState(matchLineups(box), box.events, finalMinute(box.events));
+      const state = atFullTime(box);
       return [...state.home.all, ...state.away.all];
     });
     expect(totals.reduce((n, l) => n + l.yellowCards, 0)).toBeGreaterThan(0);
@@ -171,7 +194,7 @@ describe("a rating as the match runs", () => {
   });
 
   it("never counts an event that hasn't happened yet", () => {
-    const last = finalMinute(box.events);
+    const last = finalMinute(box.events, box.finalClock);
     let previous = 0;
     for (let m = 1; m <= last; m++) {
       const state = liveMatchState(lineups, box.events, m);
