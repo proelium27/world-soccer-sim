@@ -3,6 +3,7 @@ import { mulberry32 } from "../../src/engine/rng.js";
 import { makeTeam } from "../../src/engine/composites.js";
 import { simMatchDetailed } from "../../src/engine/matchSim.js";
 import { computeMatchRating } from "../../src/engine/matchRating.js";
+import { MATCH_SECONDS } from "../../src/engine/constants.js";
 import { emptyLine } from "../../src/engine/attribution.js";
 import type { MatchPlayer } from "../../src/engine/attribution.js";
 
@@ -128,9 +129,15 @@ describe("minutesPlayed via simMatchDetailed", () => {
     }
   });
 
-  it("gives a substitute strictly fewer minutes than the starter they replaced (checkpoint subs, not injury subs)", () => {
-    // A checkpoint sub only fires at 60'/75'+ elapsed, so the starter going off
-    // always has more minutes banked than the sub coming on has left to play.
+  it("splits the match between a starter and his replacement at the minute of the change", () => {
+    // The starter banks the minutes up to the substitution and the man coming on
+    // plays what is left, so the pair account for the whole match between them.
+    //
+    // This deliberately does NOT assert the substitute plays fewer minutes than
+    // the starter, which was true only while subs could not happen before the
+    // hour. Half-time is a substitution window, and a man brought on at the break
+    // plays the longer half — the second, plus stoppage.
+    //
     // Injury-forced subs (which log an "injury" event immediately before, and
     // can fire at any minute) are excluded since that ordering isn't guaranteed.
     let checked = false;
@@ -148,11 +155,24 @@ describe("minutesPlayed via simMatchDetailed", () => {
         if (prev && prev.type === "injury" && prev.pids[0] === e.pids[0]) continue;
 
         const [offPid, onPid] = e.pids;
+        // Skip a replacement who is himself later replaced — he then holds only
+        // part of the remainder and the pair no longer span the match.
+        const replacedAgain = events.some(
+          (x, j) => j > i && x.type === "substitution" && x.pids[0] === onPid,
+        );
+        if (replacedAgain) continue;
+
         const offLine = [...result.boxScore.home, ...result.boxScore.away].find((l) => l.pid === offPid);
         const onLine = [...result.boxScore.home, ...result.boxScore.away].find((l) => l.pid === onPid);
         expect(offLine).toBeDefined();
         expect(onLine).toBeDefined();
-        expect(onLine!.minutesPlayed).toBeLessThan(offLine!.minutesPlayed);
+
+        // The starter's minutes are the elapsed time at the change...
+        const elapsedMin = Math.round((MATCH_SECONDS - e.clock) / 60);
+        expect(Math.abs(offLine!.minutesPlayed - elapsedMin)).toBeLessThanOrEqual(1);
+        // ...and the substitute really did play the rest of it.
+        expect(onLine!.minutesPlayed).toBeGreaterThan(0);
+        expect(offLine!.minutesPlayed + onLine!.minutesPlayed).toBeGreaterThanOrEqual(90);
         checked = true;
         break;
       }

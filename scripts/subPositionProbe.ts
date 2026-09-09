@@ -13,7 +13,7 @@ import { createLeagueState } from "../src/core/leagueState.js";
 import { leagueMatchData } from "../src/core/league/composites.js";
 import { simMatchDetailed } from "../src/engine/matchSim.js";
 import { teamSlots } from "../src/core/lineup/formations.js";
-import { SUB_CHECKPOINTS_ELAPSED, MATCH_SECONDS } from "../src/engine/constants.js";
+import { SUB_WINDOW_MOMENTS_ELAPSED, MATCH_SECONDS } from "../src/engine/constants.js";
 import type { Position } from "../src/core/players/types.js";
 
 /** Mirrors the private table in core/lineup/selectXI.ts. */
@@ -68,9 +68,9 @@ for (const seed of SEEDS) {
 
     // A chase-the-game sub is a deliberate reshape: the man coming on plays his
     // OWN position rather than inheriting the departing player's slot. Mirror
-    // the engine's rule (last checkpoint, side trailing) so we measure what the
+    // the engine's rule (final window moment, side trailing) so we measure what the
     // sim actually does instead of counting reshapes as out-of-position.
-    const lastCheckpoint = SUB_CHECKPOINTS_ELAPSED[SUB_CHECKPOINTS_ELAPSED.length - 1];
+    const lastCheckpoint = SUB_WINDOW_MOMENTS_ELAPSED[SUB_WINDOW_MOMENTS_ELAPSED.length - 1];
     const scoreAt = (clock: number, side: "home" | "away"): number =>
       r.boxScore.events.filter((e) => e.type === "goal" && e.side === side && e.clock > clock).length;
 

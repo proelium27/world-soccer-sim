@@ -134,6 +134,21 @@ export interface BoxScore {
   home: PlayerMatchLine[];
   away: PlayerMatchLine[];
   events: MatchEvent[];
+  /**
+   * The countdown clock when the whistle went — negative by however much
+   * stoppage was played. Optional: absent on a box score written before
+   * 2026-09-09, where every reader falls back to reading the end off the last
+   * event.
+   *
+   * It has to be recorded rather than derived, and the live match rating is why.
+   * Stoppage runs on past the final event, so the last event's clock understates
+   * the end by however long the ball was in play afterwards — measured, up to
+   * two minutes. `liveRatings` reconstructs minutes played from the stream and
+   * has to land on exactly the figure `minutesFor` stored, so a player still on
+   * at the whistle needs the real end clock and there is nowhere else to get it.
+   * Output-only and rng-free, so no scoreline moves.
+   */
+  finalClock?: number;
 }
 
 const SHOT_WEIGHTS: Record<MatchPosition, number> = {

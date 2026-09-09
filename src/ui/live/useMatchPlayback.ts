@@ -41,10 +41,13 @@ export interface MatchPlayback {
 
 export function useMatchPlayback(
   events: MatchEvent[],
-  opts: { autoStart?: boolean } = {},
+  opts: { autoStart?: boolean; finalClock?: number } = {},
 ): MatchPlayback {
   const autoStart = opts.autoStart ?? true;
-  const lastMinute = useMemo(() => finalMinute(events), [events]);
+  const { finalClock } = opts;
+  // Play to the whistle, not to the last thing that happened — stoppage carries
+  // on past the final event, so the old reading stopped the clock short.
+  const lastMinute = useMemo(() => finalMinute(events, finalClock), [events, finalClock]);
 
   const [minute, setMinute] = useState(0);
   const [playing, setPlaying] = useState(autoStart);
