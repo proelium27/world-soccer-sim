@@ -47,8 +47,15 @@ function developmentBias(pid: number): number {
   return gaussian(mulberry32(hashInts(DEV_BIAS_SALT, pid)));
 }
 
-/** Physical ratings peak earliest and decline first. */
-const PHYSICAL_KEYS: readonly SkillKey[] = ["speed", "strength", "stamina", "jumping"];
+/**
+ * Physical ratings peak earliest and decline first.
+ *
+ * Exported because world generation splits its age offsets along exactly this
+ * line (see `ageCurveOffsets` in generate.ts). Two copies of the split would be
+ * two chances for generation to age a rating the sim then develops on the other
+ * curve.
+ */
+export const PHYSICAL_KEYS: readonly SkillKey[] = ["speed", "strength", "stamina", "jumping"];
 /** Everything else: technical/mental skills (plus goalkeeping) peak later and decline slower. */
 const SKILL_KEYS_GROUP: readonly SkillKey[] = [
   "shortPass", "longPass", "crosses", "dribbling", "longShot", "finishing",
@@ -79,8 +86,17 @@ export function ageOf(player: Player, season: number): number {
   return season - player.born;
 }
 
-/** Base expected rating delta for an age, read off the model's curve (keyed by age - peak). */
-function baseAgeDelta(profile: ProgressionProfile, effectiveAge: number): number {
+/**
+ * Base expected rating delta for an age, read off the model's curve (keyed by
+ * age - peak).
+ *
+ * Exported so world generation can derive its age model from the same curve
+ * progression runs on (see `ageCurveOffsets` in generate.ts). It must be this
+ * curve and not a second table: the whole point of generating a player at an
+ * age-appropriate level is to cancel the growth the sim is about to give him,
+ * so a curve retune has to reach both sides or the cancellation drifts.
+ */
+export function baseAgeDelta(profile: ProgressionProfile, effectiveAge: number): number {
   return interpolate(profile.ageCurve, effectiveAge - BASE_AGE_CURVE_PEAK);
 }
 

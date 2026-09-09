@@ -182,7 +182,27 @@ describe("the offseason seeds, plays and archives them", () => {
    * there is nothing for a super cup to be contested between and
    * `buildSuperCups` correctly returns none — which looks exactly like the
    * feature being broken. That is how this test failed the first time it ran.
+   *
+   * `finishSeason` matters for the same reason, and it produced the identical
+   * symptom a second time. `simThrough` HALTS BEFORE THE USER'S CUP FINAL, a
+   * courtesy to the live player; headlessly that leaves the phase "regular", and
+   * `simOffseason` silently returns the league unchanged on any phase but
+   * "offseason". So one `simThrough` finishes the season only on seeds where the
+   * unmanaged user club happens not to reach a final, and a world change is
+   * enough to flip that — which is exactly what happened when generation gained
+   * an age model: on this seed tid 0 started reaching its domestic cup final, the
+   * offseason quietly never ran, and `superCups` came back empty. Same trap
+   * `scripts/weakLeaguesAudit.ts` carries this same guard for.
    */
+  const finishSeason = (l: LeagueStore, rng: () => number): LeagueStore => {
+    let out = simThrough(l, "season", rng);
+    for (let resumes = 0; (out.phase as string) !== "offseason"; resumes++) {
+      if (resumes >= 3) throw new Error(`season ${out.season} refuses to finish (phase ${out.phase})`);
+      out = simThrough(out, "season", rng);
+    }
+    return out;
+  };
+
   it("seeds one per country, plays it on the next advance, and files it", () => {
     const rng = mulberry32(103);
     let league = makeLeague(0, 5);
@@ -190,7 +210,7 @@ describe("the offseason seeds, plays and archives them", () => {
     // contest the first super cups. There is no continental one yet: the Cup
     // and the Shield both need a prior season's table to qualify from, so
     // neither has been played, let alone won.
-    league = simThrough(league, "season", rng);
+    league = finishSeason(league, rng);
     league = simOffseason(league, rng);
 
     const seeded = league.superCups;
@@ -207,7 +227,7 @@ describe("the offseason seeds, plays and archives them", () => {
 
     // Advancing plays them on the way into the season without the user ever
     // visiting the page — the lazy path, against a real world.
-    league = simThrough(league, "season", rng);
+    league = finishSeason(league, rng);
     expect(superCupsPending(league.superCups)).toBe(false);
     for (const sc of league.superCups) {
       expect(sc.teams).toContain(superCupChampion(sc));

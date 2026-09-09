@@ -1,7 +1,7 @@
 import type { Player, Position } from "../players/types.js";
 import type { FormationId } from "../lineup/formations.js";
 import { POSITIONS } from "../players/types.js";
-import { generatePlayer } from "../players/generate.js";
+import { generatePlayer, drawGenerationAge } from "../players/generate.js";
 import { hashInts } from "../../engine/rng.js";
 import type { Competition } from "../competitions.js";
 import {
@@ -12,7 +12,7 @@ import type { NationalityWeights } from "../players/nationalities.js";
 import {
   NUM_TEAMS, NUM_TEAMS_D2, LEAGUE_BASE, TEAM_STRENGTH_SPREAD, DIVISION_2_OFFSET,
   divisionStrengthOffset,
-  ROSTER_COMPOSITION, INITIAL_AGE_MIN, INITIAL_AGE_MAX,
+  ROSTER_COMPOSITION,
   CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX, type ProgressionModel,
 } from "../constants.js";
 
@@ -122,10 +122,11 @@ function generateDivisionTeams(
     let ovrSum = 0;
     for (const pos of POSITIONS as readonly Position[]) {
       for (let j = 0; j < ROSTER_COMPOSITION[pos]; j++) {
-        const age = INITIAL_AGE_MIN
-          + Math.floor(rng() * (INITIAL_AGE_MAX - INITIAL_AGE_MIN + 1));
+        // One rng draw, exactly as the uniform draw it replaces — see AGE_CDF.
+        const age = drawGenerationAge(rng());
         const p = generatePlayer(
-          rng, pos, base, pid++, age, STARTING_SEASON, genSeed, country, nationalities, model,
+          rng, pos, base, pid++, age,
+          STARTING_SEASON, genSeed, country, nationalities, model, true,
         );
         const length = CONTRACT_LENGTH_MIN
           + Math.floor(rng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));

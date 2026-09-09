@@ -5,7 +5,7 @@ import { SKILL_KEYS, POSITIONS } from "../players/types.js";
 import type { RosterFile, RosterFilePlayer } from "./rosterFile.js";
 import { resolveRosterSlots, rescaleRosterFile } from "./rosterFile.js";
 import { applyTeamIdentities } from "./customize.js";
-import { generatePlayer } from "../players/generate.js";
+import { generatePlayer, drawGenerationAge } from "../players/generate.js";
 import { computeOvr } from "../players/ovr.js";
 import { estimatePotential } from "../players/progression.js";
 import { seasonSalaryForOvr } from "../contracts.js";
@@ -17,7 +17,7 @@ import { mulberry32, hashInts } from "../../engine/rng.js";
 import { emptyCareerSummary } from "../players/careerSummary.js";
 import {
   LEAGUE_BASE, RATING_MIN, RATING_MAX, ROSTER_COMPOSITION,
-  INITIAL_AGE_MIN, INITIAL_AGE_MAX, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
+  ROSTER_FILE_AGE_MIN, ROSTER_FILE_AGE_MAX, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
   type ProgressionModel,
 } from "../constants.js";
 
@@ -84,7 +84,13 @@ interface MaterializeCtx {
 
 /** Turn one authored player spec into a full engine Player. */
 function materializePlayer(spec: RosterFilePlayer, ctx: MaterializeCtx): Player {
-  const age = clampInt(spec.age, INITIAL_AGE_MIN - 3, INITIAL_AGE_MAX + 6);
+  // Deliberately NOT derived from INITIAL_AGE_MIN/MAX. It used to be
+  // (`MIN - 3`, `MAX + 6`), which silently tracked a generation constant: when
+  // INITIAL_AGE_MIN moved 18 -> YOUTH_AGE to close the age-distribution hole,
+  // that would have widened the accepted range for authored files from 15-39 to
+  // 13-44 as a side effect nobody asked for. What a roster file may claim is a
+  // question about user input, not about how a world is generated.
+  const age = clampInt(spec.age, ROSTER_FILE_AGE_MIN, ROSTER_FILE_AGE_MAX);
   // Archetype provides a position-appropriate rating shape, a default height,
   // and a country-appropriate default nationality — all overridable below.
   const archetype = generatePlayer(
@@ -129,11 +135,20 @@ function materializePlayer(spec: RosterFilePlayer, ctx: MaterializeCtx): Player 
   };
 }
 
-/** Auto-generated reserve cover to fill a hole the imported squad left. */
+/**
+ * Auto-generated reserve cover to fill a hole the imported squad left.
+ *
+ * Takes world generation's age model (`drawGenerationAge`/`generationBaseForAge`)
+ * rather than a flat draw of its own: filler sits on a roster beside generated
+ * and imported players, so a flat-by-age filler would reintroduce exactly the
+ * free-superstar teenager that model exists to remove — in an imported world,
+ * where it is harder to spot.
+ */
 function makeFiller(pos: Position, base: number, ctx: MaterializeCtx): Player {
-  const age = INITIAL_AGE_MIN + Math.floor(ctx.rng() * (INITIAL_AGE_MAX - INITIAL_AGE_MIN + 1));
+  const age = drawGenerationAge(ctx.rng());
   const p = generatePlayer(
-    ctx.rng, pos, base, ctx.pid, age, ctx.season, ctx.genSeed, ctx.country, ctx.nationalities, ctx.model,
+    ctx.rng, pos, base, ctx.pid, age, ctx.season,
+    ctx.genSeed, ctx.country, ctx.nationalities, ctx.model, true,
   );
   const length = CONTRACT_LENGTH_MIN + Math.floor(ctx.rng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
   p.contract.expiresSeason = ctx.season + length;

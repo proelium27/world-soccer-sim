@@ -102,8 +102,19 @@ const SEASON = simSeason(mulberry32(12345));
  * right tools if this ever has to be judged again — a hash is all-or-nothing and
  * cannot tell a one-goal difference from a broken sim. Attribution is untouched,
  * which is the invariant this test actually exists for.
+ *
+ * And most recently (2026-09-09) when world generation gained an AGE MODEL —
+ * before it, `generatePlayer` rolled every rating from a club's base with no age
+ * term at all, so a generated 18-year-old and a 33-year-old were drawn from the
+ * same distribution. This is a *world* change rather than an engine one: the
+ * players are different, so the matches are. It moves the draw count as well as
+ * the values, because the age draw feeds `estimatePotential`, whose loop runs
+ * `age + 1 .. POTENTIAL_SIM_MAX_AGE`. The football is unmoved where it can be
+ * compared: generated big-four top-flight mean 75.4 -> 75.1, p90 84 -> 84,
+ * world mean 54.68 -> 54.69, with the age offsets zero-meaned so the level and
+ * the country ladder are untouched by construction. See GENERATION_AGE_WEIGHTS.
  */
-const BASELINE_SCORELINE_HASH = 346702056;
+const BASELINE_SCORELINE_HASH = 819326546;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");

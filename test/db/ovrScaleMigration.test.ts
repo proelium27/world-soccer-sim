@@ -181,12 +181,18 @@ describe("OVR scale migration", () => {
     const over = (l: LeagueStore, bar: number) =>
       l.players.filter((p) => p.ovr >= bar).length;
 
-    expect(over(stale, DIVISION_2_REFUSAL_OVR_THRESHOLD)).toBe(0);
-    expect(over(stale, PROTECTED_STAR_OVR)).toBe(0);
-
+    // Compared against the migrated count rather than against zero. The claim
+    // is that the rules effectively stop firing on an unlifted save, and "a
+    // rounding error's worth of players" says that; exact zero says something
+    // stronger that only held while the generated world's maximum happened to
+    // sit below `bar + OVR_SCALE_SHIFT`. It duly broke when world generation
+    // gained an age model and the world max moved 92 -> 94, at which point seven
+    // players of 15,650 (0.04%) cleared the Division-2 bar from below.
     const migrated = migrateLeague(stale);
-    expect(over(migrated, DIVISION_2_REFUSAL_OVR_THRESHOLD)).toBeGreaterThan(0);
-    expect(over(migrated, PROTECTED_STAR_OVR)).toBeGreaterThan(0);
+    for (const bar of [DIVISION_2_REFUSAL_OVR_THRESHOLD, PROTECTED_STAR_OVR]) {
+      expect(over(migrated, bar)).toBeGreaterThan(0);
+      expect(over(stale, bar)).toBeLessThan(over(migrated, bar) * 0.05);
+    }
 
     // And the wage floor, which is the one that costs money rather than
     // realism: unlifted, a first-teamer is priced off a floor 11 points below

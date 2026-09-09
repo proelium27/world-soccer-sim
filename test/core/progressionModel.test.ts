@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32, hashInts } from "../../src/engine/rng.js";
-import { generatePlayer } from "../../src/core/players/generate.js";
+import { generatePlayer, generationBaseForAge } from "../../src/core/players/generate.js";
 import { generateYouthIntake } from "../../src/core/players/youth.js";
 import { generateWorld } from "../../src/core/league/generate.js";
 import {
@@ -11,7 +11,7 @@ import { migrateLeague } from "../../src/db/migrate.js";
 import { englandCompetitions } from "../../src/core/competitions.js";
 import {
   PROGRESSION_PROFILES,
-  BASE_AGE_CURVE, STEADY_AGE_CURVE,
+  BASE_AGE_CURVE, STEADY_AGE_CURVE, BASE_AGE_CURVE_PEAK,
   PROGRESSION_NOISE_SD_YOUNG, PROGRESSION_NOISE_SD_OLD,
   PROGRESSION_FORM_SD_YOUNG, PROGRESSION_FORM_SD_OLD,
   PROGRESSION_BIAS_SD_YOUNG,
@@ -145,17 +145,36 @@ describe("the model scales draws, never their count", () => {
   });
 
   /**
-   * Ratings are what the model is *for*, so a world generated under it must
-   * differ only in the scouting forecast — the ratings themselves are rolled
-   * before any progression term is read.
+   * Generation reads the model's OWN age curve, so a steady world's ratings
+   * differ from a random one's as well as its forecast.
+   *
+   * This used to assert the opposite ("ratings are rolled before any progression
+   * term is read"), and that premise died when world generation gained an age
+   * model: a generated player is now placed at the level his age implies, which
+   * is a statement about the curve he is going to develop along. Generating both
+   * models against the shipped curve would hand a steady save its own version of
+   * the very transient that model was added to remove, since `STEADY_AGE_CURVE`
+   * declines far harder late.
+   *
+   * The property that actually protected the mid-save switch is the draw COUNT,
+   * and it is asserted three times above. This is now about the curve.
    */
-  it("leaves generated ratings alone and moves only the forecast", () => {
+  it("generates each model's world against its own age curve", () => {
     const random = generateWorld(mulberry32(4), 4, SMALL(), "random");
     const steady = generateWorld(mulberry32(4), 4, SMALL(), "steady");
-    expect(steady.players.map((p) => p.ovr)).toEqual(random.players.map((p) => p.ovr));
-    expect(steady.players.map((p) => p.ratings)).toEqual(random.players.map((p) => p.ratings));
+    expect(steady.players.map((p) => p.ratings))
+      .not.toEqual(random.players.map((p) => p.ratings));
     expect(steady.players.map((p) => p.potential))
       .not.toEqual(random.players.map((p) => p.potential));
+
+    // And it differs in the direction the two curves differ: steady's late
+    // decline is much steeper, so it generates a veteran further below a
+    // peak-age player than random does. Read off the bases rather than off
+    // sampled players, since a world this small has few 37-year-olds.
+    const gap = (model: "random" | "steady") =>
+      generationBaseForAge(50, BASE_AGE_CURVE_PEAK, "CM", model).skill
+      - generationBaseForAge(50, 37, "CM", model).skill;
+    expect(gap("steady")).toBeGreaterThan(gap("random"));
   });
 });
 

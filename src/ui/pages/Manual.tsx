@@ -1547,6 +1547,19 @@ export function Manual() {
             <li><strong>Goalkeepers</strong> age the best of anyone. Their careers routinely run deep into the 30s.</li>
           </ul>
           <p>
+            That curve also decides what a <em>brand new</em> world looks like, which it didn't
+            used to. Starting squads are now generated at the level a player of that age should
+            be at: a 17-year-old on the books is a prospect rated well below the first team, the
+            best players in the world are in their mid-to-late twenties, and a 35-year-old has
+            lost a yard without losing his technique. Before, age carried no information at all at
+            the start of a save &mdash; an 18-year-old was generated at the same standard as a
+            27-year-old, and then got a decade of growth on top of it. That's why the first few
+            seasons of an old save felt strange: within two or three years the best players in the
+            game were all 20 to 23, the very top ratings ran away toward the ceiling, and squads
+            that had started out looking evenly good hollowed out into a strong eleven and a lot of
+            filler. A new save now starts in roughly the shape it's going to keep.
+          </p>
+          <p>
             Development is noisy, and way noisier when a player's young. An 18-year-old can jump
             several points in a season (or stall out completely), while a 30-year-old barely moves
             year to year, and mostly downhill. Playing time gives a growing player a little nudge:

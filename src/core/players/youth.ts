@@ -1,11 +1,11 @@
 import type { Player, Position } from "./types.js";
 import { POSITIONS } from "./types.js";
-import { generatePlayer } from "./generate.js";
+import { generatePlayer, softFloorBase } from "./generate.js";
 import type { NationalityWeights } from "./nationalities.js";
 import {
   YOUTH_AGE, YOUTH_INTAKE_MIN, YOUTH_INTAKE_MAX, YOUTH_BASE_OFFSET,
   YOUTH_CONTRACT_LENGTH, ROSTER_COMPOSITION,
-  YOUTH_BASE_FLOOR, YOUTH_BASE_SOFTNESS, SCOUT_POSITION_SHARE, type ProgressionModel,
+  SCOUT_POSITION_SHARE, type ProgressionModel,
 } from "../constants.js";
 
 /**
@@ -20,12 +20,7 @@ import {
  * were never underflowing generate exactly what they generated before.
  */
 export function youthGenerationBase(academyBase: number): number {
-  const raw = academyBase - YOUTH_BASE_OFFSET;
-  const x = (raw - YOUTH_BASE_FLOOR) / YOUTH_BASE_SOFTNESS;
-  // softplus, guarded: Math.exp overflows past ~709 and the curve is already
-  // identity to well under floating-point noise by x = 30.
-  if (x > 30) return raw;
-  return YOUTH_BASE_FLOOR + YOUTH_BASE_SOFTNESS * Math.log1p(Math.exp(x));
+  return softFloorBase(academyBase - YOUTH_BASE_OFFSET);
 }
 
 /**

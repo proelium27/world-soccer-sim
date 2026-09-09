@@ -887,12 +887,169 @@ export const SUSPENSION_RED_MATCHES = 3;
 /** Generation-offset tier → additive offset (Table A). */
 export const TIER_OFFSET = { star: 18, H: 10, M: 2, L: -12, VL: -25 } as const;
 
-/** Initial league generation: uniform age range for starting rosters. */
-export const INITIAL_AGE_MIN = 18;
-export const INITIAL_AGE_MAX = 33;
-
 /** Youth intake players are always generated at this age. */
 export const YOUTH_AGE = 16;
+
+/**
+ * Initial league generation: the age range starting rosters are drawn from.
+ *
+ * These are now the BOUNDS of `GENERATION_AGE_WEIGHTS` rather than a uniform
+ * draw of their own — see that constant. They stay exported because roster
+ * import clamps a file's stated ages against them.
+ *
+ * The minimum is `YOUTH_AGE`, and that is a fix rather than a tidy-up. It used
+ * to be 18 while youth intake starts at 16, so the two cohorts never met: no
+ * player was ever created with a birth season in between, leaving a hole in the
+ * world's age distribution exactly `18 - YOUTH_AGE` years wide that marched up
+ * one year per season and crossed peak age around season 10. Measured on a real
+ * world, the whole player pool had zero players aged 17 at season 1, 17-18 at
+ * season 2, 18-19 at season 3, and 28-29 by season 13.
+ */
+export const INITIAL_AGE_MIN = YOUTH_AGE;
+export const INITIAL_AGE_MAX = 38;
+
+/**
+ * The age range a roster file may claim for a player, clamped on import.
+ *
+ * Deliberately its own pair rather than `INITIAL_AGE_MIN - 3` / `INITIAL_AGE_MAX
+ * + 6`, which is what it used to be: that made a limit on USER INPUT track a
+ * generation constant, so moving `INITIAL_AGE_MIN` to close the age-distribution
+ * hole silently widened what an authored file could claim from 15-39 to 13-44.
+ * These are the values that clamp preserved, now stated outright.
+ */
+export const ROSTER_FILE_AGE_MIN = 15;
+export const ROSTER_FILE_AGE_MAX = 39;
+
+/**
+ * THE AGE MODEL FOR WORLD GENERATION, and the bug it fixes is that there was not
+ * one. `generatePlayer` rolls every rating from a club's `base`; `age` only ever
+ * set `born`. So a generated world's age->OVR profile was FLAT — measured on a
+ * fresh big-four top flight, an 18-year-old averaged 76.2 and a 33-year-old
+ * 75.2, with every age in between inside a point of both.
+ *
+ * That is not the world the sim runs. Its equilibrium is a hump: youth arrive
+ * around 34 points below the senior level, grow through their early twenties,
+ * hold from ~25 to ~31 and decline after. So a new save spent its opening
+ * seasons converging on a shape it should have started in, and every symptom
+ * players reported is a consequence of the transient rather than of the
+ * progression model:
+ *
+ *   - A generated teenager was handed peak-age ratings AND the full growth curve
+ *     on top, making him the best player in the world within two seasons. The
+ *     ten best players in the big four were aged 25/21/32/29/19/22/32/23/32/33
+ *     at season 1 and 21/21/23/21/23/21/21/22/21/21 by season 4.
+ *   - Those same players blew through `GROWTH_DAMPING_END` into the `RATING_MAX`
+ *     ceiling: best OVR 91 -> 99 by season 5, the 90+ population 11 -> 60, and
+ *     individual ratings pinned at 99 climbing 0.10% -> 1.08% and still rising.
+ *   - The generated 30-33 band only ever declined and retired, so squads
+ *     hollowed out: big-four top-flight mean 75.4 -> 63.3 by season 4 while p90
+ *     ROSE. Uniformly-good squads became top-heavy.
+ *
+ * The model is two pieces. The RATING side is not a table at all — it is derived
+ * from the sim's own `BASE_AGE_CURVE` at module load (`ageCurveOffsets` in
+ * players/generate.ts), because the exact correction for "he was handed growth
+ * he had already been paid for" is the growth he has left: integrate the curve
+ * from his age to the peak and start him that far down, and progression then
+ * gives back precisely what generation took off. Deriving it also means a curve
+ * retune reaches both sides at once, where a second table would drift.
+ *
+ * This constant is the other piece: the AGE DISTRIBUTION starting squads are
+ * drawn from, replacing a uniform 18-33. It is a realistic senior-squad shape —
+ * thin below 20, heaviest 24-27, tapering to 38 — and it is deliberately NOT the
+ * sim's own equilibrium distribution, which was measured and rejected. At
+ * equilibrium 21% of a big-four squad is aged 16-19, because `AI_PROSPECT_SLOTS`
+ * keeps five high-potential teenagers on the SENIOR roster where they sit at
+ * ~42 OVR and never play. That is a sim artifact with no counterpart in a real
+ * squad or in EA's ratings, and generating it would import the artifact, put
+ * five near-useless players in the user's opening squad, and — because the age
+ * offsets are zero-meaned under these weights — drag every peak-age player up to
+ * compensate, which is what blew the calibrated range apart when it was tried
+ * (max 91 -> 98, the 90+ population 11 -> 182).
+ *
+ * The bottom of the range is `YOUTH_AGE` and that is load-bearing, not tidiness:
+ * see `INITIAL_AGE_MIN` for the age-distribution hole it closes.
+ *
+ * IT LOOKS INCONSISTENT WITH `YOUTH_BASE_OFFSET` AND IS NOT. Youth intake drops
+ * its 16-year-olds 34 points below the academy anchor; the curve here puts a
+ * generated 16-year-old only ~18 below a peak-age team-mate. Both are right, and
+ * they are answering different questions: intake is a POPULATION that
+ * `trimRosterSurplus` and `AI_PROSPECT_SLOTS` then keep the best of, whereas
+ * generation places a player straight onto a roster with no selection in front
+ * of him. A generated 16-year-old is therefore the equivalent of an intake
+ * player who already survived the cut.
+ *
+ * `scripts/generationAgeCalibrate.ts` measures the equilibrium these were
+ * checked against. Note its 25-season floor: a generated player is
+ * INITIAL_AGE_MIN..MAX at season 1, so at season 13 every age above 30 is still
+ * the inflated generated cohort — i.e. the very population being corrected.
+ */
+export const GENERATION_AGE_WEIGHTS: Readonly<Record<number, number>> = {
+  16: 0.010, 17: 0.015, 18: 0.025, 19: 0.035, 20: 0.045, 21: 0.055,
+  22: 0.060, 23: 0.065, 24: 0.070, 25: 0.070, 26: 0.070, 27: 0.070,
+  28: 0.065, 29: 0.060, 30: 0.055, 31: 0.050, 32: 0.045, 33: 0.040,
+  34: 0.030, 35: 0.025, 36: 0.015, 37: 0.010, 38: 0.005,
+};
+
+/**
+ * How much of the age curve's post-peak decline a GENERATED veteran carries.
+ *
+ * The curve states the mean decline of everyone who ages. A player still on a
+ * roster at 36 is not a mean player: `retirementProbability` climbs every year
+ * from `RETIREMENT_START_AGE`, so the survivors are the ones who declined least.
+ * Generating them on the raw curve makes them far worse than the veterans the
+ * sim actually carries — measured, a big-four 35-year-old landed ~15 OVR below a
+ * peak-age team-mate against ~9 at equilibrium — and on `"steady"`, whose late
+ * decline is far steeper, it pushed the physical base onto the soft floor
+ * outright (1.00 at age 37: every veteran's legs identically dead, with the
+ * clamp erasing the differences between them).
+ *
+ * 0.55 is measured, not chosen: it is the ratio between the equilibrium's
+ * peak-to-35 drop and the raw curve's. Re-derive it against
+ * `scripts/generationAgeCalibrate.ts` if the age curve or the retirement odds
+ * move, since it is a statement about how those two interact.
+ *
+ * Applied to the decline side ONLY. Selection runs the other way among the
+ * young — `AI_PROSPECT_SLOTS` keeps teenagers for their ceiling rather than
+ * their ability — so there is no equivalent factor below the peak.
+ */
+export const GENERATION_DECLINE_SELECTION = 0.55;
+
+/**
+ * How far generation sits BELOW the equilibrium it converges on, in rating
+ * points — the level half of the age model, where the curve-derived offsets in
+ * `ageCurveOffsets` are the shape half.
+ *
+ * Separate from the offsets, and not folded into them, because the two carry
+ * different risk. The shape is unambiguously a bug. The lift is a level change,
+ * and level changes cost money: wages are cubic in ovr, so raising every club's
+ * squad quality raises its opening wage bill, and the season-1 solvency margin
+ * is documented as thin (the poorest clubs land within ~£0.01M of zero after
+ * their first season).
+ *
+ * IT IS 0, AND THAT IS A DECISION RATHER THAN A PLACEHOLDER. Measured, the
+ * world's rostered mean climbs 54.7 -> 57.6 over 25 seasons, so lifting
+ * generation by ~3 would make the world start where it ends and never drift.
+ * Two reasons not to:
+ *
+ *   - The generated level is CALIBRATED, and not to itself. A big-four top
+ *     flight generates 61/75.5/92 (min/mean/max) specifically to sit on EA FC's
+ *     Premier League at ~62/76/91 — see `OVR_SCALE_SHIFT` — and the EA FC roster
+ *     converter rank-matches against a freshly generated world, so moving this
+ *     moves an imported world too.
+ *   - The drift it would cancel is not this bug. It is the documented ladder
+ *     erosion: `GROWTH_DAMPING_START` is an ABSOLUTE ovr, so leagues below it
+ *     grow undamped while the big four are throttled, and gaps compress ~40%
+ *     over 20 seasons. Pre-baking that would mean generating England already
+ *     compressed toward Serbia — i.e. deleting what `COUNTRY_STRENGTH_OFFSET`
+ *     is for, and moving the very gaps `scripts/weakLeaguesAudit.ts` gates.
+ *
+ * So this change is deliberately SHAPE ONLY: same world level, same ladder,
+ * correct age structure. The residual level drift is pre-existing and out of
+ * scope. Raising this is one edit, but it needs the 4-seed dynasty audit and a
+ * season-1 solvency check, not just a green test run.
+ */
+export const GENERATION_EQUILIBRIUM_LIFT = 0;
+
 
 /** Youth intake: min/max generated players per club per season. */
 export const YOUTH_INTAKE_MIN = 3;
