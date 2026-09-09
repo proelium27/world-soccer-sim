@@ -1,7 +1,7 @@
 import type { Player } from "../players/types.js";
 import type { StoredTeam } from "../teams/clubs.js";
 import type { ClubContext } from "../ai/clubContext.js";
-import { clubStature } from "../ai/clubContext.js";
+import { clubStature, clubStatures } from "../ai/clubContext.js";
 import {
   PLAYER_WILL_CARE_FLOOR, PLAYER_WILL_CARE_CEILING,
   PLAYER_WILL_DROP_STRENGTH, PLAYER_WILL_REFUSAL_DROP, PLAYER_WILL_RISE_BONUS,
@@ -164,14 +164,31 @@ export function abilityStature(playerOvr: number): number {
 
 /**
  * What a free agent measures an offer against: the higher of where he last
- * played and what his ability entitles him to.
+ * played and what his ability entitles him to, capped at the best club that
+ * actually exists.
  *
  * The max is the load-bearing part. Either half alone has a hole: his last club
  * misses the 85 who was at a small club, and his ability alone would ignore a
  * modest player who has spent a career at a giant.
+ *
+ * **The cap is what stops the very best players being unsignable by ANYONE, and
+ * it is not hypothetical.** `abilityStature` reaches 1.0 at STATURE_STRENGTH_HI
+ * (ovr 89), while the strongest club in a fresh 626-club world measures 0.763 —
+ * so at full care an ovr-89 free agent needed a 0.82 club and there was none,
+ * on a world whose best players are 90-91. He would have been refused by every
+ * club including his own, with the Free Agents page telling the manager of the
+ * biggest side in the game to go and build his club up. Capping at the world's
+ * own maximum means the best player alive always has somewhere that will have
+ * him, by construction, and it self-adjusts as clubs grow over a dynasty rather
+ * than needing a tuned ceiling. It only binds above ovr 89, so every rating
+ * below that behaves exactly as measured.
  */
-function freeAgentFromStature(player: Player, lastClub: number | null): number {
-  const ability = abilityStature(player.ovr);
+function freeAgentFromStature(
+  player: Player,
+  lastClub: number | null,
+  worldMax: number,
+): number {
+  const ability = Math.min(abilityStature(player.ovr), worldMax);
   return lastClub == null ? ability : Math.max(lastClub, ability);
 }
 
@@ -204,40 +221,45 @@ export function refusesFreeAgentSigning(
   teams: StoredTeam[],
   players: Player[],
 ): boolean {
-  // Checked before the roster indexes are built: most of a real pool is below
-  // the care floor, and this is on the click path of a page listing thousands.
+  // Checked before any index is built: most of a real pool is below the care
+  // floor, and this is on the click path of a page listing thousands.
   if (statureSensitivity(player.ovr) <= 0) return false;
-  const byPid = new Map(players.map((p) => [p.pid, p]));
-  const rosterOf = (t: StoredTeam): Player[] =>
-    t.roster.map((pid) => byPid.get(pid)).filter((p): p is Player => p != null);
-  const lastTid = lastClubTid(player);
-  const last = lastTid == null ? undefined : teams.find((t) => t.tid === lastTid);
-  const from = freeAgentFromStature(
-    player, last ? clubStature(rosterOf(last), last.hype) : null,
-  );
-  return refusesMove(player.ovr, from, clubStature(rosterOf(buyer), buyer.hype));
+  const statures = clubStatures(teams, players);
+  return refusesFreeAgentSigningWith(player, statures.get(buyer.tid) ?? 0, statures, buyer.tid);
 }
 
 /**
- * `refusesFreeAgentSigning` against a precomputed stature map.
+ * `refusesFreeAgentSigning` against a precomputed stature map, which is the
+ * real implementation — the club-object form above builds the map and delegates
+ * so the two can never answer differently.
  *
- * The club-object form above rebuilds a league-wide player index on every call,
- * so a per-row loop over a listing page is quadratic — the same trap
- * `clubStatures` exists to let callers avoid. Build the map once per league and
- * use this per row.
+ * Listing pages must use this form directly and build the map once per league:
+ * the object form is O(world) per call, and a per-row loop over it is the
+ * quadratic trap `clubStatures` exists to let callers avoid.
  *
- * A last club the map doesn't know (a tid no longer in the world) reads as no
- * gate, matching the object form.
+ * A last club the map doesn't know (a tid no longer in the world) falls through
+ * to the ability-only reading, which for a good player is the STRICTEST branch
+ * available rather than an open gate.
  */
 export function refusesFreeAgentSigningWith(
   player: Player,
   buyerStature: number,
   statureByTid: Map<number, number>,
+  buyerTid?: number,
 ): boolean {
   if (statureSensitivity(player.ovr) <= 0) return false;
   const lastTid = lastClubTid(player);
+  // Nobody refuses to stay where he already was. Without this the `max` in
+  // freeAgentFromStature makes re-signing your own player impossible by
+  // construction, since his ability outranks the club whenever he is better
+  // than it: measured, a club at the median stature that develops an ovr-85
+  // academy graduate and lets his contract lapse could never take him back, and
+  // an AI club would. Forgetting to extend a contract is ordinary play, not an
+  // edge case — it is why the "Extend all" button exists.
+  if (buyerTid != null && lastTid === buyerTid) return false;
+  const worldMax = statureByTid.size > 0 ? Math.max(...statureByTid.values()) : 1;
   const from = freeAgentFromStature(
-    player, lastTid == null ? null : statureByTid.get(lastTid) ?? null,
+    player, lastTid == null ? null : statureByTid.get(lastTid) ?? null, worldMax,
   );
   return refusesMove(player.ovr, from, buyerStature);
 }

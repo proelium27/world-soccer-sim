@@ -102,24 +102,40 @@ describe("refusesFreeAgentSigning", () => {
   // was the one route around the whole module.
   const bigTid = 1;
   const smallTid = 2;
+  // A second weak club, so a case can put his last club and the buyer at the
+  // same LEVEL without them being the same CLUB — which would trip the
+  // rejoin-your-own-club exemption and mask what the case is testing.
+  const otherSmallTid = 3;
 
-  /** A world of two clubs: one strong and hyped, one weak, plus one free agent. */
+  /** Two weak clubs and one strong, hyped one, plus a single free agent. */
   const world = (faOvr: number, lastTid: number | null) => {
     const mk = (pid: number, ovr: number): Player => ({
       pid, name: `p${pid}`, pos: "CM", nationality: "England", born: 0, ovr,
       potential: ovr, ratings: {} as never, contract: { salary: 1, expiresSeason: 9 },
       stats: [], hist: [],
     } as unknown as Player);
-    const big = { tid: bigTid, hype: 90, roster: [] as number[] } as unknown as StoredTeam;
-    const small = { tid: smallTid, hype: 5, roster: [] as number[] } as unknown as StoredTeam;
+    const team = (tid: number, hype: number) =>
+      ({ tid, hype, roster: [] as number[] } as unknown as StoredTeam);
+    const big = team(bigTid, 90);
+    const small = team(smallTid, 5);
+    const otherSmall = team(otherSmallTid, 5);
     const players: Player[] = [];
-    for (let i = 0; i < 20; i++) { const p = mk(100 + i, 88); big.roster.push(p.pid); players.push(p); }
-    for (let i = 0; i < 20; i++) { const p = mk(200 + i, 45); small.roster.push(p.pid); players.push(p); }
+    const fill = (t: StoredTeam, base: number, ovr: number) => {
+      for (let i = 0; i < 20; i++) { const p = mk(base + i, ovr); t.roster.push(p.pid); players.push(p); }
+    };
+    // 82, not 88: clubStature blends squad strength with hype, and a squad of
+    // 88s on hype 90 measures ~0.94 — stronger than any club a real world ever
+    // produces (measured max 0.763 fresh, 0.831 five seasons in). An unrealistic
+    // ceiling here hides exactly the bug the cap exists to fix, because the
+    // uncapped ability of 1.0 is already reachable.
+    fill(big, 100, 82);
+    fill(small, 200, 45);
+    fill(otherSmall, 300, 45);
     const fa = mk(999, faOvr);
     // The stats line is how a free agent's last club is recovered at all.
     if (lastTid != null) (fa as { stats: { tid: number }[] }).stats = [{ tid: lastTid } as never];
     players.push(fa);
-    return { teams: [big, small], players, fa, big, small };
+    return { teams: [big, small, otherSmall], players, fa, big, small, otherSmall };
   };
 
   it("keeps a star released by a big club out of a small one", () => {
@@ -153,8 +169,34 @@ describe("refusesFreeAgentSigning", () => {
     // side read as a step UP and nothing gated it. Good players sit at small
     // clubs, especially in a world whose pool is stocked by clubs releasing
     // whoever they are deepest at.
+    // A DIFFERENT small club, or the rejoin-your-own-club exemption fires and
+    // hides the thing under test.
     const w = world(PLAYER_WILL_CARE_CEILING + 5, smallTid);
-    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(true);
+    expect(refusesFreeAgentSigning(w.fa, w.otherSmall, w.teams, w.players)).toBe(true);
+  });
+
+  it("leaves the best player alive signable by the best club there is", () => {
+    // abilityStature reaches 1.0 at ovr 89 while the strongest club in a fresh
+    // 626-club world measures 0.763, so uncapped an 89+ free agent needed a
+    // 0.82 club and there was none — he was refused by every club in the game,
+    // on a world whose best players are 90-91. The cap is the world's own
+    // maximum, so somewhere will always have him.
+    // A separate world per half, so neither reading is masked by the
+    // rejoin-your-own-club exemption below.
+    const up = world(99, smallTid);
+    expect(refusesFreeAgentSigning(up.fa, up.big, up.teams, up.players)).toBe(false);
+    // ...and he still won't drop to the bottom of the pyramid.
+    const down = world(99, bigTid);
+    expect(refusesFreeAgentSigning(down.fa, down.small, down.teams, down.players)).toBe(true);
+  });
+
+  it("lets a club re-sign a player whose contract it just let lapse", () => {
+    // `max(lastClub, ability)` otherwise makes this impossible by construction
+    // whenever he outgrew the club: a mid-table side that develops a star and
+    // forgets to extend him could never take him back, while an AI club could.
+    // Nobody refuses to stay where he already is.
+    const w = world(PLAYER_WILL_CARE_CEILING + 5, smallTid);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(false);
   });
 
   it("agrees with the precomputed-stature form, which is what listing pages use", () => {

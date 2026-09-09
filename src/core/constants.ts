@@ -5063,8 +5063,14 @@ export const MOP_UP_FA_STREAM = 89;
  * reopening your recruitment for in August, a squad player is not. The elite
  * tail that made a promoted club a title contender for nothing is gone, and the
  * low-70s depth a small club actually needs is still there.
+ *
+ * Written `<calibrated> + OVR_SCALE_SHIFT` like every other constant that names
+ * a POSITION on the rating scale, so the next scale move carries it rather than
+ * leaving the bar 11 points low — the exact failure that entry documents. Note
+ * it sits one point under `divisionRefusalOvr(2)`, so a mop-up signing at
+ * exactly this rating into a tier-2 club is not swept by enforceDivisionCeilings.
  */
-export const MOP_UP_MIN_OVR = 80;
+export const MOP_UP_MIN_OVR = 69 + OVR_SCALE_SHIFT;
 
 /**
  * How far a well-run academy moves the quality of the user's trial group,

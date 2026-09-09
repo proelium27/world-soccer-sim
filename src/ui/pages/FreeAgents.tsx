@@ -74,8 +74,19 @@ export function FreeAgents() {
   // it does for a column heading: this rule decides *who is listed at all*, so
   // ranking it on the truth would have handed the reader the genuinely best
   // free agents while the POT column beside them showed only an estimate.
+  // Players who won't join sink below those who will, and this has to happen
+  // BEFORE the MAX_LISTED cap rather than at render time. Refusals land exactly
+  // on the highest-rated players, so ranking on quality alone lets them eat the
+  // whole list from the top and hide every signable player below the cut, on a
+  // page with no pagination — verbatim the mistake CLAUDE.md records from the
+  // loan-in panel, where the top 40 rows were refused every time. They are sunk
+  // rather than dropped so the reason stays visible when there is room for it.
+  const refusesFor = (p: Player) =>
+    userTeam != null
+    && refusesFreeAgentSigningWith(p, statures.get(userTeam.tid) ?? 0, statures, userTeam.tid);
   availablePlayers.sort((a, b) =>
-    b.ovr + potView.ceiling(b) - (a.ovr + potView.ceiling(a)));
+    Number(refusesFor(a)) - Number(refusesFor(b))
+    || b.ovr + potView.ceiling(b) - (a.ovr + potView.ceiling(a)));
   const filtered =
     posFilter === "ALL"
       ? availablePlayers
@@ -167,8 +178,9 @@ export function FreeAgents() {
               // Shown rather than hidden, so the reason a good player is out of
               // reach is legible instead of the list just being mysteriously
               // short — same call the Transfers page makes for a protected star.
-              const refuses = userTeam != null
-                && refusesFreeAgentSigningWith(p, statures.get(userTeam.tid) ?? 0, statures);
+              // Sunk to the bottom of the selection above so they can't crowd
+              // signable players past the render cap.
+              const refuses = refusesFor(p);
               return (
                 <tr key={p.pid}>
                   <td><WatchToggle pid={p.pid} name={p.name} /></td>
