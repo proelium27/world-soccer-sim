@@ -9,16 +9,37 @@ import { isCupComplete } from "../../src/core/cup/cup.js";
 import { leaguePhaseComplete } from "../../src/core/cup/leaguePhase.js";
 import type { CupTie } from "../../src/core/cup/types.js";
 import {
-  CUP_KO_ROUND_MATCHDAYS, CUP_PLAYOFF_MATCHDAY, DOMESTIC_CUP_MATCHDAYS,
+  CUP_KO_ROUND_MATCHDAYS, CUP_PLAYOFF_MATCHDAY,
   CUP_LEAGUE_PHASE_SIZE, CUP_KO_SIZE, cupKnockoutPlan,
 } from "../../src/core/constants.js";
+
+/**
+ * Sim to the end of the season, however many batches that takes.
+ *
+ * `simThrough` HALTS BEFORE THE USER'S CUP FINAL, a courtesy to the live player,
+ * and a club can reach several finals in a season. So the number of calls a
+ * season takes is a property of the WORLD — of how far the unmanaged user club
+ * happens to go — not of this fixture, and asserting "offseason" after exactly
+ * one call is asserting that tid 0 reached no final on this seed. It held until
+ * world generation gained an age model and then didn't, which surfaced three
+ * matchdays away from anything the tests here are about. `simOffseason` silently
+ * returns the league unchanged off-phase, so the symptom is an empty result
+ * rather than an error. Same guard `scripts/weakLeaguesAudit.ts` carries.
+ */
+function finishSeason(league: LeagueStore, rng: () => number): LeagueStore {
+  let out = simThrough(league, "season", rng);
+  for (let i = 0; (out.phase as string) !== "offseason"; i++) {
+    expect(i, `season ${out.season} refuses to finish (phase ${out.phase})`).toBeLessThan(4);
+    out = simThrough(out, "season", rng);
+  }
+  return out;
+}
 
 /** Advance a fresh save to the start of season 2 (regular phase), by which point a cup is seeded. */
 function toSeason2(seed: number, userTid = 0): LeagueStore {
   let league = makeLeague(userTid, 1);
   expect(league.cup).toBeNull(); // season 1 never has a cup
-  league = simThrough(league, "season", mulberry32(seed + 1));
-  expect(league.phase).toBe("offseason");
+  league = finishSeason(league, mulberry32(seed + 1));
   league = simOffseason(league, mulberry32(seed + 2));
   expect(league.season).toBe(2);
   return league;
@@ -54,8 +75,7 @@ describe("Continental Cup — season lifecycle", () => {
       expect(tierOf(league2.competitions, league2.teams.find((t) => t.tid === tid)!.compId)).toBe(1);
     }
 
-    const played = simThrough(league2, "season", mulberry32(99));
-    expect(played.phase).toBe("offseason");
+    const played = finishSeason(league2, mulberry32(99));
     expect(isCupComplete(played.cup!)).toBe(true);
     expect(played.cup!.championTid).not.toBeNull();
     // The whole league phase was played, the playoff filled the bracket, and the
@@ -107,14 +127,21 @@ describe("Continental Cup — season lifecycle", () => {
     };
 
     let result = simThrough(league2, "season", mulberry32(8));
-    // A club can be in two finals at once, and the sim halts before whichever
-    // comes first: the domestic final is matchday 36, the continental one 37.
-    // On this seed the user's club reaches both, so step past the domestic
-    // halt — that courtesy has its own test; the one under test here is the
-    // continental final's. A batch resumed ON a final's matchday plays it
-    // (simThrough's `matchday > currentMatchday`), so one resume does it.
+    // A club can be in several finals at once, and the sim halts before each of
+    // them: the domestic final is matchday 36, the continental one 37. Step past
+    // every halt that isn't the one under test — those courtesies have their own
+    // tests; this one is the continental final's. A batch resumed ON a final's
+    // matchday plays it (simThrough's `matchday > currentMatchday`).
+    //
+    // A LOOP rather than a single `if` on the domestic matchday, because which
+    // finals the unmanaged user club reaches is a property of the world and
+    // moves whenever the world does. It was one extra halt on this seed until
+    // generation gained an age model, at which point the single step stopped
+    // being enough and the test failed on `phase` — three matchdays from
+    // anything it is actually about.
     const next = (l: LeagueStore) => Math.min(...l.schedule.map((g) => g.matchday));
-    if (next(result) === DOMESTIC_CUP_MATCHDAYS[DOMESTIC_CUP_MATCHDAYS.length - 1]) {
+    for (let i = 0; next(result) !== CUP_KO_ROUND_MATCHDAYS[2]; i++) {
+      expect(i, `never reached the continental final (next matchday ${next(result)})`).toBeLessThan(4);
       result = simThrough(result, "season", mulberry32(8));
     }
     // Stopped before the final's matchday: still in regular play, final unplayed.
@@ -122,9 +149,15 @@ describe("Continental Cup — season lifecycle", () => {
     expect(result.cup!.championTid).toBeNull();
     expect(next(result)).toBe(CUP_KO_ROUND_MATCHDAYS[2]); // the final's matchday, still to be played
 
-    // Resuming from exactly the final's matchday plays it through to the end.
-    const resumed = simThrough(result, "season", mulberry32(9));
-    expect(resumed.phase).toBe("offseason");
+    // Resuming from exactly the final's matchday plays it. Bounded loop for the
+    // same reason as above: the continental final is matchday 37 and nothing is
+    // scheduled after it, but a halt is a property of the world rather than of
+    // this fixture, so assert the end state rather than the number of calls.
+    let resumed = simThrough(result, "season", mulberry32(9));
+    for (let i = 0; (resumed.phase as string) !== "offseason"; i++) {
+      expect(i, `season refuses to finish (phase ${resumed.phase})`).toBeLessThan(4);
+      resumed = simThrough(resumed, "season", mulberry32(9));
+    }
     expect(isCupComplete(resumed.cup!)).toBe(true);
   });
 });
