@@ -67,7 +67,7 @@ import { carryIntlInjuries } from "./injuries.js";
 import { hashInts, mulberry32 } from "../engine/rng.js";
 import {
   NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, difficultyProfile,
-  YOUTH_TRIAL_GROUP_MIN, YOUTH_TRIAL_GROUP_MAX, YOUTH_TRIAL_STREAM,
+  YOUTH_TRIAL_GROUP_MIN, YOUTH_TRIAL_GROUP_MAX, YOUTH_TRIAL_STREAM, MOP_UP_FA_STREAM, MOP_UP_MIN_OVR,
 } from "./constants.js";
 
 /** rng-stream tag for rolling carried-over international injury durations. */
@@ -881,6 +881,56 @@ export function simOffseasonReporting(
   // 6. Trim AI squads back down to target composition. Loaned-in players are
   //    left in place (owned by their parent — see trimRosterSurplus) so
   //    trimming can't orphan a live loan into a duplicate.
+  teams = trimRosterSurplus(
+    teams, players, league.meta.userTid, nextSeason, activeLoans, league.progressionModel,
+  );
+
+  // 6.05. AI free agency, a second time, on the pool the trim above just
+  //       created — and this is a fix to a step ORDER, not a new mechanic.
+  //
+  //       runAIFreeAgency's poach pass says of itself that it "drains quality
+  //       from the market the user shops in — most good free agents are gone
+  //       before the user gets to them". It could not do that from step 4:
+  //       every player released by trimRosterSurplus arrives a step and a half
+  //       LATER, so step 4 only ever shopped last year's leftovers, the ones
+  //       every club had already passed on. Measured over six simmed seasons,
+  //       the pool at the end of a season was byte-identical to the previous
+  //       summer's: between the trim and the next offseason nothing in the
+  //       world signed a free agent, so the user held a twelve-month monopoly
+  //       on ~15-25 players a year at ovr 70+, topping out in the mid-80s.
+  //       That is where a newly promoted club assembled a top-five squad for
+  //       nothing.
+  //
+  //       ON ITS OWN SEEDED STREAM, never `rng`. The poach and prospect passes
+  //       already draw contract length from per-signing streams, but the
+  //       shortfall pass uses whatever rng it is handed, so passing the shared
+  //       one here would shift every downstream draw — youth generation
+  //       included — for a pass that in practice signs nobody (the trim removes
+  //       surplus and cannot create a shortfall). A dedicated stream makes that
+  //       "in practice" irrelevant: shared-stream order is untouched by
+  //       construction, whatever this pass does.
+  const mopUpRng = mulberry32(hashInts(league.lid, nextSeason, MOP_UP_FA_STREAM));
+  let mopUpSignings: { pid: number; toTid: number }[];
+  ({ teams, players, signings: mopUpSignings } = runAIFreeAgency(
+    teams, players, nextSeason, mopUpRng, league.meta.userTid, signingOrder, activeLoans,
+    league.progressionModel, MOP_UP_MIN_OVR,
+  ));
+  ceilingTransfers = [
+    ...ceilingTransfers,
+    ...mopUpSignings.map((s) => ({
+      pid: s.pid, fromTid: FREE_AGENT_TID, toTid: s.toTid, fee: 0,
+      season: faWindow.season ?? nextSeason,
+      window: faWindow.window ?? ("summer" as const),
+    })),
+  ];
+
+  // 6.06. Trim again, because the poach pass deliberately overshoots to
+  //       ROSTER_COMPOSITION + 1 and relies on a later trim to return the
+  //       now-weakest player — that pairing is what makes a poach a SWAP
+  //       rather than squad growth, and it is why the wage bill and roster
+  //       sizes come out where they did before. Runs before the market (6.4)
+  //       for the same reason the trim above does: nothing bought with a fee
+  //       should ever be trimmable in the same offseason it was paid for.
   teams = trimRosterSurplus(
     teams, players, league.meta.userTid, nextSeason, activeLoans, league.progressionModel,
   );

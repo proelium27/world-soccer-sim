@@ -1,0 +1,19 @@
+import type { ChangelogEntry } from "../types.js";
+
+const entry: ChangelogEntry = {
+  date: "2026-09-09",
+  title: "Free agency was a twelve-month monopoly, and you were the only one shopping",
+  items: [
+    "A player sent me a save and asked why his newly promoted side kept getting a top-five squad rating and then finishing near the bottom. Digging into it turned up something I'd had backwards for a long time. He'd built nearly the whole squad out of free agents, rated 76 to 85, for nothing, and he could do that because nothing else in the world was competing with him for them.",
+    "Here's what was happening. Every summer AI clubs trim their squads and release whoever they're deepest at, which means their **surplus** players rather than their worst ones. That's what stocks the free-agent list, and it's why anything good is on it at all. But the AI's own trip round that list ran *before* the trim, so it was only ever picking over the previous year's leftovers, the ones every club had already passed on. I simmed six seasons and checked: the pool at the end of a season was identical, player for player, to what it had been the summer before. Between one summer and the next, **not one club in the world signed a free agent**. Only you could.",
+    "So every year there were fifteen to twenty-five players at 70 or better sitting there, the best of them in the mid-80s, with nobody bidding against you. The Manual has claimed for ages that the AI works the list before you do. It wasn't true. It is now, and clubs go after the genuinely elite ones, which is what a free 85 is worth reopening your recruitment for in August. Squad players they leave alone, so there's still a list worth reading.",
+    "**A free transfer also has to appeal to the player.** The game has always known that a star won't drop down to a much smaller club however good the offer is, but that check only ran when you tried to *buy* someone. Sign the same man on a free and he'd turn up without a word. The one rule the game had for stopping this was the one rule free agency walked straight past. Now he'll turn you down, and the Free Agents page says so instead of the button quietly doing nothing.",
+    "It's judged against the higher of the club that let him go and the level his ability entitles him to, and how much he cares scales with how good he is, so squad players still go wherever there's a game. Both halves matter: the 85 in that save had last played for a tiny club, so measured against his old club alone joining a second-division side was a step *up* and nothing would have stopped it.",
+    "Run against his actual signings, four of them would have been blocked at the level he made them, including the 85 and the 83 his squad was built around, and he can sign all four today now that his club is genuinely one of the biggest in France. That's the shape I wanted. It stops you skipping the queue without punishing you for having climbed it.",
+    "AI clubs are held to the same rule, which matters more than it sounds. Free-agent pickings go worst-club-first, so without it the weakest side in the world got first refusal on every released star while you were told he wouldn't drop to your level. Now nobody can do what you can't.",
+    "What you'll notice: almost nothing above 80 sits in free agency any more, but there are usually twenty or so players in the 70s, which is real squad depth for most clubs and a genuine signing for a small one. Every so often a genuinely elite one does sit there unclaimed, because only a big club would take him and no big club happened to need him. If that's you, he's yours.",
+    "Your existing saves keep every player you've already signed, and their contracts and development are untouched. What changes is next summer's shopping.",
+  ],
+};
+
+export default entry;
