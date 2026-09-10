@@ -1,10 +1,10 @@
 import type { Player, Position } from "./types.js";
 import { POSITIONS } from "./types.js";
-import { generatePlayer, softFloorBase } from "./generate.js";
+import { generatePlayer, softFloorBase, entryGrowthDebt } from "./generate.js";
 import type { NationalityWeights } from "./nationalities.js";
 import {
   YOUTH_AGE, YOUTH_INTAKE_MIN, YOUTH_INTAKE_MAX, YOUTH_BASE_OFFSET,
-  YOUTH_CONTRACT_LENGTH, ROSTER_COMPOSITION,
+  YOUTH_CONTRACT_LENGTH, ROSTER_COMPOSITION, YOUTH_BASE_REFERENCE_AGE,
   SCOUT_POSITION_SHARE, type ProgressionModel,
 } from "../constants.js";
 
@@ -21,6 +21,45 @@ import {
  */
 export function youthGenerationBase(academyBase: number): number {
   return softFloorBase(academyBase - YOUTH_BASE_OFFSET);
+}
+
+/**
+ * The same base, split per rating group and charged for entering below
+ * `YOUTH_BASE_REFERENCE_AGE`.
+ *
+ * WHY THIS EXISTS RATHER THAN A BIGGER `YOUTH_BASE_OFFSET`. Ratings are rolled
+ * with no age term, so taking a player in a year early does not make him rawer,
+ * it hands him an extra year on the growth side of the age curve - and every
+ * player in the world with him. Measured on a 20-season dynasty with no
+ * correction at all, that is **+5 OVR in every country** and weak-league
+ * solvency goes with it. `entryGrowthDebt` is exactly what that year is worth,
+ * so subtracting it leaves him arriving at his peak where he always did.
+ *
+ * It has to be PER GROUP. Physicals and skills read the curve 4.5 years apart,
+ * so the extra year is worth 2.70 to one and 3.00 to the other, and a scalar
+ * cannot say that. Two scalar levers were built and measured before this and
+ * both failed: raising `YOUTH_BASE_OFFSET` is eaten by the soft floor (~0.27 OVR
+ * per point, so parity needs ~42, which flattens every academy onto the floor),
+ * and extending the age curve's left tail closed only a quarter of the gap
+ * because it never reaches physicals at all.
+ *
+ * THE FLOOR IS APPLIED ONCE, AFTER the debt, and that ordering matters:
+ * `softFloorBase` is not idempotent (it lifts a value sitting on the floor), so
+ * flooring the scalar first and charging the debt afterwards would both
+ * double-bend the weak clubs and let the debt push them back under.
+ */
+export function youthGenerationBases(
+  academyBase: number,
+  age: number,
+  pos: Position,
+  model: ProgressionModel,
+): { physical: number; skill: number } {
+  const raw = academyBase - YOUTH_BASE_OFFSET;
+  const debt = entryGrowthDebt(age, YOUTH_BASE_REFERENCE_AGE, pos, model);
+  return {
+    physical: softFloorBase(raw - debt.physical),
+    skill: softFloorBase(raw - debt.skill),
+  };
 }
 
 /**
@@ -147,6 +186,11 @@ export function generateYouthIntake(
     const pos = weightedPosition(rng(), cdf);
     const p = generatePlayer(
       rng, pos, base, pid++, YOUTH_AGE, season, genSeed, homeCountry, nationalities, model,
+      false,
+      // Per group, and charged for arriving below the age YOUTH_BASE_OFFSET was
+      // swept at. Identical to the flat `base` while YOUTH_AGE is the reference
+      // age, so this is inert until the intake age actually moves.
+      youthGenerationBases(academyBase, YOUTH_AGE, pos, model),
     );
     p.contract.expiresSeason = season + YOUTH_CONTRACT_LENGTH;
     players.push(p);

@@ -226,6 +226,43 @@ function ageCurveOffsets(model: ProgressionModel, gkShift: number): AgeOffsets {
  * to 1, which yields not a weak player but a destroyed one — the exact failure
  * `YOUTH_BASE_FLOOR` was added to fix, arriving from a new direction.
  */
+/**
+ * How much MORE growth a player entering at `age` will get than one entering at
+ * `reference`, per rating group - i.e. what taking him in a year earlier is
+ * worth, in the same rating points generation deals in.
+ *
+ * This is what pays for a lower `YOUTH_AGE`. `generatePlayer` rolls ratings with
+ * no age term (see `YOUTH_BASE_OFFSET`), so an earlier intake is not a rawer
+ * player, it is the same player handed extra years on the growth side of the
+ * curve. Subtracting exactly those years at generation is the only correction
+ * that leaves him arriving at his peak where he always did.
+ *
+ * PER GROUP, and that is the whole reason this exists rather than a bigger
+ * `YOUTH_BASE_OFFSET`. Physicals read the curve at `age + PHYSICAL_AGE_SHIFT`
+ * and skills at `age + SKILL_AGE_SHIFT`, 4.5 years apart, with a further
+ * `GK_AGE_SHIFT` for keepers - so the extra year is worth a different amount to
+ * each of them (measured at 15 against 16: physical 2.70, skill 3.00). A single
+ * scalar offset cannot express that, and the two other levers tried could not
+ * either: raising `YOUTH_BASE_OFFSET` is absorbed by `softFloorBase` (one point
+ * buys back ~0.27 OVR, so parity needs ~42, which flattens every academy onto
+ * the floor), and extending the curve's left tail never reaches PHYSICAL at all,
+ * because entering at 15 the physical group still only reaches x = -7.
+ *
+ * Zero when `age >= reference`, so a save at the reference age is byte-identical.
+ */
+export function entryGrowthDebt(
+  age: number, reference: number, pos: Position, model: ProgressionModel,
+): { physical: number; skill: number } {
+  const profile = PROGRESSION_PROFILES[model];
+  const gk = pos === "GK" ? GK_AGE_SHIFT : 0;
+  const sum = (shift: number) => {
+    let total = 0;
+    for (let a = age + 1; a <= reference; a++) total += baseAgeDelta(profile, a + shift);
+    return total;
+  };
+  return { physical: sum(gk + PHYSICAL_AGE_SHIFT), skill: sum(gk + SKILL_AGE_SHIFT) };
+}
+
 export function generationBaseForAge(
   base: number, age: number, pos: Position, model: ProgressionModel,
 ): { physical: number; skill: number } {
@@ -272,12 +309,23 @@ export function generatePlayer(
    * one `rollRating` per skill either way.
    */
   ageAdjusted = false,
+  /**
+   * Per-group generation bases, overriding the flat `base`. Youth intake uses
+   * this to pay for a `YOUTH_AGE` below the age `YOUTH_BASE_OFFSET` was
+   * calibrated at - see `entryGrowthDebt`, which is where the two numbers come
+   * from, and `youthGenerationBases`, which applies the soft floor to them.
+   *
+   * Trailing and optional like the three above it, so the ~50 call sites that
+   * want a flat base are untouched.
+   */
+  groupBaseOverride?: { physical: number; skill: number },
 ): Player {
   const tiers = GEN_OFFSETS[pos];
   const spread = POSITION_RATING_SPREAD[pos];
-  const groupBase = ageAdjusted
-    ? generationBaseForAge(base, age, pos, model)
-    : { physical: base, skill: base };
+  const groupBase = groupBaseOverride
+    ?? (ageAdjusted
+      ? generationBaseForAge(base, age, pos, model)
+      : { physical: base, skill: base });
   const ratings = {} as PlayerRatings;
   for (const key of SKILL_KEYS as readonly SkillKey[]) {
     ratings[key] = rollRating(

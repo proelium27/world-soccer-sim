@@ -1081,6 +1081,21 @@ export const GENERATION_DECLINE_SELECTION = 0.55;
 export const GENERATION_EQUILIBRIUM_LIFT = 0;
 
 
+/**
+ * The intake age `YOUTH_BASE_OFFSET` was calibrated at, and the anchor the
+ * per-group growth debt is measured against (`entryGrowthDebt`).
+ *
+ * Deliberately its own constant rather than a literal 16 or a reuse of
+ * `YOUTH_AGE`: it is a statement about when the anti-inflation sweep was done,
+ * not about when intake happens, and the whole point is that the two can now
+ * differ. Set it equal to `YOUTH_AGE` and the debt is zero and generation is
+ * byte-identical - which is exactly what a save at the reference age gets.
+ *
+ * Move this ONLY together with a fresh 40-season sweep of `YOUTH_BASE_OFFSET`,
+ * since that is what it names.
+ */
+export const YOUTH_BASE_REFERENCE_AGE = 16;
+
 /** Youth intake: min/max generated players per club per season. */
 export const YOUTH_INTAKE_MIN = 3;
 export const YOUTH_INTAKE_MAX = 5;
@@ -1131,7 +1146,7 @@ export const YOUTH_INTAKE_MAX = 5;
  * any offset increase at the clubs already sitting on it, so 35 undershoots
  * slightly rather than overshooting — the safe direction.
  */
-export const YOUTH_BASE_OFFSET = 35;
+export const YOUTH_BASE_OFFSET = 34;
 
 /**
  * Soft floor under the youth-generation base (see `youthGenerationBase` in
