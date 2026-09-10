@@ -1429,7 +1429,11 @@ export function Manual() {
             eleven it would field highlighted; Schedule lists the fixtures for whatever's being
             played, opening on the qualifying round currently being played (a whole campaign at once
             is hundreds of games, but "All rounds" is there if you want it); Power Rankings sorts every
-            nation by squad strength, with movement since last time; Stat Leaders has both the most
+            nation by squad strength, with movement since last time, and narrows to a single
+            confederation when you want to know where you stand against the nations you actually
+            have to qualify past (narrowed, the rank and the movement are both against that
+            confederation, and a World column keeps the place overall);
+            Stat Leaders has both the most
             successful nations and the top individual players, which you can filter to a single
             country; and History keeps the roll of past winners plus each nation's tally of titles,
             finals and best finishes. Past editions keep their results and standings, though not the
