@@ -887,8 +887,31 @@ export const SUSPENSION_RED_MATCHES = 3;
 /** Generation-offset tier → additive offset (Table A). */
 export const TIER_OFFSET = { star: 18, H: 10, M: 2, L: -12, VL: -25 } as const;
 
-/** Youth intake players are always generated at this age. */
-export const YOUTH_AGE = 16;
+/**
+ * Youth intake players are always generated at this age.
+ *
+ * LOWERING THIS IS NOT A ONE-LINE CHANGE, because four other constants are
+ * defined against it and one of them is an anti-inflation constant.
+ *
+ * - `YOUTH_BASE_OFFSET` exists precisely because `generatePlayer`'s rating
+ *   rolls do not depend on age at all, so an intake player is generated at an
+ *   adult's quality distribution and then handed however many growth years
+ *   remain before his peak. Taking him in a year earlier hands every player in
+ *   the world one MORE of those years, so the offset has to rise to pay for it
+ *   or the equilibrium that constant was swept twice to hold reopens.
+ *   `scripts/youthAgeSweep.ts` prices the year.
+ * - `INITIAL_AGE_MIN` is this constant by reference, and
+ *   `GENERATION_AGE_WEIGHTS` has to reach down to it, or the age-distribution
+ *   hole that pair exists to close reopens one year wide (see either comment).
+ * - `YOUTH_CONTRACT_LENGTH` and `ACADEMY_ROSTER_CAP` are both defined by the
+ *   JOB they do rather than by their number — cover a prospect until he is
+ *   ready, and hold the intakes waiting for that — and both jobs got a year
+ *   longer. See their comments for what happens if they are left behind.
+ *
+ * Moved 16 -> 15 on 2026-09-10. See `YOUTH_BASE_OFFSET` for what the year cost
+ * and what was measured before paying it.
+ */
+export const YOUTH_AGE = 15;
 
 /**
  * Initial league generation: the age range starting rosters are drawn from.
@@ -970,13 +993,13 @@ export const ROSTER_FILE_AGE_MAX = 39;
  * see `INITIAL_AGE_MIN` for the age-distribution hole it closes.
  *
  * IT LOOKS INCONSISTENT WITH `YOUTH_BASE_OFFSET` AND IS NOT. Youth intake drops
- * its 16-year-olds 34 points below the academy anchor; the curve here puts a
- * generated 16-year-old only ~18 below a peak-age team-mate. Both are right, and
- * they are answering different questions: intake is a POPULATION that
+ * its teenagers `YOUTH_BASE_OFFSET` points below the academy anchor; the curve
+ * here puts a generated one only ~18 below a peak-age team-mate. Both are right,
+ * and they are answering different questions: intake is a POPULATION that
  * `trimRosterSurplus` and `AI_PROSPECT_SLOTS` then keep the best of, whereas
  * generation places a player straight onto a roster with no selection in front
- * of him. A generated 16-year-old is therefore the equivalent of an intake
- * player who already survived the cut.
+ * of him. A generated teenager is therefore the equivalent of an intake player
+ * who already survived the cut.
  *
  * `scripts/generationAgeCalibrate.ts` measures the equilibrium these were
  * checked against. Note its 25-season floor: a generated player is
@@ -984,6 +1007,13 @@ export const ROSTER_FILE_AGE_MAX = 39;
  * the inflated generated cohort — i.e. the very population being corrected.
  */
 export const GENERATION_AGE_WEIGHTS: Readonly<Record<number, number>> = {
+  // The bottom bucket tracks YOUTH_AGE and is deliberately the smallest in the
+  // table, alongside 38 at the other end: its whole job is to make the youngest
+  // generated cohort meet the youngest intake cohort, not to put schoolboys in
+  // opening squads. Note the offsets are zero-meaned under these weights at
+  // runtime, so adding a bucket re-levels the rest of the table on its own —
+  // which is also why the weight is kept small enough that it cannot move it.
+  15: 0.005,
   16: 0.010, 17: 0.015, 18: 0.025, 19: 0.035, 20: 0.045, 21: 0.055,
   22: 0.060, 23: 0.065, 24: 0.070, 25: 0.070, 26: 0.070, 27: 0.070,
   28: 0.065, 29: 0.060, 30: 0.055, 31: 0.050, 32: 0.045, 33: 0.040,
@@ -1081,8 +1111,27 @@ export const YOUTH_INTAKE_MAX = 5;
  * than assuming the old value still held. Re-swept the same way: 25
  * (previous value) now overshot to +8.5, 30 to +2, 35 undershot to -1.2,
  * 34 landed within ~0.2.
+ *
+ * Re-swept 34->35 (2026-09-10) when `YOUTH_AGE` moved 16 -> 15. That is the
+ * same mechanism a third time and it is the one this constant exists for:
+ * ratings are rolled with no age term, so taking an intake player a year
+ * earlier does not make him rawer, it hands him an extra year on the growth
+ * side of the age curve and every player in the world ends up that much
+ * higher. Priced on a cohort with `scripts/youthAgeSweep.ts` rather than on a
+ * 40-season world, because "where does a career end up if it starts a year
+ * earlier" is a question about a trajectory (same argument as
+ * steadySweep.ts's, whose harness this borrows).
+ *
+ * Measured, entering at 15 with the offset left at 34: plateau ovr +0.2, but
+ * the population at 80+ **29.8% -> 31.9% of plateau player-seasons** and at
+ * 85+ 14.1 -> 15.3 — i.e. the extra year lands hardest at the TOP of the
+ * distribution, which is the half a mean hides. At 35 the plateau reads -0.4
+ * and 70+ comes back to 53.5 against 53.2. Note the real path is gentler than
+ * the cohort's, because `youthGenerationBase`'s softplus floor eats part of
+ * any offset increase at the clubs already sitting on it, so 35 undershoots
+ * slightly rather than overshooting — the safe direction.
  */
-export const YOUTH_BASE_OFFSET = 34;
+export const YOUTH_BASE_OFFSET = 35;
 
 /**
  * Soft floor under the youth-generation base (see `youthGenerationBase` in
@@ -1778,7 +1827,28 @@ export const WAGE_WEEKLY_COEFF = 1.3;
 export const WAGE_VARIATION = 0.15;
 export const CONTRACT_LENGTH_MIN = 1;
 export const CONTRACT_LENGTH_MAX = 3;
-export const YOUTH_CONTRACT_LENGTH = 2;
+/**
+ * How long an intake player's first deal runs, and it is defined by the JOB it
+ * does rather than by the number: cover him from `YOUTH_AGE` until he is ready
+ * for senior football (~18). It went 2 -> 3 on 2026-09-10 when `YOUTH_AGE`
+ * moved 16 -> 15, because that gap grew by a year and the length has to grow
+ * with it.
+ *
+ * Not cosmetic. `releaseExpiredContracts` clears `academyRoster` as well as the
+ * senior roster, so on a 2-season deal a 15-year-old signed out of the trial
+ * group would walk for nothing at 17 — a year before he can do anything for
+ * you, and silently, since nothing announces an academy player leaving. The
+ * "Extend all" button on the Academy page would cover it, but only for a user
+ * who knows to press it, and the deal should not need pressing.
+ *
+ * Reaches AI clubs too, whose intake goes straight onto the senior roster on
+ * this same length, so it is a (small) world-wide change rather than a
+ * user-only one: fewer youth contracts lapse each summer, which slightly
+ * thins the free-agent pool and slightly cuts what `runAIContractRenewals`
+ * has to decide. Also reused by `academyContractTerms` for any academy
+ * signing, so a prospect signed off the free-agent list gets the same year.
+ */
+export const YOUTH_CONTRACT_LENGTH = 3;
 
 /**
  * Academy (holding pool for the user's own youth intake — see clubs.ts's
@@ -1793,10 +1863,17 @@ export const ACADEMY_STIPEND_WEEKLY = 500;
 /**
  * Hard ceiling on the academy pool, mirroring ROSTER_CAP's role for the
  * senior roster — bounds how many prospects a player can sign into the
- * academy via Incoming Talent (youth intake itself isn't gated by this, same
- * convention as ROSTER_CAP/youth intake).
+ * academy via the Youth Intake page (youth intake itself isn't gated by this,
+ * same convention as ROSTER_CAP/youth intake).
+ *
+ * Sized as INTAKES HELD AT ONCE, which is why it moved 10 -> 15 on 2026-09-10
+ * when `YOUTH_AGE` went 16 -> 15: a prospect sits here from intake until he is
+ * ready at ~18, so that is now three `YOUTH_TRIAL_SIGN_LIMIT` cohorts rather
+ * than two. Left at 10 the pool jams a year earlier than it used to and
+ * `signToAcademy` starts silently no-opping on a full five-man intake, which
+ * reads as the page being broken rather than as a cap.
  */
-export const ACADEMY_ROSTER_CAP = 10;
+export const ACADEMY_ROSTER_CAP = 15;
 /** Free agents at or under this age show up on Incoming Talent (prospects) instead of Free Agents. */
 export const PROSPECT_AGE_MAX = 21;
 

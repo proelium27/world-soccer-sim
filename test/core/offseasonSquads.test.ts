@@ -21,7 +21,7 @@ import { simOffseason } from "../../src/core/offseason.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 import { playFullSeason } from "../helpers/offseasonLeague.js";
 import {
-  NUM_TEAMS,
+  NUM_TEAMS, YOUTH_AGE,
 } from "../../src/core/constants.js";
 
 describe("simOffseason — youth intake and free agency", () => {
@@ -47,11 +47,11 @@ describe("simOffseason — youth intake and free agency", () => {
     return seed5;
   };
 
-  it("youth intake adds new 16-year-olds to every club", () => {
+  it("youth intake adds new players at YOUTH_AGE to every club", () => {
     const next = youthIntakeOffseason();
 
-    const sixteenYearOlds = next.players.filter((p) => next.season - p.born === 16);
-    expect(sixteenYearOlds.length).toBeGreaterThanOrEqual(NUM_TEAMS * 3);
+    const intake = next.players.filter((p) => next.season - p.born === YOUTH_AGE);
+    expect(intake.length).toBeGreaterThanOrEqual(NUM_TEAMS * 3);
   });
 
   it("routes the user's youth intake to the trial list, signing nobody for him", () => {
@@ -65,7 +65,7 @@ describe("simOffseason — youth intake and free agency", () => {
     expect(trialists.length).toBeGreaterThan(0);
     for (const pid of trialists) {
       const p = next.players.find((q) => q.pid === pid)!;
-      expect(next.season - p.born).toBe(16);
+      expect(next.season - p.born).toBe(YOUTH_AGE);
     }
     // Nobody is signed on his behalf, and no trialist leaks onto either squad.
     expect(userTeam.youthTrialSignings).toBe(0);
@@ -83,11 +83,11 @@ describe("simOffseason — youth intake and free agency", () => {
     // Some youth get trimmed back out immediately by trimRosterSurplus if a
     // club was already at target depth, so check across all AI clubs rather
     // than any single one.
-    const sixteenYearOlds = aiTeams.flatMap((t) => t.roster).filter((pid) => {
+    const intake = aiTeams.flatMap((t) => t.roster).filter((pid) => {
       const p = next.players.find((q) => q.pid === pid);
-      return p && next.season - p.born === 16;
+      return p && next.season - p.born === YOUTH_AGE;
     });
-    expect(sixteenYearOlds.length).toBeGreaterThan(0);
+    expect(intake.length).toBeGreaterThan(0);
   });
 
   it("records every AI free-agent arrival as a fee-0 transfer from the sentinel", () => {

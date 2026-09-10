@@ -1994,7 +1994,7 @@ export function Manual() {
           <p>
             <strong>Roster cap: 30 players.</strong> Signings, transfer buys, and academy promotions
             are blocked once you're full (the Roster, Transfers, and Free Agents pages all show
-            an x/30 count). Your academy has its own separate 10-player cap, covered in{" "}
+            an x/30 count). Your academy has its own separate 15-player cap, covered in{" "}
             <a href="#youth">The Youth Academy</a>.
           </p>
           <p>
@@ -2501,7 +2501,7 @@ export function Manual() {
 
         <Section id="youth" title="The Youth Academy">
           <p>
-            Every offseason, your club's academy turns out <strong>3&ndash;5 new 16-year-olds</strong>,
+            Every offseason, your club's academy turns out <strong>3&ndash;5 new 15-year-olds</strong>,
             landing in a holding pool on the Academy page instead of straight onto your senior
             roster. They show up raw, well below first-team level, but with youth on their side, and
             some will develop into stars (and some won't, see <a href="#players">potential</a>).
@@ -2527,7 +2527,7 @@ export function Manual() {
             <strong> Extend all</strong> in the banner does the whole final-year group at once.
             When one's ready, <strong>Promote</strong> moves him onto your senior roster on a normal
             ovr-based wage, which is blocked once you're at the 30-man roster cap. The academy has
-            its own cap, separate from your senior roster's, at 10 prospects.
+            its own cap, separate from your senior roster's, at 15 prospects.
           </p>
           <p>
             AI clubs don't keep a real academy pool. Their youth intake lands straight on their
@@ -2544,7 +2544,7 @@ export function Manual() {
             on the Academy page regularly instead.
           </p>
           <p>
-            Every summer your academy turns up a group of 16-year-olds on trial, and they land on
+            Every summer your academy turns up a group of 15-year-olds on trial, and they land on
             the <strong>Youth Intake</strong> page. Nobody's signed until you say so. You can offer
             a contract to five of them, and whoever's left when you start the next season has gone,
             free for anyone else to sign, so passing on the right one can come back to bite you.

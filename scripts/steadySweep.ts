@@ -28,6 +28,13 @@ import {
 
 const SEEDS = (process.env.SEEDS ?? "1,2").split(",").map(Number);
 const COHORT = Number(process.env.N ?? 400);
+/**
+ * Pinned rather than read from `YOUTH_AGE`, deliberately: it is a shared control
+ * across the two arms, not a modelled quantity, and pinning it keeps the sweep
+ * that derived the shipped `STEADY_*` constants reproducible. Those were derived
+ * at start age 16 against a `YOUTH_BASE_OFFSET` of 34, which is what the `- 34`
+ * in the cohort base below is; both have since moved (see YOUTH_AGE).
+ */
 const START_AGE = 16;
 const END_AGE = 38;
 

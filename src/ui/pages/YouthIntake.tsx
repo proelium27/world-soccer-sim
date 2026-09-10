@@ -71,7 +71,7 @@ export function YouthIntake() {
     <div className="container-fluid p-3">
       <h4>Youth Intake</h4>
       <p className="text-muted" style={{ maxWidth: "48rem" }}>
-        Every summer your academy turns up a group of 16-year-olds on trial. You can offer a
+        Every summer your academy turns up a group of 15-year-olds on trial. You can offer a
         contract to {YOUTH_TRIAL_SIGN_LIMIT} of them. Nobody here is signed until you say so, and
         whoever you haven't signed when the next season starts leaves for good, free for anyone
         else to pick up, so passing on the right one can come back to haunt you.

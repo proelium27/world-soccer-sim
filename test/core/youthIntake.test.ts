@@ -286,7 +286,7 @@ describe("a trial group is never stranded on a club the user leaves", () => {
   it("clears them when the club goes on autopilot", () => {
     // During a jump meta.userTid is AUTOPILOT_TID, so the offseason's reset
     // matches no team and the group would survive the whole jump — the user
-    // coming back to a page offering 26-year-old "16-year-olds on trial".
+    // coming back to a page offering twenty-somethings as "youngsters on trial".
     const tid = world.meta.userTid;
     expect(world.teams.find((t) => t.tid === tid)!.youthTrialists!.length).toBeGreaterThan(0);
 

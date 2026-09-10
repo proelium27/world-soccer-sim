@@ -133,6 +133,16 @@ const SEASON = simSeason(mulberry32(12345));
  * world mean 54.68 -> 54.69, with the age offsets zero-meaned so the level and
  * the country ladder are untouched by construction. See GENERATION_AGE_WEIGHTS.
  *
+ * And on 2026-09-10, when YOUTH INTAKE moved to `YOUTH_AGE` 15. That is a world
+ * change for the same reason the age model above was: `GENERATION_AGE_WEIGHTS`
+ * has to reach down to the intake age or the age-distribution hole reopens, so
+ * it gained a 15 bucket and starting squads are drawn from a different table.
+ * The level is held by the offsets being zero-meaned under those same weights:
+ * world rostered mean ovr 54.69 -> 54.75, with the new bucket the smallest in
+ * the table. `YOUTH_BASE_OFFSET` moved 34 -> 35 in the same change but does NOT
+ * reach this baseline — it only feeds youth intake, which is offseason-only,
+ * and `simSeason` never crosses an offseason.
+ *
  * NOTE ON THE MERGE OF THOSE LAST TWO. They landed on separate branches and each
  * rebased this hash on its own, so the value below is NEITHER of theirs: it was
  * re-measured with both live (substitution windows 2426966974, the age model
@@ -140,7 +150,7 @@ const SEASON = simSeason(mulberry32(12345));
  * a side — two independent outcome changes compose into a third world, and
  * taking either number would leave the test asserting a season nothing produces.
  */
-const BASELINE_SCORELINE_HASH = 1044906061;
+const BASELINE_SCORELINE_HASH = 340746435;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");

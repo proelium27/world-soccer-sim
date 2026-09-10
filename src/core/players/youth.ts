@@ -93,8 +93,9 @@ function targetedPositionCdf(targets: readonly Position[]): { pos: Position; cum
 }
 
 /**
- * Generate one club's youth intake for the season: 3-5 raw 16-year-olds,
- * quality anchored to the club's fixed generation-time academy strength (a
+ * Generate one club's youth intake for the season: 3-5 raw teenagers at
+ * `YOUTH_AGE`, quality anchored to the club's fixed generation-time academy
+ * strength (a
  * stand-in for the budget-weighted intake described in the spec, until
  * finances are designed) — NOT the club's current roster average, which
  * would let any random upward drift in the roster compound into every future

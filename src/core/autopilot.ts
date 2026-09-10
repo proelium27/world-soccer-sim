@@ -85,7 +85,7 @@ export function beginAutopilot(league: LeagueStore): LeagueStore {
         // reset (which keys off userTid) matches no team at all — left here,
         // the group survives the whole jump with its pids locked out of the
         // free-agent pool, and the user comes back to a Youth Intake page
-        // offering 26-year-old "16-year-olds on trial".
+        // offering twenty-somethings as "youngsters on trial".
         ? { ...t, starters: null, transferListed: [], moreMinutes: [],
             youthTrialists: [], youthTrialSignings: 0 }
         : t,

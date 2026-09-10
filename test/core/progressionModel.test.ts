@@ -46,8 +46,8 @@ function player(seed: number, age: number, pid = 1): Player {
 const SMALL = englandCompetitions;
 
 /**
- * A 16-year-old's real generation base. `youthGenerationBase` takes
- * YOUTH_BASE_OFFSET (34) off a club's academy anchor, so an academy prospect is
+ * An intake player's real generation base. `youthGenerationBase` takes
+ * `YOUTH_BASE_OFFSET` off a club's academy anchor, so an academy prospect is
  * generated in the teens-to-thirties, not at a senior club's LEAGUE_BASE. It
  * matters here rather than being a detail: `growthDamping` starts biting at ovr
  * 65, so a cohort generated at senior strength is already against the wall and
