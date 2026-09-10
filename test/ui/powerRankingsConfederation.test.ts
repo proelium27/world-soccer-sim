@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeLeague } from "../helpers/league.js";
 import { buildPowerSnapshot, confederationOf } from "../../src/core/international/index.js";
-import type { IntlPowerSnapshot } from "../../src/core/international/index.js";
+import type { IntlPowerSnapshot, NationFormStats } from "../../src/core/international/index.js";
 import {
   powerRows, confederationsPresent,
 } from "../../src/ui/pages/nationalTeams/PowerRankings.js";
@@ -19,6 +19,55 @@ import {
 function snap(season: number, ranks: [string, number][]): IntlPowerSnapshot {
   return { season, ranks: ranks.map(([nation, rating]) => ({ nation, rating })) };
 }
+
+/** A form record carrying only the bonus, which is all the ranking reads. */
+function bonus(byNation: Record<string, number>): Map<string, NationFormStats> {
+  return new Map(Object.entries(byNation).map(([nation, performanceBonus]) => [
+    nation,
+    { played: 6, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, performanceBonus },
+  ]));
+}
+
+describe("power rankings ranked on Power", () => {
+  it("puts an overperforming nation above a stronger squad", () => {
+    const s = snap(4, [["Spain", 80], ["Brazil", 78], ["Wales", 70]]);
+    const rows = powerRows(s, null, null, bonus({ Wales: 12, Spain: -3 }));
+
+    expect(rows.map((r) => r.nation)).toEqual(["Wales", "Brazil", "Spain"]);
+    expect(rows.map((r) => r.power)).toEqual([82, 78, 77]);
+    // Rating is untouched and still says who has the better squad.
+    expect(rows.find((r) => r.nation === "Spain")!.rating).toBe(80);
+  });
+
+  it("falls back to squad order before anything has been played", () => {
+    const s = snap(4, [["Spain", 80], ["Brazil", 78], ["Wales", 70]]);
+    const rows = powerRows(s, null, null);
+
+    expect(rows.map((r) => r.nation)).toEqual(["Spain", "Brazil", "Wales"]);
+    expect(rows.map((r) => r.power)).toEqual(rows.map((r) => r.rating));
+  });
+
+  it("measures movement against the previous table as it was actually ranked", () => {
+    // Wales was top last time on the back of a good campaign and has since
+    // fallen back to its squad strength. Reading the previous snapshot in
+    // stored (rating) order would report it steady instead of dropping two.
+    const before = snap(4, [["Spain", 80], ["Brazil", 78], ["Wales", 70]]);
+    const after = snap(8, [["Spain", 80], ["Brazil", 78], ["Wales", 70]]);
+    const rows = powerRows(after, before, null, new Map(), bonus({ Wales: 12 }));
+
+    expect(rows.map((r) => r.nation)).toEqual(["Spain", "Brazil", "Wales"]);
+    expect(rows.find((r) => r.nation === "Wales")).toMatchObject({ rank: 3, delta: -2 });
+    expect(rows.find((r) => r.nation === "Spain")).toMatchObject({ rank: 1, delta: 1 });
+  });
+
+  it("ranks within the confederation on Power too", () => {
+    const s = snap(4, [["Spain", 80], ["Brazil", 78], ["Argentina", 70]]);
+    const rows = powerRows(s, null, "South America", bonus({ Argentina: 12 }));
+
+    expect(rows.map((r) => r.nation)).toEqual(["Argentina", "Brazil"]);
+    expect(rows.map((r) => r.worldRank)).toEqual([1, 3]);
+  });
+});
 
 describe("power rankings by confederation", () => {
   it("numbers the confederation from 1 and keeps the world place beside it", () => {
