@@ -86,6 +86,57 @@ export function hasRosterRoom(team: StoredTeam): boolean {
 }
 
 /**
+ * Pids that have already changed clubs permanently in the given window.
+ *
+ * A player moves at most once per window: once a club has bought him he is
+ * theirs until it shuts. Football has no mid-window resale market the way the
+ * North American leagues trade, and without the rule a club can buy cheap and
+ * sell on at many times the fee inside one window — a windfall to a middleman
+ * for holding a player for zero matchdays. Measured before this existed
+ * (scripts/windowDoubleMoveProbe.ts, seed 1): ~3-4% of a summer window's deals
+ * were second legs, growing season on season, with single chains running
+ * $7.1M -> $113.3M.
+ *
+ * `AI_MARKET_FEE_FLOOR_FRACTION` is the existing defence against exactly that
+ * flip and cannot cover this on its own, which is why the bug survived: it
+ * bounds one deal's fee against the player's own market value, while the two
+ * legs of a chain come from *different mechanisms* (the division-ceiling sweep
+ * and the AI market, which run either side of each other in the offseason), so
+ * neither leg ever sees the other's fee. The AI market's internal `moved` set
+ * has the same blind spot — it only spans one run of one function.
+ *
+ * Two kinds of move are deliberately not counted:
+ *
+ *  - **Free-agent arrivals**, logged from the FREE_AGENT_TID sentinel rather
+ *    than from a club. They already carry a stronger hold of their own
+ *    (`faTransferLocked`, a full season), and free-agent *departures* are not
+ *    logged at all, so counting the sentinel would lock half a story.
+ *  - **Loans**, in both directions. A loan moves who a player turns out for,
+ *    not who owns him, and buying a player then loaning him straight out is
+ *    ordinary business rather than the flip this exists to stop.
+ *
+ * `enforceDivisionCeilings` is exempt as a *mover* — it is a forced structural
+ * correction and it must still be able to confiscate a player the market has
+ * just sold below the division ceiling, which is the whole reason it runs
+ * after the market. Its moves still land in the log, so a swept player is
+ * locked for the rest of the window like anyone else.
+ */
+export function movedThisWindow(
+  transfers: CompletedTransfer[],
+  season: number,
+  window: TransferWindowKind,
+): Set<number> {
+  const moved = new Set<number>();
+  for (const t of transfers) {
+    if (t.season !== season || t.window !== window) continue;
+    if (t.loanSeasons !== undefined || t.loanReturn) continue;
+    if (isFreeAgentTid(t.fromTid) || isFreeAgentTid(t.toTid)) continue;
+    moved.add(t.pid);
+  }
+  return moved;
+}
+
+/**
  * Deterministic per-(league, season, window, player, salt) seed: scout
  * reports, reservation prices, and recommendation ordering stay fixed for a
  * whole window instead of rerolling on every render or probing offer.
@@ -377,6 +428,10 @@ export function makeTransferOffer(
   // loan would be orphaned and processLoanReturns would later duplicate the
   // pid onto the parent's roster too.
   if (league.activeLoans.some((l) => l.pid === pid)) return league;
+  // One move per window, for the user exactly as for an AI buyer — a player
+  // his new club signed days ago isn't going anywhere yet (see
+  // movedThisWindow). Exempting the user here would just hand him the flip.
+  if (movedThisWindow(league.transfers, ws.season, ws.window).has(pid)) return league;
 
   const offer = Math.round(amount);
   const wageCharge = acquisitionWageCharge(league, player);
@@ -493,6 +548,10 @@ export function acceptCounterOffer(
   // A player who went out on loan since the counter was made is no longer the
   // seller's to sell (see makeTransferOffer).
   if (league.activeLoans.some((l) => l.pid === pid)) return league;
+  // ...and one who has moved clubs since it was made is settled for the window,
+  // whoever countered. Re-checked here rather than trusted from offer time for
+  // the same reason the depth floor is: the world moves between the two.
+  if (movedThisWindow(league.transfers, ws.season, ws.window).has(pid)) return league;
   const wageCharge = acquisitionWageCharge(league, player);
   // The counter is a CASH price the seller has already named, so meeting it in
   // cash is all that is required. Any add-ons attached here ride on top and can

@@ -222,6 +222,11 @@ export const FILE_WEIGHTS_SECONDS: Readonly<Record<string, number>> = {
   "test/core/autopilot.test.ts": 141,
   "test/core/nationalManager.test.ts": 114,
   "test/core/ai/transferMarket.test.ts": 45,
+  // Measured at ~40s locally rather than from a CI run, so entered unscaled
+  // and an UNDER-estimate by roughly the 1.5x CI factor — see the note on
+  // progressionModel above. Nearly all of it is two whole-world market passes,
+  // which do not shrink on CI. Re-take it from the next green run.
+  "test/core/transfers/windowLock.test.ts": 40,
   "test/core/transfers/searchWorldPlayers.test.ts": 107,
   "test/core/careerSummary.test.ts": 69,
   "test/validation/m1-table-spread.test.ts": 65,

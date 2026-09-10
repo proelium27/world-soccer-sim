@@ -9,6 +9,22 @@ import { trueTransferValue } from "../finance/valuation.js";
 import { clampBudget, financeScale } from "../finance/budget.js";
 
 /**
+ * The tier a player is swept to from `fromTier`: the deepest division above
+ * him whose own ceiling he does NOT clear, and so the deepest one he is
+ * allowed to stay in.
+ *
+ * Exported for the test that pins it, because it is the whole of the
+ * "one move, not one per rung" property and reads as arithmetic rather than as
+ * a rule otherwise. Tier 1 has no ceiling (`divisionRefusalOvr` answers
+ * Infinity there), so the walk always terminates at 1 at the latest.
+ */
+export function landingTierFor(ovr: number, fromTier: number): number {
+  let tier = fromTier;
+  while (tier >= 2 && ovr >= divisionRefusalOvr(tier)) tier -= 1;
+  return tier;
+}
+
+/**
  * Guaranteed, deterministic ceiling on how good an AI-controlled Division 2
  * player is allowed to stay: any rostered player at or above
  * DIVISION_2_REFUSAL_OVR_THRESHOLD is moved to a Division 1 club every
@@ -43,6 +59,15 @@ import { clampBudget, financeScale } from "../finance/budget.js";
  * from), capped at whatever it can actually pay so a forced move can never
  * push a club into deficit, and the selling club banks the fee (clamped by
  * its tier's budget cap, same as any AI-market sale).
+ *
+ * **Deliberately exempt from the one-move-per-window rule** (`movedThisWindow`
+ * in transfers/negotiation.ts). Every other path refuses to move a player who
+ * has already changed clubs this window; this one must not, because catching a
+ * player the market has just sold below the ceiling *in the same offseason it
+ * happens* is the entire reason the second call sits after the market rather
+ * than before it. Do not "fix" the inconsistency by adding the check here.
+ * The moves logged below still count as moves, so a swept player is settled
+ * for the rest of the window like anyone else.
  */
 export function enforceDivisionCeilings(
   teams: StoredTeam[],
@@ -76,11 +101,26 @@ export function enforceDivisionCeilings(
 
   // One pass per tier that has a division above it, DEEPEST FIRST — and the
   // order is load-bearing rather than tidy. Each pass reads the rosters the
-  // previous one left behind, so a third-tier player good enough to clear both
-  // bars is swept up to tier 2 and then swept again to tier 1 within this single
-  // call. Running shallowest-first would strand him one division short and cost
-  // him a whole season to surface, which is exactly the drift this exists to
-  // prevent. A two-division world runs one pass and is unchanged.
+  // previous one left behind, so a player is never stranded a division short
+  // and left to surface a whole season later, which is exactly the drift this
+  // exists to prevent. A two-division world runs one pass and is unchanged.
+  //
+  // A player who clears SEVERAL ceilings lands at his final tier in one move
+  // (`landingTierFor`), rather than being hoisted a rung at a time. That used
+  // to be a rung at a time, and every rung banked its own fee and logged its
+  // own transfer — so a third-tier player good enough for the top flight read
+  // as two transfers inside one window (the thing `movedThisWindow` exists to
+  // make impossible everywhere else), a club that held him for no time at all
+  // pocketed the difference between a second-tier fee and a top-flight one,
+  // and if that club happened to be at ROSTER_CAP it released one of its own
+  // players to make room for someone it lost again in the same breath.
+  //
+  // Skipping the intermediate club changes nothing about where he ends up, and
+  // that is checkable rather than assumed: the receiving pool at each rung is
+  // drawn from the seller's COUNTRY, which never changes on the way up, and
+  // the neediest-club search reads only the destination tier's rosters. So the
+  // intermediate club's identity could not affect the next rung's choice — it
+  // was an artifact of the loop, not a step in the journey.
   const deepestTier = Math.max(1, ...competitions.map((c) => c.tier));
   for (let fromTier = deepestTier; fromTier >= 2; fromTier--) {
     const ceiling = divisionRefusalOvr(fromTier);
@@ -108,14 +148,18 @@ export function enforceDivisionCeilings(
       // D1 — the weakest tier-1 clubs — compressing the deliberate cross-country
       // strength gap over a dynasty; a 15-season audit confirmed the compression.)
       //
-      // One division up rather than straight to the top flight, for the same
-      // reason: a third tier's ceiling is a statement about the second tier, and
-      // teleporting its best players past a division would flatten the pyramid it
-      // is meant to grade.
+      // Only as far up as his rating actually forces him, never straight to the
+      // top flight on principle: a third tier's ceiling is a statement about the
+      // second tier, and teleporting its best players past a division they are
+      // allowed to play in would flatten the pyramid it is meant to grade. So
+      // an ovr-65 third-division player stops in the second division, and only
+      // one who also clears the second division's own ceiling carries on — a
+      // player who provably cannot stay there either way.
+      const landingTier = landingTierFor(player.ovr, fromTier);
       const sellerCountry = countryByTid.get(sellerTid);
       const upCandidates = [...tierByTid.entries()].filter(
         ([tid, tier]) =>
-          tier === fromTier - 1 && tid !== userTid && countryByTid.get(tid) === sellerCountry,
+          tier === landingTier && tid !== userTid && countryByTid.get(tid) === sellerCountry,
       );
       if (upCandidates.length === 0) continue;
 

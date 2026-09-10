@@ -2,12 +2,13 @@ import type { Player } from "../players/types.js";
 import { isBorrowed, borrowedPids } from "../loanOwnership.js";
 import type { LeagueStore } from "../leagueState.js";
 import type { ClubContext } from "../ai/clubContext.js";
-import type { TransferWindowKind } from "./window.js";
+import type { TransferWindowKind, TransferWindowState } from "./window.js";
 import type { StoredTeam } from "../teams/clubs.js";
 import { transferWindowState } from "./window.js";
 import { faTransferLocked } from "../freeAgency.js";
 import {
   windowSeed, departsAtRollover, acquisitionWageCharge, hasRosterRoom, executeTransfer,
+  movedThisWindow,
 } from "./negotiation.js";
 import { deriveLeagueContexts } from "../ai/clubContext.js";
 import type { ProposedClause } from "./clauses.js";
@@ -143,6 +144,11 @@ export function inboundOfferCandidates(league: LeagueStore): InboundOfferCandida
   // someone else's asset, orphaning the live loan.
   const borrowed = borrowedPids(league.activeLoans, userTid);
 
+  // Anyone who has already changed clubs this window is settled until it shuts,
+  // which on this side of the market is what stops the user buying a player
+  // cheap and selling him on in the same window (see movedThisWindow).
+  const moved = movedThisWindow(league.transfers, ws.season, ws.window);
+
   const candidates: InboundOfferCandidate[] = [];
   for (const pid of user.roster) {
     if (borrowed.has(pid)) continue;
@@ -152,6 +158,7 @@ export function inboundOfferCandidates(league: LeagueStore): InboundOfferCandida
     // A free agent the user just signed is under a one-season transfer hold —
     // no club can bid on him until it clears (see faTransferLocked).
     if (faTransferLocked(player, league.season)) continue;
+    if (moved.has(pid)) continue;
 
     // Keep-side, exactly as an AI seller prices its own players, plus the
     // settling-in premium (see ValuationSide / playerWill.ts). The user's stars
@@ -359,6 +366,35 @@ export function respondToAsk(
  * is actually on the table, and the buyer can still afford it (its budget or
  * roster may have moved since the offer was computed).
  */
+/**
+ * Can the user still sell this pid at all, at the moment he clicks?
+ *
+ * Every condition on a sale (borrowed, out on loan, already moved this window)
+ * otherwise lives in `inboundOfferCandidates`, which builds a FRESH offer. A
+ * persisted offer skips that builder entirely — `resolveOpenOffer` returns the
+ * stored row first — so an offer opened in one state and accepted in another is
+ * checked against nothing. `acceptCounterOffer` on the buy side already
+ * re-checks its own conditions for exactly this reason ("the roster may have
+ * changed since the counter was made"); this is the missing mirror.
+ *
+ * The loan case is the one with teeth. Nothing in `loans.ts` clears
+ * `inboundOffers`, so a player can go out on loan with an open offer still on
+ * the table. He then sits on the LOANEE's roster, and `executeTransfer` removes
+ * a pid only from the seller's roster — the user's, where he no longer is —
+ * while pushing him onto the buyer's. That leaves one pid on two rosters with a
+ * live loan pointing at a third club, which `processLoanReturns` would later
+ * duplicate again. Same reasoning as the AI market's `onLoanPids` skip.
+ */
+function canStillSell(league: LeagueStore, pid: number, ws: TransferWindowState): boolean {
+  const user = league.teams.find((t) => t.tid === league.meta.userTid);
+  if (!user || !user.roster.includes(pid)) return false;
+  // Covers both directions: a player in on loan isn't his to sell, and one out
+  // on loan isn't on his roster to hand over.
+  if (league.activeLoans.some((l) => l.pid === pid)) return false;
+  if (ws.open && movedThisWindow(league.transfers, ws.season, ws.window).has(pid)) return false;
+  return true;
+}
+
 export function acceptInboundOffer(
   league: LeagueStore,
   pid: number,
@@ -375,6 +411,7 @@ export function acceptInboundOffer(
 
   const resolved = resolveOpenOffer(league, pid);
   if (!resolved) return league;
+  if (!canStillSell(league, pid, ws)) return league;
 
   const buyer = league.teams.find((t) => t.tid === resolved.buyerTid);
   const player = league.players.find((p) => p.pid === pid);
@@ -436,6 +473,9 @@ export function counterInboundOffer(
 
   const resolved = resolveOpenOffer(league, pid);
   if (!resolved) return league;
+  // Countering can end in an immediate sale, so it needs the same re-check as
+  // accepting outright (see canStillSell).
+  if (!canStillSell(league, pid, ws)) return league;
 
   const ask = Math.round(askAmount);
   if (!Number.isFinite(ask) || ask <= 0) return league;
