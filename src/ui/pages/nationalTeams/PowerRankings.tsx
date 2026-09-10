@@ -172,9 +172,11 @@ export function NTPowerRankings() {
         <>
           <p className="text-muted small">
             Every eligible nation, ranked by Power: its best-available-squad rating, plus a bonus or
-            penalty for how it has been playing. Form counts results from the last four seasons of
-            international football, and beating a nation you were expected to lose to is worth more
-            than beating one you weren't. Movement is against the previous ranking.
+            penalty for how it has been playing. Form counts the last four seasons of international
+            football, including the campaign in progress. Beating a nation you were expected to lose
+            to is worth more than beating one you weren't, and where the game was played counts too
+            &mdash; a World Cup knockout tie moves the needle further than a qualifier, on the same
+            scale FIFA uses. Movement is against the previous ranking.
             {shown !== null && " Narrowed to one confederation, the rank and the movement are both"
               + " against the other nations in it, and World is the place overall."}
           </p>

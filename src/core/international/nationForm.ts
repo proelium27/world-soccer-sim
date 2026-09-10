@@ -1,12 +1,19 @@
-import type { InternationalState, IntlGroupTable, IntlTournamentSummary } from "./types.js";
+import type {
+  InternationalState, IntlGroupTable, IntlTournamentSummary, IntlQualifyingCampaign,
+} from "./types.js";
+import { groupTableSummary } from "./groups.js";
 import {
   INTL_CYCLE_YEARS, INTL_QUAL_LEGS,
+  INTL_IMPORTANCE_QUALIFYING, INTL_IMPORTANCE_CONTINENTAL, INTL_IMPORTANCE_CONTINENTAL_LATE,
+  INTL_IMPORTANCE_WORLD_CUP, INTL_IMPORTANCE_WORLD_CUP_LATE, INTL_IMPORTANCE_LATE_FROM_FINAL,
+  INTL_SHOOTOUT_WIN_POINTS,
   POWER_EXPECTED_POINTS_SLOPE, POWER_GD_WEIGHT, POWER_GD_CAP, POWER_PERFORMANCE_WEIGHT,
 } from "../constants.js";
 
 /**
  * How a nation has actually been playing, for the Power column on the national
- * rankings — the international counterpart of `computeTeamForm`.
+ * rankings — the international counterpart of `computeTeamForm`, with the parts
+ * of FIFA's own ranking formula that carry over.
  *
  * DERIVED FROM THE ARCHIVE, never stored, and that is a requirement rather than
  * a preference. `IntlPowerSnapshot.ranks` is not a display list: its ordering is
@@ -23,16 +30,16 @@ import {
  * that no decision the manager makes may move the bar he is measured against.
  * Squad strength is the un-gameable reading; this one is not, which is exactly
  * why it belongs on the page and not in the verdict.
- */
-/**
- * How many seasons of international football the Power column reads.
  *
- * One full cycle, so the window always contains a complete qualifying campaign
- * and whatever tournament has been played, and a World Cup stays in view for
- * the four years until the next one.
+ * **What is taken from FIFA and what is not.** The expectation term and the
+ * per-match importance weights are theirs. The running total is not: FIFA's SUM
+ * accumulates points forever, so a nation that plays fewer matches simply moves
+ * less, whereas this is a per-match average that sits on top of squad rating.
+ * That difference is deliberate — confederations here range from ~25 eligible
+ * nations to one, so a cumulative score would rank a nation partly on how many
+ * fixtures its confederation happens to hand it, which is a known criticism of
+ * the real ranking rather than a property worth importing.
  */
-export const INTL_FORM_WINDOW = INTL_CYCLE_YEARS;
-
 export interface NationFormStats {
   played: number;
   won: number;
@@ -45,6 +52,17 @@ export interface NationFormStats {
   performanceBonus: number;
 }
 
+/**
+ * How many seasons of international football the Power column reads.
+ *
+ * One full cycle, so the window always contains a complete qualifying campaign
+ * and whatever tournament has been played, and a World Cup stays in view for
+ * the four years until the next one. FIFA's current formula has no window at
+ * all, but its PREVIOUS one used exactly this — four years, with the older ones
+ * counting for less.
+ */
+export const INTL_FORM_WINDOW = INTL_CYCLE_YEARS;
+
 /** Points a nation "should" take off an opponent, from the rating gap alone. Mirrors `expectedPoints`. */
 function expectedPoints(own: number, opp: number): number {
   const raw = 1.5 + POWER_EXPECTED_POINTS_SLOPE * (own - opp);
@@ -55,15 +73,25 @@ function blank(): NationFormStats {
   return { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, performanceBonus: 0 };
 }
 
-/** Running totals while accumulating; `performanceBonus` is only meaningful once divided by games. */
+/**
+ * Running totals while accumulating.
+ *
+ * The bonus is a WEIGHTED average — `weighted / weight`, not `total / played` —
+ * so that a World Cup quarter-final counts for more than a qualifying group
+ * game without every nation's bonus being multiplied by the size of the weights.
+ * With one weight throughout it reduces exactly to the unweighted per-game mean,
+ * which is what makes the whole table invariant to scaling the importance
+ * constants uniformly.
+ */
 interface Accumulator extends NationFormStats {
-  performanceTotal: number;
+  weighted: number;
+  weight: number;
 }
 
 function accFor(into: Map<string, Accumulator>, nation: string): Accumulator {
   const existing = into.get(nation);
   if (existing) return existing;
-  const fresh: Accumulator = { ...blank(), performanceTotal: 0 };
+  const fresh: Accumulator = { ...blank(), weighted: 0, weight: 0 };
   into.set(nation, fresh);
   return fresh;
 }
@@ -85,11 +113,13 @@ function foldGroup(
   into: Map<string, Accumulator>,
   group: IntlGroupTable,
   ratingOf: (nation: string) => number,
+  importance: number,
 ): void {
   const opponents = group.rows.length - 1;
   if (opponents <= 0) return;
 
   for (const row of group.rows) {
+    if (row.played === 0) continue;
     const acc = accFor(into, row.nation);
     acc.played += row.played;
     acc.won += row.won;
@@ -100,6 +130,8 @@ function foldGroup(
     acc.gd += row.gd;
 
     const own = ratingOf(row.nation);
+    // A group part-way through a campaign has played fewer than a full leg
+    // against each opponent, so this is fractional rather than a whole number.
     const legs = row.played / opponents;
     let expected = 0;
     for (const other of group.rows) {
@@ -110,8 +142,23 @@ function foldGroup(
     // capping a whole group's aggregate would let a six-game campaign carry the
     // same maximum as a single knockout tie.
     const cappedGd = Math.min(POWER_GD_CAP * row.played, Math.max(-POWER_GD_CAP * row.played, row.gd));
-    acc.performanceTotal += (row.points - expected * legs) + POWER_GD_WEIGHT * cappedGd;
+    acc.weighted += importance * ((row.points - expected * legs) + POWER_GD_WEIGHT * cappedGd);
+    acc.weight += importance * row.played;
   }
+}
+
+/**
+ * How much a knockout round counts.
+ *
+ * FIFA steps its weight up from the quarter-finals, so the round is measured
+ * backwards from the final rather than forwards from the first round — brackets
+ * differ in depth, and a confederation cup's round 0 may be the semi-final where
+ * the World Cup's is the round of 16. Reading the depth off the rounds present
+ * is only sound because an ARCHIVED tournament is a finished one; do not copy
+ * this to a live bracket, which would call its first round the final.
+ */
+function knockoutImportance(round: number, totalRounds: number, base: number, late: number): number {
+  return totalRounds - 1 - round <= INTL_IMPORTANCE_LATE_FROM_FINAL ? late : base;
 }
 
 /** Fold a tournament's knockout ties in. These carry per-match detail, so the club formula applies directly. */
@@ -119,8 +166,13 @@ function foldKnockout(
   into: Map<string, Accumulator>,
   tournament: IntlTournamentSummary,
   ratingOf: (nation: string) => number,
+  base: number,
+  late: number,
 ): void {
+  const totalRounds = tournament.knockout.reduce((max, t) => Math.max(max, t.round + 1), 0);
+
   for (const tie of tournament.knockout) {
+    const importance = knockoutImportance(tie.round, totalRounds, base, late);
     for (const [nation, opponent, own, against] of [
       [tie.home, tie.away, tie.homeGoals, tie.awayGoals] as const,
       [tie.away, tie.home, tie.awayGoals, tie.homeGoals] as const,
@@ -130,19 +182,31 @@ function foldKnockout(
       acc.gf += own;
       acc.ga += against;
       acc.gd += own - against;
-      // A tie level after extra time is settled on penalties, and the shootout
-      // decides who goes through rather than the result. Scored as the draw it
-      // was, so a nation is not punished for losing a coin flip.
+      // Level after extra time is a DRAW in the record, which is what football
+      // records — the shootout decides who goes through, not the result.
       if (own > against) acc.won += 1;
       else if (own === against) acc.drawn += 1;
       else acc.lost += 1;
 
-      const points = own > against ? 3 : own === against ? 1 : 0;
+      // The shootout does count toward the rating, though, the way FIFA counts
+      // it: the winner lands halfway between a draw and a win and the loser
+      // keeps a draw. Scoring it as a flat draw for both ignores a real result;
+      // scoring it as a win overpays a coin flip.
+      const wonShootout = tie.pens !== null && tie.winner === nation;
+      const points = wonShootout
+        ? INTL_SHOOTOUT_WIN_POINTS
+        : own > against ? 3 : own === against ? 1 : 0;
       const cappedGd = Math.min(POWER_GD_CAP, Math.max(-POWER_GD_CAP, own - against));
-      acc.performanceTotal +=
-        (points - expectedPoints(ratingOf(nation), ratingOf(opponent))) + POWER_GD_WEIGHT * cappedGd;
+      acc.weighted += importance
+        * ((points - expectedPoints(ratingOf(nation), ratingOf(opponent))) + POWER_GD_WEIGHT * cappedGd);
+      acc.weight += importance;
     }
   }
+}
+
+/** A qualifying campaign is only in `qualifyingHistory` once its last leg has locked in the qualifiers. */
+function isArchived(campaign: IntlQualifyingCampaign): boolean {
+  return campaign.qualified.length > 0;
 }
 
 /**
@@ -175,21 +239,46 @@ export function nationForm(
     // one leg per offseason, so it is only in the window once it has finished.
     const concluded = qualifying.season + INTL_QUAL_LEGS - 1;
     if (concluded <= oldest || concluded > season) continue;
-    for (const group of qualifying.groups) foldGroup(acc, group, ratingOf);
+    for (const group of qualifying.groups) {
+      foldGroup(acc, group, ratingOf, INTL_IMPORTANCE_QUALIFYING);
+    }
   }
 
-  for (const tournament of [...intl.history, ...intl.confederationCupHistory]) {
+  // The campaign still being played, which is NOT in the history above: a
+  // summary is only appended when the last leg locks in the qualifiers, so
+  // without this up to two of a cycle's three legs would be invisible for the
+  // two years they are the most recent football anyone has played. The live
+  // campaign is kept on the state after archiving too, hence the guard — the
+  // alternative is counting a finished campaign twice.
+  const live = intl.qualifying;
+  if (live && !isArchived(live) && live.season > oldest && live.season <= season) {
+    for (const group of live.groups) {
+      foldGroup(acc, groupTableSummary(group, live.nations), ratingOf, INTL_IMPORTANCE_QUALIFYING);
+    }
+  }
+
+  for (const tournament of intl.history) {
     if (tournament.season <= oldest || tournament.season > season) continue;
-    for (const group of tournament.groups) foldGroup(acc, group, ratingOf);
-    foldKnockout(acc, tournament, ratingOf);
+    for (const group of tournament.groups) {
+      foldGroup(acc, group, ratingOf, INTL_IMPORTANCE_WORLD_CUP);
+    }
+    foldKnockout(acc, tournament, ratingOf, INTL_IMPORTANCE_WORLD_CUP, INTL_IMPORTANCE_WORLD_CUP_LATE);
+  }
+
+  for (const cup of intl.confederationCupHistory) {
+    if (cup.season <= oldest || cup.season > season) continue;
+    for (const group of cup.groups) {
+      foldGroup(acc, group, ratingOf, INTL_IMPORTANCE_CONTINENTAL);
+    }
+    foldKnockout(acc, cup, ratingOf, INTL_IMPORTANCE_CONTINENTAL, INTL_IMPORTANCE_CONTINENTAL_LATE);
   }
 
   const out = new Map<string, NationFormStats>();
   for (const [nation, a] of acc) {
-    const { performanceTotal, ...stats } = a;
+    const { weighted, weight, ...stats } = a;
     out.set(nation, {
       ...stats,
-      performanceBonus: a.played > 0 ? (performanceTotal / a.played) * POWER_PERFORMANCE_WEIGHT : 0,
+      performanceBonus: weight > 0 ? (weighted / weight) * POWER_PERFORMANCE_WEIGHT : 0,
     });
   }
   return out;
