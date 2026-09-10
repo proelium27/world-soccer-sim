@@ -742,6 +742,48 @@ export const POWER_GD_CAP = 4;
 export const POWER_PERFORMANCE_WEIGHT = 4;
 
 /**
+ * How much each kind of international match counts toward a nation's Power
+ * (src/core/international/nationForm.ts).
+ *
+ * These are FIFA's own importance coefficients from the SUM formula it has used
+ * since 2018 — qualifiers 25, a continental final tournament 35 before the
+ * quarter-finals and 40 from them on, the World Cup 50 and 60 on the same split.
+ * Kept at FIFA's absolute numbers rather than rescaled to 1, because the whole
+ * point is that they are checkable against the real thing; only their RATIOS
+ * matter, since the form term is a weighted average and so is invariant to a
+ * uniform scaling of this table.
+ *
+ * FIFA's friendly weights (5 and 10) have no counterpart: nothing in this game
+ * plays a friendly. The Nations League tiers likewise.
+ */
+export const INTL_IMPORTANCE_QUALIFYING = 25;
+export const INTL_IMPORTANCE_CONTINENTAL = 35;
+export const INTL_IMPORTANCE_CONTINENTAL_LATE = 40;
+export const INTL_IMPORTANCE_WORLD_CUP = 50;
+export const INTL_IMPORTANCE_WORLD_CUP_LATE = 60;
+
+/**
+ * The round from which a tournament match takes its "late" weight, counted
+ * backwards from the final: 2 is the quarter-final, which is where FIFA's own
+ * step up sits. Group games and anything earlier than the quarters take the
+ * lower weight.
+ */
+export const INTL_IMPORTANCE_LATE_FROM_FINAL = 2;
+
+/**
+ * What a knockout tie settled on penalties is worth to the winner, in league
+ * points, against 3 for a win and 1 for a draw.
+ *
+ * FIFA scores the shootout winner at 0.75 and the loser at 0.5 on its 0-1 scale
+ * — exactly halfway between a draw and a win for the winner, and no worse than
+ * a draw for the loser. 2 is that same halfway point on the 3-1-0 scale this
+ * file uses. The loser keeps a draw's 1, so a shootout is not a punishment.
+ *
+ * The W/D/L record still shows a draw for both, which is what football records.
+ */
+export const INTL_SHOOTOUT_WIN_POINTS = 2;
+
+/**
  * Power-rankings history: a full snapshot of the rankings is persisted after
  * every POWER_SNAPSHOT_INTERVAL-th matchday (10, 20, 30) plus the season's
  * final matchday, so past rankings stay browsable — they can't be rebuilt

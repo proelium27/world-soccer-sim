@@ -16,6 +16,9 @@ export {
   summarizeConfederationCups, confederationCupChampions,
 } from "./confederationCup.js";
 export { formatFor, knockoutRounds, type TournamentFormat } from "./format.js";
+export {
+  nationForm, noNationForm, INTL_FORM_WINDOW, type NationFormStats,
+} from "./nationForm.js";
 export { qualifyingPlan, placesByPosition, type ConfederationQualifyingPlan } from "./qualifying.js";
 export {
   buildSquads, selectSquad, isEligibleNation, manageableNations, nationPools,

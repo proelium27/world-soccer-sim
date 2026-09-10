@@ -1430,7 +1430,25 @@ export function Manual() {
             eleven it would field highlighted; Schedule lists the fixtures for whatever's being
             played, opening on the qualifying round currently being played (a whole campaign at once
             is hundreds of games, but "All rounds" is there if you want it); Power Rankings sorts every
-            nation by squad strength, with movement since last time; Stat Leaders has both the most
+            nation by a Power score, the same idea as the club rankings &mdash; squad strength plus a
+            bonus or penalty for recent results, where beating a nation you were expected to lose to
+            counts for more than beating one you weren't. Where the game was played counts as well:
+            it uses FIFA's own weighting, so a qualifier is worth 25, a continental final tournament
+            35 and 40 from the quarter-finals, and the World Cup 50 and 60 on the same split. A tie
+            settled on penalties goes down as a draw in the record, but the side that won the
+            shootout is credited halfway between a draw and a win, which is also what FIFA does. It
+            reads the last four seasons of international football rather than resetting each year,
+            because a nation plays a handful of games a season and a tournament only comes round
+            every four, so a yearly reset would throw the World Cup away the moment it was won. The
+            campaign currently being played counts too, so qualifying legs show up as they happen
+            rather than waiting for the whole three-year campaign to finish. Squad rating sits in its own column
+            beside it, and the table narrows to a single confederation when you want to know where
+            you stand against the nations you actually have to qualify past (narrowed, the rank and
+            the movement are both against that confederation, and a World column keeps the place
+            overall). One thing worth knowing: your federation judges you on squad strength, not on
+            Power, so the order here and the bar you're held to can differ. That's deliberate
+            &mdash; if results moved the bar, losing on purpose would lower it.
+            Stat Leaders has both the most
             successful nations and the top individual players, which you can filter to a single
             country; and History keeps the roll of past winners plus each nation's tally of titles,
             finals and best finishes. Past editions keep their results and standings, though not the
