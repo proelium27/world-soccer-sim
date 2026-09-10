@@ -21,7 +21,29 @@ const MS_PER_MATCH_MINUTE = 800;
 /** A longer beat on the stroke of half time, so the break reads as a break. */
 const HALF_TIME_MS = 2400;
 
-export type PlaybackSpeed = 1 | 2 | 4;
+/**
+ * Half speed is here because a match minute at 1x is 800ms, which is fine for
+ * following the score and quick enough that a passage where something happens
+ * in consecutive minutes can be over before it has been read.
+ */
+export type PlaybackSpeed = 0.5 | 1 | 2 | 4;
+
+/** The speeds offered, slowest first — the order the buttons are drawn in. */
+export const SPEEDS: PlaybackSpeed[] = [0.5, 1, 2, 4];
+
+/**
+ * How long to hold on `minute` before advancing.
+ *
+ * Pulled out of the effect because there is no DOM test environment in this
+ * repo, so this is the only part of the clock a test can reach — and it is the
+ * part that would break silently. The speed divides, so a *smaller* number is a
+ * *slower* match; half time scales along with everything else, because a break
+ * that stayed 2400ms at 0.5x would read as shorter than the minutes around it.
+ */
+export function tickDelayMs(minute: number, speed: PlaybackSpeed): number {
+  const base = minute === HALF_TIME_MINUTE ? HALF_TIME_MS : MS_PER_MATCH_MINUTE;
+  return base / speed;
+}
 
 export interface MatchPlayback {
   /** Match minute reached so far. 0 means kickoff hasn't happened yet. */
@@ -66,8 +88,7 @@ export function useMatchPlayback(
     if (!playing || finished) return;
     // setTimeout rather than setInterval so half time can take longer than a
     // normal minute without the interval fighting the change.
-    const base = minute === HALF_TIME_MINUTE ? HALF_TIME_MS : MS_PER_MATCH_MINUTE;
-    const timer = setTimeout(() => setMinute((m) => m + 1), base / speed);
+    const timer = setTimeout(() => setMinute((m) => m + 1), tickDelayMs(minute, speed));
     return () => clearTimeout(timer);
   }, [playing, finished, minute, speed]);
 

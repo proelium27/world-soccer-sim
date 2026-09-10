@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type { StoredTeam } from "../../core/teams/clubs.js";
 import { ClubCrest } from "./ClubCrest.js";
 import { eventSummary, KEY_EVENTS, TimelineRow } from "./matchEvents.js";
-import { useMatchPlayback, type PlaybackSpeed } from "../live/useMatchPlayback.js";
+import { SPEEDS, useMatchPlayback } from "../live/useMatchPlayback.js";
 import type { MatchLineups, SideLineup } from "../live/lineups.js";
 import { liveMatchState } from "../live/liveRatings.js";
 import { MatchPitch } from "./MatchPitch.js";
@@ -36,8 +36,6 @@ import {
  * page is simply read, with headings to jump between and browser history to
  * leave by. WatchMatch.tsx owns the route.
  */
-
-const SPEEDS: PlaybackSpeed[] = [1, 2, 4];
 
 /** One row of the rail's table. Only what the rail draws — position comes from order. */
 export interface LiveTableRow {

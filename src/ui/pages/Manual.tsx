@@ -556,10 +556,11 @@ export function Manual() {
             <strong>Watching a match.</strong> Next to Sim One Game there's <strong>Watch Next
             Game</strong>, which plays your club's match out a minute at a time instead of jumping
             to the result: a running clock, the events as they happen, and the rest of your
-            division's scores and the live table down the right. You can pause, run it at 1x, 2x or
-            4x, or skip to the final whistle, and the <strong>Every chance</strong> switch decides
-            whether you see every shot or only the goals, cards, subs, penalties and injuries. To
-            see one again later, open its box score and hit <strong>Watch it back</strong>.
+            division's scores and the live table down the right. You can pause, run it at half
+            speed, 1x, 2x or 4x, or skip to the final whistle, and the <strong>Every
+            chance</strong> switch decides whether you see every shot or only the goals, cards,
+            subs, penalties and injuries. To see one again later, open its box score and hit
+            <strong>Watch it back</strong>.
           </p>
           <p>
             It's a page of its own rather than a window laid over the game, so it has an address
