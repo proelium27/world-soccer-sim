@@ -14,7 +14,8 @@ import {
 } from "./contracts.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
 import { affordable, type SpendPolicy } from "./finance/debt.js";
-import { refusesFreeAgentSigning } from "./transfers/playerWill.js";
+import { refusesFreeAgentSigning, refusesFreeAgentSigningWith } from "./transfers/playerWill.js";
+import { clubStatures } from "./ai/clubContext.js";
 
 /**
  * True while a player the user signed from free agency is inside his
@@ -167,6 +168,29 @@ export function runAIFreeAgency(
 
   let pool = [...freeAgentPids(teams, players, activeLoans)]
     .filter((pid) => (playerMap.get(pid)?.ovr ?? 0) >= poolMinOvr);
+
+  /**
+   * A free agent has a say here too, exactly as he does when the user signs him.
+   *
+   * Leaving this out made the AI the one actor in the world exempt from the
+   * module that exists to stop stars moving downhill — and worse than exempt:
+   * `freeAgencySigningOrder` is worst-first, so the WEAKEST club in the world
+   * got first pick of every elite free agent, while the user was refused the
+   * identical signing. The pass most likely to move a star down the pyramid was
+   * the one pass that never asked him.
+   *
+   * Statures are computed ONCE rather than after each signing. Recomputing per
+   * signing would be quadratic over 626 clubs, and it would buy nothing: a
+   * club's stature is its top-16 mean blended with hype, which one arrival
+   * barely moves.
+   *
+   * Costs nothing for the great majority of a real pool — `statureSensitivity`
+   * is 0 below the care floor, so the check returns on its first line for every
+   * squad player and every prospect, who are the bulk of what is on offer.
+   */
+  const statures = clubStatures(teams, players);
+  const willing = (p: Player, tid: number): boolean =>
+    !refusesFreeAgentSigningWith(p, statures.get(tid) ?? 0, statures, tid);
   // Each free-agent arrival is logged by the caller as a fee-0 transfer (see
   // offseason.ts) so the player's club-by-season history registers the move.
   const signings: { pid: number; toTid: number }[] = [];
@@ -194,7 +218,7 @@ export function runAIFreeAgency(
       while (shortfall > 0) {
         const candidates = pool
           .map((pid) => playerMap.get(pid)!)
-          .filter((p) => p.pos === pos)
+          .filter((p) => p.pos === pos && willing(p, tid))
           .sort((a, b) => b.ovr - a.ovr);
         const signing = candidates[0];
         if (!signing) break;
@@ -248,7 +272,7 @@ export function runAIFreeAgency(
       const weakest = Math.min(...atPos.map((p) => p.ovr));
       const best = pool
         .map((pid) => playerMap.get(pid)!)
-        .filter((p) => p.pos === pos)
+        .filter((p) => p.pos === pos && willing(p, tid))
         .sort((a, b) => b.ovr - a.ovr)[0];
       if (best && best.ovr > weakest) poachSign(team, best);
     }
@@ -313,7 +337,8 @@ export function runAIFreeAgency(
       const best = pool
         .map((pid) => playerMap.get(pid)!)
         .filter(
-          (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot,
+          (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot
+            && willing(p, tid),
         )
         .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid)[0];
       if (!best) break;

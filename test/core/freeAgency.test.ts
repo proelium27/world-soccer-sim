@@ -11,6 +11,7 @@ import {
   PROSPECT_AGE_MAX,
 } from "../../src/core/constants.js";
 import type { Player } from "../../src/core/players/types.js";
+import { clubStatures } from "../../src/core/ai/clubContext.js";
 
 describe("freeAgentPids", () => {
   it("is empty when every player is rostered", () => {
@@ -607,6 +608,45 @@ describe("signFreeAgent player will", () => {
     );
     const out = signToAcademy(teams, young, weak.tid, star.pid, 1, "offseason");
     expect(out.teams.find((t) => t.tid === weak.tid)!.academyRoster).not.toContain(star.pid);
+  });
+});
+
+describe("runAIFreeAgency player will", () => {
+  // freeAgencySigningOrder is worst-first, so without this gate the WEAKEST
+  // club in the world got first pick of every elite free agent — while the user
+  // was refused the identical signing. The pass most likely to move a star down
+  // the pyramid was the one pass that never asked him.
+  it("does not let the weakest club in the world sign an elite free agent", () => {
+    const league = makeLeague(0, 1);
+    const statures = clubStatures(league.teams, league.players);
+    const ranked = [...league.teams].sort(
+      (a, b) => (statures.get(a.tid) ?? 0) - (statures.get(b.tid) ?? 0),
+    );
+    const weakest = ranked[0];
+    const strongest = ranked[ranked.length - 1];
+
+    // An ADDED free agent rather than one taken off a roster: removing a player
+    // leaves his club a man short at that position, and the shortfall pass runs
+    // for every club before the poach pass runs for any, so his old club simply
+    // signs him straight back and the poach pass — the thing under test — never
+    // sees him.
+    const pid = Math.max(...league.players.map((p) => p.pid)) + 1;
+    const star = {
+      ...league.players.find((p) => p.pos === "CM")!,
+      pid,
+      ovr: 88,
+      // The stats line is how a free agent's last club is recovered at all.
+      stats: [{ season: 1, tid: strongest.tid } as never],
+    };
+    const players = [...league.players, star];
+
+    // Worst club first, which is the real signing order.
+    const order = [weakest.tid, strongest.tid];
+    const out = runAIFreeAgency(
+      league.teams, players, 2, mulberry32(1), league.meta.userTid, order, [], "random",
+    );
+    const landed = out.signings.find((s) => s.pid === pid);
+    expect(landed?.toTid).not.toBe(weakest.tid);
   });
 });
 
