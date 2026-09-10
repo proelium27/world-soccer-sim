@@ -149,6 +149,23 @@ export interface BoxScore {
    * Output-only and rng-free, so no scoreline moves.
    */
   finalClock?: number;
+  /**
+   * Seconds of stoppage played at the end of the FIRST half.
+   *
+   * The one number needed to turn a clock reading into a displayed minute. The
+   * clock counts playing time straight through both halves, so a second-half
+   * event sits `firstHalfStoppage` seconds further down it than its match minute
+   * implies — without this, every minute after the break reads late and nothing
+   * can tell 45+2 from 47.
+   *
+   * Optional, and absent is EXACT rather than a guess: a box score written
+   * before 2026-09-10 was produced by an engine that played both halves'
+   * stoppage together at the end of the match, so its first half really did have
+   * none. Those matches decode today exactly as they always have — nothing reads
+   * 45+n, and everything past 90 reads 90+n — which is a true account of the
+   * football they recorded.
+   */
+  firstHalfStoppage?: number;
 }
 
 const SHOT_WEIGHTS: Record<MatchPosition, number> = {

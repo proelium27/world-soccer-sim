@@ -52,6 +52,8 @@ import {
   STOPPAGE_MIN_SECONDS_PER_HALF,
   STOPPAGE_MAX_SECONDS_PER_HALF,
   STOPPAGE_SECONDS_PER_EVENT,
+  GOAL_RESTART_MIN_SECONDS,
+  GOAL_RESTART_MAX_SECONDS,
 } from "./constants.js";
 import type { Composites } from "./composites.js";
 import { familiarityPenalty } from "./positionFit.js";
@@ -106,13 +108,29 @@ function applyFatigue(c: Composites, avgEnergy: number): Composites {
 export const clamp = (x: number, lo = 0, hi = 1): number =>
   Math.max(lo, Math.min(hi, x));
 
-/** 1-5 minutes per half, weighted by that half's notable-event count, per spec §5. */
-export function computeStoppageSeconds(eventCount: number): number {
-  return clamp(
-    STOPPAGE_MIN_SECONDS_PER_HALF + eventCount * STOPPAGE_SECONDS_PER_EVENT,
+/**
+ * How long a half's stoppage runs: a floor, plus a flat allowance per notable
+ * event, plus the clock genuinely consumed by goal celebrations in that half.
+ *
+ * `secondsLost` defaults to 0 so the composite-only `simMatch` — which has no
+ * player identity, no celebrations and no box score anyone reads — keeps
+ * calling this exactly as it did. It is the M1 benchmark path, and moving it
+ * would retune spec gates for no player-visible gain (same call
+ * RED_GIVEN_FOUL_SIMPLE already makes).
+ */
+export function computeStoppageSeconds(eventCount: number, secondsLost = 0): number {
+  const raw = clamp(
+    STOPPAGE_MIN_SECONDS_PER_HALF + eventCount * STOPPAGE_SECONDS_PER_EVENT + secondsLost,
     STOPPAGE_MIN_SECONDS_PER_HALF,
     STOPPAGE_MAX_SECONDS_PER_HALF,
   );
+  // WHOLE MINUTES, because a fourth official holds up a board with an integer on
+  // it — and because the display depends on it. The playback timeline is indexed
+  // by minute, so a half ending 2.5 minutes into stoppage would leave the second
+  // half's minutes straddling the break and nothing could label 45+3 or 46
+  // exactly. Both bounds are already whole minutes, so rounding cannot leave the
+  // clamped range.
+  return Math.round(raw / 60) * 60;
 }
 
 export interface TeamMatchStat {
@@ -463,9 +481,12 @@ export function simMatchDetailed(
       .sort((a, b) => a - b);
   }
 
+  // In-play moments only. Half-time is fired from the period boundary in the
+  // main loop instead, so it lands at the actual break rather than at the start
+  // of first-half stoppage — which is where an `elapsed >= 2700` test now puts it.
   const sideMoments: Record<Side, number[]> = {
-    home: [SUB_WINDOW_HALFTIME_ELAPSED, ...windowMomentsFor("home")],
-    away: [SUB_WINDOW_HALFTIME_ELAPSED, ...windowMomentsFor("away")],
+    home: windowMomentsFor("home"),
+    away: windowMomentsFor("away"),
   };
   // Fired per SIDE, not globally: the two sides no longer share their moments.
   const firedCheckpoints: Record<Side, Set<number>> = { home: new Set(), away: new Set() };
@@ -513,13 +534,78 @@ export function simMatchDetailed(
   let clock = MATCH_SECONDS;
   let poss: Side = rng() < 0.5 ? "home" : "away";
 
-  let half1Events = 0;
-  let half2Events = 0;
-  let stoppageApplied = false;
-  let stoppageBudget = 0;
+  /**
+   * The two halves are real periods, each ending with its own stoppage.
+   *
+   * `clock` still counts down monotonically and still measures PLAYING TIME, so
+   * everything built on it (minutes played, enter/exit clocks, the two-legged
+   * split, which reads a jump back UP as the leg boundary) is untouched. What
+   * changes is that it now runs past 0 by both halves' stoppage rather than
+   * pausing at 90 — and that the first half's stoppage is played where it
+   * happened instead of being carried to the end of the match.
+   *
+   * The displayed minute is therefore no longer `clock` alone: the second half
+   * has to discount the stoppage already played in the first. That one number is
+   * recorded on the box score (`firstHalfStoppage`) so every reader decodes the
+   * same timeline; see liveMatch.ts's `eventMinute`.
+   */
+  let period: 1 | 2 = 1;
+  /** Notable events in the CURRENT period — the board reads only its own half. */
+  let periodEvents = 0;
+  /** Clock this period genuinely lost to goal celebrations; credited back below. */
+  let periodSecondsLost = 0;
+  /** Countdown value at which this period's regulation time expires. */
+  let regulationEndClock = HALF_SECONDS;
+  /** Countdown value at which this period ends. Only meaningful once the board is up. */
+  let periodEndClock = HALF_SECONDS;
+  /** Has the fourth official shown this period's board yet? */
+  let boardShown = false;
+  /** First-half stoppage, in seconds. Fixed at the break; 0 until then. */
+  let firstHalfStoppage = 0;
+
   const bumpEvent = () => {
-    if (clock > HALF_SECONDS) half1Events++;
-    else half2Events++;
+    periodEvents++;
+  };
+
+  /**
+   * Elapsed time on the clock a broadcast shows, in seconds — stoppage already
+   * PLAYED in an earlier period does not advance it.
+   *
+   * Every rule phrased as "how far into the match are we" reads this rather than
+   * raw elapsed playing time, so first-half stoppage cannot silently drag those
+   * rules earlier in match terms than they were calibrated at.
+   */
+  const matchElapsedNow = (): number => MATCH_SECONDS - clock - firstHalfStoppage;
+
+  /**
+   * A goal costs clock, and the referee hands it back.
+   *
+   * Both halves of that are required. Consuming the time is what stops two goals
+   * sharing a displayed minute (a tick is 2-10 seconds, so nothing else did);
+   * crediting it to the half's stoppage is what keeps the amount of football in
+   * a match unchanged, which is why this needed no rebalance.
+   *
+   * When the board is already up — a goal scored IN stoppage — the period is
+   * extended rather than eaten into, which is both what referees do and what
+   * stops a 90+1 winner truncating the passage it was scored in.
+   */
+  /** Put this period's board up (or revise it), always on a whole minute. */
+  const showBoard = () => {
+    const stoppage = computeStoppageSeconds(periodEvents, periodSecondsLost);
+    periodEndClock = regulationEndClock - stoppage;
+    if (period === 1) firstHalfStoppage = stoppage;
+  };
+
+  const celebrate = () => {
+    const restart =
+      GOAL_RESTART_MIN_SECONDS + rng() * (GOAL_RESTART_MAX_SECONDS - GOAL_RESTART_MIN_SECONDS);
+    clock -= restart;
+    periodSecondsLost += restart;
+    // A goal scored after the board went up revises it rather than eating into
+    // it — what referees do, and what stops a 90+1 winner cutting short the
+    // passage it was scored in. Recomputed rather than nudged, so the board stays
+    // a whole number of minutes; the inputs only ever grow, so it never shrinks.
+    if (boardShown) showBoard();
   };
 
   /**
@@ -592,9 +678,13 @@ export function simMatchDetailed(
    * composites, not forty-five. Growing the tolerance as the clock runs out is
    * that correction, and it is what produces the ordinary late change for a
    * fringe player. Clamped at 1 because stoppage pushes elapsed past the 90.
+   *
+   * Reads MATCH time, not playing time: "how much match is left" is a question
+   * about the clock on the wall, and counting first-half stoppage twice would
+   * make every second-half sub look later than it is.
    */
   function lateAllowance(): number {
-    const elapsedFraction = clamp((MATCH_SECONDS - clock) / MATCH_SECONDS, 0, 1);
+    const elapsedFraction = clamp(matchElapsedNow() / MATCH_SECONDS, 0, 1);
     return SUB_LATE_MARGIN * elapsedFraction ** SUB_LATE_MARGIN_EXPONENT;
   }
 
@@ -836,13 +926,43 @@ export function simMatchDetailed(
   for (;;) {
     const dt = MIN_DT + rng() * (MAX_DT - MIN_DT);
     clock -= dt;
-    const elapsed = MATCH_SECONDS - clock;
+    /**
+     * The clock a broadcast would show, in seconds: stoppage already PLAYED in
+     * an earlier period does not advance it. Substitution windows are keyed on
+     * this rather than on raw elapsed time, so every moment in
+     * SUB_WINDOW_MOMENTS_ELAPSED still fires at the match minute it names —
+     * without this, inserting first-half stoppage would silently drag every
+     * second-half window two-odd minutes earlier than #354 measured them.
+     */
+    const matchElapsed = matchElapsedNow();
 
-    if (!stoppageApplied && clock <= 0) {
-      stoppageBudget = computeStoppageSeconds(half1Events) + computeStoppageSeconds(half2Events);
-      stoppageApplied = true;
+    if (!boardShown && clock <= regulationEndClock) {
+      boardShown = true;
+      showBoard();
     }
-    if (stoppageApplied && clock <= -stoppageBudget) break;
+    if (boardShown && clock <= periodEndClock) {
+      // Snap to the whistle. A goal's restart can overshoot the end of a period
+      // by most of a minute, and left unsnapped that lands in `finalClock` and
+      // inflates everyone's minutes played.
+      clock = periodEndClock;
+      if (period === 2) break;
+
+      // Half time. The second half's regulation runs another HALF_SECONDS from
+      // here, so the break's clock is its own reference point.
+      period = 2;
+      regulationEndClock = clock - HALF_SECONDS;
+      periodEndClock = regulationEndClock;
+      boardShown = false;
+      periodEvents = 0;
+      periodSecondsLost = 0;
+      // Fired here rather than from sideMoments, so it lands at the real break
+      // instead of at the start of first-half stoppage. runSubWindow keys its
+      // no-fatigue-relief rules off this exact constant.
+      for (const side of ["home", "away"] as const) {
+        runSubWindow(side, SUB_WINDOW_HALFTIME_ELAPSED);
+      }
+      continue;
+    }
 
     for (const side of ["home", "away"] as const) {
       for (const p of onPitch[side]) {
@@ -853,7 +973,7 @@ export function simMatchDetailed(
 
     for (const side of ["home", "away"] as const) {
       for (const moment of sideMoments[side]) {
-        if (!firedCheckpoints[side].has(moment) && elapsed >= moment) {
+        if (!firedCheckpoints[side].has(moment) && matchElapsed >= moment) {
           firedCheckpoints[side].add(moment);
           runSubWindow(side, moment);
         }
@@ -979,6 +1099,7 @@ export function simMatchDetailed(
           stat[poss].goals++;
           shooterLine.goals++;
           events.push({ clock, type: "goal", side: poss, pids: [shooter.pid] });
+          celebrate();
           poss = defSide;
         } else if (rng() < PENALTY_MISS_SAVED_PROB) {
           stat[poss].sot++;
@@ -1022,6 +1143,7 @@ export function simMatchDetailed(
           bumpEvent();
           stat[poss].goals++;
           shooterLine.goals++;
+          celebrate();
           poss = defSide;
         }
       }
@@ -1069,6 +1191,7 @@ export function simMatchDetailed(
       }
 
       events.push({ clock, type: evtType, side: poss, pids });
+      celebrate();
       poss = defSide;
       continue;
     }
@@ -1109,6 +1232,7 @@ export function simMatchDetailed(
           cornerPids.push(assister.pid);
         }
         events.push({ clock, type: "goal", side: poss, pids: cornerPids });
+        celebrate();
         poss = defSide;
         continue;
       }
@@ -1212,6 +1336,7 @@ export function simMatchDetailed(
       away: awayLines,
       events,
       finalClock,
+      firstHalfStoppage,
     },
   };
 }
