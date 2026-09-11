@@ -64,6 +64,66 @@ describe("buildClubRows", () => {
   });
 });
 
+/**
+ * The season columns, on a league that has actually played.
+ *
+ * Every case above runs on a fresh world, where `league.played` is empty — and
+ * that is exactly why the page shipped crashing. `computeStandings` asserts
+ * every club of every match it is handed is in the ids it was given, so
+ * building one division's table from the whole world's matches threw on the
+ * first fixture from another division, i.e. on any save with a ball kicked.
+ * The matches here are hand-built rather than simmed: a real season is minutes
+ * of sim for a fault that needs only two fixtures in two divisions.
+ */
+describe("buildClubRows with matches played", () => {
+  /** A result with an empty box score — the standings only read the score. */
+  const match = (home: number, away: number, homeGoals: number, awayGoals: number) => ({
+    home,
+    away,
+    homeGoals,
+    awayGoals,
+    possessionHome: 0.5,
+    matchday: 1,
+    boxScore: { home: [], away: [], events: [] },
+  });
+
+  const [compA, compB] = league.competitions;
+  const a = league.teams.filter((t) => t.compId === compA.id).map((t) => t.tid);
+  const b = league.teams.filter((t) => t.compId === compB.id).map((t) => t.tid);
+  const played = [match(a[0], a[1], 3, 0), match(b[0], b[1], 1, 1)];
+  const withPlay = { ...league, played };
+
+  it("builds a table per division instead of throwing on another division's match", () => {
+    // Two competitions, one match each: on the broken version the first
+    // division's table hit the second division's fixture and threw.
+    const built = buildClubRows(withPlay);
+    expect(built).toHaveLength(league.teams.length);
+  });
+
+  it("counts only the matches played in the club's own division", () => {
+    const built = buildClubRows(withPlay);
+    const by = new Map(built.map((r) => [r.team.tid, r]));
+    expect(by.get(a[0])!.table).toMatchObject({ played: 1, won: 1, gf: 3, points: 3 });
+    expect(by.get(a[1])!.table).toMatchObject({ played: 1, lost: 1, ga: 3, points: 0 });
+    expect(by.get(b[0])!.table).toMatchObject({ played: 1, drawn: 1, points: 1 });
+    // Everyone else in those divisions played nobody, and the two divisions do
+    // not contaminate each other's records.
+    expect(by.get(a[2])!.table).toMatchObject({ played: 0, points: 0 });
+    expect(by.get(b[2])!.table).toMatchObject({ played: 0, points: 0 });
+  });
+
+  it("ranks a division once it has started, and the winner leads it", () => {
+    const built = buildClubRows(withPlay);
+    const by = new Map(built.map((r) => [r.team.tid, r]));
+    expect(by.get(a[0])!.rank).toBe(1);
+    // A club in a division with nothing played keeps no position: an unplayed
+    // table is array order, not a ranking.
+    const quiet = league.competitions[2];
+    const quietTid = league.teams.find((t) => t.compId === quiet.id)!.tid;
+    expect(by.get(quietTid)!.rank).toBeNull();
+  });
+});
+
 describe("filterClubRows", () => {
   const comps = league.competitions;
 
