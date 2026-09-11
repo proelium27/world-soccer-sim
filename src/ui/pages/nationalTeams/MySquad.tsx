@@ -14,6 +14,10 @@ import { SuspensionBadge } from "../../components/SuspensionBadge.js";
 import { PositionBadge } from "../../components/PositionBadge.js";
 import { PlayerRatingsTooltip } from "../../components/PlayerRatingsTooltip.js";
 import { sortByPosThenOvr } from "../Roster.js";
+import {
+  PlayerViewCells, PlayerViewHeaders, PlayerViewSwitch, performanceSeason,
+  performanceSeasonOptions, usePlayerView, viewTableClass,
+} from "../../playerViews.js";
 import { NationalTeamsLayout, NationName, useClubIndex, ClubCell } from "./shared.js";
 
 const DRAG_MIME = "application/x-soccer-gm-pid";
@@ -45,6 +49,16 @@ export function NTMySquad() {
   const [dragOverPid, setDragOverPid] = useState<number | null>(null);
   const [selectedPid, setSelectedPid] = useState<number | null>(null);
   const [showDepthChart, setShowDepthChart] = useState(false);
+  const [view, setView] = usePlayerView();
+  const seasonOptions = useMemo(
+    () => (league ? performanceSeasonOptions(league) : []),
+    [league],
+  );
+  const defaultSeason = useMemo(() => (league ? performanceSeason(league) : 0), [league]);
+  const [pickedSeason, setPickedSeason] = useState<number | null>(null);
+  const season = pickedSeason !== null && seasonOptions.includes(pickedSeason)
+    ? pickedSeason
+    : defaultSeason;
 
   const byPid = useMemo(
     () => new Map((league?.players ?? []).map((p) => [p.pid, p])),
@@ -199,24 +213,36 @@ export function NTMySquad() {
       </td>
       <td className="small text-muted"><ClubCell club={clubByPid.get(p.pid)} competitions={league.competitions} /></td>
       <td className="text-end">{league.season - p.born}</td>
-      <td className="text-end fw-semibold" style={{ color: getRatingColor(p.ovr) }}>{p.ovr}</td>
-      <td className="text-end">{p.intl?.caps ?? 0}</td>
-      <td className="text-end">{p.intl?.goals ?? 0}</td>
+      {view === "overview" ? (
+        <>
+          <td className="text-end fw-semibold" style={{ color: getRatingColor(p.ovr) }}>{p.ovr}</td>
+          <td className="text-end">{p.intl?.caps ?? 0}</td>
+          <td className="text-end">{p.intl?.goals ?? 0}</td>
+        </>
+      ) : (
+        <PlayerViewCells view={view} player={p} season={season} />
+      )}
     </tr>
   );
 
   const squadTable = (rows: Player[]) => (
     <div className="table-responsive mb-3">
-      <table className="table table-sm table-striped align-middle mb-0">
+      <table className={`table table-sm table-striped align-middle mb-0${viewTableClass(view)}`}>
         <thead>
           <tr>
             <th>Pos</th>
             <th>Player</th>
             <th>Club</th>
             <th className="text-end">Age</th>
-            <th className="text-end">Ovr</th>
-            <th className="text-end">Caps</th>
-            <th className="text-end">Intl G</th>
+            {view === "overview" ? (
+              <>
+                <th className="text-end">Ovr</th>
+                <th className="text-end">Caps</th>
+                <th className="text-end">Intl G</th>
+              </>
+            ) : (
+              <PlayerViewHeaders view={view} />
+            )}
           </tr>
         </thead>
         <tbody>{rows.map(squadRow)}</tbody>
@@ -294,6 +320,14 @@ export function NTMySquad() {
         onDropOnSlot={handleDropOnSlot}
         selectedPid={selectedPid}
         onTapToMove={handleTap}
+      />
+
+      <PlayerViewSwitch
+        value={view}
+        onChange={setView}
+        season={season}
+        seasons={seasonOptions}
+        onSeason={setPickedSeason}
       />
 
       <h6 className="text-muted text-uppercase small mb-1">Starting XI</h6>

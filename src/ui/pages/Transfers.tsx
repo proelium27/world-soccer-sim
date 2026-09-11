@@ -29,6 +29,12 @@ import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { PlayerRefLink, usePlayerRefs } from "../components/PlayerRefLink.js";
 import { PotDisplay } from "../components/PotDisplay.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
+import { usePotentialView } from "../potentialView.js";
+import {
+  PlayerViewCells, PlayerViewHeaders, PlayerViewSwitch, ViewTableWrap, performanceSeason,
+  performanceSeasonOptions, usePlayerView, viewKeepsSort, viewSortAccessors, viewTableClass,
+  type PlayerView, type ViewSortKey,
+} from "../playerViews.js";
 import {
   PlayerFilterBar,
   EMPTY_PLAYER_FILTERS,
@@ -42,7 +48,11 @@ import { ROSTER_CAP, WINDOW_TRANSFER_LIMIT } from "../../core/constants.js";
 // sentinel: "recommended" is the shortlist's best-fit order and "rank" the
 // search's own ovr ranking. Neither has an accessor, so sortRows leaves that
 // order alone until the user actually clicks a header.
-type ColumnSortKey = "name" | "pos" | "age" | "ovr" | "pot" | "club" | "wage" | "value";
+type ColumnSortKey =
+  | "name" | "pos" | "age" | "ovr" | "pot" | "club" | "wage" | "value" | ViewSortKey;
+
+/** Keys with a header only on the overview; see `viewKeepsSort`. */
+const OVERVIEW_ONLY: readonly string[] = ["pot", "wage", "value"];
 type TargetSortKey = ColumnSortKey | "recommended";
 type SearchSortKey = ColumnSortKey | "rank";
 
@@ -180,8 +190,36 @@ export function Transfers() {
   // (the shortlist never shows an unbuyable player in the first place).
   const [searchName, setSearchName] = useState("");
   const [forSaleOnly, setForSaleOnly] = useState(false);
-  const { sort, toggle } = useTableSort<TargetSortKey>("recommended", "desc");
+  const { sort, toggle, setSort } = useTableSort<TargetSortKey>("recommended", "desc");
   const searchSort = useTableSort<SearchSortKey>("rank", "desc");
+  const potView = usePotentialView();
+
+  // Each table has its own view, so reading the shortlist as an attribute sheet
+  // doesn't also flip the search below it. The performance season is shared:
+  // it answers "which season's form", which is one question for the page.
+  const [targetView, setTargetView] = usePlayerView("view");
+  const [searchView, setSearchView] = usePlayerView("searchView");
+  const seasonOptions = useMemo(
+    () => (league ? performanceSeasonOptions(league) : []),
+    [league],
+  );
+  const defaultSeason = useMemo(() => (league ? performanceSeason(league) : 0), [league]);
+  const [pickedSeason, setPickedSeason] = useState<number | null>(null);
+  const perfSeason = pickedSeason !== null && seasonOptions.includes(pickedSeason)
+    ? pickedSeason
+    : defaultSeason;
+  // A view switch drops a sort whose column has no header in the new view,
+  // back to the table's own default order.
+  const changeTargetView = (next: PlayerView) => {
+    setTargetView(next);
+    if (!viewKeepsSort(sort.key, next, OVERVIEW_ONLY)) setSort({ key: "recommended", dir: "desc" });
+  };
+  const changeSearchView = (next: PlayerView) => {
+    setSearchView(next);
+    if (!viewKeepsSort(searchSort.sort.key, next, OVERVIEW_ONLY)) {
+      searchSort.setSort({ key: "rank", dir: "desc" });
+    }
+  };
 
   const hasFilters = hasAnyFilter(filters);
   // "For sale only" isn't a search on its own — by itself it still describes
@@ -302,12 +340,15 @@ export function Transfers() {
       pos: (r) => r.player.pos,
       age: (r) => season - r.player.born,
       ovr: (r) => r.player.ovr,
-      pot: (r) => r.player.potential,
+      // The scouted ceiling, never the true value: the column shows a band, and
+      // ordering rows by the number behind it would hand the answer over.
+      pot: (r) => potView.ceiling(r.player),
       club: (r) => teamName(r.sellerTid),
       wage: (r) => r.player.contract.salary,
       value: (r) => r.scoutedValue,
+      ...viewSortAccessors((r: TargetRow) => r.player, perfSeason, baseTargets),
     });
-  }, [targets, pinnedBuys, sort, league?.season, teamName]);
+  }, [targets, pinnedBuys, sort, league?.season, teamName, potView, perfSeason]);
 
   // Same column sort for the search table. Its default "rank" key has no
   // accessor either, so until a header is clicked the rows stay in the order
@@ -320,12 +361,15 @@ export function Transfers() {
       pos: (r) => r.player.pos,
       age: (r) => season - r.player.born,
       ovr: (r) => r.player.ovr,
-      pot: (r) => r.player.potential,
+      pot: (r) => potView.ceiling(r.player),
       club: (r) => teamName(r.sellerTid),
       wage: (r) => r.player.contract.salary,
       value: (r) => r.scoutedValue,
+      ...viewSortAccessors(
+        (r: (typeof searchResults)[number]) => r.player, perfSeason, searchResults,
+      ),
     });
-  }, [searchResults, searchSort.sort, league?.season, teamName]);
+  }, [searchResults, searchSort.sort, league?.season, teamName, potView, perfSeason]);
 
   if (!league) {
     return <p className="p-3">Loading...</p>;
@@ -427,6 +471,13 @@ export function Transfers() {
               nationalities={nationalities}
               competitions={competitions}
             />
+            <PlayerViewSwitch
+              value={targetView}
+              onChange={changeTargetView}
+              season={perfSeason}
+              seasons={seasonOptions}
+              onSeason={setPickedSeason}
+            />
             {displayTargets.length === 0 ? (
               <p className="mb-0">
                 {hasFilters
@@ -434,25 +485,35 @@ export function Transfers() {
                   : "No suitable targets found."}
               </p>
             ) : (
-              <table className="table table-striped table-sm align-middle">
+              <ViewTableWrap view={targetView}>
+              <table className={`table table-striped table-sm align-middle${viewTableClass(targetView)}`}>
                 <thead>
                   <tr>
                     <th></th>
                     <SortableTh sortKey="name" sort={sort} onSort={toggle} defaultDir="asc">Name</SortableTh>
                     <SortableTh sortKey="pos" sort={sort} onSort={toggle} defaultDir="asc">Pos</SortableTh>
                     <SortableTh sortKey="age" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Age</SortableTh>
-                    <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end">Ovr</SortableTh>
-                    <SortableTh sortKey="pot" sort={sort} onSort={toggle} className="text-end">Pot <PotHelp /></SortableTh>
-                    <SortableTh sortKey="club" sort={sort} onSort={toggle} defaultDir="asc">Club</SortableTh>
-                    <SortableTh sortKey="wage" sort={sort} onSort={toggle} className="text-end">Wage</SortableTh>
-                    <SortableTh sortKey="value" sort={sort} onSort={toggle} className="text-end">
-                      Scout value
-                      <HelpHint>
-                        Our scouts' estimate of this player's transfer value. It's an estimate, not
-                        the exact asking price. More scouting spend makes it more accurate (it can be
-                        off by up to &plusmn;35% at &pound;0 spend, down to about &plusmn;5% at the max).
-                      </HelpHint>
-                    </SortableTh>
+                    {targetView !== "overview" ? (
+                      <>
+                        <SortableTh sortKey="club" sort={sort} onSort={toggle} defaultDir="asc">Club</SortableTh>
+                        <PlayerViewHeaders view={targetView} sort={{ sort, onSort: toggle }} />
+                      </>
+                    ) : (
+                      <>
+                        <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end">Ovr</SortableTh>
+                        <SortableTh sortKey="pot" sort={sort} onSort={toggle} className="text-end">Pot <PotHelp /></SortableTh>
+                        <SortableTh sortKey="club" sort={sort} onSort={toggle} defaultDir="asc">Club</SortableTh>
+                        <SortableTh sortKey="wage" sort={sort} onSort={toggle} className="text-end">Wage</SortableTh>
+                        <SortableTh sortKey="value" sort={sort} onSort={toggle} className="text-end">
+                          Scout value
+                          <HelpHint>
+                            Our scouts' estimate of this player's transfer value. It's an estimate, not
+                            the exact asking price. More scouting spend makes it more accurate (it can be
+                            off by up to &plusmn;35% at &pound;0 spend, down to about &plusmn;5% at the max).
+                          </HelpHint>
+                        </SortableTh>
+                      </>
+                    )}
                     <th>Offer</th>
                   </tr>
                 </thead>
@@ -468,11 +529,20 @@ export function Transfers() {
                       </td>
                       <td>{p.pos}</td>
                       <td className="text-end">{league.season - p.born}</td>
-                      <td className="text-end">{p.ovr}</td>
-                      <td className="text-end"><PotDisplay player={p} /></td>
-                      <td><ClubLink tid={sellerTid} /></td>
-                      <td className="text-end">{formatWeeklyWage(p.contract.salary)}</td>
-                      <td className="text-end">{currency.format(scoutedValue)}</td>
+                      {targetView !== "overview" ? (
+                        <>
+                          <td><ClubLink tid={sellerTid} /></td>
+                          <PlayerViewCells view={targetView} player={p} season={perfSeason} />
+                        </>
+                      ) : (
+                        <>
+                          <td className="text-end">{p.ovr}</td>
+                          <td className="text-end"><PotDisplay player={p} /></td>
+                          <td><ClubLink tid={sellerTid} /></td>
+                          <td className="text-end">{formatWeeklyWage(p.contract.salary)}</td>
+                          <td className="text-end">{currency.format(scoutedValue)}</td>
+                        </>
+                      )}
                       <td>
                         <NegotiationControls
                           pid={p.pid}
@@ -490,6 +560,7 @@ export function Transfers() {
                   ))}
                 </tbody>
               </table>
+              </ViewTableWrap>
             )}
           </div>
         </div>
@@ -538,6 +609,13 @@ export function Transfers() {
                 Only show players I can actually bid on
               </label>
             </div>
+            <PlayerViewSwitch
+              value={searchView}
+              onChange={changeSearchView}
+              season={perfSeason}
+              seasons={seasonOptions}
+              onSeason={setPickedSeason}
+            />
             {!hasSearch ? (
               <p className="mb-0 text-muted">
                 Enter a name or set a filter to search the whole world.
@@ -545,18 +623,31 @@ export function Transfers() {
             ) : searchResults.length === 0 ? (
               <p className="mb-0">No players match your search.</p>
             ) : (
-              <table className="table table-striped table-sm align-middle">
+              <ViewTableWrap view={searchView}>
+              <table className={`table table-striped table-sm align-middle${viewTableClass(searchView)}`}>
                 <thead>
                   <tr>
                     <th></th>
                     <SortableTh sortKey="name" sort={searchSort.sort} onSort={searchSort.toggle} defaultDir="asc">Name</SortableTh>
                     <SortableTh sortKey="pos" sort={searchSort.sort} onSort={searchSort.toggle} defaultDir="asc">Pos</SortableTh>
                     <SortableTh sortKey="age" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end" defaultDir="asc">Age</SortableTh>
-                    <SortableTh sortKey="ovr" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end">Ovr</SortableTh>
-                    <SortableTh sortKey="pot" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end">Pot <PotHelp /></SortableTh>
-                    <SortableTh sortKey="club" sort={searchSort.sort} onSort={searchSort.toggle} defaultDir="asc">Club</SortableTh>
-                    <SortableTh sortKey="wage" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end">Wage</SortableTh>
-                    <SortableTh sortKey="value" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end">Scout value</SortableTh>
+                    {searchView !== "overview" ? (
+                      <>
+                        <SortableTh sortKey="club" sort={searchSort.sort} onSort={searchSort.toggle} defaultDir="asc">Club</SortableTh>
+                        <PlayerViewHeaders
+                          view={searchView}
+                          sort={{ sort: searchSort.sort, onSort: searchSort.toggle }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <SortableTh sortKey="ovr" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end">Ovr</SortableTh>
+                        <SortableTh sortKey="pot" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end">Pot <PotHelp /></SortableTh>
+                        <SortableTh sortKey="club" sort={searchSort.sort} onSort={searchSort.toggle} defaultDir="asc">Club</SortableTh>
+                        <SortableTh sortKey="wage" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end">Wage</SortableTh>
+                        <SortableTh sortKey="value" sort={searchSort.sort} onSort={searchSort.toggle} className="text-end">Scout value</SortableTh>
+                      </>
+                    )}
                     <th>Offer</th>
                   </tr>
                 </thead>
@@ -572,11 +663,20 @@ export function Transfers() {
                       </td>
                       <td>{p.pos}</td>
                       <td className="text-end">{league.season - p.born}</td>
-                      <td className="text-end">{p.ovr}</td>
-                      <td className="text-end"><PotDisplay player={p} /></td>
-                      <td><ClubLink tid={sellerTid} /></td>
-                      <td className="text-end">{formatWeeklyWage(p.contract.salary)}</td>
-                      <td className="text-end">{currency.format(scoutedValue)}</td>
+                      {searchView !== "overview" ? (
+                        <>
+                          <td><ClubLink tid={sellerTid} /></td>
+                          <PlayerViewCells view={searchView} player={p} season={perfSeason} />
+                        </>
+                      ) : (
+                        <>
+                          <td className="text-end">{p.ovr}</td>
+                          <td className="text-end"><PotDisplay player={p} /></td>
+                          <td><ClubLink tid={sellerTid} /></td>
+                          <td className="text-end">{formatWeeklyWage(p.contract.salary)}</td>
+                          <td className="text-end">{currency.format(scoutedValue)}</td>
+                        </>
+                      )}
                       <td>
                         {forSale ? (
                           <NegotiationControls
@@ -598,6 +698,7 @@ export function Transfers() {
                   ))}
                 </tbody>
               </table>
+              </ViewTableWrap>
             )}
             {hasSearch && searchResults.length >= PLAYER_SEARCH_LIMIT && (
               <p className="text-muted small mb-0">

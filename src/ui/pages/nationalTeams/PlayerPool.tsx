@@ -8,7 +8,13 @@ import { getRatingColor } from "../../utils/ratingColor.js";
 import { InjuryBadge } from "../../components/InjuryBadge.js";
 import { PositionBadge } from "../../components/PositionBadge.js";
 import { PlayerRatingsTooltip } from "../../components/PlayerRatingsTooltip.js";
+import { SortableTh, sortRows, useTableSort, type SortState } from "../../components/SortableTable.js";
 import { sortByPosThenOvr } from "../Roster.js";
+import {
+  PlayerViewCells, PlayerViewHeaders, PlayerViewSwitch, performanceSeason,
+  performanceSeasonOptions, usePlayerView, viewKeepsSort, viewSortAccessors, viewTableClass,
+  type PlayerView, type ViewSortKey,
+} from "../../playerViews.js";
 import { NationalTeamsLayout, NationName, useClubIndex, ClubCell } from "./shared.js";
 
 /**
@@ -19,6 +25,16 @@ import { NationalTeamsLayout, NationName, useClubIndex, ClubCell } from "./share
  * searching, because nobody scrolls to the three-hundredth best player.
  */
 const POOL_SHOWN = 40;
+
+/**
+ * "squad" is the team-sheet order (position, then rating) and has no accessor,
+ * so `sortRows` leaves the named squad as it was built until a header is
+ * clicked.
+ */
+type PoolSortKey = "squad" | "name" | "pos" | "club" | "age" | "ovr" | "caps" | ViewSortKey;
+
+/** Keys with a header only on the overview; see `viewKeepsSort`. */
+const OVERVIEW_ONLY: readonly PoolSortKey[] = ["caps"];
 
 /**
  * Choosing who is in the squad, separate from choosing who plays.
@@ -32,8 +48,35 @@ const POOL_SHOWN = 40;
 export function NTPlayerPool() {
   const { league, setNationalSquadAction, simming } = useLeague();
   const [filter, setFilter] = useState("");
+  const [view, setView] = usePlayerView();
+  const squadSort = useTableSort<PoolSortKey>("squad");
+  const poolSort = useTableSort<PoolSortKey>("ovr");
 
   const clubByPid = useClubIndex(league?.teams);
+
+  // The form a squad is picked on: during the summer that is the season just
+  // finished, which is still `league.season` until the offseason rolls it over.
+  const seasonOptions = useMemo(
+    () => (league ? performanceSeasonOptions(league) : []),
+    [league],
+  );
+  const defaultSeason = useMemo(() => (league ? performanceSeason(league) : 0), [league]);
+  const [pickedSeason, setPickedSeason] = useState<number | null>(null);
+  const season = pickedSeason !== null && seasonOptions.includes(pickedSeason)
+    ? pickedSeason
+    : defaultSeason;
+
+  /**
+   * A view switch keeps the sort where its column still has a header and falls
+   * back where it doesn't, so a table never reads as sorted by something the
+   * reader can't see.
+   */
+  const changeView = (next: PlayerView) => {
+    setView(next);
+    const keep = (s: SortState<PoolSortKey>) => viewKeepsSort(s.key, next, OVERVIEW_ONLY);
+    if (!keep(squadSort.sort)) squadSort.setSort({ key: "squad", dir: "desc" });
+    if (!keep(poolSort.sort)) poolSort.setSort({ key: "ovr", dir: "desc" });
+  };
 
   const nation = league?.nationalManager.nation ?? null;
   const found = league && nation ? editableSquad(league.international, nation) : null;
@@ -80,15 +123,33 @@ export function NTPlayerPool() {
   const keepers = named.filter((p) => p.pos === "GK").length;
   const full = squad.pids.length >= INTL_SQUAD_SIZE;
 
+  // The rating qualifier is measured against the whole eligible pool, not the
+  // forty on screen, so the same player can't qualify on one sort and not
+  // another.
+  const eligible = [...named, ...pool];
+  const accessors = {
+    name: (p: Player) => p.name,
+    pos: (p: Player) => p.pos,
+    club: (p: Player) => clubByPid.get(p.pid)?.name ?? "",
+    age: (p: Player) => league.season - p.born,
+    ovr: (p: Player) => p.ovr,
+    caps: (p: Player) => p.intl?.caps ?? 0,
+    ...viewSortAccessors((p: Player) => p, season, eligible),
+  };
+
+  // Filter, then sort, then slice: the sort has to see the whole eligible pool,
+  // or sorting by match rating would only reorder the forty best by overall and
+  // the in-form player rated 62 would never make the list at all.
   const query = filter.trim().toLowerCase();
-  const shown = (query
+  const matching = query
     ? pool.filter((p) => (
       p.name.toLowerCase().includes(query)
       || p.pos.toLowerCase() === query
       || (clubByPid.get(p.pid)?.name ?? "").toLowerCase().includes(query)
     ))
-    : pool
-  ).slice(0, POOL_SHOWN);
+    : pool;
+  const shown = sortRows(matching, poolSort.sort, accessors).slice(0, POOL_SHOWN);
+  const namedRows = sortRows(named, squadSort.sort, accessors);
 
   const row = (p: Player, inSquad: boolean) => (
     <tr key={p.pid}>
@@ -103,8 +164,14 @@ export function NTPlayerPool() {
         <ClubCell club={clubByPid.get(p.pid)} competitions={league.competitions} />
       </td>
       <td className="text-end">{league.season - p.born}</td>
-      <td className="text-end fw-semibold" style={{ color: getRatingColor(p.ovr) }}>{p.ovr}</td>
-      <td className="text-end">{p.intl?.caps ?? 0}</td>
+      {view === "overview" ? (
+        <>
+          <td className="text-end fw-semibold" style={{ color: getRatingColor(p.ovr) }}>{p.ovr}</td>
+          <td className="text-end">{p.intl?.caps ?? 0}</td>
+        </>
+      ) : (
+        <PlayerViewCells view={view} player={p} season={season} />
+      )}
       <td className="text-end">
         {inSquad ? (
           <button
@@ -139,17 +206,27 @@ export function NTPlayerPool() {
     </tr>
   );
 
-  const table = (rows: Player[], inSquad: boolean) => (
+  const table = (
+    rows: Player[],
+    inSquad: boolean,
+    { sort, toggle }: { sort: SortState<PoolSortKey>; toggle: (k: PoolSortKey, d?: "asc" | "desc") => void },
+  ) => (
     <div className="table-responsive mb-3">
-      <table className="table table-sm table-striped align-middle mb-0">
+      <table className={`table table-sm table-striped align-middle mb-0${viewTableClass(view)}`}>
         <thead>
           <tr>
-            <th>Pos</th>
-            <th>Player</th>
-            <th>Club</th>
-            <th className="text-end">Age</th>
-            <th className="text-end">Ovr</th>
-            <th className="text-end">Caps</th>
+            <SortableTh sortKey="pos" sort={sort} onSort={toggle} defaultDir="asc">Pos</SortableTh>
+            <SortableTh sortKey="name" sort={sort} onSort={toggle} defaultDir="asc">Player</SortableTh>
+            <SortableTh sortKey="club" sort={sort} onSort={toggle} defaultDir="asc">Club</SortableTh>
+            <SortableTh sortKey="age" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Age</SortableTh>
+            {view === "overview" ? (
+              <>
+                <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end">Ovr</SortableTh>
+                <SortableTh sortKey="caps" sort={sort} onSort={toggle} className="text-end">Caps</SortableTh>
+              </>
+            ) : (
+              <PlayerViewHeaders view={view} sort={{ sort, onSort: toggle }} />
+            )}
             <th />
           </tr>
         </thead>
@@ -171,11 +248,21 @@ export function NTPlayerPool() {
       </div>
       <p className="text-muted small">
         Anyone born in your country is eligible, whoever they play for. You have to take
-        at least one goalkeeper, and a squad of at least eleven.
+        at least one goalkeeper, and a squad of at least eleven. Switch the view to compare
+        players on their attributes or on how they played for their clubs, and click any
+        heading to sort by it.
       </p>
 
+      <PlayerViewSwitch
+        value={view}
+        onChange={changeView}
+        season={season}
+        seasons={seasonOptions}
+        onSeason={setPickedSeason}
+      />
+
       <h6 className="text-muted text-uppercase small mb-1">Your squad</h6>
-      {table(named, true)}
+      {table(namedRows, true, squadSort)}
 
       <h6 className="text-muted text-uppercase small mb-1">
         Everyone else eligible
@@ -194,10 +281,11 @@ export function NTPlayerPool() {
         <p className="text-muted small">Nobody eligible by that name.</p>
       ) : (
         <>
-          {table(shown, false)}
-          {shown.length < pool.length && (
+          {table(shown, false, poolSort)}
+          {shown.length < matching.length && (
             <p className="text-muted small">
-              Showing the best {shown.length} of {pool.length}. Search to find anyone else.
+              Showing the top {shown.length} of {matching.length} by the column you sorted
+              on. Search to find anyone else.
             </p>
           )}
         </>

@@ -154,7 +154,9 @@ describe("Player Pool page", () => {
     expect(html).toContain("Everyone else eligible");
     expect(html).toContain("Search eligible players");
     expect(html).toContain("Call up");
-    expect(html).toContain("Showing the best");
+    // The cap note names the sort rather than "the best", because the column
+    // the pool is ranked on is now the reader's choice.
+    expect(html).toContain("Showing the top");
   });
 
   /**

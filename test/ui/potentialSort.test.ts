@@ -23,6 +23,11 @@ const FOGGED_POT_PAGES = [
   "src/ui/pages/FreeAgents.tsx",
   "src/ui/pages/Loans.tsx",
   "src/ui/pages/Database.tsx",
+  // Both still sorted on `r.player.potential` until 2026-09-11, when the view
+  // switch reworked their accessor maps — the leak's natural rate of return,
+  // exactly as that entry in CLAUDE.md predicted.
+  "src/ui/pages/Transfers.tsx",
+  "src/ui/pages/Watchlist.tsx",
 ];
 
 describe("no fogged POT column sorts on the true value", () => {
