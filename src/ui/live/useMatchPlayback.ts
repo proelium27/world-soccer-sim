@@ -45,6 +45,56 @@ export function tickDelayMs(minute: number, speed: PlaybackSpeed): number {
   return base / speed;
 }
 
+/**
+ * The last speed picked, remembered per browser so the next match opens at it.
+ *
+ * localStorage rather than the save, deliberately: how fast you like to watch
+ * is a preference about you, not a fact about a league, so it should follow you
+ * into every save and never ride along in an export.
+ */
+export const SPEED_STORAGE_KEY = "soccer-gm:watch-speed";
+
+/** The subset of `Storage` these helpers touch, so a test can hand in a stub. */
+type SpeedStorage = Pick<Storage, "getItem" | "setItem">;
+
+/** A stored value back to a speed, or null for anything that isn't one we offer. */
+export function parseSpeed(raw: string | null): PlaybackSpeed | null {
+  if (raw === null) return null;
+  const n = Number(raw);
+  return (SPEEDS as number[]).includes(n) ? (n as PlaybackSpeed) : null;
+}
+
+function defaultStorage(): SpeedStorage | null {
+  try {
+    return typeof localStorage === "undefined" ? null : localStorage;
+  } catch {
+    // Some browsers throw on the bare property access when storage is blocked.
+    return null;
+  }
+}
+
+/**
+ * The speed a new match opens at: the last one picked, else 1x. A stale or
+ * hand-edited value (a speed that has since been removed, say) falls back
+ * rather than handing the clock a number it has no button for.
+ */
+export function readStoredSpeed(storage: SpeedStorage | null = defaultStorage()): PlaybackSpeed {
+  try {
+    return parseSpeed(storage?.getItem(SPEED_STORAGE_KEY) ?? null) ?? 1;
+  } catch {
+    // Private mode / storage disabled: every match simply opens at 1x.
+    return 1;
+  }
+}
+
+export function storeSpeed(speed: PlaybackSpeed, storage: SpeedStorage | null = defaultStorage()): void {
+  try {
+    storage?.setItem(SPEED_STORAGE_KEY, String(speed));
+  } catch {
+    // Ignore: worst case the next match opens at 1x.
+  }
+}
+
 export interface MatchPlayback {
   /** Match minute reached so far. 0 means kickoff hasn't happened yet. */
   minute: number;
@@ -73,7 +123,12 @@ export function useMatchPlayback(
 
   const [minute, setMinute] = useState(0);
   const [playing, setPlaying] = useState(autoStart);
-  const [speed, setSpeed] = useState<PlaybackSpeed>(1);
+  // Lazy initializer, so storage is read once per viewer rather than per render.
+  const [speed, setSpeedState] = useState<PlaybackSpeed>(() => readStoredSpeed());
+  const setSpeed = useCallback((s: PlaybackSpeed) => {
+    setSpeedState(s);
+    storeSpeed(s);
+  }, []);
 
   // A different match means a fresh kickoff. Keyed on the array identity rather
   // than its contents: every caller hands over one match's stream.

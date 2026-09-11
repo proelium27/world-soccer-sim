@@ -557,7 +557,8 @@ export function Manual() {
             Game</strong>, which plays your club's match out a minute at a time instead of jumping
             to the result: a running clock, the events as they happen, and the rest of your
             division's scores and the live table down the right. You can pause, run it at half
-            speed, 1x, 2x or 4x, or skip to the final whistle, and the <strong>Every
+            speed, 1x, 2x or 4x (the next match opens at whichever you used last), or skip to
+            the final whistle, and the <strong>Every
             chance</strong> switch decides whether you see every shot or only the goals, cards,
             subs, penalties and injuries. To see one again later, open its box score and hit
             <strong>Watch it back</strong>.
