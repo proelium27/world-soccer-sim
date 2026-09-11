@@ -276,8 +276,23 @@ describe("migrateLeague", () => {
     }
   });
 
+  it("keeps the first half's stoppage, which is what makes a minute read 45+2", () => {
+    // Same trap as the whistle above, and the reason the note below is written
+    // in the plural: this is the field that would have been dropped next.
+    const league = simThrough(makeLeague(0, 1), "game", mulberry32(8));
+    const migrated = migrateLeague(league);
+    const played = league.played.filter((m) => m.boxScore.firstHalfStoppage !== undefined);
+    // Guard against passing because the engine stopped recording it at all.
+    expect(played.length).toBeGreaterThan(0);
+    for (const [i, m] of migrated.played.entries()) {
+      expect(m.boxScore.firstHalfStoppage, `match ${i}`).toBe(
+        league.played[i].boxScore.firstHalfStoppage,
+      );
+    }
+  });
+
   /**
-   * The test above exists because `migrateLeague` rebuilds each box score, and
+   * The two tests above exist because `migrateLeague` rebuilds each box score, and
    * a rebuild that lists its keys is a whitelist: every field added to
    * `BoxScore` later is dropped on load, silently and for every save. The
    * generic deep-equality test above did catch it, but it reports
