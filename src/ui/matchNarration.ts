@@ -101,9 +101,11 @@ export function yellowCardReason(event: MatchEvent, ctx: CardContext): string | 
   const conceded = ctx.sameTick.find((e) => e.type === "penalty");
   if (conceded) return "foul in the penalty area";
 
-  // A free kick was awarded in a shooting position: this was a challenge.
+  // A free kick was awarded in a shooting position: this was a challenge. A goal
+  // counts too — a scored free kick is logged as "goal", not "shot_*", and
+  // missing it would let the booking that conceded it read as time wasting.
   const gaveFreeKick = ctx.sameTick.some(
-    (e) => e.side !== event.side && e.type.startsWith("shot_"),
+    (e) => e.side !== event.side && (e.type.startsWith("shot_") || e.type === "goal"),
   );
   const seed = [event.pids[0] ?? 0, Math.round(event.clock)];
 
@@ -196,13 +198,16 @@ export function shotSource(
   event: MatchEvent,
   sameTick: MatchEvent[],
   slot: MatchPosition | undefined,
+  afterCorner: boolean,
 ): string | null {
   if (sameTick.some((e) => e.type === "penalty" && e.side === event.side)) {
     return "from the spot";
   }
-  if (sameTick.some((e) => e.type === "corner" && e.side === event.side)) {
-    return "header from the corner";
-  }
+  // A corner tick holds TWO shots: the one that went out for the corner, then
+  // the header from it. Only the second is the header, so this has to know
+  // which side of the corner the shot sits in the stream, not merely that a
+  // corner shares its tick.
+  if (afterCorner) return "header from the corner";
   switch (slot) {
     case "CB":
     case "GK":
@@ -251,7 +256,13 @@ export function eventDetail(
     case "shot_blocked":
     case "shot_off_target": {
       const sameTick = events.filter((e) => e.clock === event.clock && e !== event);
-      return shotSource(event, sameTick, slotOf?.(event.pids[0]));
+      // Stream order is engine order (shot, corner, header), which both callers
+      // pass through untouched.
+      const at = events.indexOf(event);
+      const afterCorner = events.some(
+        (e, i) => i < at && e.clock === event.clock && e.type === "corner" && e.side === event.side,
+      );
+      return shotSource(event, sameTick, slotOf?.(event.pids[0]), afterCorner);
     }
     default:
       return null;

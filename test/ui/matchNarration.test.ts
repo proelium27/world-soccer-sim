@@ -80,7 +80,53 @@ describe("matchNarration — the honesty rule", () => {
     expect(eventDetail(goal, [goal, penalty], -120)).toBe("from the spot");
 
     const corner = ev({ type: "corner", pids: [] });
-    expect(eventDetail(goal, [goal, corner], -120)).toBe("header from the corner");
+    expect(eventDetail(goal, [corner, goal], -120)).toBe("header from the corner");
+  });
+
+  it("does not call the shot that WON the corner a header from it", () => {
+    // The engine logs a corner tick as: the miss, the corner, the header. All
+    // three share a clock, so "a corner is on this tick" labels both shots.
+    const miss = ev({ type: "shot_off_target", pids: [10] });
+    const corner = ev({ type: "corner", pids: [] });
+    const header = ev({ type: "shot_saved", pids: [4] });
+    const stream = [miss, corner, header];
+    expect(eventDetail(miss, stream, -120)).not.toBe("header from the corner");
+    expect(eventDetail(header, stream, -120)).toBe("header from the corner");
+  });
+
+  it("treats a SCORED free kick as a set piece conceded", () => {
+    // A free kick that goes in is logged as "goal", not "shot_*"; the booking
+    // that gave it away must still read as a challenge.
+    const card = ev({ type: "yellow_card", side: "away", clock: 400 });
+    const freeKickGoal = ev({ type: "goal", side: "home", clock: 400, pids: [3] });
+    for (const lead of [0, 1]) {
+      // Put the booked side ahead late on: the one state that unlocks time wasting.
+      const earlier = Array.from({ length: lead }, (_, i) =>
+        ev({ type: "goal", side: "away", clock: 3000 - i, pids: [99] }),
+      );
+      const detail = eventDetail(card, [...earlier, card, freeKickGoal], -120);
+      expect(detail).not.toMatch(/time wasting|too long|kicks the ball away|dissent|referee|handball/);
+    }
+  });
+
+  it("labels real engine corner ticks correctly", () => {
+    let checked = 0;
+    // Corners are rare off these even-strength squads (~1 in 13 matches), hence
+    // the wide sample; a match sims in a couple of milliseconds.
+    for (let seed = 1; seed <= 200; seed++) {
+      const events = simMatchDetailed(
+        mulberry32(seed), makeTeam("Home"), makeTeam("Away"), makeSquad(0), makeSquad(100),
+      ).boxScore.events;
+      events.forEach((c, i) => {
+        if (c.type !== "corner") return;
+        const before = events[i - 1];
+        const after = events[i + 1];
+        expect(eventDetail(before, events, -120)).not.toBe("header from the corner");
+        expect(eventDetail(after, events, -120)).toBe("header from the corner");
+        checked++;
+      });
+    }
+    expect(checked).toBeGreaterThanOrEqual(8);
   });
 
   it("is deterministic — the same card always reads the same way", () => {
