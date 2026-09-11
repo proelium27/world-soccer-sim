@@ -1304,26 +1304,47 @@ export function Manual() {
             Every nation with enough players in the world enters qualifying. They're split into
             groups by confederation and play a long home-and-away campaign spread over the three
             qualifying offseasons, and the number of places each confederation gets depends on how
-            many genuinely strong nations it has, so the 32 who make it are a believable field rather
-            than whoever happens to be nearby. At the
-            tournament those 32 are drawn into eight groups of four; the top two from each go through
-            to a round of 16, then quarter-finals, semi-finals and a final. Knockout ties level after
-            extra time go to a shootout, exactly like the Continental Cup.
+            many genuinely strong nations it has, so the ones who make it are a believable field
+            rather than whoever happens to be nearby. Every confederation still gets at least one
+            place for each qualifying group it's drawn into, so no group is ever bigger than about
+            seven nations and every group winner goes through. Knockout ties level after extra time
+            go to a shootout, exactly like the Continental Cup.
+          </p>
+          <p>
+            <strong>How big the World Cup is</strong> is up to you. Pick it when you start a save,
+            or change it on the Qualifying page:
+          </p>
+          <ul>
+            <li><strong>16</strong>: four groups of four, top two into the quarter-finals.</li>
+            <li><strong>24</strong>: six groups of four. The top two and the four best third-placed
+              teams go through to a round of 16.</li>
+            <li><strong>32</strong>: eight groups of four, top two into a round of 16.</li>
+            <li><strong>48</strong>: twelve groups of four. The top two and the eight best
+              third-placed teams go through to a round of 32.</li>
+            <li><strong>Auto</strong>, which new saves start on, sizes it to your world. The
+              standard world plays 32. A world with 96 or more nations able to field a squad plays
+              48, and a thin one drops to 24 or 16.</li>
+          </ul>
+          <p>
+            A change never touches a campaign that's already going. The size is fixed the moment
+            qualifying is drawn, so the World Cup at the end of that cycle keeps it, and your new
+            size starts with the next draw. If your world can't fill the size you picked, it drops to
+            the biggest one it can. Saves started before you could choose play 32 until you change it.
           </p>
           <p>
             How many go through from any one qualifying group isn't fixed. Every group winner
             qualifies, and then the runners-up from all of that confederation's groups are ranked
             against each other for whatever places are left, so a strong runner-up can go through
             while a weaker one in the next group misses out. Both the confederation's share of the
-            32 places and the groups it plays in are settled the moment the campaign is drawn, three
+            places and the groups it plays in are settled the moment the campaign is drawn, three
             offseasons before the last round is played, so the Qualifying page tells you what each
             confederation is playing for from the start. In the tables, a solid bar down the left
             marks a place that qualifies outright and a fainter one marks a place that's in the
             running for whatever's left.
           </p>
           <p>
-            A 32-nation field is most of the nations that can field a squad at all, so several
-            confederations now send everyone they have and play no qualifying matches. They're still
+            A big field can be most of the nations that can field a squad at all, so some
+            confederations send everyone they have and play no qualifying matches. They're still
             listed on the Qualifying page, with a line saying everyone's through instead of a table.
             The contest is in Europe and Africa, where there are more nations than places. If you'd
             rather qualifying meant more everywhere, the fix is a deeper world: more countries with

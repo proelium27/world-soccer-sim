@@ -13,7 +13,9 @@ import {
   initConfederationCups, playConfederationCupGroups, playConfederationCupKnockoutRound,
   confederationCupGroupsPending, confederationCupKnockoutPending, summarizeConfederationCups,
 } from "./confederationCup.js";
-import { qualifyingLeg, CONFEDERATION_CUP_QUALIFYING_LEG } from "../constants.js";
+import {
+  qualifyingLeg, CONFEDERATION_CUP_QUALIFYING_LEG, INTL_FIELD_SIZE, type WorldCupSize,
+} from "../constants.js";
 
 /**
  * Staged international football.
@@ -122,7 +124,7 @@ export function applyCareerDelta(
  * On the two-year cadence: an odd season's offseason draws a qualifying
  * campaign; the following even one draws the tournament its qualifiers fill.
  * `stage` is left null when there is nothing to play — an even year with no
- * qualifiers on file yet, or a world too small to field INTL_FIELD_SIZE nations
+ * qualifiers on file yet, or a world too small to field even a 16-nation World Cup
  * — in which case the offseason simply advances as normal.
  */
 export function initInternationalCampaign(
@@ -130,6 +132,12 @@ export function initInternationalCampaign(
   players: Player[],
   endingSeason: number,
   lid: number,
+  /**
+   * The save's `worldCupSize`. Only a fresh qualifying campaign reads it: a
+   * campaign records the size it was drawn at, and the World Cup takes its
+   * field from that campaign's qualifiers.
+   */
+  worldCupSize: WorldCupSize = INTL_FIELD_SIZE,
 ): InternationalState {
   // A power-ranking snapshot of every eligible nation, taken now on the
   // just-finished club season's squads (only kept if a campaign is actually
@@ -157,7 +165,7 @@ export function initInternationalCampaign(
     // Start of a cycle: draw a fresh qualifying campaign (all legs, unplayed)
     // and stage its first leg. The campaign's season is this start season, which
     // seeds every leg — so the whole three-offseason campaign is deterministic.
-    const campaign = initQualifying(players, endingSeason);
+    const campaign = initQualifying(players, endingSeason, worldCupSize);
     if (!campaign) return { ...state, stage: null };
     return withSnapshot({ ...state, qualifying: campaign, stage: "qualifying" });
   }
@@ -208,7 +216,7 @@ export function playIntlStage(
     case "qualifying": {
       if (!state.qualifying) return { international: { ...state, stage: "done" }, players };
       // Play this offseason's one leg. The campaign spans three offseasons, so
-      // only archive its summary once the last leg locks in the 16 qualifiers.
+      // only archive its summary once the last leg locks in the qualifiers.
       const { campaign, delta, injured } = playQualifyingRound(state.qualifying, players, lid);
       const finished = campaign.qualified.length > 0;
       return {

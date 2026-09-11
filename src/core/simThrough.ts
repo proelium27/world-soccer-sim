@@ -38,7 +38,7 @@ import { clampBudget, financeScaleFor, domesticCupScaleFor } from "./finance/bud
 import { initInternationalCampaign } from "./international/index.js";
 import { reviewSeason, tablesByCompetition } from "./manager/index.js";
 import { playPromotionPlayoffs } from "./promotionPlayoff.js";
-import { POWER_SNAPSHOT_INTERVAL } from "./constants.js";
+import { POWER_SNAPSHOT_INTERVAL, INTL_FIELD_SIZE } from "./constants.js";
 import { pointsDeductionMap } from "./finance/debt.js";
 
 /**
@@ -628,7 +628,10 @@ export function simThrough(
   // no shared-stream rng is drawn — so it can't perturb club results.
   const enteringOffseason = finalRemaining.length === 0;
   const international = enteringOffseason
-    ? initInternationalCampaign(league.international, currentPlayers, league.season, league.lid)
+    ? initInternationalCampaign(
+      league.international, currentPlayers, league.season, league.lid,
+      league.worldCupSize ?? INTL_FIELD_SIZE,
+    )
     : league.international;
 
   // Same boundary: the promotion playoffs are the last act of the season, so

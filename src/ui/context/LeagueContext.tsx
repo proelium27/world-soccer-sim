@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
-import type { ProgressionModel } from "../../core/constants.js";
+import type { ProgressionModel, WorldCupSize } from "../../core/constants.js";
 import type { SimThrough, IntlMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
 import { saveLeague, loadLeague } from "../../db/leagueDb.js";
@@ -167,6 +167,8 @@ interface LeagueContextValue {
   /** God Mode: take charge of any country, offer or not. */
   godModeTakeNationalJobAction: (nation: string) => Promise<void>;
   godModeSetProgressionModelAction: (model: ProgressionModel) => Promise<void>;
+  /** Set how many nations the World Cup takes, from the next qualifying draw on. */
+  setWorldCupSizeAction: (size: WorldCupSize) => Promise<void>;
   movePlayerToClubAction: (pid: number, tid: number) => Promise<void>;
   releasePlayerGodModeAction: (pid: number) => Promise<void>;
   editPlayerAction: (pid: number, edit: PlayerEdit) => Promise<void>;
@@ -1121,6 +1123,24 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * Change how many nations the World Cup takes (see `LeagueStore.worldCupSize`).
+   *
+   * Not a God Mode action, deliberately. It edits a competition format rather
+   * than anyone's squad or money, and it cannot reach a campaign in progress —
+   * the one read is the draw of the NEXT qualifying campaign, which records the
+   * size it was drawn at. Gating it behind God Mode would make a player turn
+   * on a sandbox that un-fogs every potential in the save just to change a
+   * tournament's size.
+   */
+  const setWorldCupSizeAction = useCallback(
+    (size: WorldCupSize) => mutate((l) => {
+      if (l.worldCupSize === size) return null;
+      return { ...l, worldCupSize: size };
+    }),
+    [mutate],
+  );
+
+  /**
    * God Mode: hand the user any country in the world. The national counterpart
    * of the club switch above, and it removes the same single gate — that a
    * federation actually approached — by calling `takeNationalJob` directly
@@ -1271,6 +1291,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
     godModeSetProgressionModelAction,
+    setWorldCupSizeAction,
     releasePlayerGodModeAction,
     editPlayerAction,
     createPlayerAction,
@@ -1303,6 +1324,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
     godModeSetProgressionModelAction,
+    setWorldCupSizeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useLeague } from "../../context/LeagueContext.js";
 import type { IntlTournament, IntlQualifyingCampaign } from "../../../core/international/index.js";
 import { INTL_TOURNAMENT_NAME, INTL_QUALIFY_PER_GROUP } from "../../../core/constants.js";
+import { bestThirdsFor } from "../../../core/international/format.js";
 import {
   NationalTeamsLayout, NationName, koRoundName, useHasInternational, IntlEmpty, liveCampaign,
 } from "./shared.js";
@@ -33,7 +34,9 @@ function TournamentSchedule({ tournament }: { tournament: IntlTournament }) {
   // to 32 has three. Naming off the list directly would label an old save's
   // quarter-finals "Round of 16". Read off the groups because the bracket is
   // empty until they are played.
-  const koRounds = Math.max(1, Math.round(Math.log2(tournament.groups.length * INTL_QUALIFY_PER_GROUP)));
+  const advancing = tournament.groups.length * INTL_QUALIFY_PER_GROUP
+    + bestThirdsFor(tournament.groups.length, INTL_QUALIFY_PER_GROUP);
+  const koRounds = Math.max(1, Math.round(Math.log2(advancing)));
   const options = ["Group stage", ...Array.from({ length: koRounds }, (_, i) => koRoundName(i, koRounds))];
 
   let body;

@@ -6,7 +6,9 @@ import { simMatchDetailed } from "../../engine/matchSim.js";
 import { resolveCupTie } from "../cup/simCup.js";
 import { mulberry32, hashInts } from "../../engine/rng.js";
 import { INTL_QUALIFY_PER_GROUP } from "../constants.js";
-import { groupTable } from "./groups.js";
+import { groupTable, rankAcrossGroups, type GroupRow } from "./groups.js";
+import { bestThirdsFor } from "./format.js";
+import { seedOrder } from "../cup/cup.js";
 
 /**
  * rng-stream tags for international football. Every international match runs on
@@ -139,7 +141,9 @@ export const TOURNAMENT_KNOCKOUT_STREAM = KNOCKOUT_STREAM;
 export function seedBracket(
   groups: IntlGroup[],
   qualifyPerGroup: number = INTL_QUALIFY_PER_GROUP,
+  bestThirds: number = bestThirdsFor(groups.length, qualifyPerGroup),
 ): number[] {
+  if (bestThirds > 0) return seedWithBestThirds(groups, bestThirds);
   const advancing = groups.map((g) => groupTable(g).slice(0, qualifyPerGroup).map((r) => r.nid));
   const winner = (g: number): number => advancing[g][0];
   const runnerUp = (g: number): number => advancing[g][1];
@@ -155,6 +159,125 @@ export function seedBracket(
     bottom.push(winner(b), runnerUp(a));
   }
   return [...top, ...bottom];
+}
+
+/** A qualifier out of the group stage, and the group it came out of. */
+interface Qualifier {
+  nid: number;
+  group: number;
+}
+
+/**
+ * Seed a bracket that takes the best third-placed sides as well as every
+ * group's top two — the 24- and 48-nation World Cups (see WORLD_CUP_FORMATS).
+ * Partner groups can't work here, because six or twelve winners don't pair off
+ * against the same number of runners-up once thirds join, so the pairings are
+ * made on group-stage record instead, which is what rewards winning a group:
+ *
+ *  - the best winners, one per qualifying third, draw a third-placed side, the
+ *    best winner getting the weakest third;
+ *  - the other winners draw the weakest runners-up;
+ *  - that leaves the strongest runners-up, who play each other, best v worst.
+ *
+ * No first-round tie is ever a group rematch (every one of those pairings is a
+ * matching over at least two sides a piece, where one forbidden opponent each
+ * always leaves one to take). Ties are then split into halves greedily, trying
+ * to put a group's winner and runner-up apart, and within a half the strongest
+ * ties are spread so they meet as late as possible. The split is best-effort,
+ * not a guarantee: measured over 20 draws each, a group's top two still share a
+ * half 32% of the time at 24 nations and 25% at 48 (against ~50% by chance),
+ * because a third from the same group is often through too and the halves must
+ * stay equal. Zero first-round rematches in the same runs.
+ *
+ * Every rank here comes off rankAcrossGroups, the per-game comparison qualifying
+ * already uses across groups; it needs no rng, so the bracket is fully fixed by
+ * the group results.
+ */
+function seedWithBestThirds(groups: IntlGroup[], bestThirds: number): number[] {
+  const tables = groups.map((g) => groupTable(g));
+  const groupOf = new Map<number, number>();
+  tables.forEach((table, g) => table.forEach((row) => groupOf.set(row.nid, g)));
+  const ranked = (rows: (GroupRow | undefined)[]): Qualifier[] =>
+    rankAcrossGroups(rows.filter((r): r is GroupRow => r !== undefined))
+      .map((r) => ({ nid: r.nid, group: groupOf.get(r.nid)! }));
+
+  const winners = ranked(tables.map((t) => t[0]));
+  const runnersUp = ranked(tables.map((t) => t[1]));
+  const thirds = ranked(tables.map((t) => t[2])).slice(0, bestThirds);
+
+  const facingThirds = winners.slice(0, thirds.length);
+  const facingRunners = winners.slice(thirds.length);
+  const weakRunners = runnersUp.slice(runnersUp.length - facingRunners.length);
+  const strongRunners = runnersUp.slice(0, runnersUp.length - facingRunners.length);
+
+  const ties: [Qualifier, Qualifier][] = [
+    ...matchAvoidingGroup(facingThirds, [...thirds].reverse()),
+    ...matchAvoidingGroup(facingRunners, [...weakRunners].reverse()),
+  ];
+  for (let i = 0; i < Math.floor(strongRunners.length / 2); i++) {
+    ties.push([strongRunners[i], strongRunners[strongRunners.length - 1 - i]]);
+  }
+
+  // Split into halves, strongest tie first. A tie goes to whichever half it
+  // shares fewer groups with, a winner-and-runner-up clash counting double —
+  // those are the two most likely to be the same group's best sides.
+  const halfSize = ties.length / 2;
+  const halves: [Qualifier, Qualifier][][] = [[], []];
+  const clash = (tie: [Qualifier, Qualifier], half: [Qualifier, Qualifier][]): number => {
+    let cost = 0;
+    for (const placed of half) {
+      for (const a of tie) {
+        for (const b of placed) {
+          if (a.group !== b.group) continue;
+          cost += isTopTwo(a, winners, runnersUp) && isTopTwo(b, winners, runnersUp) ? 2 : 1;
+        }
+      }
+    }
+    return cost;
+  };
+  ties.forEach((tie, i) => {
+    const open = [0, 1].filter((h) => halves[h].length < halfSize);
+    const [first, second] = i % 2 === 0 ? [0, 1] : [1, 0];
+    const pick = open.length === 1
+      ? open[0]
+      : clash(tie, halves[second]) < clash(tie, halves[first]) ? second : first;
+    halves[pick].push(tie);
+  });
+
+  // Within each half, standard seeding over its ties (already strongest first).
+  const order = seedOrder(halfSize);
+  return halves.flatMap((half) => order.flatMap((seed) => half[seed - 1].map((q) => q.nid)));
+}
+
+/** A group winner or runner-up — the pair seeding most wants kept apart. */
+function isTopTwo(q: Qualifier, winners: Qualifier[], runnersUp: Qualifier[]): boolean {
+  return winners.some((w) => w.nid === q.nid) || runnersUp.some((r) => r.nid === q.nid);
+}
+
+/**
+ * Pair each of `firsts` (in order) with one of `seconds`, taking the earliest
+ * available opponent from a different group and backtracking if a later side
+ * would be left only with its own group. Falls back to plain order if no such
+ * pairing exists at all, which cannot happen at the sizes seedWithBestThirds
+ * passes (two or more a side).
+ */
+function matchAvoidingGroup(firsts: Qualifier[], seconds: Qualifier[]): [Qualifier, Qualifier][] {
+  const used = new Set<number>();
+  const picked: number[] = [];
+  const place = (i: number): boolean => {
+    if (i === firsts.length) return true;
+    for (let j = 0; j < seconds.length; j++) {
+      if (used.has(j) || seconds[j].group === firsts[i].group) continue;
+      used.add(j);
+      picked.push(j);
+      if (place(i + 1)) return true;
+      used.delete(j);
+      picked.pop();
+    }
+    return false;
+  };
+  if (!place(0)) return firsts.map((f, i) => [f, seconds[i]]);
+  return firsts.map((f, i) => [f, seconds[picked[i]]]);
 }
 
 /**

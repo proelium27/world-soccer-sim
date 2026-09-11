@@ -8,6 +8,7 @@ import type {
 import { tournamentGoals } from "../../../core/international/index.js";
 import { PlayerRefLink } from "../../components/PlayerRefLink.js";
 import { INTL_TOURNAMENT_NAME, INTL_QUALIFY_PER_GROUP, INTL_CYCLE_YEARS } from "../../../core/constants.js";
+import { bestThirdsFor } from "../../../core/international/format.js";
 import { EmptyState } from "../../components/EmptyState.js";
 import {
   NationalTeamsLayout, NationName, GroupCards, liveGroupRows, KnockoutColumns, SeasonSelect,
@@ -22,12 +23,23 @@ function ChampionBanner({ champion }: { champion: string }) {
   );
 }
 
-/** Group cards from already-normalized standings, top INTL_QUALIFY_PER_GROUP shaded. */
-function GroupStage({ groups }: { groups: StandingRow[][] }) {
+/**
+ * Group cards from already-normalized standings. Shaded rows are who went
+ * through: the top two in each group, or, once the knockout is seeded, exactly
+ * the nations in it — which is the only way to show which third-placed sides
+ * made it at a 24- or 48-nation World Cup.
+ */
+function GroupStage({ groups, through }: { groups: StandingRow[][]; through?: ReadonlySet<string> }) {
+  const thirds = bestThirdsFor(groups.length, INTL_QUALIFY_PER_GROUP);
   return (
     <>
       <h6 className="mt-3">Group stage</h6>
-      <GroupCards groups={groups} advancing={INTL_QUALIFY_PER_GROUP} />
+      <p className="text-muted small mb-2">
+        {thirds > 0
+          ? `The top two in each group go through, along with the ${thirds} best third-placed teams.`
+          : "The top two in each group go through."}
+      </p>
+      <GroupCards groups={groups} advancing={INTL_QUALIFY_PER_GROUP} through={through} />
     </>
   );
 }
@@ -38,6 +50,9 @@ function LiveTournament({ tournament }: { tournament: IntlTournament }) {
   const champion = tournament.championNid !== null ? nations[tournament.championNid] : null;
 
   const groups = tournament.groups.map((g) => liveGroupRows(g, nations));
+  const through = tournament.bracket.length > 0
+    ? new Set(tournament.bracket.map((nid) => nations[nid]))
+    : undefined;
   const knockout: KnockoutResultView[] = tournament.ties.map((t) => ({
     round: t.round,
     home: nations[t.home],
@@ -69,7 +84,7 @@ function LiveTournament({ tournament }: { tournament: IntlTournament }) {
   return (
     <>
       {champion && <ChampionBanner champion={champion} />}
-      <GroupStage groups={groups} />
+      <GroupStage groups={groups} through={through} />
       <h6>Knockout</h6>
       <KnockoutColumns results={knockout} />
       {scorers.length > 0 && (
@@ -96,6 +111,12 @@ function LiveTournament({ tournament }: { tournament: IntlTournament }) {
   );
 }
 
+/** The nations in an archived tournament's first knockout round, i.e. who got out of the groups. */
+function firstRoundNations(summary: IntlTournamentSummary): ReadonlySet<string> | undefined {
+  const first = summary.knockout.filter((k) => k.round === 0);
+  return first.length > 0 ? new Set(first.flatMap((k) => [k.home, k.away])) : undefined;
+}
+
 function ArchivedTournament({ summary }: { summary: IntlTournamentSummary }) {
   const groups = summary.groups.map((g) => g.rows);
   const knockout: KnockoutResultView[] = summary.knockout.map((k) => ({
@@ -112,7 +133,7 @@ function ArchivedTournament({ summary }: { summary: IntlTournamentSummary }) {
   return (
     <>
       <ChampionBanner champion={summary.champion} />
-      {groups.length > 0 ? <GroupStage groups={groups} /> : null}
+      {groups.length > 0 ? <GroupStage groups={groups} through={firstRoundNations(summary)} /> : null}
       {knockout.length > 0 && (
         <>
           <h6>Knockout</h6>

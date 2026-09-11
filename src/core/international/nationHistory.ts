@@ -11,6 +11,8 @@ import type { IntlTournamentSummary } from "./types.js";
 export const FINISH_ORDER = [
   "Did not qualify",
   "Group stage",
+  "Round of 32",
+  "Round of 16",
   "Quarter-finals",
   "Semi-finals",
   "Runners-up",
@@ -18,24 +20,37 @@ export const FINISH_ORDER = [
 ] as const;
 export type Finish = (typeof FINISH_ORDER)[number];
 
+/** Knockout exits by rounds from the final: index 1 = lost a semi, 2 = a quarter, and so on. */
+const EXIT_BY_ROUNDS_FROM_FINAL: Finish[] = [
+  "Runners-up", "Semi-finals", "Quarter-finals", "Round of 16", "Round of 32",
+];
+
 /**
  * A nation's finish in one archived tournament, or null if it wasn't in the
  * field. Champion and runner-up come straight off the summary; otherwise the
- * deepest knockout round the nation appears in tells the story (lost in the SF →
- * "Semi-finals", lost in the QF → "Quarter-finals", never reached the knockout →
- * "Group stage").
+ * deepest knockout round the nation appears in tells the story, named by how
+ * far that round was from the final (lost in the SF → "Semi-finals", never
+ * reached the knockout → "Group stage").
+ *
+ * Counted BACKWARDS, because bracket depth varies with the World Cup's size:
+ * three rounds at 16 nations, four at 24 or 32, five at 48. This used to count
+ * forwards from a three-round bracket, so once the World Cup grew to 32 a
+ * nation beaten in the round of 16 was recorded as a quarter-finalist and a
+ * beaten quarter-finalist as a semi-finalist — which also inflated the History
+ * page's semi-final counts. Reading depth off the rounds present is sound here
+ * only because an archived tournament is a finished one.
  */
 export function finishOf(summary: IntlTournamentSummary, nation: string): Finish | null {
   if (!summary.field.includes(nation)) return null;
   if (summary.champion === nation) return "Champions";
   if (summary.runnerUp === nation) return "Runners-up";
+  const totalRounds = summary.knockout.reduce((max, k) => Math.max(max, k.round + 1), 0);
   let deepest = -1;
   for (const k of summary.knockout) {
     if (k.home === nation || k.away === nation) deepest = Math.max(deepest, k.round);
   }
-  if (deepest >= 1) return "Semi-finals";
-  if (deepest >= 0) return "Quarter-finals";
-  return "Group stage";
+  if (deepest < 0) return "Group stage";
+  return EXIT_BY_ROUNDS_FROM_FINAL[totalRounds - 1 - deepest] ?? "Round of 32";
 }
 
 export interface NationRecord {

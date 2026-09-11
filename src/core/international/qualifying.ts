@@ -6,7 +6,10 @@ import { groupByConfederation, allocateSlots } from "./confederations.js";
 import { buildGroup, serpentineGroups, groupTable, rankAcrossGroups, type GroupRow } from "./groups.js";
 import { playGroups, emptyCareerDelta, mergeCareerDelta, QUALIFYING_GROUP_STREAM } from "./simIntl.js";
 import { hashInts } from "../../engine/rng.js";
-import { INTL_FIELD_SIZE, INTL_QUAL_GROUP_TARGET, INTL_QUAL_LEGS } from "../constants.js";
+import { resolveWorldCupSize } from "./format.js";
+import {
+  INTL_FIELD_SIZE, INTL_QUAL_GROUP_TARGET, INTL_QUAL_LEGS, type WorldCupSize,
+} from "../constants.js";
 
 /**
  * How many groups a confederation's qualifying splits into: about
@@ -73,30 +76,54 @@ export function placesByPosition(groupSizes: number[], slots: number): number[] 
 }
 
 /**
- * The confederation allocation for a set of nations, recomputed identically at
- * draw time and at play time so no allocation state has to be persisted. Nations
- * arrive strongest first (buildSquads sorts them), so nids and the contender set
- * are stable.
+ * The size and confederation allocation a campaign plays for. Everything a
+ * campaign drawn today needs is recorded on it (`fieldSize`, `places`), so this
+ * reads it back rather than recomputing it — a campaign spans three offseasons,
+ * and a rule or setting that changed in between must not re-deal places its
+ * groups were drawn for.
+ *
+ * A campaign drawn before either field existed replays the rule it was drawn
+ * under instead: a 32-nation field, strength-weighted with a floor of one place
+ * per confederation. Nations arrive strongest first (buildSquads sorts them),
+ * so nids and the contender set are stable.
  */
-function planQualifying(nations: string[]): {
+function planQualifying(campaign: QualifyingSource): {
   nidOf: Map<string, number>;
+  fieldSize: number;
   byConfederation: ReturnType<typeof groupByConfederation>;
   slotsByConfederation: ReturnType<typeof allocateSlots>;
 } {
+  const { nations } = campaign;
   const nidOf = new Map(nations.map((n, i) => [n, i]));
   const byConfederation = groupByConfederation(nations);
-  // A confederation's pull comes from how many genuinely competitive nations it
-  // holds, not how many nations it has — the contender set is the strongest
-  // INTL_FIELD_SIZE in the world.
-  const contenders = new Set(nations.slice(0, INTL_FIELD_SIZE));
-  const slotsByConfederation = allocateSlots(byConfederation, INTL_FIELD_SIZE, contenders);
-  return { nidOf, byConfederation, slotsByConfederation };
+  const fieldSize = campaign.fieldSize ?? INTL_FIELD_SIZE;
+  const places = campaign.places;
+  const slotsByConfederation = places
+    ? new Map([...byConfederation.keys()].filter((c) => (places[c] ?? 0) > 0).map((c) => [c, places[c]]))
+    : allocateSlots(byConfederation, fieldSize, new Set(nations.slice(0, fieldSize)));
+  return { nidOf, fieldSize, byConfederation, slotsByConfederation };
+}
+
+/** The parts of a campaign planQualifying reads. */
+type QualifyingSource = Pick<IntlQualifyingCampaign, "nations" | "fieldSize" | "places">;
+
+/**
+ * The places each confederation plays for in a campaign being drawn now. A
+ * confederation's pull comes from how many genuinely competitive nations it
+ * holds (the contender set is the world's strongest `fieldSize`), and it is
+ * guaranteed one place per qualifying group on top — see AllocationOptions.
+ */
+function allocatePlaces(nations: string[], fieldSize: number): Record<string, number> {
+  const byConfederation = groupByConfederation(nations);
+  const contenders = new Set(nations.slice(0, fieldSize));
+  const slots = allocateSlots(byConfederation, fieldSize, contenders, { groupTarget: INTL_QUAL_GROUP_TARGET });
+  return Object.fromEntries(slots);
 }
 
 /** What one confederation is playing for, all of it fixed at the draw. */
 export interface ConfederationQualifyingPlan {
   confederation: string;
-  /** Places allocated out of INTL_FIELD_SIZE. */
+  /** Places allocated out of the campaign's field size. */
   slots: number;
   /** Nations entered from this confederation. */
   nations: number;
@@ -112,9 +139,8 @@ export interface ConfederationQualifyingPlan {
 
 /**
  * What every confederation in a campaign is playing for, in the order the draw
- * allocated the places. Pure, and derived from the campaign's own nation list
- * and drawn groups rather than from anything stored, exactly as computeQualified
- * derives the allocation, so the two can never disagree.
+ * allocated the places. Pure, and read through the same planQualifying that
+ * computeQualified fills the places from, so the two can never disagree.
  *
  * Note what this is NOT: a per-group qualifying count. A group's winner always
  * goes through, but whether its runner-up does depends on the other groups in
@@ -123,7 +149,7 @@ export interface ConfederationQualifyingPlan {
  * per group it can only ever be a zone.
  */
 export function qualifyingPlan(campaign: IntlQualifyingCampaign): ConfederationQualifyingPlan[] {
-  const { byConfederation, slotsByConfederation } = planQualifying(campaign.nations);
+  const { byConfederation, slotsByConfederation } = planQualifying(campaign);
 
   // Read the group sizes off the drawn groups instead of recomputing them, so
   // the plan describes the campaign in front of the user and not a fresh draw.
@@ -149,8 +175,9 @@ export function qualifyingPlan(campaign: IntlQualifyingCampaign): ConfederationQ
 
 /**
  * Draw a qualifying campaign without playing a match: every eligible nation
- * names a squad, confederations are allocated the INTL_FIELD_SIZE places between
- * them, and each confederation that has more nations than places is drawn into
+ * names a squad, the World Cup's size is settled from the save's setting and
+ * how many nations that is (resolveWorldCupSize), confederations are allocated
+ * the places between them, and each confederation that has more nations than places is drawn into
  * serpentine groups whose fixtures start unplayed (`qualified` stays empty until
  * the last leg is played, one leg per offseason via playQualifyingRound). No rng
  * draw is taken from the shared stream and no player is touched, so this is safe
@@ -160,12 +187,19 @@ export function qualifyingPlan(campaign: IntlQualifyingCampaign): ConfederationQ
  * legacy save, say, whose player pool spans too few nations. The caller treats
  * that exactly like a world with no Continental Cup: the feature stays dark.
  */
-export function initQualifying(players: Player[], season: number): IntlQualifyingCampaign | null {
+export function initQualifying(
+  players: Player[],
+  season: number,
+  /** The save's `worldCupSize`; absent means the 32 every older save plays. */
+  size: WorldCupSize = INTL_FIELD_SIZE,
+): IntlQualifyingCampaign | null {
   const squads: NationSquad[] = buildSquads(players);
-  if (squads.length < INTL_FIELD_SIZE) return null;
+  const fieldSize = resolveWorldCupSize(size, squads.length);
+  if (fieldSize === null) return null;
 
   const nations = squads.map((s) => s.nation);
-  const { nidOf, byConfederation, slotsByConfederation } = planQualifying(nations);
+  const places = allocatePlaces(nations, fieldSize);
+  const { nidOf, byConfederation, slotsByConfederation } = planQualifying({ nations, fieldSize, places });
 
   const groups: IntlGroup[] = [];
   for (const [confederation, slots] of slotsByConfederation) {
@@ -178,19 +212,19 @@ export function initQualifying(players: Player[], season: number): IntlQualifyin
     }
   }
 
-  return { season, nations, squads, groups, qualified: [] };
+  return { season, nations, squads, groups, qualified: [], fieldSize, places };
 }
 
 /**
- * The 16 qualifiers, computed once the whole campaign is played: each
+ * The qualifiers, computed once the whole campaign is played: each
  * confederation's places filled by finishing position across its groups, plus
  * the direct qualifiers whose confederation had no more nations than places.
  * Strongest first (by nid) so the tournament draw's pots seed correctly. The
- * allocation is recomputed from the campaign's own nations, so no extra state is
- * stored on the campaign.
+ * allocation is the one recorded at the draw (see planQualifying).
  */
-export function computeQualified(played: IntlGroup[], nations: string[]): string[] {
-  const { nidOf, byConfederation, slotsByConfederation } = planQualifying(nations);
+export function computeQualified(played: IntlGroup[], campaign: QualifyingSource): string[] {
+  const { nations } = campaign;
+  const { nidOf, fieldSize, byConfederation, slotsByConfederation } = planQualifying(campaign);
 
   // Which of the played groups belong to each confederation, keyed off the
   // confederation stamped on the fixture at draw time.
@@ -215,7 +249,7 @@ export function computeQualified(played: IntlGroup[], nations: string[]): string
 
   return [...new Set(qualifiedNids)]
     .sort((a, b) => a - b)
-    .slice(0, INTL_FIELD_SIZE)
+    .slice(0, fieldSize)
     .map((nid) => nations[nid]);
 }
 
@@ -226,7 +260,7 @@ export function computeQualified(played: IntlGroup[], nations: string[]): string
  * whether the campaign is clicked through a leg at a time or run in one pass.
  * Squad pids are filtered to players still in the world, because a three-season
  * campaign outlives some of the players named at its start (retirement runs
- * between offseasons). Once the final leg completes, the 16 qualifiers are
+ * between offseasons). Once the final leg completes, the qualifiers are
  * locked in.
  */
 export function playQualifyingRound(
@@ -246,7 +280,7 @@ export function playQualifyingRound(
     // directly): make sure the qualifiers are computed.
     const qualified = campaign.qualified.length > 0
       ? campaign.qualified
-      : computeQualified(campaign.groups, campaign.nations);
+      : computeQualified(campaign.groups, campaign);
     return { campaign: { ...campaign, qualified }, delta, injured: [] };
   }
   const leg = Math.min(...pendingLegs);
@@ -261,7 +295,7 @@ export function playQualifyingRound(
   const played = playGroups(campaign.groups, matchData, seed, false, delta, injured, leg);
 
   const complete = played.every((g) => g.matches.every((m) => m.homeGoals >= 0));
-  const qualified = complete ? computeQualified(played, campaign.nations) : campaign.qualified;
+  const qualified = complete ? computeQualified(played, campaign) : campaign.qualified;
   return { campaign: { ...campaign, groups: played, qualified }, delta, injured: [...injured] };
 }
 
@@ -274,8 +308,9 @@ export function runQualifying(
   players: Player[],
   season: number,
   lid: number,
+  size: WorldCupSize = INTL_FIELD_SIZE,
 ): { campaign: IntlQualifyingCampaign; delta: CareerDelta; injured: number[] } | null {
-  const drawn = initQualifying(players, season);
+  const drawn = initQualifying(players, season, size);
   if (!drawn) return null;
 
   const delta = emptyCareerDelta();
@@ -288,6 +323,6 @@ export function runQualifying(
     campaign = r.campaign;
   }
 
-  if (campaign.qualified.length < INTL_FIELD_SIZE) return null;
+  if (campaign.qualified.length < (campaign.fieldSize ?? INTL_FIELD_SIZE)) return null;
   return { campaign, delta, injured: [...injured] };
 }

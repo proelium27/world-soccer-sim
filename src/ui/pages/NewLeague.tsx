@@ -8,8 +8,9 @@ import { useLeague } from "../context/LeagueContext.js";
 import { readLeagueFileText } from "../../db/exportImport.js";
 import {
   DIFFICULTIES, DIFFICULTY_ORDER, DEFAULT_DIFFICULTY, INTL_MIN_POOL, type Difficulty,
-  type ProgressionModel,
+  type ProgressionModel, DEFAULT_WORLD_CUP_SIZE, type WorldCupSize,
 } from "../../core/constants.js";
+import { WorldCupSizeSelect, worldCupSizeBlurb } from "../components/WorldCupSizeSelect.js";
 import { confederationOf, isEligibleNation } from "../../core/international/index.js";
 import { PICKABLE_NATIONALITIES } from "../components/NationalityEditor.js";
 import {
@@ -192,6 +193,9 @@ export function NewLeague() {
   // the two settings above it is NOT fixed for the save's lifetime — it scales
   // rng draws without changing their count, so God Mode can flip it later.
   const [progressionModel, setProgressionModel] = useState<ProgressionModel>("random");
+  // How many nations the World Cup takes. Changeable later from the Qualifying
+  // page, since a campaign records the size it was drawn at.
+  const [worldCupSize, setWorldCupSize] = useState<WorldCupSize>(DEFAULT_WORLD_CUP_SIZE);
   const [pending, setPending] = useState<LeagueStore | null>(null);
   const [saving, setSaving] = useState(false);
   // Every path on this page that writes a save goes through one gate. Building a
@@ -396,7 +400,7 @@ export function NewLeague() {
     const rng = mulberry32(seed);
     const generated = createLeagueState(
       tid, rng, seed, difficulty, world.competitions, rollingCoefficients, userNation,
-      progressionModel,
+      progressionModel, worldCupSize,
     );
     // A roster import is orthogonal to who manages: it replaces squads, and a
     // spectator watching real clubs is exactly as sensible as managing one.
@@ -1231,6 +1235,22 @@ export function NewLeague() {
             ? "Your league sends more clubs when they do well in Europe, fewer when they don't."
             : "Every country keeps the same number of places forever."}{" "}
           Fixed once you start.
+        </p>
+      </div>
+
+      <div className="mb-3">
+        <h6 className="text-muted text-uppercase small fw-semibold mb-2">
+          <label htmlFor="world-cup-size" className="mb-0">World Cup size</label>{" "}
+          <HelpHint label="How big can it be?">
+            Qualifying hands out the places by confederation, and every qualifying group
+            plays for at least its winner's place. Bigger fields let more of the world's
+            smaller nations in; smaller ones make qualifying tougher. If your world can't
+            fill the size you pick, the World Cup drops to the biggest one it can.
+          </HelpHint>
+        </h6>
+        <WorldCupSizeSelect id="world-cup-size" value={worldCupSize} onChange={setWorldCupSize} />
+        <p className="text-muted small mt-2 mb-0">
+          {worldCupSizeBlurb(worldCupSize)} You can change this later on the Qualifying page.
         </p>
       </div>
 

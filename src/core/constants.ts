@@ -4601,6 +4601,50 @@ export function isQualifyingSeason(season: number): boolean {
  * the floor to 15 adds only about five nations and all of them rate below 56.
  */
 export const INTL_FIELD_SIZE = 32;
+
+/**
+ * World Cup sizes a save can be set to (`LeagueStore.worldCupSize`). Each has a
+ * shape in `WORLD_CUP_FORMATS` (core/international/format.ts): 16 and 32 are
+ * groups of four whose top two go through, 24 and 48 are the "top two plus the
+ * best third-placed sides" formats of Euro 2016 and the 2026 World Cup, which
+ * is what lets a field that isn't a power of two still end in a clean bracket.
+ *
+ * INTL_FIELD_SIZE above stays the size of every save that predates the
+ * setting, and of any qualifying campaign drawn before it existed.
+ */
+export const WORLD_CUP_SIZES = [16, 24, 32, 48] as const;
+export type WorldCupFieldSize = (typeof WORLD_CUP_SIZES)[number];
+/** The per-save setting: a fixed size, or "auto" to size it off the world. */
+export type WorldCupSize = WorldCupFieldSize | "auto";
+/** What a new save starts on. */
+export const DEFAULT_WORLD_CUP_SIZE: WorldCupSize = "auto";
+
+/**
+ * The fewest nations able to field a squad before "auto" picks each size. Auto
+ * takes the largest size whose bar the world clears.
+ *
+ * 48 needs twice its size, so that at least half the world still misses out;
+ * below that a 48-nation World Cup is most of the nations that exist, and
+ * qualifying stops meaning anything. The others need half as many again as
+ * their size. The bars are a table rather than one ratio because what they must
+ * do is keep a default world firmly inside one band, and the default world is a
+ * moving target: 66 eligible nations at generation (the first campaign is drawn
+ * on that), then climbing as youth intake tops the thinner nationalities up
+ * past INTL_MIN_POOL — 74-77 over eleven seasons on seed 1, 78-80 on seed 2,
+ * 82 by season 8 on seed 3 and still rising. A ratio sized to put 48's bar at
+ * 80 or 87 (both tried) left a mature default save within a handful of nations
+ * of flipping its World Cup mid-dynasty. At 48 and 96 a default save plays 32
+ * for its whole life with room either way, and only a genuinely bigger world
+ * (added leagues, an imported roster) earns 48 on Auto; anyone else who wants
+ * it can set it.
+ */
+export const WORLD_CUP_AUTO_MIN_NATIONS: Record<WorldCupFieldSize, number> = {
+  16: 16,
+  24: 36,
+  32: 48,
+  48: 96,
+};
+
 export const INTL_GROUPS = 8;
 export const INTL_GROUP_SIZE = 4;
 export const INTL_QUALIFY_PER_GROUP = 2;

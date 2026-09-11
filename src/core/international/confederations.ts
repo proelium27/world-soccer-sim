@@ -306,11 +306,90 @@ export function groupByConfederation(nations: string[]): Map<Confederation, stri
  * confederations. A confederation is never given more places than it has
  * nations; places freed by that cap go to the largest remainders. Pure function
  * of the inputs, so it needs no rng and is stable for a given world.
+ *
+ * With `opts.groupTarget` a confederation is also guaranteed a place for every
+ * qualifying group it will be drawn into, so no group ever plays for less than
+ * its winner's place — see AllocationOptions.
  */
 export function allocateSlots(
   byConfederation: Map<Confederation, string[]>,
   slots: number,
   contenders: ReadonlySet<string> = new Set(),
+  opts: AllocationOptions = {},
+): Map<Confederation, number> {
+  const base = allocateByStrength(byConfederation, slots, contenders);
+  if (opts.groupTarget === undefined) return base;
+  return raiseToGroupFloors(byConfederation, slots, base, opts.groupTarget);
+}
+
+export interface AllocationOptions {
+  /**
+   * Guarantee each confederation one place per this many nations (rounded, and
+   * at least one) — i.e. one place per qualifying group, since the draw splits
+   * a confederation into groups of about this size and never makes more groups
+   * than it has places (see groupCountFor in qualifying.ts).
+   *
+   * Without it the strength weighting alone can hand a confederation of nine
+   * nations a single place, and the draw then has no choice but to put all
+   * nine in one group and play it three times over: 24 games each for one
+   * spot, measured in a real save (2026-09-11). Pass INTL_QUAL_GROUP_TARGET.
+   * Omitted, the allocation is exactly what it always was — which is what a
+   * qualifying campaign drawn before this existed replays against.
+   */
+  groupTarget?: number;
+}
+
+/**
+ * The per-group floor applied as a MINIMUM on top of the strength allocation,
+ * not as places reserved ahead of it. Reserving them first would take places
+ * out of the proportional pool on every world, including the default one where
+ * no confederation is anywhere near its floor (Europe's six against the
+ * eighteen it earns) — silently reshuffling every save's qualifying. As a
+ * minimum it changes nothing until a floor actually binds, and then only moves
+ * the places that binding needs, each taken from whichever confederation holds
+ * the most above its own floor.
+ *
+ * A world with so many nations that the floors alone overrun the field can't
+ * guarantee every group its winner; there the places go by nation count
+ * instead, which keeps every confederation's groups about the same size.
+ */
+function raiseToGroupFloors(
+  byConfederation: Map<Confederation, string[]>,
+  slots: number,
+  base: Map<Confederation, number>,
+  groupTarget: number,
+): Map<Confederation, number> {
+  const floors = new Map<Confederation, number>();
+  for (const [conf, nations] of byConfederation) {
+    if (nations.length === 0) continue;
+    floors.set(conf, Math.min(nations.length, Math.max(1, Math.round(nations.length / groupTarget))));
+  }
+  const floorTotal = [...floors.values()].reduce((a, b) => a + b, 0);
+  if (floorTotal > slots) return allocateByStrength(byConfederation, slots, new Set());
+
+  const out = new Map(base);
+  const floorOf = (conf: Confederation) => floors.get(conf) ?? 0;
+  const confs = [...floors.keys()].sort((a, b) => a.localeCompare(b));
+  for (const conf of confs) {
+    while ((out.get(conf) ?? 0) < floorOf(conf)) {
+      const donor = confs
+        .filter((c) => c !== conf && (out.get(c) ?? 0) > floorOf(c))
+        .sort((a, b) =>
+          ((out.get(b) ?? 0) - floorOf(b)) - ((out.get(a) ?? 0) - floorOf(a)) || a.localeCompare(b),
+        )[0];
+      if (!donor) break; // unreachable: floorTotal <= slots and base sums to slots
+      out.set(donor, out.get(donor)! - 1);
+      out.set(conf, (out.get(conf) ?? 0) + 1);
+    }
+  }
+  return out;
+}
+
+/** The strength-weighted allocation — see allocateSlots. */
+function allocateByStrength(
+  byConfederation: Map<Confederation, string[]>,
+  slots: number,
+  contenders: ReadonlySet<string>,
 ): Map<Confederation, number> {
   const entries = [...byConfederation.entries()].filter(([, ns]) => ns.length > 0);
   const out = new Map<Confederation, number>();
