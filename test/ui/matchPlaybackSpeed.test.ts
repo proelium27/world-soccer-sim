@@ -1,6 +1,58 @@
 import { describe, expect, it } from "vitest";
 import { HALF_TIME_MINUTE } from "../../src/ui/live/liveMatch.js";
-import { SPEEDS, tickDelayMs, type PlaybackSpeed } from "../../src/ui/live/useMatchPlayback.js";
+import {
+  parseSpeed,
+  readStoredSpeed,
+  SPEED_STORAGE_KEY,
+  SPEEDS,
+  storeSpeed,
+  tickDelayMs,
+  type PlaybackSpeed,
+} from "../../src/ui/live/useMatchPlayback.js";
+
+/** A plain in-memory stand-in for `localStorage`. */
+function memoryStorage(initial: Record<string, string> = {}) {
+  const data = new Map(Object.entries(initial));
+  return {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, v),
+  };
+}
+
+describe("remembered playback speed", () => {
+  it("opens at 1x when nothing has been picked yet", () => {
+    expect(readStoredSpeed(memoryStorage())).toBe(1);
+  });
+
+  it("opens at whatever speed was picked last, every speed included", () => {
+    for (const s of SPEEDS) {
+      const storage = memoryStorage();
+      storeSpeed(s, storage);
+      expect(readStoredSpeed(storage)).toBe(s);
+    }
+  });
+
+  it("falls back to 1x on a value that isn't a speed we offer", () => {
+    for (const raw of ["3", "", "fast", "NaN", "0"]) {
+      expect(readStoredSpeed(memoryStorage({ [SPEED_STORAGE_KEY]: raw }))).toBe(1);
+    }
+    expect(parseSpeed(null)).toBeNull();
+  });
+
+  it("survives storage that throws or isn't there", () => {
+    const broken = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    expect(readStoredSpeed(broken)).toBe(1);
+    expect(() => storeSpeed(2, broken)).not.toThrow();
+    expect(readStoredSpeed(null)).toBe(1);
+  });
+});
 
 /**
  * There is no DOM test environment in this repo, so the playback clock itself
