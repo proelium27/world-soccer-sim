@@ -4676,6 +4676,20 @@ export const INTL_MIN_KEEPERS = 1;
 export const INTL_QUAL_GROUP_TARGET = 5;
 
 /**
+ * The biggest a qualifying group may get: seven nations, i.e. eighteen games
+ * each over the three legs, which is what real South American qualifying plays.
+ * Enforced by guaranteeing a confederation a place per this many nations
+ * (allocateByQuota), because the draw never makes more groups than places.
+ * Without it a confederation of nine nations on one place played a single
+ * nine-nation group three times over, 24 games each (the report that started
+ * this, 2026-09-11). Seven rather than the target of five so the guarantee only
+ * bites where a quota really is too small for its confederation; at five it
+ * handed out most of a 16-nation World Cup on the floor alone and overrode
+ * the quotas it sits under.
+ */
+export const INTL_QUAL_GROUP_MAX = 7;
+
+/**
  * Legs of the qualifying round-robin — now three, one played in each of the
  * cycle's three qualifying offseasons (see INTL_CYCLE_YEARS). A single
  * round-robin left a five-nation group turning on four games, noisy enough that

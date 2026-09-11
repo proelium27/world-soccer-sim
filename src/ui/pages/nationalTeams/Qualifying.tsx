@@ -126,11 +126,12 @@ function QualifyingView({
       </div>
 
       <p className="text-muted small">
-        {entered} nations entered for {fieldSize} places. Groups are played home and away, and
-        how many places each confederation gets depends on how many genuinely competitive nations
-        it has, though every group plays for at least its winner's place. That split, and the
-        groups it's played in, are settled when the campaign is drawn, so what each confederation
-        is playing for is known before the first match.
+        {entered} nations entered for {fieldSize} places. Groups are played home and away. Each
+        confederation gets a quota the way FIFA does it, based on the real World Cup of this size,
+        trimmed so no confederation sends more than two thirds of its nations, and every group
+        plays for at least its winner's place. That split, and the groups it's played in, are
+        settled when the campaign is drawn, so what each confederation is playing for is known
+        before the first match.
       </p>
 
       {stillPlaying && (

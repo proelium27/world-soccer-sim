@@ -4,15 +4,17 @@ import {
   WORLD_CUP_FORMATS, TOURNAMENT_FORMATS, bestThirdsFor, resolveWorldCupSize,
   autoWorldCupThreshold, worldCupFormatFor,
 } from "../../src/core/international/format.js";
-import { allocateSlots, groupByConfederation, type Confederation } from "../../src/core/international/confederations.js";
+import {
+  allocateSlots, allocateByQuota, groupByConfederation, CONFEDERATION_QUOTAS, QUOTA_MAX_SHARE_OF_ENTRANTS,
+  type Confederation,
+} from "../../src/core/international/confederations.js";
 import { initQualifying, runQualifying } from "../../src/core/international/qualifying.js";
 import { initTournament, runTournament } from "../../src/core/international/tournament.js";
 import { seedBracket } from "../../src/core/international/simIntl.js";
 import { buildGroup, groupTable, rankAcrossGroups } from "../../src/core/international/groups.js";
-import { buildSquads } from "../../src/core/international/squads.js";
 import { finishOf, qualifyingPlan } from "../../src/core/international/index.js";
 import type { IntlGroup, IntlTournamentSummary } from "../../src/core/international/types.js";
-import { INTL_FIELD_SIZE, INTL_QUAL_GROUP_TARGET, WORLD_CUP_SIZES } from "../../src/core/constants.js";
+import { INTL_FIELD_SIZE, INTL_QUAL_GROUP_MAX, WORLD_CUP_SIZES } from "../../src/core/constants.js";
 import { koRoundName } from "../../src/ui/pages/nationalTeams/shared.js";
 
 /**
@@ -81,10 +83,16 @@ describe("resolveWorldCupSize", () => {
   });
 });
 
-describe("allocateSlots' per-group floor", () => {
+describe("allocateByQuota", () => {
   const nations = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${i}`);
+  const total = (m: Map<unknown, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+  /** Shaped like a real save a decade in: the world the report came from. */
+  const matureWorld = () => new Map<Confederation, string[]>([
+    ["Europe", nations("E", 31)], ["South America", nations("S", 5)], ["Africa", nations("A", 19)],
+    ["Asia", nations("As", 6)], ["North America", nations("N", 9)], ["Oceania", nations("O", 1)],
+  ]);
 
-  it("reproduces the bug without it: nine nations and no contender get one place", () => {
+  it("reproduces the bug under the old rule: nine nations and no contender get one place", () => {
     const byConf = new Map<Confederation, string[]>([
       ["Europe", nations("E", 40)],
       ["North America", nations("N", 9)],
@@ -93,27 +101,58 @@ describe("allocateSlots' per-group floor", () => {
     expect(allocateSlots(byConf, 32, contenders).get("North America")).toBe(1);
   });
 
-  it("gives every confederation a place per qualifying group with it", () => {
-    const byConf = new Map<Confederation, string[]>([
-      ["Europe", nations("E", 40)],
-      ["North America", nations("N", 9)],
-      ["Oceania", nations("O", 2)],
-    ]);
-    const contenders = new Set(nations("E", 32));
-    const alloc = allocateSlots(byConf, 32, contenders, { groupTarget: INTL_QUAL_GROUP_TARGET });
-    expect(alloc.get("North America")).toBe(2); // two groups of four or five
-    expect(alloc.get("Oceania")).toBe(1);
-    expect([...alloc.values()].reduce((a, b) => a + b, 0)).toBe(32);
+  it("gives the screenshot's North America a real share, with no group over seven", () => {
+    const alloc = allocateByQuota(matureWorld(), 32, INTL_QUAL_GROUP_MAX);
+    // 1998-2022 CONCACAF quota is 3.5 of 31: about four.
+    expect(alloc.get("North America")).toBeGreaterThanOrEqual(3);
+    expect(alloc.get("North America")).toBeLessThanOrEqual(6);
+    expect(total(alloc)).toBe(32);
+    for (const [conf, ns] of matureWorld()) {
+      expect(alloc.get(conf)!).toBeGreaterThanOrEqual(Math.ceil(ns.length / INTL_QUAL_GROUP_MAX));
+    }
   });
 
-  it("changes nothing on a default world, where no floor binds", () => {
-    const league = makeLeague(0, 7);
-    const all = buildSquads(league.players).map((s) => s.nation);
-    const byConf = groupByConfederation(all);
-    const contenders = new Set(all.slice(0, INTL_FIELD_SIZE));
-    const plain = allocateSlots(byConf, INTL_FIELD_SIZE, contenders);
-    const floored = allocateSlots(byConf, INTL_FIELD_SIZE, contenders, { groupTarget: INTL_QUAL_GROUP_TARGET });
-    expect([...floored]).toEqual([...plain]);
+  it("follows the real quotas when every confederation has nations to spare", () => {
+    // Each confederation well over twice its quota, so no cap binds.
+    const byConf = new Map<Confederation, string[]>([
+      ["Europe", nations("E", 40)], ["South America", nations("S", 14)], ["Africa", nations("A", 16)],
+      ["Asia", nations("As", 14)], ["North America", nations("N", 12)], ["Oceania", nations("O", 3)],
+    ]);
+    for (const size of WORLD_CUP_SIZES) {
+      const quotas = CONFEDERATION_QUOTAS[size];
+      const weight = Object.values(quotas).reduce((a, b) => a + b, 0);
+      const alloc = allocateByQuota(byConf, size, INTL_QUAL_GROUP_MAX);
+      expect(total(alloc)).toBe(size);
+      for (const [conf, places] of alloc) {
+        const target = (quotas[conf] / weight) * size;
+        const floor = Math.ceil(byConf.get(conf)!.length / INTL_QUAL_GROUP_MAX);
+        // Within a place of the quota, unless the group floor lifts it.
+        expect(places).toBeLessThanOrEqual(Math.max(Math.ceil(target) + 1, floor));
+        expect(places).toBeGreaterThanOrEqual(Math.min(Math.floor(target) - 1, floor));
+      }
+    }
+  });
+
+  it("never sends more than two thirds of a confederation while the field allows it", () => {
+    const alloc = allocateByQuota(matureWorld(), 32, INTL_QUAL_GROUP_MAX);
+    for (const [conf, ns] of matureWorld()) {
+      expect(alloc.get(conf)!).toBeLessThanOrEqual(Math.max(1, Math.floor(ns.length * QUOTA_MAX_SHARE_OF_ENTRANTS)));
+    }
+  });
+
+  it("loosens the caps evenly when the field is too big for them", () => {
+    // Caps total 46 against 48 places: two confederations must go over.
+    const alloc = allocateByQuota(matureWorld(), 48, INTL_QUAL_GROUP_MAX);
+    expect(total(alloc)).toBe(48);
+    for (const [conf, ns] of matureWorld()) expect(alloc.get(conf)!).toBeLessThanOrEqual(ns.length);
+  });
+
+  it("is not strength-weighted: which nations are strong does not move a place", () => {
+    // The same counts in a different order (i.e. different nations strongest)
+    // must share places identically.
+    const reversed = new Map([...matureWorld()].map(([c, ns]) => [c, [...ns].reverse()]));
+    expect([...allocateByQuota(reversed, 32, INTL_QUAL_GROUP_MAX)])
+      .toEqual([...allocateByQuota(matureWorld(), 32, INTL_QUAL_GROUP_MAX)]);
   });
 
   it("falls back to nation counts when the floors alone overrun the field", () => {
@@ -121,8 +160,8 @@ describe("allocateSlots' per-group floor", () => {
       ["Europe", nations("E", 60)],
       ["Africa", nations("A", 60)],
     ]);
-    // Floors would be 12 + 12 against 16 places.
-    const alloc = allocateSlots(byConf, 16, new Set(), { groupTarget: INTL_QUAL_GROUP_TARGET });
+    // Floors would be 9 + 9 against 16 places.
+    const alloc = allocateByQuota(byConf, 16, INTL_QUAL_GROUP_MAX);
     expect(alloc.get("Europe")).toBe(8);
     expect(alloc.get("Africa")).toBe(8);
   });

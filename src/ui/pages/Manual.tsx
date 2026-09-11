@@ -1303,12 +1303,17 @@ export function Manual() {
           <p>
             Every nation with enough players in the world enters qualifying. They're split into
             groups by confederation and play a long home-and-away campaign spread over the three
-            qualifying offseasons, and the number of places each confederation gets depends on how
-            many genuinely strong nations it has, so the ones who make it are a believable field
-            rather than whoever happens to be nearby. Every confederation still gets at least one
-            place for each qualifying group it's drawn into, so no group is ever bigger than about
-            seven nations and every group winner goes through. Knockout ties level after extra time
-            go to a shootout, exactly like the Continental Cup.
+            qualifying offseasons. Places are shared out between confederations the way FIFA does
+            it, by quota rather than by who happens to be strong right now. The quotas come from
+            the real World Cup of the same size: a 16-nation one uses the 1974 split, 24 uses 1986,
+            32 uses the 1998-2022 split and 48 uses 2026's. Because this world has far more European
+            nations than anywhere else, two things bend them to fit. No confederation sends more
+            than two thirds of its nations (South America's real share, the highest there is), so
+            qualifying means something everywhere. And every confederation gets at least one place
+            for every seven nations it enters, so no group is bigger than seven and every group
+            winner goes through. The places a cap frees up go to the confederations with nations to
+            spare, still in quota proportion. Knockout ties level after extra time go to a shootout,
+            exactly like the Continental Cup.
           </p>
           <p>
             <strong>How big the World Cup is</strong> is up to you. Pick it when you start a save,

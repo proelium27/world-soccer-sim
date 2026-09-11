@@ -2,13 +2,13 @@ import type { Player } from "../players/types.js";
 import type { IntlGroup, IntlQualifyingCampaign, NationSquad } from "./types.js";
 import type { CareerDelta } from "./simIntl.js";
 import { buildSquads, nationMatchData } from "./squads.js";
-import { groupByConfederation, allocateSlots } from "./confederations.js";
+import { groupByConfederation, allocateSlots, allocateByQuota } from "./confederations.js";
 import { buildGroup, serpentineGroups, groupTable, rankAcrossGroups, type GroupRow } from "./groups.js";
 import { playGroups, emptyCareerDelta, mergeCareerDelta, QUALIFYING_GROUP_STREAM } from "./simIntl.js";
 import { hashInts } from "../../engine/rng.js";
 import { resolveWorldCupSize } from "./format.js";
 import {
-  INTL_FIELD_SIZE, INTL_QUAL_GROUP_TARGET, INTL_QUAL_LEGS, type WorldCupSize,
+  INTL_FIELD_SIZE, INTL_QUAL_GROUP_TARGET, INTL_QUAL_GROUP_MAX, INTL_QUAL_LEGS, type WorldCupSize,
 } from "../constants.js";
 
 /**
@@ -108,16 +108,14 @@ function planQualifying(campaign: QualifyingSource): {
 type QualifyingSource = Pick<IntlQualifyingCampaign, "nations" | "fieldSize" | "places">;
 
 /**
- * The places each confederation plays for in a campaign being drawn now. A
- * confederation's pull comes from how many genuinely competitive nations it
- * holds (the contender set is the world's strongest `fieldSize`), and it is
- * guaranteed one place per qualifying group on top — see AllocationOptions.
+ * The places each confederation plays for in a campaign being drawn now: the
+ * real World Cup's confederation quotas for this size, capped so qualifying
+ * means something everywhere and floored so no group outgrows INTL_QUAL_GROUP_MAX —
+ * see allocateByQuota.
  */
 function allocatePlaces(nations: string[], fieldSize: number): Record<string, number> {
   const byConfederation = groupByConfederation(nations);
-  const contenders = new Set(nations.slice(0, fieldSize));
-  const slots = allocateSlots(byConfederation, fieldSize, contenders, { groupTarget: INTL_QUAL_GROUP_TARGET });
-  return Object.fromEntries(slots);
+  return Object.fromEntries(allocateByQuota(byConfederation, fieldSize, INTL_QUAL_GROUP_MAX));
 }
 
 /** What one confederation is playing for, all of it fixed at the draw. */

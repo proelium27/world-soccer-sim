@@ -307,89 +307,15 @@ export function groupByConfederation(nations: string[]): Map<Confederation, stri
  * nations; places freed by that cap go to the largest remainders. Pure function
  * of the inputs, so it needs no rng and is stable for a given world.
  *
- * With `opts.groupTarget` a confederation is also guaranteed a place for every
- * qualifying group it will be drawn into, so no group ever plays for less than
- * its winner's place — see AllocationOptions.
+ * NO LONGER HOW A NEW CAMPAIGN IS ALLOCATED (2026-09-11): that is
+ * allocateByQuota, below. This stays because a qualifying campaign drawn
+ * before campaigns recorded their own allocation replays it — see
+ * planQualifying.
  */
 export function allocateSlots(
   byConfederation: Map<Confederation, string[]>,
   slots: number,
   contenders: ReadonlySet<string> = new Set(),
-  opts: AllocationOptions = {},
-): Map<Confederation, number> {
-  const base = allocateByStrength(byConfederation, slots, contenders);
-  if (opts.groupTarget === undefined) return base;
-  return raiseToGroupFloors(byConfederation, slots, base, opts.groupTarget);
-}
-
-export interface AllocationOptions {
-  /**
-   * Guarantee each confederation one place per this many nations (rounded, and
-   * at least one) — i.e. one place per qualifying group, since the draw splits
-   * a confederation into groups of about this size and never makes more groups
-   * than it has places (see groupCountFor in qualifying.ts).
-   *
-   * Without it the strength weighting alone can hand a confederation of nine
-   * nations a single place, and the draw then has no choice but to put all
-   * nine in one group and play it three times over: 24 games each for one
-   * spot, measured in a real save (2026-09-11). Pass INTL_QUAL_GROUP_TARGET.
-   * Omitted, the allocation is exactly what it always was — which is what a
-   * qualifying campaign drawn before this existed replays against.
-   */
-  groupTarget?: number;
-}
-
-/**
- * The per-group floor applied as a MINIMUM on top of the strength allocation,
- * not as places reserved ahead of it. Reserving them first would take places
- * out of the proportional pool on every world, including the default one where
- * no confederation is anywhere near its floor (Europe's six against the
- * eighteen it earns) — silently reshuffling every save's qualifying. As a
- * minimum it changes nothing until a floor actually binds, and then only moves
- * the places that binding needs, each taken from whichever confederation holds
- * the most above its own floor.
- *
- * A world with so many nations that the floors alone overrun the field can't
- * guarantee every group its winner; there the places go by nation count
- * instead, which keeps every confederation's groups about the same size.
- */
-function raiseToGroupFloors(
-  byConfederation: Map<Confederation, string[]>,
-  slots: number,
-  base: Map<Confederation, number>,
-  groupTarget: number,
-): Map<Confederation, number> {
-  const floors = new Map<Confederation, number>();
-  for (const [conf, nations] of byConfederation) {
-    if (nations.length === 0) continue;
-    floors.set(conf, Math.min(nations.length, Math.max(1, Math.round(nations.length / groupTarget))));
-  }
-  const floorTotal = [...floors.values()].reduce((a, b) => a + b, 0);
-  if (floorTotal > slots) return allocateByStrength(byConfederation, slots, new Set());
-
-  const out = new Map(base);
-  const floorOf = (conf: Confederation) => floors.get(conf) ?? 0;
-  const confs = [...floors.keys()].sort((a, b) => a.localeCompare(b));
-  for (const conf of confs) {
-    while ((out.get(conf) ?? 0) < floorOf(conf)) {
-      const donor = confs
-        .filter((c) => c !== conf && (out.get(c) ?? 0) > floorOf(c))
-        .sort((a, b) =>
-          ((out.get(b) ?? 0) - floorOf(b)) - ((out.get(a) ?? 0) - floorOf(a)) || a.localeCompare(b),
-        )[0];
-      if (!donor) break; // unreachable: floorTotal <= slots and base sums to slots
-      out.set(donor, out.get(donor)! - 1);
-      out.set(conf, (out.get(conf) ?? 0) + 1);
-    }
-  }
-  return out;
-}
-
-/** The strength-weighted allocation — see allocateSlots. */
-function allocateByStrength(
-  byConfederation: Map<Confederation, string[]>,
-  slots: number,
-  contenders: ReadonlySet<string>,
 ): Map<Confederation, number> {
   const entries = [...byConfederation.entries()].filter(([, ns]) => ns.length > 0);
   const out = new Map<Confederation, number>();
@@ -437,6 +363,120 @@ function allocateByStrength(
     if (remaining === before) break; // every confederation is at its cap
   }
 
+  return out;
+}
+
+/**
+ * How the real World Cup of each size shared its places between the six
+ * confederations, used as WEIGHTS rather than counts (they are normalised, so a
+ * row need not sum to its size). Each size takes the allocation of the era that
+ * really played that format:
+ *
+ *  - 16: 1974. UEFA 9 (the hosts among them), CONMEBOL 4 (the holders among
+ *    them), CONCACAF 1, CAF 1, and one place for Asia and Oceania together,
+ *    which went to Australia.
+ *  - 24: 1986. UEFA 14, CONMEBOL 4, CAF 2, AFC 2, CONCACAF 2 with the hosts,
+ *    and Oceania's half place in a playoff it lost.
+ *  - 32: the 1998-2022 quotas. UEFA 13, CAF 5, AFC 4.5, CONMEBOL 4.5, CONCACAF
+ *    3.5, OFC 0.5, the halves being intercontinental playoffs. The host's place
+ *    is left out: the game has no host, and a rotating one averages to noise.
+ *  - 48: 2026. UEFA 16, CAF 9, AFC 8, CONMEBOL 6, CONCACAF 6 with its three
+ *    hosts, OFC 1, and the six-team intercontinental playoff for two places
+ *    shared a third each (one side each for AFC, CAF, CONMEBOL and OFC, two for
+ *    CONCACAF).
+ *
+ * The point of weights over counts is that this world's confederations are not
+ * real football's size: almost every player is generated from a European
+ * league's nationality table, so a default world fields ~31 European nations
+ * but only ~6 Asian and ~4 North American ones. See allocateByQuota for how the
+ * quotas bend to that.
+ */
+export const CONFEDERATION_QUOTAS: Record<number, Record<Confederation, number>> = {
+  16: { "Europe": 9, "South America": 4, "Africa": 1, "Asia": 0.75, "North America": 1, "Oceania": 0.25 },
+  24: { "Europe": 14, "South America": 4, "Africa": 2, "Asia": 2, "North America": 2, "Oceania": 0.5 },
+  32: { "Europe": 13, "South America": 4.5, "Africa": 5, "Asia": 4.5, "North America": 3.5, "Oceania": 0.5 },
+  48: { "Europe": 16, "South America": 6.33, "Africa": 9.33, "Asia": 8.33, "North America": 6.67, "Oceania": 1.33 },
+};
+
+/**
+ * The most of its own entrants a confederation may send, before the field is
+ * too big for the world to allow it. Two thirds is CONMEBOL's real share
+ * (6.33 of its 10 at the 2026 World Cup), the highest any confederation has.
+ * Without it a quota meant for real football's 46 Asian nations lands on this
+ * world's 6 and sends all of them, which is no qualifying at all.
+ */
+export const QUOTA_MAX_SHARE_OF_ENTRANTS = 2 / 3;
+
+/**
+ * Share `slots` World Cup places between confederations the way FIFA does: by
+ * a fixed quota for each (CONFEDERATION_QUOTAS, the real allocation for a World
+ * Cup of this size), bent to fit the nations this world actually has. Team
+ * strength plays no part, deliberately — real quotas are set in advance and a
+ * confederation keeps its places through a bad cycle. It replaced
+ * allocateSlots, which dealt places by how many of the world's strongest
+ * nations each confederation held; that filled the World Cup with the best
+ * teams and made qualifying outside Europe a formality or a lockout, neither of
+ * which is how the real thing reads.
+ *
+ * In order:
+ *  1. Caps. No confederation sends more than QUOTA_MAX_SHARE_OF_ENTRANTS of its
+ *     entrants (at least one). When the caps together can't fill the field —
+ *     a 48-nation World Cup in a thin world — they are raised one place at a
+ *     time, always for the confederation sending the smallest share, so the
+ *     slack is shared out evenly rather than landing on one.
+ *  2. Floors. Every confederation gets one place per `maxGroup` nations
+ *     (rounded up), since the draw never makes more groups than places: that
+ *     is what keeps a qualifying group from growing past `maxGroup` nations.
+ *     The bug this began with was nine nations on one place, drawn into one
+ *     group and played three times, 24 games each. A world so big the floors
+ *     overrun the field falls back to sharing by nation count.
+ *  3. The rest by quota, Sainte-Laguë: each place goes to the confederation
+ *     with the highest quota / (2 x places + 1) that is still under its cap —
+ *     the standard proportional method, with no bias toward big or small.
+ *
+ * Pure and rng-free, so it is stable for a given world.
+ */
+export function allocateByQuota(
+  byConfederation: Map<Confederation, string[]>,
+  slots: number,
+  maxGroup: number,
+  quotas: Record<Confederation, number> = CONFEDERATION_QUOTAS[slots] ?? CONFEDERATION_QUOTAS[32],
+): Map<Confederation, number> {
+  const confs = [...byConfederation.entries()]
+    .filter(([, ns]) => ns.length > 0)
+    .map(([conf, ns]) => ({ conf, nations: ns.length, quota: quotas[conf] ?? 0 }));
+  if (confs.length === 0) return new Map();
+  // More confederations than places: the legacy rule already handles it.
+  if (confs.length >= slots) return allocateSlots(byConfederation, slots);
+
+  const cap = new Map(confs.map((c) => [
+    c.conf, Math.min(c.nations, Math.max(1, Math.floor(c.nations * QUOTA_MAX_SHARE_OF_ENTRANTS))),
+  ]));
+  const capTotal = () => [...cap.values()].reduce((a, b) => a + b, 0);
+  while (capTotal() < slots) {
+    const open = confs.filter((c) => cap.get(c.conf)! < c.nations);
+    if (open.length === 0) break; // fewer nations than places; the caller never asks this
+    open.sort((a, b) =>
+      cap.get(a.conf)! / a.nations - cap.get(b.conf)! / b.nations
+      || b.quota - a.quota || a.conf.localeCompare(b.conf));
+    cap.set(open[0].conf, cap.get(open[0].conf)! + 1);
+  }
+
+  const out = new Map(confs.map((c) => [
+    c.conf, Math.min(cap.get(c.conf)!, Math.max(1, Math.ceil(c.nations / maxGroup))),
+  ]));
+  const given = () => [...out.values()].reduce((a, b) => a + b, 0);
+  if (given() > slots) return allocateSlots(byConfederation, slots);
+
+  while (given() < slots) {
+    const next = confs
+      .filter((c) => out.get(c.conf)! < cap.get(c.conf)!)
+      .sort((a, b) =>
+        b.quota / (2 * out.get(b.conf)! + 1) - a.quota / (2 * out.get(a.conf)! + 1)
+        || b.nations - a.nations || a.conf.localeCompare(b.conf))[0];
+    if (!next) break; // every cap met; cannot happen once the caps cover the field
+    out.set(next.conf, out.get(next.conf)! + 1);
+  }
   return out;
 }
 
