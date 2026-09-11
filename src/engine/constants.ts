@@ -351,15 +351,25 @@ export const INJURY_PROB_ON_TACKLE = 0.003;
 // See simMatchDetailed's celebration note for why those two must stay paired.
 export const HALF_SECONDS = MATCH_SECONDS / 2;
 export const STOPPAGE_MIN_SECONDS_PER_HALF = 60; // 1 minute floor, per spec
-// 8 minutes. Was 5 ("per spec"), and on its own that raise is very nearly inert:
-// at 20s an event a half needs 12+ notable events to have reached the old cap,
-// which is rare. It was raised FOR the celebration credit above, which routinely
-// adds two minutes to a half that saw two goals and would otherwise be clipped —
-// and a clipped credit is not a cosmetic loss, it is playing time deleted from
-// exactly the halves that were most eventful, i.e. a quiet negative feedback on
-// scoring. Modern top-flight halves genuinely run this long.
-export const STOPPAGE_MAX_SECONDS_PER_HALF = 480;
+// 5 minutes, "per spec" — and still exactly that for the composite-only
+// `simMatch`, which is the M1 benchmark path and must not move. See
+// STOPPAGE_BOARD_MAX_SECONDS for the detailed engine's own cap.
+export const STOPPAGE_MAX_SECONDS_PER_HALF = 300;
 export const STOPPAGE_SECONDS_PER_EVENT = 20;
+// The detailed engine's cap on one half's board: 8 minutes. On its own the raise
+// from 5 is very nearly inert — at 20s an event a half needs 12+ notable events
+// to reach 300 — and it exists FOR the celebration credit, which routinely adds
+// two minutes to a half that saw two goals. A clipped credit is not a cosmetic
+// loss: it is playing time deleted from exactly the most eventful halves, a quiet
+// negative feedback on scoring. Modern top-flight halves genuinely run this long.
+//
+// A SEPARATE constant, not a retune of the one above, and that is load-bearing:
+// the first cut of this change raised STOPPAGE_MAX_SECONDS_PER_HALF itself and
+// rounded inside the shared `computeStoppageSeconds`, which leaked straight into
+// `simMatch` and moved its golden snapshot — while the code, the commit and
+// CLAUDE.md all said simMatch was untouched. CI caught it; no local run did,
+// because test/matchSim.test.ts sits outside every directory that was run.
+export const STOPPAGE_BOARD_MAX_SECONDS = 480;
 
 // How long the ball is out of play after a goal: the celebration, the walk back,
 // the restart. Drawn per goal on the MAIN rng, because it is a real quantity

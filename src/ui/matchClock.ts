@@ -35,7 +35,7 @@ export const HALF_TIME_MINUTE = REGULATION_MINUTES / 2;
  * The whole minutes a stoppage board shows.
  *
  * The engine already rounds a period's stoppage to a whole minute (see
- * `computeStoppageSeconds`), so this is a conversion rather than a rounding —
+ * `stoppageBoardSeconds`), so this is a conversion rather than a rounding —
  * but it is written to round anyway, because `undefined` has to mean 0 and
  * because a hand-built fixture should not be able to produce a fractional half.
  */

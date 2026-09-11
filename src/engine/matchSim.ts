@@ -52,6 +52,7 @@ import {
   STOPPAGE_MIN_SECONDS_PER_HALF,
   STOPPAGE_MAX_SECONDS_PER_HALF,
   STOPPAGE_SECONDS_PER_EVENT,
+  STOPPAGE_BOARD_MAX_SECONDS,
   GOAL_RESTART_MIN_SECONDS,
   GOAL_RESTART_MAX_SECONDS,
 } from "./constants.js";
@@ -110,27 +111,40 @@ export const clamp = (x: number, lo = 0, hi = 1): number =>
   Math.max(lo, Math.min(hi, x));
 
 /**
- * How long a half's stoppage runs: a floor, plus a flat allowance per notable
- * event, plus the clock genuinely consumed by goal celebrations in that half.
+ * The composite-only `simMatch`'s stoppage for one half: 1-5 minutes, weighted
+ * by that half's notable-event count, per spec §5.
  *
- * `secondsLost` defaults to 0 so the composite-only `simMatch` — which has no
- * player identity, no celebrations and no box score anyone reads — keeps
- * calling this exactly as it did. It is the M1 benchmark path, and moving it
- * would retune spec gates for no player-visible gain (same call
- * RED_GIVEN_FOUL_SIMPLE already makes).
+ * UNCHANGED, deliberately and exactly. `simMatch` is the M1 benchmark path, has
+ * no box score anyone reads, and moving it would retune spec gates for no
+ * player-visible gain — the same call RED_GIVEN_FOUL_SIMPLE makes. The detailed
+ * engine has its own board (`stoppageBoardSeconds`) rather than a parameter on
+ * this one, because a shared function is exactly how the first cut of the
+ * half-time rework leaked into this path and moved its golden snapshot.
  */
-export function computeStoppageSeconds(eventCount: number, secondsLost = 0): number {
-  const raw = clamp(
-    STOPPAGE_MIN_SECONDS_PER_HALF + eventCount * STOPPAGE_SECONDS_PER_EVENT + secondsLost,
+export function computeStoppageSeconds(eventCount: number): number {
+  return clamp(
+    STOPPAGE_MIN_SECONDS_PER_HALF + eventCount * STOPPAGE_SECONDS_PER_EVENT,
     STOPPAGE_MIN_SECONDS_PER_HALF,
     STOPPAGE_MAX_SECONDS_PER_HALF,
   );
-  // WHOLE MINUTES, because a fourth official holds up a board with an integer on
-  // it — and because the display depends on it. The playback timeline is indexed
-  // by minute, so a half ending 2.5 minutes into stoppage would leave the second
-  // half's minutes straddling the break and nothing could label 45+3 or 46
-  // exactly. Both bounds are already whole minutes, so rounding cannot leave the
-  // clamped range.
+}
+
+/**
+ * The detailed engine's board for one half: a floor, a flat allowance per
+ * notable event, and the clock the half genuinely lost to goal celebrations.
+ *
+ * WHOLE MINUTES, because a fourth official holds up a board with an integer on
+ * it — and because the display depends on it. The playback timeline is indexed
+ * by minute, so a half ending 2.5 minutes into stoppage would leave the second
+ * half's minutes straddling the break and nothing could label 45+3 or 46 exactly.
+ * Both bounds are whole minutes, so rounding cannot leave the clamped range.
+ */
+export function stoppageBoardSeconds(eventCount: number, secondsLost: number): number {
+  const raw = clamp(
+    STOPPAGE_MIN_SECONDS_PER_HALF + eventCount * STOPPAGE_SECONDS_PER_EVENT + secondsLost,
+    STOPPAGE_MIN_SECONDS_PER_HALF,
+    STOPPAGE_BOARD_MAX_SECONDS,
+  );
   return Math.round(raw / 60) * 60;
 }
 
@@ -592,7 +606,7 @@ export function simMatchDetailed(
    */
   /** Put this period's board up (or revise it), always on a whole minute. */
   const showBoard = () => {
-    const stoppage = computeStoppageSeconds(periodEvents, periodSecondsLost);
+    const stoppage = stoppageBoardSeconds(periodEvents, periodSecondsLost);
     periodEndClock = regulationEndClock - stoppage;
     if (period === 1) firstHalfStoppage = stoppage;
   };
