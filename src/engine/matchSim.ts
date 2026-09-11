@@ -1140,6 +1140,8 @@ export function simMatchDetailed(
         }
         events.push({ clock, type: eventTypeFromShot(outcome), side: poss, pids: [shooter.pid] });
         if (outcome === "goal") {
+          // Bumps as well as celebrating; see the open-play goal for why that is
+          // not the double-count it looks like.
           bumpEvent();
           stat[poss].goals++;
           shooterLine.goals++;
@@ -1180,6 +1182,14 @@ export function simMatchDetailed(
     const pids = [shooter.pid];
 
     if (outcome === "goal") {
+      // A goal bumps like any other notable event AND pays its celebration. That
+      // reads like double-counting and was removed on exactly that reasoning,
+      // then measured and put back: dropping it buys 24 seconds of displayed
+      // stoppage and deletes 1.1% of the match's football (shots/match -0.3% ->
+      // -1.1% against the merge base), because on the old model a goal credited
+      // 20s and cost nothing, so those seconds were part of the scoring
+      // calibration. The flat allowance is not "celebration time" — it is the
+      // regrouping and the walk back that follow one.
       bumpEvent();
       stat[poss].goals++;
       shooterLine.goals++;

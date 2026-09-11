@@ -61,13 +61,25 @@ describe("neutral venue", () => {
     // With the bonus, two identical sides are not identical: home outscores away.
     expect(normal.home).toBeGreaterThan(normal.away);
 
-    // Without it they are, so whatever edge is left is sampling noise. The gap
-    // must be a fraction of the one the bonus produces — asserted relative to
-    // that gap rather than as a fixed number, so a retune of
-    // HOME_ATTACK_BONUS moves both sides of the comparison together.
-    const normalGap = normal.home - normal.away;
-    const neutralGap = Math.abs(neutral.home - neutral.away);
-    expect(neutralGap).toBeLessThan(normalGap / 2);
+    /**
+     * Taking the bonus away moves the home SHARE of the goals down.
+     *
+     * Deliberately a one-sided comparison of the quantity the flag changes,
+     * rather than the old `neutralGap < normalGap / 2`. That form compared one
+     * noisy sum against half of another noisy sum, and the residual it bounded is
+     * centred on zero — so its sampling error was most of its value. Measured on
+     * one tree it passed at 400 matches, FAILED at 1200 and passed again at 3000,
+     * with the residual wandering 15 -> 103 -> 8; and the denominator is itself a
+     * small number (an 11-goal bonus gap over 400 matches on `origin/main`),
+     * which leaves the bar nearly at zero exactly when the sample is unluckiest.
+     *
+     * A share moves both halves of the comparison together, so the noise largely
+     * divides out. Verified to pass at 400/800/1200/2000 matches on BOTH
+     * `origin/main` and this branch before being adopted — see
+     * `scripts/homeEdgeProbe.ts`, which prints both forms.
+     */
+    const homeShare = (r: { home: number; away: number }) => r.home / (r.home + r.away);
+    expect(homeShare(neutral)).toBeLessThan(homeShare(normal));
   });
 
   it("leaves every ordinary match bit-identical, since the flag is off by default", () => {

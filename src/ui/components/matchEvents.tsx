@@ -10,7 +10,7 @@
  */
 import { Link } from "react-router-dom";
 import type { MatchEvent, MatchEventType } from "../../engine/attribution.js";
-import { formatClock } from "../matchClock.js";
+import { formatClock, type PeriodMarker } from "../matchClock.js";
 
 /* ---------------------------------------------------------------------------
    Icons
@@ -299,6 +299,30 @@ export function TimelineRow({
         </span>
       </div>
       <div className="bs-ev-cell bs-ev-cell--away">{event.side === "away" && cell}</div>
+    </div>
+  );
+}
+
+/**
+ * A beat of the clock rather than something a player did: the fourth official's
+ * board, half time, full time.
+ *
+ * Spans the timeline instead of picking a column, because it belongs to neither
+ * club — which is also what makes it read as punctuation between the two halves
+ * rather than as another event in the list.
+ */
+export function TimelineMarkerRow({ marker }: { marker: PeriodMarker }) {
+  const text =
+    marker.addedMinutes === undefined
+      ? marker.label
+      : `${marker.addedMinutes} ${marker.addedMinutes === 1 ? "minute" : "minutes"} added`;
+  return (
+    <div className="bs-ev bs-ev--marker">
+      <div className="bs-ev-marker">
+        <span className="bs-ev-marker-rule" aria-hidden="true" />
+        <span className="bs-ev-marker-text">{text}</span>
+        <span className="bs-ev-marker-rule" aria-hidden="true" />
+      </div>
     </div>
   );
 }

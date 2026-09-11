@@ -8,7 +8,8 @@ import type { PlayerMatchLine } from "../../engine/attribution.js";
 import { Flag } from "../components/Flag.js";
 import { ClubCrest } from "../components/ClubCrest.js";
 import { BackLink } from "../components/BackLink.js";
-import { KEY_EVENTS, TimelineRow } from "../components/matchEvents.js";
+import { KEY_EVENTS, TimelineRow, TimelineMarkerRow } from "../components/matchEvents.js";
+import { matchTimeline, periodMarkers } from "../matchClock.js";
 
 
 function ratingClass(rating: number): string {
@@ -287,11 +288,16 @@ export function BoxScore() {
   const motm = manOfTheMatch(match);
   const motmIsHome = motm ? home.some((l) => l.pid === motm.pid) : false;
 
-  const events = match.boxScore.events
-    .filter((e) => e.type !== "turnover")
-    .filter((e) => showAllEvents || KEY_EVENTS.has(e.type))
-    // The clock counts down, so descending clock is chronological order.
-    .sort((a, b) => b.clock - a.clock);
+  const firstHalfStoppage = match.boxScore.firstHalfStoppage;
+  // Events and the clock's own beats — the board, half time, full time — as one
+  // chronological list. The markers are derived from the box score's own numbers
+  // rather than stored, so they read correctly on saves that predate them.
+  const timeline = matchTimeline(
+    match.boxScore.events
+      .filter((e) => e.type !== "turnover")
+      .filter((e) => showAllEvents || KEY_EVENTS.has(e.type)),
+    periodMarkers(firstHalfStoppage, match.boxScore.finalClock),
+  );
 
   return (
     <div className="container-fluid p-3 bs-page">
@@ -407,10 +413,21 @@ export function BoxScore() {
       </div>
 
       <div className="bs-timeline">
-        {events.length === 0 ? (
+        {timeline.every((i) => i.kind === "marker") ? (
           <p className="text-muted mb-0 p-3">Nothing worth reporting happened.</p>
         ) : (
-          events.map((e, i) => <TimelineRow key={i} event={e} playerName={playerName} />)
+          timeline.map((item, i) =>
+            item.kind === "marker" ? (
+              <TimelineMarkerRow key={i} marker={item.marker} />
+            ) : (
+              <TimelineRow
+                key={i}
+                event={item.event}
+                playerName={playerName}
+                firstHalfStoppage={firstHalfStoppage}
+              />
+            ),
+          )
         )}
       </div>
     </div>

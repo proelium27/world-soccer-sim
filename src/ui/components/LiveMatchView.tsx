@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { StoredTeam } from "../../core/teams/clubs.js";
 import { ClubCrest } from "./ClubCrest.js";
-import { eventSummary, KEY_EVENTS, TimelineRow } from "./matchEvents.js";
+import { eventSummary, KEY_EVENTS, TimelineRow, TimelineMarkerRow } from "./matchEvents.js";
+import { halfTimeMinute, matchMinuteLabel, matchTimeline, periodMarkers } from "../matchClock.js";
 import { SPEEDS, useMatchPlayback } from "../live/useMatchPlayback.js";
 import type { MatchLineups, SideLineup } from "../live/lineups.js";
 import { liveMatchState } from "../live/liveRatings.js";
@@ -11,7 +12,6 @@ import { useMediaQuery } from "../useIsMobile.js";
 import {
   eventMinute,
   eventsThrough,
-  HALF_TIME_MINUTE,
   scoreAtMinute,
   scoresAtMinute,
   statsAtMinute,
@@ -142,6 +142,7 @@ function SubList({
   lineup,
   playerName,
   minute,
+  firstHalfStoppage,
 }: {
   tid: number;
   name: string;
@@ -150,6 +151,8 @@ function SubList({
   playerName: (pid: number) => string;
   /** Subs are revealed as they are made, so the list tracks the match being watched. */
   minute: number;
+  /** See matchClock.ts — what makes a substitution at the break read 45+2. */
+  firstHalfStoppage?: number;
 }) {
   const subs = lineup.subs.filter((s) => s.minute <= minute);
   return (
@@ -167,7 +170,9 @@ function SubList({
           <ul className="live-sheet-list live-sheet-list--subs">
             {subs.map((s) => (
               <li key={s.on}>
-                <span className="live-sheet-slot stat-num">{s.minute}&apos;</span>
+                <span className="live-sheet-slot stat-num">
+                  {matchMinuteLabel(s.minute, firstHalfStoppage)}
+                </span>
                 <span>
                   <Link to={`/player/${s.on}`}>{playerName(s.on)}</Link>{" "}
                   <span className="live-sheet-for">for {playerName(s.off)}</span>
@@ -195,9 +200,14 @@ export function LiveMatchView({
   skipLabel,
 }: LiveMatchViewProps) {
   const [showAllEvents, setShowAllEvents] = useState(true);
+  // The clock on the wall is not the minute playback is on: a minute past 45 in
+  // the first half reads 45+2, and the second half discounts the stoppage
+  // already played. One number bridges them. See matchClock.ts.
+  const h1 = match.firstHalfStoppage;
   const playback = useMatchPlayback(match.events, {
     autoStart: true,
     finalClock: match.finalClock,
+    firstHalfStoppage: h1,
   });
   const { minute, finished } = playback;
 
@@ -239,13 +249,20 @@ export function LiveMatchView({
   // an auto-scroll. The box score's own timeline stays oldest-first, since a
   // finished match reads as a story from kickoff.
   const shown = eventsThrough(match.events, minute).filter((e) => e.type !== "turnover");
-  const feed = shown.filter((e) => showAllEvents || KEY_EVENTS.has(e.type)).reverse();
+  const feed = matchTimeline(
+    shown.filter((e) => showAllEvents || KEY_EVENTS.has(e.type)),
+    periodMarkers(h1, match.finalClock),
+    minute,
+  ).reverse();
 
   const rail = scoresAtMinute(otherMatches, minute);
   const table = tableAtMinute ? tableAtMinute(minute) : null;
 
-  const clockLabel = minute === 0 ? "Kickoff" : finished ? "Full time" : `${minute}'`;
-  const atHalfTime = minute === HALF_TIME_MINUTE && !finished;
+  const clockLabel =
+    minute === 0 ? "Kickoff" : finished ? "Full time" : matchMinuteLabel(minute, h1);
+  // The break falls at the END of first-half stoppage, so it is minute 48 of
+  // football when three were added — not minute 45.
+  const atHalfTime = minute === halfTimeMinute(h1) && !finished;
 
   /**
    * What a screen reader hears as the match runs.
@@ -262,7 +279,7 @@ export function LiveMatchView({
   const announcement = finished
     ? `Full time. ${nameOf(match.home)} ${score.home}, ${nameOf(match.away)} ${score.away}.`
     : latestIsNow
-      ? `${eventSummary(latest, playerName, clubOfSide(latest.side))} ${score.home}-${score.away}.`
+      ? `${eventSummary(latest, playerName, clubOfSide(latest.side), h1)} ${score.home}-${score.away}.`
       : "";
 
   return (
@@ -371,14 +388,19 @@ export function LiveMatchView({
                 {minute === 0 ? "Just about to kick off." : "Nothing doing yet."}
               </p>
             ) : (
-              feed.map((e, i) => (
-                <TimelineRow
-                  key={`${e.clock}-${e.type}-${i}`}
-                  event={e}
-                  playerName={playerName}
-                  clubName={clubOfSide(e.side)}
-                />
-              ))
+              feed.map((item, i) =>
+                item.kind === "marker" ? (
+                  <TimelineMarkerRow key={`m-${i}`} marker={item.marker} />
+                ) : (
+                  <TimelineRow
+                    key={`${item.clock}-${item.event.type}-${i}`}
+                    event={item.event}
+                    playerName={playerName}
+                    clubName={clubOfSide(item.event.side)}
+                    firstHalfStoppage={h1}
+                  />
+                ),
+              )
             )}
           </div>
         </section>
@@ -406,6 +428,7 @@ export function LiveMatchView({
                 lineup={lineups.home}
                 playerName={playerName}
                 minute={minute}
+                firstHalfStoppage={h1}
               />
               <SubList
                 tid={match.away}
@@ -414,6 +437,7 @@ export function LiveMatchView({
                 lineup={lineups.away}
                 playerName={playerName}
                 minute={minute}
+                firstHalfStoppage={h1}
               />
             </div>
             <p className="live-lineups-note text-muted small">

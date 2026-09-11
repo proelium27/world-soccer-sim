@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MatchEvent } from "../../engine/attribution.js";
-import { finalMinute, HALF_TIME_MINUTE } from "./liveMatch.js";
+import { finalMinute, halfTimeMinute, HALF_TIME_MINUTE } from "./liveMatch.js";
 
 /**
  * The playback clock for the live match viewer.
@@ -40,8 +40,12 @@ export const SPEEDS: PlaybackSpeed[] = [0.5, 1, 2, 4];
  * *slower* match; half time scales along with everything else, because a break
  * that stayed 2400ms at 0.5x would read as shorter than the minutes around it.
  */
-export function tickDelayMs(minute: number, speed: PlaybackSpeed): number {
-  const base = minute === HALF_TIME_MINUTE ? HALF_TIME_MS : MS_PER_MATCH_MINUTE;
+export function tickDelayMs(
+  minute: number,
+  speed: PlaybackSpeed,
+  breakMinute: number = HALF_TIME_MINUTE,
+): number {
+  const base = minute === breakMinute ? HALF_TIME_MS : MS_PER_MATCH_MINUTE;
   return base / speed;
 }
 
@@ -63,10 +67,14 @@ export interface MatchPlayback {
 
 export function useMatchPlayback(
   events: MatchEvent[],
-  opts: { autoStart?: boolean; finalClock?: number } = {},
+  opts: { autoStart?: boolean; finalClock?: number; firstHalfStoppage?: number } = {},
 ): MatchPlayback {
   const autoStart = opts.autoStart ?? true;
-  const { finalClock } = opts;
+  const { finalClock, firstHalfStoppage } = opts;
+  // The break falls at the END of first-half stoppage — minute 48 of football
+  // when three were added, not minute 45. Holding on 45 instead would pause the
+  // match mid-passage and then run the rest of the half past the break.
+  const breakMinute = halfTimeMinute(firstHalfStoppage);
   // Play to the whistle, not to the last thing that happened — stoppage carries
   // on past the final event, so the old reading stopped the clock short.
   const lastMinute = useMemo(() => finalMinute(events, finalClock), [events, finalClock]);
@@ -88,9 +96,12 @@ export function useMatchPlayback(
     if (!playing || finished) return;
     // setTimeout rather than setInterval so half time can take longer than a
     // normal minute without the interval fighting the change.
-    const timer = setTimeout(() => setMinute((m) => m + 1), tickDelayMs(minute, speed));
+    const timer = setTimeout(
+      () => setMinute((m) => m + 1),
+      tickDelayMs(minute, speed, breakMinute),
+    );
     return () => clearTimeout(timer);
-  }, [playing, finished, minute, speed]);
+  }, [playing, finished, minute, speed, breakMinute]);
 
   const play = useCallback(() => setPlaying(true), []);
   const pause = useCallback(() => setPlaying(false), []);

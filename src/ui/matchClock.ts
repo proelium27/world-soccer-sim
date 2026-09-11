@@ -22,6 +22,7 @@
  * axis than its displayed minute implies, and without it nothing can tell 45+2
  * from 47.
  */
+import type { MatchEvent } from "../engine/attribution.js";
 import { MATCH_SECONDS } from "../engine/constants.js";
 
 /** Regulation length in minutes. Stoppage pushes real matches past this. */
@@ -148,4 +149,44 @@ export function periodMarkers(firstHalfStoppage?: number, finalClock?: number): 
     out.push({ clock: finalClock, minute: eventMinute(finalClock), label: "Full time" });
   }
   return out;
+}
+
+/** One row of a match timeline: something that happened, or a beat of the clock. */
+export type TimelineItem =
+  | { kind: "event"; clock: number; minute: number; event: MatchEvent }
+  | { kind: "marker"; clock: number; minute: number; marker: PeriodMarker };
+
+/**
+ * Events and period markers as one chronological list.
+ *
+ * Markers are appended before sorting and the sort is stable, so a marker shares
+ * its clock with the events of the minute it closes and lands AFTER them — the
+ * board goes up at the end of the 45th minute, not in the middle of it.
+ *
+ * `throughMinute` is what the live viewer passes to reveal the match a minute at
+ * a time; the box score omits it and gets the finished timeline.
+ */
+export function matchTimeline(
+  events: MatchEvent[],
+  markers: PeriodMarker[],
+  throughMinute?: number,
+): TimelineItem[] {
+  const items: TimelineItem[] = [
+    ...events.map((event) => ({
+      kind: "event" as const,
+      clock: event.clock,
+      minute: eventMinute(event.clock),
+      event,
+    })),
+    ...markers.map((marker) => ({
+      kind: "marker" as const,
+      clock: marker.clock,
+      minute: marker.minute,
+      marker,
+    })),
+  ];
+  const visible =
+    throughMinute === undefined ? items : items.filter((i) => i.minute <= throughMinute);
+  // Clock counts down, so descending clock is chronological.
+  return visible.sort((a, b) => b.clock - a.clock);
 }
