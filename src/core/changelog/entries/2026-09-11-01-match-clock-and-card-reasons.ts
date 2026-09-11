@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-10",
+  date: "2026-09-11",
   title: "Halves are real now: 45+2, first-half stoppage, and what the card was for",
   items: [
     "A player wrote in about the live match view. Stoppage time counting 91, 92, 93 instead of 90+1. No first-half stoppage at all. Two goals landing in the same minute. No way to tell what a booking was for. All of that was fair, and most of it turned out to be the same root cause.",
