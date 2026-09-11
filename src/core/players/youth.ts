@@ -184,13 +184,12 @@ export function generateYouthIntake(
   let pid = nextPid;
   for (let i = 0; i < count; i++) {
     const pos = weightedPosition(rng(), cdf);
+    // Deliberately the FLAT base, not a per-group one charged for arriving
+    // young. That was built, measured and abandoned: see `entryGrowthDebt`. The
+    // extra year is paid for in `progressPlayer` instead, which is the only
+    // place the payment cannot be clamped away.
     const p = generatePlayer(
       rng, pos, base, pid++, YOUTH_AGE, season, genSeed, homeCountry, nationalities, model,
-      false,
-      // Per group, and charged for arriving below the age YOUTH_BASE_OFFSET was
-      // swept at. Identical to the flat `base` while YOUTH_AGE is the reference
-      // age, so this is inert until the intake age actually moves.
-      youthGenerationBases(academyBase, YOUTH_AGE, pos, model),
     );
     p.contract.expiresSeason = season + YOUTH_CONTRACT_LENGTH;
     players.push(p);

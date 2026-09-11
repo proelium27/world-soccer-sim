@@ -15,6 +15,7 @@ import {
   RETIREMENT_START_AGE, RETIREMENT_BASE_PROB, RETIREMENT_PROB_PER_YEAR,
   RETIREMENT_ROSTERED_DAMPING, RETIREMENT_UNROSTERED_BASE, RETIREMENT_MAX_PROB,
   RETIREMENT_PROSPECT_POT_THRESHOLD, RETIREMENT_PROSPECT_MAX_AGE,
+  YOUTH_BASE_REFERENCE_AGE,
 } from "../constants.js";
 
 /** Salt distinguishing this hash use from other pid-keyed hashes (e.g. identity rng). */
@@ -248,7 +249,14 @@ export function estimatePotential(
   for (let trial = 0; trial < POTENTIAL_SIM_TRIALS; trial++) {
     let simRatings = ratings;
     let peak = ovr;
-    for (let simAge = age + 1; simAge <= POTENTIAL_SIM_MAX_AGE; simAge++) {
+    // Starts at the reference age, not at `age`, for players below it: nothing
+    // develops before then (see `progressPlayer`), so a 15-year-old's ceiling is
+    // forecast over exactly the years a 16-year-old's is. Without this clamp a
+    // younger intake reads a HIGHER potential purely for having one more
+    // simulated year, which then slides every absolute potential gate in the
+    // game (AI_PROSPECT_MIN_POT, FREE_AGENT_CULL_MAX_POT).
+    const from = Math.max(age, YOUTH_BASE_REFERENCE_AGE);
+    for (let simAge = from + 1; simAge <= POTENTIAL_SIM_MAX_AGE; simAge++) {
       simRatings = stepRatings(rng, profile, simRatings, simAge, pos, 1, pid, heightCm);
       const simOvr = computeOvr(pos, simRatings, heightCm);
       if (simOvr > peak) peak = simOvr;
@@ -315,7 +323,23 @@ export function progressPlayer(
 
   // Every draw above has now been spent. From here on a locked player simply
   // keeps what he already had.
-  const locked = player.ratingsLocked === true;
+  //
+  // `preDevelopment` is the second reason to discard the step, and it is what
+  // makes a `YOUTH_AGE` below `YOUTH_BASE_REFERENCE_AGE` safe. Ratings are
+  // rolled with no age term, so an earlier intake is not a rawer player, it is
+  // the same player handed an extra year on the growth side of the curve —
+  // measured, +5 OVR across the whole world over 20 seasons. Paying for it at
+  // GENERATION does not work: the soft floor and RATING_MIN clamp most of the
+  // reduction away (~0.27 OVR per point of YOUTH_BASE_OFFSET), which is why
+  // three separate generation-side corrections each moved the world by well
+  // under a point. Paying for it here does, because a discarded step is
+  // discarded for every player at every academy regardless of where he starts.
+  //
+  // So he trains, and is scouted, and simply does not develop until the age the
+  // model was calibrated at. Inert while YOUTH_AGE >= YOUTH_BASE_REFERENCE_AGE,
+  // which is what makes this a no-op for a save at the reference age.
+  const preDevelopment = age < YOUTH_BASE_REFERENCE_AGE;
+  const locked = player.ratingsLocked === true || preDevelopment;
   const ratings = locked ? player.ratings : stepped;
   const pos = locked ? player.pos : steppedPos;
   const ovr = locked ? player.ovr : steppedOvr;

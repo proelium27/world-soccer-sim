@@ -1082,17 +1082,44 @@ export const GENERATION_EQUILIBRIUM_LIFT = 0;
 
 
 /**
- * The intake age `YOUTH_BASE_OFFSET` was calibrated at, and the anchor the
- * per-group growth debt is measured against (`entryGrowthDebt`).
+ * THE AGE DEVELOPMENT STARTS AT, and the one thing that lets `YOUTH_AGE` sit
+ * below it without inflating the world.
  *
- * Deliberately its own constant rather than a literal 16 or a reuse of
- * `YOUTH_AGE`: it is a statement about when the anti-inflation sweep was done,
- * not about when intake happens, and the whole point is that the two can now
- * differ. Set it equal to `YOUTH_AGE` and the debt is zero and generation is
- * byte-identical - which is exactly what a save at the reference age gets.
+ * `generatePlayer` rolls ratings with no age term at all — that is the whole
+ * reason `YOUTH_BASE_OFFSET` exists — so taking a player in a year earlier does
+ * not produce a rawer player. It produces the same player handed an extra year
+ * on the growth side of the age curve, and every player in the world with him.
+ * Measured on a 20-season dynasty with no correction: **+5 OVR in every
+ * country**, with weak-league solvency going from 0/625 clubs in deficit to
+ * 8/625 at -£16M.
  *
- * Move this ONLY together with a fresh 40-season sweep of `YOUTH_BASE_OFFSET`,
- * since that is what it names.
+ * **PAYING FOR IT AT GENERATION DOES NOT WORK, AND THREE ATTEMPTS PROVED IT.**
+ * A bigger `YOUTH_BASE_OFFSET` (BIG4 73.7), an extended `BASE_AGE_CURVE` tail
+ * (72.4) and the exact per-group `entryGrowthDebt` (71.9) each left almost all
+ * of a +5.1 gap against a baseline of 68.6. The reason is that a reduction to
+ * the starting level gets clamped away: `softFloorBase` absorbs it at every
+ * academy already on the floor, and `RATING_MIN` absorbs the rest, so one point
+ * of offset buys back only ~0.27 OVR. `scripts/youthAgeDiagnose.ts` settled
+ * which of the two candidate mechanisms it was by reporting every player ALIVE
+ * rather than only the rostered ones: the whole population is better at every
+ * age band (18-20 `40.37 -> 44.72`, 21-23 `53.99 -> 58.61`, 24-26
+ * `65.01 -> 68.68`), so it is development and not selection from a deeper pool
+ * — which also rules out intake VOLUME as the lever, the fix the pool-depth
+ * reading implies.
+ *
+ * **SO THE EXTRA YEAR DELIVERS NOTHING INSTEAD.** `progressPlayer` discards the
+ * rating step below this age (exactly as `ratingsLocked` does, after every draw
+ * is spent, so the stream is untouched) and `estimatePotential` forecasts from
+ * here rather than from `age`. A player generated at 15 is therefore identical
+ * to a 16-year-old intake, holds for a year, and then follows the same path —
+ * so the world from 16 onward is unchanged. A discarded growth step cannot be
+ * clamped away, which is precisely why this works where the generation-side
+ * corrections could not. Measured: **BIG4 68.2 against a baseline 68.6, Serbia
+ * 58.4 against 58.3, SOLVENT 0/625.**
+ *
+ * Inert while `YOUTH_AGE >= YOUTH_BASE_REFERENCE_AGE`, so a save at the
+ * reference age is byte-identical. Move THIS constant only together with a
+ * fresh 40-season sweep of `YOUTH_BASE_OFFSET`, since that is what it names.
  */
 export const YOUTH_BASE_REFERENCE_AGE = 16;
 
