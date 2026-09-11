@@ -47,12 +47,13 @@ function confederationCupLabel(tournaments: IntlConfederationCup[]): string {
 /**
  * What to call a knockout round that has `roundsLeft` rounds still to play,
  * counting backwards from the final. Backwards because bracket depth varies —
- * four rounds for the World Cup's 32-nation field, three for a 16-nation
+ * five rounds for a 48-nation World Cup, four at 32, three for a 16-nation
  * confederation cup, one for a tournament that is only a final — so a round's
  * name follows from how much is left, never from a fixed position.
  */
 function knockoutRoundName(roundsLeft: number): string {
-  if (roundsLeft >= 4) return "round of 16";
+  if (roundsLeft >= 5) return "round of 32";
+  if (roundsLeft === 4) return "round of 16";
   if (roundsLeft === 3) return "quarterfinals";
   if (roundsLeft === 2) return "semifinals";
   return "final";
@@ -138,7 +139,7 @@ export function intlStageHeadline(
       const round = worldCupRoundName(tournament);
       if (round === "final") return "Two nations left. It's the final.";
       const lead = (tournament?.ties.length ?? 0) === 0 ? "The group stage is done. " : "";
-      return `${lead}The ${round} ${round === "round of 16" ? "is" : "are"} next.`;
+      return `${lead}The ${round} ${round.startsWith("round of") ? "is" : "are"} next.`;
     }
     case "confederation-groups":
       return `Qualifying is done for the summer. Now for the ${confederationCupLabel(confederationCups)}: play the group stage to get things underway.`;

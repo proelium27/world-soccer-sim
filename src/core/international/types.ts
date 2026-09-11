@@ -74,13 +74,30 @@ export interface IntlQualifyingCampaign {
   nations: string[]; // nid → nation name
   squads: NationSquad[]; // parallel to `nations`
   groups: IntlGroup[];
-  /** The INTL_FIELD_SIZE qualifiers, strongest first — the next tournament's field. */
+  /** The `fieldSize` qualifiers, strongest first — the next tournament's field. */
   qualified: string[];
+  /**
+   * How many places this campaign is playing for: the World Cup's size, fixed
+   * the moment the campaign is drawn from the save's `worldCupSize` setting.
+   * Absent on a campaign drawn before the size could vary, which means
+   * INTL_FIELD_SIZE (32) — what every one of them was.
+   */
+  fieldSize?: number;
+  /**
+   * Places per confederation, recorded at the draw. Stored rather than
+   * recomputed because the rule behind it can change (the per-group floor did,
+   * 2026-09-11) and a campaign spans three offseasons: recomputing at the last
+   * leg would hand out a different allocation from the one its groups were
+   * drawn for. Absent on an older campaign, which replays the rule it was
+   * drawn under — see planQualifying.
+   */
+  places?: Record<string, number>;
 }
 
 /**
- * One tournament: INTL_GROUPS groups of INTL_GROUP_SIZE, whose top
- * INTL_QUALIFY_PER_GROUP feed an INTL_KO_SIZE bracket. The knockout reuses the
+ * One tournament: groups of four whose top two — plus, at a 24- or 48-nation
+ * World Cup, the best third-placed sides (see WORLD_CUP_FORMATS) — feed a
+ * power-of-two bracket. The knockout reuses the
  * Continental Cup's `CupTie` and `resolveCupTie` outright — the shape is
  * identical (scoreline after extra time, shootout recorded separately, winner,
  * box score) and `home`/`away` being plain numbers means nids drop straight in.
@@ -94,9 +111,9 @@ export interface IntlTournament {
   nations: string[]; // nid → nation name
   squads: NationSquad[]; // parallel to `nations`
   groups: IntlGroup[];
-  /** INTL_KO_SIZE nids in bracket order; empty until the groups complete. */
+  /** The knockout's nids in bracket order (16 at a 32-nation World Cup); empty until the groups complete. */
   bracket: number[];
-  ties: CupTie[]; // round 0 = QF, 1 = SF, 2 = Final
+  ties: CupTie[]; // round 0 = the first knockout round, the last = the final
   championNid: number | null;
 }
 

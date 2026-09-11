@@ -3,8 +3,10 @@ import { useLeague } from "../../context/LeagueContext.js";
 import { seasonYear } from "../../format.js";
 import { INTL_TOURNAMENT_NAME, INTL_FIELD_SIZE } from "../../../core/constants.js";
 import {
-  qualifyingPlan, type ConfederationQualifyingPlan,
+  qualifyingPlan, manageableNations, type ConfederationQualifyingPlan,
 } from "../../../core/international/index.js";
+import { resolveWorldCupSize } from "../../../core/international/format.js";
+import { WorldCupSizeSelect, worldCupSizeBlurb } from "../../components/WorldCupSizeSelect.js";
 import {
   NationalTeamsLayout, NationName, GroupStandings, liveGroupRows, SeasonSelect,
   useHasInternational, IntlEmpty, type StandingRow, type RowMark,
@@ -39,8 +41,8 @@ function placeName(position: number): string {
  * those are ranked against each other across the confederation's groups and no
  * single group can be read on its own.
  */
-function planSentence(plan: ConfederationQualifyingPlan): string {
-  const places = `${plan.slots} of the ${INTL_FIELD_SIZE} places`;
+function planSentence(plan: ConfederationQualifyingPlan, fieldSize: number): string {
+  const places = `${plan.slots} of the ${fieldSize} places`;
 
   if (plan.groups === 0) {
     return plan.nations === 1
@@ -99,10 +101,13 @@ function QualifyingView({
   entered,
   qualified,
   byConfederation,
+  fieldSize,
 }: {
   entered: number;
   qualified: string[];
   byConfederation: ConfGroups[];
+  /** Places the campaign played for; an archived one reads it off its qualifiers. */
+  fieldSize: number;
 }) {
   const qualifiedSet = new Set(qualified);
   // `qualified` fills only when the last of the three legs is played, so an
@@ -121,10 +126,12 @@ function QualifyingView({
       </div>
 
       <p className="text-muted small">
-        {entered} nations entered. Groups are played home and away, and how many places each
-        confederation gets depends on how many genuinely competitive nations it has. That split,
-        and the groups it's played in, are settled when the campaign is drawn, so what each
-        confederation is playing for is known before the first match.
+        {entered} nations entered for {fieldSize} places. Groups are played home and away. Each
+        confederation gets a quota the way FIFA does it, based on the real World Cup of this size,
+        trimmed so no confederation sends more than two thirds of its nations, and every group
+        plays for at least its winner's place. That split, and the groups it's played in, are
+        settled when the campaign is drawn, so what each confederation is playing for is known
+        before the first match.
       </p>
 
       {stillPlaying && (
@@ -142,7 +149,7 @@ function QualifyingView({
       {byConfederation.map(({ confederation, groups, plan }) => (
         <div className="mb-3" key={confederation}>
           <h6 className="mb-1">{confederation}</h6>
-          {plan && <p className="text-muted small mb-2">{planSentence(plan)}</p>}
+          {plan && <p className="text-muted small mb-2">{planSentence(plan, fieldSize)}</p>}
           <div className="row g-3">
             {groups.map((rows, i) => (
               <div className="col-12 col-lg-6" key={i}>
@@ -213,7 +220,7 @@ export function NTQualifying() {
   const [season, setSeason] = useState<number | null>(null);
   const selected = season ?? seasons[0] ?? null;
 
-  if (!hasIntl || !league) return <IntlEmpty />;
+  if (!hasIntl || !league) return <IntlEmpty footer={<WorldCupSizeCard />} />;
 
   const showingCurrent = current !== null && selected === current.season;
   const archived = history.find((h) => h.season === selected) ?? null;
@@ -224,6 +231,7 @@ export function NTQualifying() {
       <QualifyingView
         entered={current.nations.length}
         qualified={current.qualified}
+        fieldSize={current.fieldSize ?? INTL_FIELD_SIZE}
         byConfederation={bucketByConfederation(
           current.groups.map((g) => ({ confederation: g.confederation, rows: liveGroupRows(g, current.nations) })),
           // Only the live campaign can carry a plan: an archived summary keeps
@@ -239,6 +247,7 @@ export function NTQualifying() {
       <QualifyingView
         entered={archived.entered}
         qualified={archived.qualified}
+        fieldSize={archived.qualified.length}
         byConfederation={bucketByConfederation(archived.groups)}
       />
     );
@@ -255,6 +264,54 @@ export function NTQualifying() {
         labelFor={(s) => `Qualifying ${seasonYear(s)}`}
       />
       {body}
+      <WorldCupSizeCard />
     </NationalTeamsLayout>
+  );
+}
+
+/**
+ * The save's World Cup size, and what it means for the next draw.
+ *
+ * Lives here rather than in God Mode because it can't touch anything already
+ * under way: a qualifying campaign records the size it was drawn at, so a
+ * change only reaches the next one (see LeagueStore.worldCupSize). The card
+ * says which size the current cycle is locked to, because otherwise changing
+ * the setting mid-cycle looks like it did nothing.
+ */
+export function WorldCupSizeCard() {
+  const { league, setWorldCupSizeAction, simming } = useLeague();
+  const players = league?.players;
+  const eligible = useMemo(() => (players ? manageableNations(players).length : 0), [players]);
+  if (!league) return null;
+
+  const setting = league.worldCupSize ?? INTL_FIELD_SIZE;
+  const next = resolveWorldCupSize(setting, eligible);
+  const q = league.international.qualifying;
+  const t = league.international.tournament;
+  // A qualifying campaign stays on the state after its World Cup is played, so
+  // it is only "this cycle" until a tournament drawn from it exists.
+  const lockedTo = q && !(t && t.season > q.season) ? (q.fieldSize ?? INTL_FIELD_SIZE) : null;
+
+  return (
+    <div className="card mt-4">
+      <div className="card-body">
+        <h6 className="mb-2"><label htmlFor="world-cup-size-setting" className="mb-0">World Cup size</label></h6>
+        <WorldCupSizeSelect
+          id="world-cup-size-setting"
+          value={setting}
+          disabled={simming}
+          onChange={(size) => void setWorldCupSizeAction(size)}
+        />
+        <p className="text-muted small mt-2 mb-1">{worldCupSizeBlurb(setting)}</p>
+        <p className="text-muted small mb-0">
+          {next === null
+            ? `Your world has ${eligible} nations with enough players to field a squad, which isn't enough for a World Cup yet.`
+            : `Your world has ${eligible} nations with enough players to field a squad, so the next qualifying draw will be for a ${next}-nation World Cup.`}
+          {lockedTo !== null && (
+            ` This cycle's qualifying was drawn for ${lockedTo} places, so the World Cup at the end of it stays that size. A change here starts with the next draw.`
+          )}
+        </p>
+      </div>
+    </div>
   );
 }

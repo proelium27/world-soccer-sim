@@ -11,7 +11,8 @@ import {
 } from "./simIntl.js";
 import type { CupTie } from "../cup/types.js";
 import { mulberry32, hashInts } from "../../engine/rng.js";
-import { INTL_TOURNAMENT_NAME, INTL_FIELD_SIZE, INTL_GROUPS } from "../constants.js";
+import { worldCupFormatFor } from "./format.js";
+import { INTL_TOURNAMENT_NAME } from "../constants.js";
 
 /** rng-stream tag for the tournament draw, distinct from every match stream. */
 const DRAW_STREAM = 830;
@@ -26,7 +27,12 @@ const DRAW_STREAM = 830;
  * retirement) forfeits its place to the best nation that can, so the field is
  * always full.
  */
-export function assembleField(qualified: string[], players: Player[]): NationSquad[] {
+export function assembleField(
+  qualified: string[],
+  players: Player[],
+  /** How many places there are — the qualifying campaign's field size. */
+  fieldSize: number = qualified.length,
+): NationSquad[] {
   const available = buildSquads(players); // strongest first
   const byNation = new Map(available.map((s) => [s.nation, s]));
 
@@ -36,25 +42,27 @@ export function assembleField(qualified: string[], players: Player[]): NationSqu
     if (squad) field.push(squad);
   }
   // Backfill any forfeited place with the strongest nation not already in.
-  if (field.length < INTL_FIELD_SIZE) {
+  if (field.length < fieldSize) {
     const inField = new Set(field.map((s) => s.nation));
     for (const squad of available) {
-      if (field.length >= INTL_FIELD_SIZE) break;
+      if (field.length >= fieldSize) break;
       if (!inField.has(squad.nation)) field.push(squad);
     }
   }
   return field
-    .slice(0, INTL_FIELD_SIZE)
+    .slice(0, fieldSize)
     .sort((a, b) => b.rating - a.rating || a.nation.localeCompare(b.nation));
 }
 
 /**
  * Draw a tournament without playing a match: assemble the field from the
- * qualifiers, pot-draw them into INTL_GROUPS groups whose fixtures start
- * unplayed, and leave the bracket empty (it can only be seeded once the groups
- * are played). No player is touched and no shared-stream rng is drawn, so this
- * is safe to run the instant the offseason begins. Null when the field can't be
- * filled (see assembleField).
+ * qualifiers, pot-draw them into groups of four whose fixtures start unplayed,
+ * and leave the bracket empty (it can only be seeded once the groups are
+ * played). The shape follows the field's size (WORLD_CUP_FORMATS) — the size is
+ * the qualifying campaign's, so it is whatever the save was set to when that
+ * campaign was drawn. No player is touched and no shared-stream rng is drawn,
+ * so this is safe to run the instant the offseason begins. Null when the field
+ * can't be filled (see assembleField).
  */
 export function initTournament(
   qualified: string[],
@@ -62,13 +70,17 @@ export function initTournament(
   season: number,
   lid: number,
 ): IntlTournament | null {
-  const squads = assembleField(qualified, players);
-  if (squads.length < INTL_FIELD_SIZE) return null;
+  const field = assembleField(qualified, players);
+  // Only smaller than the qualified list if the world has since run out of
+  // nations to backfill a forfeit with; the weakest then make way.
+  const format = worldCupFormatFor(field.length);
+  if (!format) return null;
+  const squads = field.slice(0, format.fieldSize);
 
   const nations = squads.map((s) => s.nation);
   const seeded = squads.map((_, nid) => nid); // already strongest-first
   const drawRng = mulberry32(hashInts(lid, season, DRAW_STREAM, 30));
-  const drawn = potDraw(seeded, INTL_GROUPS, drawRng);
+  const drawn = potDraw(seeded, format.groupCount, drawRng);
   const groups = drawn.map((nids, i) => buildGroup(i, nids, null));
 
   return { season, name: INTL_TOURNAMENT_NAME, nations, squads, groups, bracket: [], ties: [], championNid: null };
@@ -121,7 +133,7 @@ export function playTournamentGroups(
  * most rounds left. Across the confederation cups that aligns their finals onto
  * one click; within the World Cup it is how the staged offseason knows whether
  * a knockout round remains, without the stage machine hard-coding how deep the
- * bracket is (it is four rounds at INTL_FIELD_SIZE 32 and was three at 16).
+ * bracket is (four rounds at a 32-nation World Cup, five at 48, three at 16).
  */
 export function roundsRemaining(t: IntlTournament): number {
   if (t.championNid !== null) return 0;
@@ -146,7 +158,7 @@ function nextKnockoutRound(tournament: IntlTournament): { round: number; field: 
 }
 
 /**
- * Play exactly the next knockout round (QF, then SF, then final) of a tournament
+ * Play exactly the next knockout round (through to the final) of a tournament
  * whose groups are already played. Each round owns its seed, so playing them one
  * at a time is byte-identical to playKnockout's one-pass loop. Sets championNid
  * when the round leaves a single nation standing.

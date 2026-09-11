@@ -30,7 +30,8 @@ import { SEASON_MATCHDAYS } from "./calendar.js";
 import { worldCompetitions } from "./competitions.js";
 import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
 import {
-  DEFAULT_DIFFICULTY, OVR_SCALE_SHIFT, type Difficulty, type ProgressionModel,
+  DEFAULT_DIFFICULTY, DEFAULT_WORLD_CUP_SIZE, OVR_SCALE_SHIFT,
+  type Difficulty, type ProgressionModel, type WorldCupSize,
 } from "./constants.js";
 import { isSpectatorTid } from "./spectator.js";
 
@@ -403,6 +404,25 @@ export interface LeagueStore {
    * existed, so no dynasty in progress changes.
    */
   progressionModel: ProgressionModel;
+
+  /**
+   * How many nations the World Cup takes: 16, 24, 32 or 48, or "auto" to size
+   * it off how many nations the world can field (resolveWorldCupSize).
+   *
+   * Safe to change mid-save, and the National Teams → Qualifying page offers
+   * exactly that, because it is read at ONE point — the draw of a new
+   * qualifying campaign, which records the size it was drawn at. A campaign
+   * already under way, and the World Cup it feeds, keep the size they started
+   * with; the change arrives with the next cycle. It feeds no club result, no
+   * rating and no money.
+   *
+   * Optional, and absent means INTL_FIELD_SIZE (32) rather than the "auto" a new
+   * save starts on. That is deliberate: Auto on a save generated before the
+   * world reached 626 clubs (44 eligible nations) would resolve to 24, quietly
+   * shrinking a World Cup the player never asked to change. So no migration,
+   * and an existing save plays exactly the World Cup it always has.
+   */
+  worldCupSize?: WorldCupSize;
 }
 
 export function createLeagueState(
@@ -435,6 +455,8 @@ export function createLeagueState(
    * in it until his first offseason re-estimate.
    */
   progressionModel: ProgressionModel = "random",
+  /** See `LeagueStore.worldCupSize`. Takes no rng draw and touches no generation. */
+  worldCupSize: WorldCupSize = DEFAULT_WORLD_CUP_SIZE,
 ): LeagueStore {
   const league = generateWorld(rng, seed, competitions, progressionModel);
   // Each AI club lines up in the formation that fields its strongest XI; the
@@ -517,5 +539,6 @@ export function createLeagueState(
     aiManagedSeasons: [],
     rollingCoefficients,
     progressionModel,
+    worldCupSize,
   };
 }
