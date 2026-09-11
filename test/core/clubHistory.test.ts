@@ -114,6 +114,32 @@ describe("computeClubHistory", () => {
     expect(h.seasons[0].teamOfSeasonPids.sort()).toEqual([100, 101]);
   });
 
+  // Retirement deletes a player from `league.players`, so a lookup that only
+  // reads the live pool loses every award he won once he hangs up his boots.
+  it("keeps crediting a retired player's awards to the club he won them at", () => {
+    const awardsS1: SeasonAwards = { playerOfSeasonPid: 100, goldenBootPid: 101, teamOfSeason: [100, 101, 200] };
+    const history = [entry(1, { 0: [7, 1, 2] }, { 0: awardsS1 })];
+    history[0].world = { ballonDOr: [{ pid: 100 } as never], worldTeamOfYear: [101] };
+    // 100 retired into the archive; 101 retired below the archive's bar and
+    // survives only in the season's award snapshot; 200 was elsewhere.
+    history[0].awardWinners = [
+      { pid: 100, name: "A", nationality: "England", pos: "ST", ovr: 90, tid: 7, born: 0 },
+      { pid: 101, name: "B", nationality: "England", pos: "W", ovr: 80, tid: 7, born: 0 },
+      { pid: 200, name: "C", nationality: "England", pos: "CB", ovr: 80, tid: 1, born: 0 },
+    ];
+    const league = makeLeague(history, [{ tid: 7, compId: 0 }], []);
+    (league as { retiredPlayers: unknown }).retiredPlayers = [
+      { pid: 100, seasons: [{ season: 1, tid: 7, ovr: 90, apps: 38 }] },
+    ];
+    const h = computeClubHistory(league, 7);
+
+    expect(h.playerOfSeason.map((a) => a.pid)).toEqual([100]);
+    expect(h.goldenBoots.map((a) => a.pid)).toEqual([101]);
+    expect(h.teamOfSeasonSelections.map((a) => a.pid).sort()).toEqual([100, 101]);
+    expect(h.seasons[0].ballonDOrPid).toBe(100);
+    expect(h.seasons[0].worldTeamOfYearPids).toEqual([101]);
+  });
+
   it("detects relegation and computes franchise records", () => {
     // Club 3 is tier-1 in season 1 (finishes last), tier-2 in season 2.
     const history = [

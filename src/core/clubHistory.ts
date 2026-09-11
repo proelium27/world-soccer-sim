@@ -134,12 +134,32 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
 
   // Season → this club's stat tid for each player, so an award pid can be
   // attributed to the club the player actually played for that season.
+  //
+  // The live pool alone is not enough: retirement deletes a player from
+  // `league.players`, so every award a retiree won here used to vanish from the
+  // club's history the offseason he retired. Two records outlive him, and both
+  // were copied from the same `SeasonStats.tid` read below, so they cannot
+  // disagree with it: the retiree archive's per-season line (every season he
+  // played, if his career cleared `isArchiveWorthy`) and the season's own
+  // award snapshot (every winner, archived or not — see core/awardWinners.ts).
+  const livePlayer = new Map(players.map((p) => [p.pid, p]));
+  const archived = new Map((league.retiredPlayers ?? []).map((r) => [r.pid, r]));
+  const snapshotTid = new Map<string, number>();
+  for (const h of seasonHistory) {
+    for (const w of h.awardWinners ?? []) {
+      if (w.tid !== undefined) snapshotTid.set(`${w.pid}:${h.season}`, w.tid);
+    }
+  }
   const playerSeasonTid = new Map<string, number | undefined>();
   const seasonTidOf = (pid: number, season: number): number | undefined => {
     const key = `${pid}:${season}`;
     if (!playerSeasonTid.has(key)) {
-      const p = players.find((pl) => pl.pid === pid);
-      playerSeasonTid.set(key, p?.stats.find((s) => s.season === season)?.tid);
+      playerSeasonTid.set(
+        key,
+        livePlayer.get(pid)?.stats.find((s) => s.season === season)?.tid
+          ?? archived.get(pid)?.seasons.find((s) => s.season === season)?.tid
+          ?? snapshotTid.get(key),
+      );
     }
     return playerSeasonTid.get(key);
   };
