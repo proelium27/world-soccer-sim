@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { StoredTeam } from "../../core/teams/clubs.js";
+import type { MatchEvent, MatchPosition } from "../../engine/attribution.js";
 import { ClubCrest } from "./ClubCrest.js";
 import { eventSummary, KEY_EVENTS, TimelineRow, TimelineMarkerRow } from "./matchEvents.js";
 import { halfTimeMinute, matchMinuteLabel, matchTimeline, periodMarkers } from "../matchClock.js";
+import { eventDetail } from "../matchNarration.js";
 import { SPEEDS, useMatchPlayback } from "../live/useMatchPlayback.js";
 import type { MatchLineups, SideLineup } from "../live/lineups.js";
 import { liveMatchState } from "../live/liveRatings.js";
@@ -230,6 +232,16 @@ export function LiveMatchView({
     [lineups, match.events, match.finalClock, minute],
   );
 
+  // Slots come from the lineups when the caller has them; a LiveMatch on its own
+  // carries only events, and the two EXACT shot sources still resolve without it.
+  const slotOfPid = useMemo(() => {
+    const map = new Map<number, MatchPosition>();
+    for (const side of [lineups?.home, lineups?.away]) {
+      for (const p of side?.starters ?? []) if (p.slot) map.set(p.pid, p.slot);
+    }
+    return (pid: number) => map.get(pid);
+  }, [lineups]);
+
   const teamOf = useMemo(() => {
     const map = new Map<number, StoredTeam>();
     for (const t of teams) map.set(t.tid, t);
@@ -255,6 +267,17 @@ export function LiveMatchView({
     minute,
   ).reverse();
 
+  /**
+   * Why a card was shown, or where a shot came from — the same derivation the
+   * box score uses, so the two cannot describe one booking differently.
+   *
+   * Built against the WHOLE stream rather than the revealed prefix: the reason a
+   * card was given does not change as the match runs on, and deriving it from a
+   * growing slice would have a booking's explanation shift under the reader.
+   */
+  const detailOf = (e: MatchEvent) =>
+    eventDetail(e, match.events, match.finalClock ?? 0, slotOfPid);
+
   const rail = scoresAtMinute(otherMatches, minute);
   const table = tableAtMinute ? tableAtMinute(minute) : null;
 
@@ -279,7 +302,7 @@ export function LiveMatchView({
   const announcement = finished
     ? `Full time. ${nameOf(match.home)} ${score.home}, ${nameOf(match.away)} ${score.away}.`
     : latestIsNow
-      ? `${eventSummary(latest, playerName, clubOfSide(latest.side), h1)} ${score.home}-${score.away}.`
+      ? `${eventSummary(latest, playerName, clubOfSide(latest.side), h1, detailOf(latest))} ${score.home}-${score.away}.`
       : "";
 
   return (
@@ -398,6 +421,7 @@ export function LiveMatchView({
                     playerName={playerName}
                     clubName={clubOfSide(item.event.side)}
                     firstHalfStoppage={h1}
+                    detail={detailOf(item.event)}
                   />
                 ),
               )

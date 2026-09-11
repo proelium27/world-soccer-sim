@@ -10,6 +10,7 @@ import { ClubCrest } from "../components/ClubCrest.js";
 import { BackLink } from "../components/BackLink.js";
 import { KEY_EVENTS, TimelineRow, TimelineMarkerRow } from "../components/matchEvents.js";
 import { matchTimeline, periodMarkers } from "../matchClock.js";
+import { eventDetail } from "../matchNarration.js";
 
 
 function ratingClass(rating: number): string {
@@ -289,6 +290,12 @@ export function BoxScore() {
   const motmIsHome = motm ? home.some((l) => l.pid === motm.pid) : false;
 
   const firstHalfStoppage = match.boxScore.firstHalfStoppage;
+  // Which slot a player filled is recorded on his line, so a shot can read like
+  // the position it came from. Derived per render rather than stored — see
+  // matchNarration.ts.
+  const slotOf = (pid: number) =>
+    [...match.boxScore.home, ...match.boxScore.away].find((l) => l.pid === pid)?.slot;
+  const lastEventClock = match.boxScore.finalClock ?? 0;
   // Events and the clock's own beats — the board, half time, full time — as one
   // chronological list. The markers are derived from the box score's own numbers
   // rather than stored, so they read correctly on saves that predate them.
@@ -425,6 +432,12 @@ export function BoxScore() {
                 event={item.event}
                 playerName={playerName}
                 firstHalfStoppage={firstHalfStoppage}
+                detail={eventDetail(
+                  item.event,
+                  match.boxScore.events,
+                  lastEventClock,
+                  slotOf,
+                )}
               />
             ),
           )
