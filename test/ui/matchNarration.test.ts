@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../../src/engine/rng.js";
 import { makeTeam } from "../../src/engine/composites.js";
 import { simMatchDetailed } from "../../src/engine/matchSim.js";
-import { eventDetail } from "../../src/ui/matchNarration.js";
+import { eventDetail, shotLocation } from "../../src/ui/matchNarration.js";
 import type { MatchEvent, MatchPlayer } from "../../src/engine/attribution.js";
 
 const ev = (over: Partial<MatchEvent> & Pick<MatchEvent, "type">): MatchEvent => ({
@@ -107,6 +107,58 @@ describe("matchNarration — the honesty rule", () => {
       const detail = eventDetail(card, [...earlier, card, freeKickGoal], -120);
       expect(detail).not.toMatch(/time wasting|too long|kicks the ball away|dissent|referee|handball/);
     }
+  });
+
+  it("names a shot off a carded foul as a free kick", () => {
+    // The engine's free kick is a shot for the fouled side on the foul's own
+    // tick, so an opposing card sharing the tick pins it.
+    const card = ev({ type: "yellow_card", side: "away", clock: 900 });
+    const shot = ev({ type: "shot_saved", side: "home", clock: 900, pids: [3] });
+    expect(eventDetail(shot, [card, shot], -120)).toBe("from a free kick");
+    // ...but a penalty on that tick outranks it.
+    const penalty = ev({ type: "penalty", side: "home", clock: 900, pids: [3] });
+    expect(eventDetail(shot, [card, penalty, shot], -120)).toBe("from the spot");
+  });
+
+  it("fits open-play locations to how the shot ended, like real football", () => {
+    // The point of the rework: a zone is picked to fit the outcome, so goals
+    // come mostly from inside the box and blocked shots lean outside it, rather
+    // than every midfielder's goal arriving "from distance".
+    const goals = { inside: 0, outside: 0 };
+    const all = { inside: 0, outside: 0 };
+    const cmGoals = { inside: 0, outside: 0 };
+    for (let seed = 1; seed <= 250; seed++) {
+      const box = simMatchDetailed(
+        mulberry32(seed), makeTeam("Home"), makeTeam("Away"), makeSquad(0), makeSquad(100),
+      ).boxScore;
+      const slots = new Map([...box.home, ...box.away].map((l) => [l.pid, l.slot]));
+      box.events.forEach((e, at) => {
+        if (!["goal", "shot_saved", "shot_blocked", "shot_off_target"].includes(e.type)) return;
+        const sameTick = box.events.filter((x) => x.clock === e.clock && x !== e);
+        const afterCorner = box.events.some(
+          (x, k) => k < at && x.clock === e.clock && x.type === "corner" && x.side === e.side,
+        );
+        const { origin, label } = shotLocation(e, sameTick, slots.get(e.pids[0]), afterCorner);
+        // An open-play shot is resolved on `shooting`, never `heading`.
+        if (origin !== "corner") expect(label).not.toMatch(/header/);
+        if (origin !== "close" && origin !== "box" && origin !== "outside") return;
+        const where = origin === "outside" ? "outside" : "inside";
+        all[where]++;
+        if (e.type === "goal") {
+          goals[where]++;
+          if (slots.get(e.pids[0]) === "CM") cmGoals[where]++;
+        }
+      });
+    }
+    const share = (t: { inside: number; outside: number }) => t.outside / (t.inside + t.outside);
+    expect(goals.inside + goals.outside).toBeGreaterThan(400);
+    // Real top flights: ~13% of open-play goals and ~38% of shots from outside.
+    expect(share(goals)).toBeGreaterThan(0.06);
+    expect(share(goals)).toBeLessThan(0.22);
+    expect(share(all)).toBeGreaterThan(0.3);
+    expect(share(all)).toBeLessThan(0.46);
+    // A midfielder shoots from distance more than most, but scores from inside.
+    expect(share(cmGoals)).toBeLessThan(0.5);
   });
 
   it("labels real engine corner ticks correctly", () => {

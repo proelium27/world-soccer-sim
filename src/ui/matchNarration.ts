@@ -187,39 +187,135 @@ export function cardContext(event: MatchEvent, events: MatchEvent[], lastClock: 
 /**
  * Where a shot came from.
  *
- * Two of these are EXACT rather than flavour — the sim really did award a
- * penalty, and really did play a header from a corner — and they are the ones
- * worth having. The rest key off the shooter's slot, which is real recorded data
- * (`PlayerMatchLine.slot`), so a centre-back's effort reads like a centre-back's.
- * Nothing here invents physical detail the sim has no notion of: there is no
- * "curled into the top corner", because the engine never decided that.
+ * THE ENGINE HAS NO PITCH, and that is the constraint everything here works
+ * inside. `resolveShot` decides a shot from team composites alone, so every shot
+ * a side takes in a match carries the same xG; nothing about it says whether it
+ * was a tap-in or a thirty-yarder. Three sources are nonetheless EXACT, because
+ * the sim really did play them and the stream says so: a penalty, a header from
+ * a corner, and a shot off a free kick (which is only visible when the foul drew
+ * a card — an uncarded foul leaves no event behind, so its free kick reads as
+ * open play).
+ *
+ * Every other shot gets a ZONE picked to fit the one real fact the stream holds
+ * about it: how it ended. The engine's outcome mix already lands on real
+ * football (measured from the constants: ~28% blocked, ~38% off target, ~23%
+ * saved, ~11% scored, against a top flight's ~27/38/24/11), so real football's
+ * "where do shots that end this way come from" can be borrowed directly. That is
+ * what stops the old failure, where a label keyed on position alone had every
+ * midfielder's goal arriving "from distance" when most real midfield goals are
+ * scored inside the box. Position only SHADES the odds.
+ *
+ * Still a label: the zone caused nothing, and the xG beside it does not move.
+ * Making it real means rolling a zone inside the engine and letting it set
+ * conversion — an engine change with an audit, not a display one.
+ *
+ * Open-play shots are never called headers. The engine resolves them on the
+ * shooter's `shooting` rating, so calling one a header would contradict it;
+ * only the corner path resolves on `heading`.
  */
-export function shotSource(
+export type ShotZone = "close" | "box" | "outside";
+export type ShotOrigin = ShotZone | "penalty" | "corner" | "freeKick";
+
+type ZoneWeights = readonly [close: number, box: number, outside: number];
+
+/**
+ * Real-football share of each outcome by zone: six-yard box, the rest of the
+ * area, outside it. Built from typical top-flight figures (shots ~7/55/38 by
+ * zone, converting ~32% / ~12.5% / ~3.5%, blocked ~15% / ~25% / ~34%) and
+ * inverted, so goals come mostly from inside the box and blocks lean outside it.
+ * `scripts/shotZoneProbe.ts` measures what these produce on real matches.
+ */
+const ZONE_BY_OUTCOME: Record<string, ZoneWeights> = {
+  goal: [21, 66, 13],
+  shot_saved: [8, 57, 35],
+  shot_blocked: [4, 50, 46],
+  shot_off_target: [5, 55, 40],
+};
+
+/**
+ * How a position shades those odds. A striker lives in the six-yard box, a
+ * holding midfielder shoots from outside it, a centre-back's open-play chances
+ * are mostly knock-downs in the area. Missing (an old box score with no slot on
+ * its lines) means no shading.
+ */
+const ZONE_BY_SLOT: Partial<Record<MatchPosition, ZoneWeights>> = {
+  ST: [1.5, 1.15, 0.65],
+  W: [0.8, 1.0, 1.15],
+  AM: [0.7, 0.95, 1.35],
+  CM: [0.6, 0.85, 1.55],
+  DM: [0.5, 0.75, 1.8],
+  FB: [0.6, 1.0, 1.2],
+  CB: [1.6, 1.1, 0.6],
+};
+
+const ZONES: readonly ShotZone[] = ["close", "box", "outside"];
+
+const ZONE_LABELS: Record<ShotZone, readonly string[]> = {
+  close: ["from close range", "from inside the six-yard box"],
+  box: ["inside the box", "from 12 yards", "from just inside the area"],
+  outside: ["from distance", "from the edge of the box", "from 25 yards", "from long range"],
+};
+
+/** Salts that keep the zone roll and the wording roll independent of each other. */
+const ZONE_ROLL = 1;
+const LABEL_ROLL = 2;
+
+function unitRoll(...seed: number[]): number {
+  return hashInts(...seed, NARRATION_STREAM) / 4294967296;
+}
+
+function pickZone(outcome: string, slot: MatchPosition | undefined, seed: number[]): ShotZone {
+  const base = ZONE_BY_OUTCOME[outcome] ?? ZONE_BY_OUTCOME.shot_off_target;
+  const shade = (slot && ZONE_BY_SLOT[slot]) || [1, 1, 1];
+  const weights = base.map((w, i) => w * shade[i]);
+  let r = unitRoll(...seed, ZONE_ROLL) * weights.reduce((s, w) => s + w, 0);
+  for (let i = 0; i < ZONES.length; i++) {
+    r -= weights[i];
+    if (r < 0) return ZONES[i];
+  }
+  return ZONES[ZONES.length - 1];
+}
+
+function zoneLabel(zone: ShotZone, outcome: string, slot: MatchPosition | undefined, seed: number[]): string {
+  let options = ZONE_LABELS[zone];
+  // A tap-in is a goal by definition, and a tight angle is where wide men shoot from.
+  if (zone === "close" && outcome === "goal") options = ["tap-in", ...options];
+  if (zone === "box" && (slot === "W" || slot === "FB")) options = [...options, "from a tight angle"];
+  return pick(options, ...seed, LABEL_ROLL);
+}
+
+/** The origin and its wording. Exported so the probe and tests can see the zone. */
+export function shotLocation(
   event: MatchEvent,
   sameTick: MatchEvent[],
   slot: MatchPosition | undefined,
   afterCorner: boolean,
-): string | null {
+): { origin: ShotOrigin; label: string } {
   if (sameTick.some((e) => e.type === "penalty" && e.side === event.side)) {
-    return "from the spot";
+    return { origin: "penalty", label: "from the spot" };
   }
   // A corner tick holds TWO shots: the one that went out for the corner, then
   // the header from it. Only the second is the header, so this has to know
   // which side of the corner the shot sits in the stream, not merely that a
   // corner shares its tick.
-  if (afterCorner) return "header from the corner";
-  switch (slot) {
-    case "CB":
-    case "GK":
-      return "from deep";
-    case "DM":
-    case "CM":
-      return "from distance";
-    case "FB":
-      return "from the angle";
-    default:
-      return null;
+  if (afterCorner) return { origin: "corner", label: "header from the corner" };
+  // The engine's free kick is a shot for the fouled side on the foul's own
+  // tick, so an opposing card sharing the tick (with no penalty) pins it.
+  if (sameTick.some((e) => e.side !== event.side && (e.type === "yellow_card" || e.type === "red_card"))) {
+    return { origin: "freeKick", label: "from a free kick" };
   }
+  const seed = [event.pids[0] ?? 0, Math.round(event.clock)];
+  const zone = pickZone(event.type, slot, seed);
+  return { origin: zone, label: zoneLabel(zone, event.type, slot, seed) };
+}
+
+export function shotSource(
+  event: MatchEvent,
+  sameTick: MatchEvent[],
+  slot: MatchPosition | undefined,
+  afterCorner: boolean,
+): string {
+  return shotLocation(event, sameTick, slot, afterCorner).label;
 }
 
 /* ---------------------------------------------------------------------------
@@ -235,10 +331,10 @@ export function shotSource(
  * different reasons for one booking reads as a bug, and this is exactly the kind
  * of text that would drift.
  *
- * `slotOf` is optional because the live viewer is fed from a `LiveMatch`, which
- * carries the event stream and no player lines. Without it the two EXACT shot
- * sources (a penalty, a header from a corner) still resolve, since both are read
- * off the stream; only the position-flavoured ones drop out.
+ * `slotOf` is optional because a caller may hold the event stream and no player
+ * lines. Without it the EXACT shot sources (penalty, corner header, free kick)
+ * still resolve, since all are read off the stream, and every other shot still
+ * gets a zone fitted to its outcome; only the positional shading drops out.
  */
 export function eventDetail(
   event: MatchEvent,

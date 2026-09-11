@@ -602,13 +602,22 @@ export function Manual() {
           </p>
           <p>
             The feed says what a booking was for, and where a shot came from. A card reads "late
-            challenge" or "tactical foul, breaks up the counter" or "time wasting"; a goal reads
-            "from the spot" or "header from the corner". These follow what actually happened in the
-            match rather than being picked at random: a booking that gave away a penalty can only be
-            a foul in the box and will never claim to be time wasting, while one shown late on by a
-            side protecting a lead can be. A second yellow is recognised as one rather than guessed
-            at. It's all worked out from the match itself, not stored, so old box scores have it too
-            &mdash; right back to your first season.
+            challenge" or "tactical foul, breaks up the counter" or "time wasting"; a shot reads
+            "from the spot", "header from the corner", "tap-in" or "from the edge of the box". These
+            follow what actually happened in the match rather than being picked at random: a booking
+            that gave away a penalty can only be a foul in the box and will never claim to be time
+            wasting, while one shown late on by a side protecting a lead can be. A second yellow is
+            recognised as one rather than guessed at.
+          </p>
+          <p>
+            Shot locations have one honest limit: the match engine doesn't track where anyone is on
+            the pitch. Penalties, corner headers and free kicks are real, because the engine really
+            played them. For every other shot the game picks a spot that fits how the shot ended,
+            so goals mostly come from inside the box, blocked shots more often from outside it, and
+            a striker's efforts sit closer to goal than a holding midfielder's. Over a season that
+            lands on the same split real top flights have. The location is a description, though,
+            not a cause: it doesn't change the xG. It's all worked out from the match itself, not
+            stored, so old box scores have it too &mdash; right back to your first season.
           </p>
           <p>After matchday 38, the offseason runs on its own, in this order:</p>
           <ol>
