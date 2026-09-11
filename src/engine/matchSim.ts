@@ -57,6 +57,7 @@ import {
 } from "./constants.js";
 import type { Composites } from "./composites.js";
 import { familiarityPenalty } from "./positionFit.js";
+import { matchMinutesBetween } from "./matchTime.js";
 import type { MatchPlayer, MatchPosition, MatchEvent, BoxScore, PlayerMatchLine, TouchSide } from "./attribution.js";
 import {
   pickShooter,
@@ -738,8 +739,11 @@ export function simMatchDetailed(
 
   /** Minutes played so far by a still-on-pitch player, for a live (mid-match) rating estimate. */
   function liveMinutesFor(pid: number): number {
+    // Match minutes, not playing time — see engine/matchTime.ts. Counting playing
+    // time here made a starter at the 60th minute read 60 plus the first half's
+    // stoppage, loosening the rating damping behind second-half subs.
     const enter = enterClock.get(pid) ?? MATCH_SECONDS;
-    return Math.max(0, Math.round((enter - clock) / 60));
+    return matchMinutesBetween(enter, clock, firstHalfStoppage);
   }
 
   /** How well a still-on-pitch player is playing so far (0-10 live match rating). */
@@ -1259,10 +1263,12 @@ export function simMatchDetailed(
   const totalTicks = stat.home.ticks + stat.away.ticks;
 
   const finalClock = clock;
+  // Minutes on the MATCH clock, which holds at 45:00 and 90:00 through stoppage,
+  // so a full match is 90 — see engine/matchTime.ts.
   const minutesFor = (pid: number): number => {
     const enter = enterClock.get(pid) ?? MATCH_SECONDS;
     const exit = exitClock.get(pid) ?? finalClock;
-    return Math.max(0, Math.round((enter - exit) / 60));
+    return matchMinutesBetween(enter, exit, firstHalfStoppage);
   };
 
   // Goalkeepers can't currently be subbed off mid-match (see the landmine

@@ -228,8 +228,8 @@ export function LiveMatchView({
   // to now, so ratings and marks move as the match does. O(events) on ~200
   // events, against the feed and rail this screen already re-derives per tick.
   const live = useMemo(
-    () => (lineups ? liveMatchState(lineups, match.events, minute, match.finalClock) : null),
-    [lineups, match.events, match.finalClock, minute],
+    () => (lineups ? liveMatchState(lineups, match.events, minute, match.finalClock, h1) : null),
+    [lineups, match.events, match.finalClock, minute, h1],
   );
 
   // Slots come from the lineups when the caller has them; a LiveMatch on its own

@@ -36,6 +36,7 @@ import { emptyLine } from "../../engine/attribution.js";
 import { computeMatchRating } from "../../engine/matchRating.js";
 import type { MatchLineups, SideLineup } from "./lineups.js";
 import { eventMinute } from "./liveMatch.js";
+import { matchMinutesBetween } from "../../engine/matchTime.js";
 import { MATCH_SECONDS } from "../../engine/constants.js";
 
 /** One player's afternoon so far. */
@@ -89,6 +90,7 @@ function sideState(
   events: MatchEvent[],
   minute: number,
   finalClock?: number,
+  firstHalfStoppage?: number,
 ): LiveSide {
   // Everyone who appears in the box score is a starter or came on for one, so
   // the team sheet already names the whole cast and no second input is needed.
@@ -217,7 +219,19 @@ function sideState(
     // endpoints. See the comment on `fromClock` above.
     const enter = fromClock.get(pid) ?? MATCH_SECONDS;
     const exit = untilClock.get(pid) ?? stillOnClock;
-    const minutesPlayed = Math.max(0, Math.round((enter - exit) / 60));
+    // Match minutes — the clock holds at 45:00 and 90:00 through stoppage — via
+    // the engine's own function, so this cannot drift from `minutesFor`.
+    //
+    // A box score with no `firstHalfStoppage` was written by the engine before
+    // halves were periods, and that engine STORED PLAYING TIME, stoppage
+    // included. The two changes shipped in one merge, so the field's absence is
+    // an exact marker of which rule wrote the stored figure, and the legacy
+    // arithmetic is kept for those or every old rewatch would rate its
+    // substitutes against minutes the box score never recorded.
+    const minutesPlayed =
+      firstHalfStoppage === undefined
+        ? Math.max(0, Math.round((enter - exit) / 60))
+        : matchMinutesBetween(enter, exit, firstHalfStoppage);
     const line = lines.get(pid)!;
     line.minutesPlayed = minutesPlayed;
     const slot = slotOf.get(pid) ?? null;
@@ -283,10 +297,11 @@ export function liveMatchState(
   events: MatchEvent[],
   minute: number,
   finalClock?: number,
+  firstHalfStoppage?: number,
 ): LiveMatchState {
   return {
-    home: sideState(lineups.home, "home", events, minute, finalClock),
-    away: sideState(lineups.away, "away", events, minute, finalClock),
+    home: sideState(lineups.home, "home", events, minute, finalClock, firstHalfStoppage),
+    away: sideState(lineups.away, "away", events, minute, finalClock, firstHalfStoppage),
   };
 }
 

@@ -3,8 +3,8 @@ import { mulberry32 } from "../../src/engine/rng.js";
 import { makeTeam } from "../../src/engine/composites.js";
 import { simMatchDetailed } from "../../src/engine/matchSim.js";
 import { computeMatchRating } from "../../src/engine/matchRating.js";
-import { MATCH_SECONDS } from "../../src/engine/constants.js";
 import { emptyLine } from "../../src/engine/attribution.js";
+import { matchSecondsAt } from "../../src/engine/matchTime.js";
 import type { MatchPlayer } from "../../src/engine/attribution.js";
 
 function makeSquad(pidOffset: number): MatchPlayer[] {
@@ -136,7 +136,12 @@ describe("minutesPlayed via simMatchDetailed", () => {
     // This deliberately does NOT assert the substitute plays fewer minutes than
     // the starter, which was true only while subs could not happen before the
     // hour. Half-time is a substitution window, and a man brought on at the break
-    // plays the longer half — the second, plus stoppage.
+    // plays exactly as long as the man he replaced: 45 each, on the match clock.
+    //
+    // Minutes are counted on that clock (engine/matchTime.ts), which holds at
+    // 45:00 and 90:00 through stoppage — so the pair now span EXACTLY the 90
+    // minutes on the wall, where they used to span "at least 90" because each
+    // was credited his share of the stoppage.
     //
     // Injury-forced subs (which log an "injury" event immediately before, and
     // can fire at any minute) are excluded since that ordering isn't guaranteed.
@@ -167,12 +172,16 @@ describe("minutesPlayed via simMatchDetailed", () => {
         expect(offLine).toBeDefined();
         expect(onLine).toBeDefined();
 
-        // The starter's minutes are the elapsed time at the change...
-        const elapsedMin = Math.round((MATCH_SECONDS - e.clock) / 60);
-        expect(Math.abs(offLine!.minutesPlayed - elapsedMin)).toBeLessThanOrEqual(1);
-        // ...and the substitute really did play the rest of it.
+        // The starter's minutes are the wall-clock minute of the change...
+        const h1 = result.boxScore.firstHalfStoppage ?? 0;
+        const changeMin = Math.round(matchSecondsAt(e.clock, h1) / 60);
+        expect(Math.abs(offLine!.minutesPlayed - changeMin)).toBeLessThanOrEqual(1);
+        // ...and the substitute really did play the rest of it. Rounding each
+        // duration independently can land the pair on 90 or 91, never below.
         expect(onLine!.minutesPlayed).toBeGreaterThan(0);
-        expect(offLine!.minutesPlayed + onLine!.minutesPlayed).toBeGreaterThanOrEqual(90);
+        const pair = offLine!.minutesPlayed + onLine!.minutesPlayed;
+        expect(pair).toBeGreaterThanOrEqual(90);
+        expect(pair).toBeLessThanOrEqual(91);
         checked = true;
         break;
       }
