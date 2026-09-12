@@ -16,6 +16,11 @@ import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.
 import { ROSTER_CAP } from "../../core/constants.js";
 import { clubStatures } from "../../core/ai/clubContext.js";
 import { refusesFreeAgentSigningWith } from "../../core/transfers/playerWill.js";
+import {
+  PlayerViewCells, PlayerViewHeaders, PlayerViewSwitch, ViewTableWrap, performanceSeason,
+  performanceSeasonOptions, usePlayerView, viewKeepsSort, viewSortAccessors, viewTableClass,
+  type PlayerView, type ViewSortKey,
+} from "../playerViews.js";
 
 const MAX_LISTED = 25;
 // On the unfiltered "all positions" view, cap how many of any one position can
@@ -26,7 +31,10 @@ const MAX_LISTED = 25;
 // full depth chart, uncapped.
 const PER_POSITION_CAP = 5;
 
-type FaSortKey = "name" | "pos" | "ovr" | "pot" | "age";
+type FaSortKey = "name" | "pos" | "ovr" | "pot" | "age" | ViewSortKey;
+
+/** Keys with a header only on the overview; see `viewKeepsSort`. */
+const OVERVIEW_ONLY: readonly FaSortKey[] = ["pot"];
 
 /**
  * General free-agent signing: every unsigned player, any age.
@@ -42,7 +50,21 @@ type FaSortKey = "name" | "pos" | "ovr" | "pot" | "age";
 export function FreeAgents() {
   const { league, signFreeAgentAction, simming } = useLeague();
   const [posFilter, setPosFilter] = useState<Position | "ALL">("ALL");
-  const { sort, toggle } = useTableSort<FaSortKey>("ovr", "desc");
+  const { sort, toggle, setSort } = useTableSort<FaSortKey>("ovr", "desc");
+  const [view, setView] = usePlayerView();
+  const seasonOptions = useMemo(
+    () => (league ? performanceSeasonOptions(league) : []),
+    [league],
+  );
+  const defaultSeason = useMemo(() => (league ? performanceSeason(league) : 0), [league]);
+  const [pickedSeason, setPickedSeason] = useState<number | null>(null);
+  const season = pickedSeason !== null && seasonOptions.includes(pickedSeason)
+    ? pickedSeason
+    : defaultSeason;
+  const changeView = (next: PlayerView) => {
+    setView(next);
+    if (!viewKeepsSort(sort.key, next, OVERVIEW_ONLY)) setSort({ key: "ovr", dir: "desc" });
+  };
   const potView = usePotentialView();
   // One pass per league rather than per row: the object form of the refusal
   // rebuilds a league-wide player index on every call, which on a 25-row table
@@ -115,6 +137,7 @@ export function FreeAgents() {
     ovr: (p) => p.ovr,
     pot: (p) => potView.ceiling(p),
     age: (p) => league.season - p.born,
+    ...viewSortAccessors((p: Player) => p, season, pool),
   });
 
   return (
@@ -159,15 +182,32 @@ export function FreeAgents() {
             ? `Showing the top ${shownPlayers.length} across every position (up to ${PER_POSITION_CAP} per position so one spot can't crowd out the rest) of ${availablePlayers.length} free agents by OVR + POT. Pick a position to see its full list.`
             : `Showing top ${shownPlayers.length} of ${filtered.length} ${posFilter}s by OVR + POT.`}
         </p>
-        <table className="table table-striped table-sm">
+        <PlayerViewSwitch
+          value={view}
+          onChange={changeView}
+          season={season}
+          seasons={seasonOptions}
+          onSeason={setPickedSeason}
+        />
+        <ViewTableWrap view={view}>
+        <table className={`table table-striped table-sm${viewTableClass(view)}`}>
           <thead>
             <tr>
               <th></th>
               <SortableTh sortKey="name" sort={sort} onSort={toggle} defaultDir="asc">Name</SortableTh>
               <SortableTh sortKey="pos" sort={sort} onSort={toggle} defaultDir="asc">Pos</SortableTh>
-              <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end">OVR</SortableTh>
-              <SortableTh sortKey="pot" sort={sort} onSort={toggle} className="text-end">POT <PotHelp /></SortableTh>
-              <SortableTh sortKey="age" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Age</SortableTh>
+              {view === "overview" ? (
+                <>
+                  <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end">OVR</SortableTh>
+                  <SortableTh sortKey="pot" sort={sort} onSort={toggle} className="text-end">POT <PotHelp /></SortableTh>
+                  <SortableTh sortKey="age" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Age</SortableTh>
+                </>
+              ) : (
+                <>
+                  <SortableTh sortKey="age" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Age</SortableTh>
+                  <PlayerViewHeaders view={view} sort={{ sort, onSort: toggle }} />
+                </>
+              )}
               <th></th>
             </tr>
           </thead>
@@ -191,9 +231,18 @@ export function FreeAgents() {
                     <Flag nationality={p.nationality} />
                   </td>
                   <td>{p.pos}</td>
-                  <td className="text-end">{p.ovr}</td>
-                  <td className="text-end"><PotDisplay player={p} /></td>
-                  <td className="text-end">{league.season - p.born}</td>
+                  {view === "overview" ? (
+                    <>
+                      <td className="text-end">{p.ovr}</td>
+                      <td className="text-end"><PotDisplay player={p} /></td>
+                      <td className="text-end">{league.season - p.born}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="text-end">{league.season - p.born}</td>
+                      <PlayerViewCells view={view} player={p} season={season} />
+                    </>
+                  )}
                   <td className="text-end">
                     {refuses ? (
                       <span className="text-muted small text-nowrap">
@@ -219,6 +268,7 @@ export function FreeAgents() {
             })}
           </tbody>
         </table>
+        </ViewTableWrap>
         </>
       )}
     </div>

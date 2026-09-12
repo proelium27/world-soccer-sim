@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { watchlistEntries } from "../../core/watchlist.js";
@@ -15,9 +15,19 @@ import { SuspensionBadge } from "../components/SuspensionBadge.js";
 import { WatchToggle } from "../components/WatchToggle.js";
 import { SortableTh, sortRows, useTableSort } from "../components/SortableTable.js";
 import { EmptyState } from "../components/EmptyState.js";
+import { usePotentialView } from "../potentialView.js";
+import {
+  PlayerViewCells, PlayerViewHeaders, PlayerViewSwitch, ViewTableWrap, performanceSeason,
+  performanceSeasonOptions, usePlayerView, viewKeepsSort, viewSortAccessors, viewTableClass,
+  type PlayerView, type ViewSortKey,
+} from "../playerViews.js";
 
 type SortKey =
-  | "name" | "pos" | "age" | "ovr" | "pot" | "club" | "wage" | "contract" | "value" | "apps";
+  | "name" | "pos" | "age" | "ovr" | "pot" | "club" | "wage" | "contract" | "value" | "apps"
+  | ViewSortKey;
+
+/** Keys with a header only on the overview; see `viewKeepsSort`. */
+const OVERVIEW_ONLY: readonly SortKey[] = ["pot", "apps", "wage", "contract", "value"];
 
 /**
  * Your shortlist: every player you've starred, wherever he is in the world,
@@ -32,7 +42,22 @@ export function Watchlist() {
 
   const entries = useMemo(() => (league ? watchlistEntries(league) : []), [league]);
 
-  const { sort, toggle } = useTableSort<SortKey>("ovr");
+  const { sort, toggle, setSort } = useTableSort<SortKey>("ovr");
+  const potView = usePotentialView();
+  const [view, setView] = usePlayerView();
+  const seasonOptions = useMemo(
+    () => (league ? performanceSeasonOptions(league) : []),
+    [league],
+  );
+  const defaultSeason = useMemo(() => (league ? performanceSeason(league) : 0), [league]);
+  const [pickedSeason, setPickedSeason] = useState<number | null>(null);
+  const perfSeason = pickedSeason !== null && seasonOptions.includes(pickedSeason)
+    ? pickedSeason
+    : defaultSeason;
+  const changeView = (next: PlayerView) => {
+    setView(next);
+    if (!viewKeepsSort(sort.key, next, OVERVIEW_ONLY)) setSort({ key: "ovr", dir: "desc" });
+  };
 
   const rows = useMemo(() => {
     if (!league) return [];
@@ -55,14 +80,17 @@ export function Watchlist() {
       pos: (r) => r.player.pos,
       age: (r) => league.season - r.player.born,
       ovr: (r) => r.player.ovr,
-      pot: (r) => r.player.potential,
+      // The scouted ceiling, never the true value: the column shows a band, and
+      // ordering rows by the number behind it would hand the answer over.
+      pot: (r) => potView.ceiling(r.player),
       club: (r) => r.clubName,
       wage: (r) => r.player.contract.salary,
       contract: (r) => r.player.contract.expiresSeason,
       value: (r) => r.value,
       apps: (r) => r.season?.appearances ?? -1,
+      ...viewSortAccessors((r: (typeof named)[number]) => r.player, perfSeason, named),
     });
-  }, [league, entries, sort]);
+  }, [league, entries, sort, potView, perfSeason]);
 
   if (!league) return null;
 
@@ -106,33 +134,50 @@ export function Watchlist() {
             {rows.length} {rows.length === 1 ? "player" : "players"}. Club, rating and price are
             all as they stand today, not as they were when you starred him.
           </p>
-          <table className="table table-striped table-sm align-middle">
+          <PlayerViewSwitch
+            value={view}
+            onChange={changeView}
+            season={perfSeason}
+            seasons={seasonOptions}
+            onSeason={setPickedSeason}
+          />
+          <ViewTableWrap view={view}>
+          <table className={`table table-striped table-sm align-middle${viewTableClass(view)}`}>
             <thead>
               <tr>
                 <th></th>
                 <SortableTh sortKey="name" sort={sort} onSort={toggle} defaultDir="asc">Name</SortableTh>
                 <SortableTh sortKey="pos" sort={sort} onSort={toggle} defaultDir="asc">Pos</SortableTh>
                 <SortableTh sortKey="age" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Age</SortableTh>
-                <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end">Ovr</SortableTh>
-                <SortableTh sortKey="pot" sort={sort} onSort={toggle} className="text-end">Pot</SortableTh>
-                <SortableTh sortKey="club" sort={sort} onSort={toggle} defaultDir="asc">Club</SortableTh>
-                <SortableTh sortKey="apps" sort={sort} onSort={toggle} className="text-end">
-                  This season
-                  <HelpHint>
-                    Appearances, goals and assists in league play so far this season, and his
-                    average match rating. Blank if he hasn't played yet.
-                  </HelpHint>
-                </SortableTh>
-                <SortableTh sortKey="wage" sort={sort} onSort={toggle} className="text-end">Wage</SortableTh>
-                <SortableTh sortKey="contract" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Until</SortableTh>
-                <SortableTh sortKey="value" sort={sort} onSort={toggle} className="text-end">
-                  Scout value
-                  <HelpHint>
-                    Our scouts' estimate of his transfer value — the same figure the Transfers
-                    page quotes, and an estimate rather than the asking price. More scouting spend
-                    makes it sharper.
-                  </HelpHint>
-                </SortableTh>
+                {view !== "overview" ? (
+                  <>
+                    <SortableTh sortKey="club" sort={sort} onSort={toggle} defaultDir="asc">Club</SortableTh>
+                    <PlayerViewHeaders view={view} sort={{ sort, onSort: toggle }} />
+                  </>
+                ) : (
+                  <>
+                    <SortableTh sortKey="ovr" sort={sort} onSort={toggle} className="text-end">Ovr</SortableTh>
+                    <SortableTh sortKey="pot" sort={sort} onSort={toggle} className="text-end">Pot</SortableTh>
+                    <SortableTh sortKey="club" sort={sort} onSort={toggle} defaultDir="asc">Club</SortableTh>
+                    <SortableTh sortKey="apps" sort={sort} onSort={toggle} className="text-end">
+                      This season
+                      <HelpHint>
+                        Appearances, goals and assists in league play so far this season, and his
+                        average match rating. Blank if he hasn't played yet.
+                      </HelpHint>
+                    </SortableTh>
+                    <SortableTh sortKey="wage" sort={sort} onSort={toggle} className="text-end">Wage</SortableTh>
+                    <SortableTh sortKey="contract" sort={sort} onSort={toggle} className="text-end" defaultDir="asc">Until</SortableTh>
+                    <SortableTh sortKey="value" sort={sort} onSort={toggle} className="text-end">
+                      Scout value
+                      <HelpHint>
+                        Our scouts' estimate of his transfer value — the same figure the Transfers
+                        page quotes, and an estimate rather than the asking price. More scouting spend
+                        makes it sharper.
+                      </HelpHint>
+                    </SortableTh>
+                  </>
+                )}
                 <th>Status</th>
               </tr>
             </thead>
@@ -152,37 +197,50 @@ export function Watchlist() {
                     </td>
                     <td><PositionBadge player={p} /></td>
                     <td className="text-end">{league.season - p.born}</td>
-                    <td className="text-end">{p.ovr}</td>
-                    <td className="text-end"><PotDisplay player={p} /></td>
-                    <td>
-                      {r.tid === null ? (
-                        <span className="text-muted">Free agent</span>
-                      ) : (
-                        <>
-                          <ClubLink tid={r.tid} />
-                          {r.academy && <span className="text-muted small"> Academy</span>}
-                          <br />
-                          <span className="text-muted small">{r.compName}</span>
-                        </>
-                      )}
-                    </td>
-                    <td className="text-end text-nowrap">
-                      {r.season && r.season.appearances > 0 ? (
-                        <>
-                          {r.season.appearances} app{r.season.appearances === 1 ? "" : "s"}
-                          {" "}&middot; {r.season.goals}G {r.season.assists}A
-                          <br />
-                          <span className="text-muted small">
-                            {r.season.avgRating.toFixed(2)} avg
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-muted">&mdash;</span>
-                      )}
-                    </td>
-                    <td className="text-end text-nowrap">{formatWeeklyWage(p.contract.salary)}</td>
-                    <td className="text-end">{seasonYear(p.contract.expiresSeason)}</td>
-                    <td className="text-end text-nowrap">{currency.format(r.value)}</td>
+                    {view !== "overview" ? (
+                      <>
+                        <td>
+                          {r.tid === null
+                            ? <span className="text-muted">Free agent</span>
+                            : <ClubLink tid={r.tid} />}
+                        </td>
+                        <PlayerViewCells view={view} player={p} season={perfSeason} />
+                      </>
+                    ) : (
+                      <>
+                        <td className="text-end">{p.ovr}</td>
+                        <td className="text-end"><PotDisplay player={p} /></td>
+                        <td>
+                          {r.tid === null ? (
+                            <span className="text-muted">Free agent</span>
+                          ) : (
+                            <>
+                              <ClubLink tid={r.tid} />
+                              {r.academy && <span className="text-muted small"> Academy</span>}
+                              <br />
+                              <span className="text-muted small">{r.compName}</span>
+                            </>
+                          )}
+                        </td>
+                        <td className="text-end text-nowrap">
+                          {r.season && r.season.appearances > 0 ? (
+                            <>
+                              {r.season.appearances} app{r.season.appearances === 1 ? "" : "s"}
+                              {" "}&middot; {r.season.goals}G {r.season.assists}A
+                              <br />
+                              <span className="text-muted small">
+                                {r.season.avgRating.toFixed(2)} avg
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-muted">&mdash;</span>
+                          )}
+                        </td>
+                        <td className="text-end text-nowrap">{formatWeeklyWage(p.contract.salary)}</td>
+                        <td className="text-end">{seasonYear(p.contract.expiresSeason)}</td>
+                        <td className="text-end text-nowrap">{currency.format(r.value)}</td>
+                      </>
+                    )}
                     <td className="small">
                       {r.own ? (
                         <span className="text-muted">Yours</span>
@@ -199,6 +257,7 @@ export function Watchlist() {
               })}
             </tbody>
           </table>
+          </ViewTableWrap>
         </>
       )}
     </div>

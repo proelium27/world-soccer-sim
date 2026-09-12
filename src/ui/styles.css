@@ -4185,3 +4185,32 @@ body.nav-drawer-open {
 .db-table > tbody > tr > td.text-end {
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------------------------------------------------------------------
+   Player view switch (ui/playerViews.tsx) — the Attributes and Performance
+   views on Transfers, Free Agents, the Watchlist and the national squad pages.
+
+   Same treatment as the Database's wide sets (DESIGN.md §6), scoped to the
+   numeric cells so the action column keeps wrapping its controls: a raised
+   stripe for fifteen columns of numbers, and digits that line up.
+--------------------------------------------------------------------------- */
+.player-view-table {
+  --bs-table-striped-bg: oklch(0.94 0.007 155 / 0.055);
+  /* Size to the content and scroll inside the wrapper, rather than stretching
+     to the card and compressing the numbers. Transfers is the case that needs
+     it: its offer controls are the widest cell on the row by a distance, so at
+     100% width the nine stat columns were squeezed into the gap left over. */
+  width: auto;
+  min-width: 100%;
+}
+.player-view-table > tbody > tr > td.text-end {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Nine to fifteen numeric columns run together at the default cell padding,
+   so single-digit counts read as one long number. Applied to the headers too,
+   so a column and its heading stay over each other. */
+.player-view-table > thead > tr > th.text-end,
+.player-view-table > tbody > tr > td.text-end {
+  padding-inline: 0.3rem;
+}
