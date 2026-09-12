@@ -164,7 +164,7 @@ function knockoutImportance(round: number, totalRounds: number, base: number, la
 /** Fold a tournament's knockout ties in. These carry per-match detail, so the club formula applies directly. */
 function foldKnockout(
   into: Map<string, Accumulator>,
-  tournament: IntlTournamentSummary,
+  tournament: Pick<IntlTournamentSummary, "knockout">,
   ratingOf: (nation: string) => number,
   base: number,
   late: number,
@@ -241,6 +241,11 @@ export function nationForm(
     if (concluded <= oldest || concluded > season) continue;
     for (const group of qualifying.groups) {
       foldGroup(acc, group, ratingOf, INTL_IMPORTANCE_QUALIFYING);
+    }
+    // Playoff ties count as qualifiers, at qualifying's own weight.
+    for (const playoff of qualifying.playoffs ?? []) {
+      const knockout = playoff.rounds.flatMap((r) => r.results);
+      foldKnockout(acc, { knockout }, ratingOf, INTL_IMPORTANCE_QUALIFYING, INTL_IMPORTANCE_QUALIFYING);
     }
   }
 
