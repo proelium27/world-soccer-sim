@@ -79,15 +79,7 @@ export function beginAutopilot(league: LeagueStore): LeagueStore {
     meta: { ...league.meta, userTid: AUTOPILOT_TID },
     teams: league.teams.map((t): StoredTeam =>
       t.tid === userTid
-        // Trialists go with the rest of the standing instructions the user
-        // can't be around to give. Load-bearing rather than tidy: during the
-        // jump meta.userTid is AUTOPILOT_TID, so the offseason's trial-group
-        // reset (which keys off userTid) matches no team at all — left here,
-        // the group survives the whole jump with its pids locked out of the
-        // free-agent pool, and the user comes back to a Youth Intake page
-        // offering 26-year-old "16-year-olds on trial".
-        ? { ...t, starters: null, transferListed: [], moreMinutes: [],
-            youthTrialists: [], youthTrialSignings: 0 }
+        ? { ...t, starters: null, transferListed: [], moreMinutes: [] }
         : t,
     ),
     negotiations: [],

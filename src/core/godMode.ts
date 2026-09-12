@@ -24,20 +24,12 @@ export function detachPlayer(league: LeagueStore, pid: number): LeagueStore {
     const inAcademy = t.academyRoster.includes(pid);
     const inList = t.transferListed.includes(pid);
     const wasStarter = t.starters?.includes(pid) ?? false;
-    // A trialist has to go too: left on the list, the Youth Intake page still
-    // offers him a contract, and signing him would add the pid to academyRoster
-    // while he sits on whichever club God Mode just moved him to — the same pid
-    // on two rosters, which is the duplication the loan guards here prevent.
-    const onTrial = (t.youthTrialists ?? []).includes(pid);
-    if (!inRoster && !inAcademy && !inList && !wasStarter && !onTrial) return t;
+    if (!inRoster && !inAcademy && !inList && !wasStarter) return t;
     return {
       ...t,
       roster: inRoster ? t.roster.filter((p) => p !== pid) : t.roster,
       academyRoster: inAcademy ? t.academyRoster.filter((p) => p !== pid) : t.academyRoster,
       transferListed: inList ? t.transferListed.filter((p) => p !== pid) : t.transferListed,
-      youthTrialists: onTrial
-        ? (t.youthTrialists ?? []).filter((p) => p !== pid)
-        : t.youthTrialists,
       // A stale starter pid would make resolveXI fall back anyway, but null it
       // explicitly so the XI re-auto-picks cleanly.
       starters: wasStarter ? null : t.starters,

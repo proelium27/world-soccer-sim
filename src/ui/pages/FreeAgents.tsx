@@ -45,7 +45,7 @@ const OVERVIEW_ONLY: readonly FaSortKey[] = ["pot"];
  * pool was a standing supply of other clubs' wonderkids worth browsing on its
  * own (see AI_PROSPECT_SLOTS). Clubs keep their own now, so what is left is
  * ordinary scrap-heap material and belongs on one list with everyone else
- * nobody wanted — the user's own youth comes from Youth Intake instead.
+ * nobody wanted — the user's own youth joins his Academy automatically.
  */
 export function FreeAgents() {
   const { league, signFreeAgentAction, simming } = useLeague();
@@ -147,7 +147,7 @@ export function FreeAgents() {
         <HelpHint>
           Unsigned players you can add on a free transfer (no fee), at a wage based on their
           rating. Released veterans and youngsters nobody kept both end up here. Your own academy's
-          crop is on the Youth Intake page. A free transfer still has to appeal to the player:
+          kids are on the Academy page. A free transfer still has to appeal to the player:
           someone who was a regular at a much bigger club won't drop to you just because there's no
           fee, so build the club up and he'll take the call.
         </HelpHint>

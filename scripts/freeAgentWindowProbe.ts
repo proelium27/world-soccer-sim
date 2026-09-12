@@ -39,7 +39,6 @@ function pool(l: LeagueStore): Player[] {
   for (const t of l.teams) {
     for (const p of t.roster) on.add(p);
     for (const p of t.academyRoster ?? []) on.add(p);
-    for (const p of t.youthTrialists ?? []) on.add(p);
   }
   return l.players.filter((p) => !on.has(p.pid));
 }

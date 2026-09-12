@@ -52,9 +52,11 @@ and `left_click_drag` as "the built-in drag helper".
   the Dashboard shows an "Advance to Season N+1" button (offseason phase).
 - A full roster (30/30) disables transfer Offer buttons until you Release
   someone on the Roster page.
-- Your youth intake no longer lands on the roster or in the academy by itself.
-  It arrives unsigned on `/youth-intake` and the Dashboard flags it; nothing
-  reaches your academy until you offer a contract there.
+- Your youth intake joins your academy by itself at every offseason (6-8 kids
+  aged 14), so a fresh save's `/academy` is empty until the first rollover.
+  Decisions come at 16 and 18 and resolve at the rollover; the Academy page's
+  "Next rollover" column previews them, and the Dashboard flags them in the
+  offseason.
 - At $0 scouting spend, offering the suggested "scout value" usually collapses
   talks instantly as a lowball (valuation noise is ±35% at zero spend). To
   complete a transfer quickly, offer well above scout value and accept the
@@ -66,8 +68,8 @@ and `left_click_drag` as "the built-in drag helper".
 `/dashboard` (sim buttons, budget, wage bill, scouting slider), `/roster`
 (release/extend/drag-swap; header shows "x/30"), `/transfers`, `/finance`
 (offseason cash flow, wage table, transfer history, league finances),
-`/youth-intake` (this year's trial group; only populated after an offseason)
-and `/free-agents` (every unsigned player, any age), `/schedule` → played rows
+`/academy` (the automatic academy and its checkpoint preview; only populated
+after an offseason) and `/free-agents` (every unsigned player, any age), `/schedule` → played rows
 link to `/box-score/<i>`, `/leagues`.
 
 ## Fast assertions

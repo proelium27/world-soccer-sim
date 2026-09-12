@@ -34,7 +34,6 @@ import { Leaders } from "./pages/Leaders.js";
 import { Database } from "./pages/Database.js";
 import { BoxScore } from "./pages/BoxScore.js";
 import { WatchMatch } from "./pages/WatchMatch.js";
-import { YouthIntake } from "./pages/YouthIntake.js";
 import { FreeAgents } from "./pages/FreeAgents.js";
 import { Academy } from "./pages/Academy.js";
 import { Transfers } from "./pages/Transfers.js";
@@ -188,15 +187,14 @@ export function App() {
                 — a spectator save browses the database like any other. */}
             <Route path="/database" element={<Navigate to="/database/players" replace />} />
             <Route path="/database/:tab" element={<Database />} />
-            {/* Club-only like the rest of this block: a trial group is an
-                offer to YOUR academy, so a spectator save has none. */}
-            <Route path="/youth-intake" element={<ClubOnly><YouthIntake /></ClubOnly>} />
-            {/* The old Incoming Talent path: keep it working rather than 404 a
-                bookmark, and it lands on what replaced it. The redirect is
-                deliberately NOT wrapped — it resolves to /youth-intake, which
-                does the gating, so wrapping here would answer "you're
-                spectating" at a URL that is only ever a forwarding address. */}
-            <Route path="/incoming-talent" element={<Navigate to="/youth-intake" replace />} />
+            {/* Two retired youth pages (Incoming Talent, then the Youth Intake
+                trial screen): keep them working rather than 404 a bookmark, and
+                land on what replaced both. Deliberately NOT wrapped — they
+                resolve to /academy, which does the gating, so wrapping here
+                would answer "you're spectating" at a URL that is only ever a
+                forwarding address. */}
+            <Route path="/youth-intake" element={<Navigate to="/academy" replace />} />
+            <Route path="/incoming-talent" element={<Navigate to="/academy" replace />} />
             <Route path="/free-agents" element={<ClubOnly><FreeAgents /></ClubOnly>} />
             <Route path="/academy" element={<ClubOnly><Academy /></ClubOnly>} />
             <Route path="/transfers" element={<ClubOnly><Transfers /></ClubOnly>} />

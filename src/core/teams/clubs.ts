@@ -739,39 +739,9 @@ export interface StoredTeam {
    */
   academyRoster: number[];
   /**
-   * This year's youth trial group, awaiting the user's decision on the Youth
-   * Intake screen — pids only, no contracts, no wages, nobody signed.
-   *
-   * **User's club only**, like `academyRoster`: an AI club's intake still goes
-   * straight to `roster`. Trialists are deliberately counted as rostered by
-   * `freeAgentPids` (which reads them off the team, so all 18 of its callers
-   * get this for free), because a pending trialist must not be signable by an
-   * AI club or culled from under the decision. They carry no contract, so they
-   * cost nothing at the season-start wage charge, which sums roster + academy.
-   *
-   * The offseason clears any group left undecided before generating the next
-   * one, so this can never accumulate into the `academyRoster`-style zombies
-   * an AI club would strand — the group is resolved either by the user or by
-   * the next rollover, never held indefinitely.
-   *
-   * Optional: absent on every save written before the screen existed, and
-   * `migrate.ts` backfills `[]`.
-   */
-  youthTrialists?: number[];
-  /**
-   * How many of the CURRENT trial group have been signed, against
-   * YOUTH_TRIAL_SIGN_LIMIT. Reset by the offseason when it lays out the new
-   * group, so it always describes this intake and never accumulates.
-   *
-   * A counter rather than something derived from ages or contract dates,
-   * because both are ambiguous the moment a 16-year-old can reach the academy
-   * by any other route. Optional; `migrate.ts` backfills 0.
-   */
-  youthTrialSignings?: number;
-  /**
    * Countries the user has sent his youth scouts to, capped at
-   * SCOUTING_REGION_MAX. They supply SCOUTING_REGION_SHARE of his trial group
-   * between them; his league's own nationality mix supplies the rest.
+   * SCOUTING_REGION_MAX. They supply SCOUTING_REGION_SHARE of his academy's
+   * yearly intake between them; his league's own nationality mix supplies the rest.
    *
    * **User's club only** — an AI club's intake is drawn from its league's mix
    * as it always was. Rating-neutral either way: nationality decides a player's
@@ -783,7 +753,7 @@ export interface StoredTeam {
   /**
    * Positions the user has told his youth scouts to look for, capped at
    * SCOUT_POSITION_MAX. They take SCOUT_POSITION_SHARE of the SCOUTED part of
-   * his trial group between them; roster demand supplies the rest.
+   * his academy's yearly intake between them; roster demand supplies the rest.
    *
    * **Reaches less of the group than `scoutingRegions` does, and that is a
    * constraint rather than a decision** — a country is relabelled onto the
@@ -976,8 +946,6 @@ export function assignIdentities(
       // round trip through the database is an identity rather than gaining
       // two fields on load (leagueDb.test.ts compares the whole team).
       // The first real trial group arrives at the first offseason.
-      youthTrialists: [],
-      youthTrialSignings: 0,
       scoutingRegions: [],
       scoutingPositions: [],
       budget,

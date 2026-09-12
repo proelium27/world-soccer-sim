@@ -10,6 +10,7 @@ import { pickNationality } from "../../src/core/players/nationalities.js";
 import { type Position } from "../../src/core/players/types.js";
 import {
   SCOUTING_REGION_MAX, SCOUTING_REGION_SHARE, SCOUT_POSITION_MAX,
+  USER_ACADEMY_ENTRY_AGE,
 } from "../../src/core/constants.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 
@@ -90,6 +91,19 @@ describe("scout directions through a real offseason", () => {
     league: LeagueStore;
   }
 
+  /**
+   * The user academy's intake after one offseason. A fresh world's academy is
+   * empty, so that is everyone in it; the age filter is belt-and-braces against
+   * the safety net having promoted one to the senior squad.
+   */
+  function intakePids(league: LeagueStore): number[] {
+    const team = league.teams.find((t) => t.tid === league.meta.userTid)!;
+    const byPid = new Map(league.players.map((p) => [p.pid, p]));
+    return team.academyRoster.filter(
+      (pid) => league.season - byPid.get(pid)!.born === USER_ACADEMY_ENTRY_AGE,
+    );
+  }
+
   // Each call builds a world and plays a season through its offseason, ~75s a
   // time, and four of the cases below want the same untargeted baseline. The
   // helper is deterministic — one fixed seed, directions the only input — so
@@ -124,7 +138,7 @@ describe("scout directions through a real offseason", () => {
     // and a failure that points at the wrong thing.
     league = simOffseason(playSeason(league, rng), rng);
     const byPid = new Map(league.players.map((p) => [p.pid, p]));
-    const group = league.teams.find((t) => t.tid === league.meta.userTid)!.youthTrialists ?? [];
+    const group = intakePids(league);
     return {
       nationalities: group.map((pid) => byPid.get(pid)!.nationality),
       positions: group.map((pid) => byPid.get(pid)!.pos),
@@ -132,7 +146,7 @@ describe("scout directions through a real offseason", () => {
     };
   }
 
-  it("fills most of the trial group from where the scouts were sent", () => {
+  it("fills most of the intake from where the scouts were sent", () => {
     const { nationalities } = intake({ regions: ["Brazil"] });
     expect(nationalities.length).toBeGreaterThan(0);
     const share = nationalities.filter((n) => n === "Brazil").length / nationalities.length;
@@ -148,9 +162,7 @@ describe("scout directions through a real offseason", () => {
     // the roll lands in the rest-of-world bucket.
     const plain = intake({});
     const scouted = intake({ regions: ["Brazil", "Argentina"] });
-    const trial = new Set(
-      scouted.league.teams.find((t) => t.tid === scouted.league.meta.userTid)!.youthTrialists ?? [],
-    );
+    const trial = new Set(intakePids(scouted.league));
     const fingerprint = (l: LeagueStore) =>
       l.players
         .filter((p) => !trial.has(p.pid))
@@ -188,9 +200,7 @@ describe("scout directions through a real offseason", () => {
     // if that ever stopped being true.
     const plain = intake({});
     const directed = intake({ regions: ["Brazil"], positions: ["GK", "ST"] });
-    const trial = new Set(
-      directed.league.teams.find((t) => t.tid === directed.league.meta.userTid)!.youthTrialists ?? [],
-    );
+    const trial = new Set(intakePids(directed.league));
     const fingerprint = (l: LeagueStore) =>
       l.players
         .filter((p) => !trial.has(p.pid))
@@ -204,8 +214,7 @@ describe("scout directions through a real offseason", () => {
     const scouted = intake({ regions: ["Brazil"] });
     const ovrsOf = (r: ReturnType<typeof intake>) => {
       const byPid = new Map(r.league.players.map((p) => [p.pid, p]));
-      const group = r.league.teams.find((t) => t.tid === r.league.meta.userTid)!.youthTrialists!;
-      return group.map((pid) => byPid.get(pid)!.ovr);
+      return intakePids(r.league).map((pid) => byPid.get(pid)!.ovr);
     };
     expect(ovrsOf(scouted)).toEqual(ovrsOf(plain));
   });

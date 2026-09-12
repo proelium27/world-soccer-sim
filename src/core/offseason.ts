@@ -20,6 +20,9 @@ import { withSeason, summaryOf, ovrLookup } from "./players/careerSummary.js";
 import { extendPlayerNames } from "./players/playerNames.js";
 import { archiveCup } from "./cup/archive.js";
 import {
+  academyDuePids, resolveAcademyCheckpoints, trimAcademyToCap, enrolAcademyYouth,
+} from "./academyPipeline.js";
+import {
   releaseExpiredContracts, runAIFreeAgency, freeAgencySigningOrder, trimRosterSurplus,
   ensureUserRosterSafety,
   freeAgentPids,
@@ -67,7 +70,8 @@ import { carryIntlInjuries } from "./injuries.js";
 import { hashInts, mulberry32 } from "../engine/rng.js";
 import {
   NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, difficultyProfile,
-  YOUTH_TRIAL_GROUP_MIN, YOUTH_TRIAL_GROUP_MAX, YOUTH_TRIAL_STREAM, MOP_UP_FA_STREAM, MOP_UP_MIN_OVR,
+  USER_ACADEMY_INTAKE_MIN, USER_ACADEMY_INTAKE_MAX, USER_ACADEMY_ENTRY_AGE,
+  YOUTH_TRIAL_STREAM, MOP_UP_FA_STREAM, MOP_UP_MIN_OVR,
 } from "./constants.js";
 
 /** rng-stream tag for rolling carried-over international injury durations. */
@@ -313,10 +317,15 @@ export function simOffseasonReporting(
 
   // 1.5. Release expired contracts to the free agent pool — skipping anyone
   //      still out on loan, whose contract is his parent club's business and
-  //      is settled when he comes home (see releaseExpiredContracts).
+  //      is settled when he comes home (see releaseExpiredContracts), and the
+  //      user's academy kids whose deal is up. Theirs isn't a lapse, it is a
+  //      checkpoint, and step 5.0 resolves it (see academyPipeline.ts).
+  const academyDue = academyDuePids(
+    loanReturns.teams.find((t) => t.tid === league.meta.userTid), renewals.players, endingSeason,
+  );
   let teams: StoredTeam[] = releaseExpiredContracts(
     loanReturns.teams, renewals.players, endingSeason,
-    new Set(activeLoans.map((l) => l.pid)),
+    new Set([...activeLoans.map((l) => l.pid), ...academyDue]),
   );
 
   // 1.7. International football (qualifying campaigns and World Cups) is no
@@ -704,8 +713,19 @@ export function simOffseasonReporting(
     tablesByCompId.values(), league.seasonHistory,
   );
   const academyOffset = difficultyProfile(league.difficulty).academyOffset;
-  // The user's intake is held back from the loop below and assembled into a
-  // trial group afterwards (step 5.2), so it can't shift any other club's pids.
+
+  // 5.0. The user's academy checkpoints, before the new intake arrives: kids at
+  //      the professional cut are promoted or leave, kids at the scholarship cut
+  //      are re-contracted (and trimmed to the cap at 5.4, once the intake's
+  //      real size is known). Rng-free, and after progression, so a kid promoted
+  //      here developed through the season just ended as the academy player he
+  //      was.
+  ({ teams, players } = resolveAcademyCheckpoints(
+    teams, players, league.meta.userTid, endingSeason, nextSeason, league.difficulty,
+  ));
+
+  // The user's intake is held back from the loop below and enrolled in his
+  // academy afterwards (step 5.2), so it can't shift any other club's pids.
   // Not `Player[] | null`: the assignment happens inside the teams.map callback
   // below, which TS's control-flow analysis can't see, so it would narrow this
   // to `never` at the point of use.
@@ -746,6 +766,9 @@ export function simOffseasonReporting(
         + (t.tid === league.meta.userTid ? academyOffset + academyFacilitiesBonus(t) : 0),
       nextSeason, nextPid, genSeed, homeCountry, nationalities,
       undefined, undefined, league.progressionModel,
+      // The user's academy takes its kids younger. Same draws either way (see
+      // generateYouthIntake's `age`), so the shared stream doesn't move.
+      t.tid === league.meta.userTid ? USER_ACADEMY_ENTRY_AGE : undefined,
     );
     nextPid = updatedNextPid;
     // Note: a generational talent's arrival is deliberately NOT announced.
@@ -753,21 +776,16 @@ export function simOffseasonReporting(
     // high potential estimate, which is the only intended tell. See the
     // generational-talent entry in CLAUDE.md.
     if (t.tid === league.meta.userTid) {
-      // The user's intake is a trial group he chooses from, not a squad handed
-      // to him — it is held on the team unsigned until the Youth Intake screen
-      // resolves it (see StoredTeam.youthTrialists). The contract and the
-      // academy stamp are applied at signing, not here, because a trialist who
-      // is never signed was never an academy player.
-      userYouth = youth;
-      // Held back: pids are attached below, once the extra trialists have been
+      // Held back: enrolled below, once the academy's extras have been
       // generated. Nothing is pushed to `players` here for the same reason.
+      userYouth = youth;
       return t;
     }
     players.push(...youth);
     return { ...t, roster: [...t.roster, ...youth.map((p) => p.pid)] };
   });
 
-  // 5.2. Top the user's intake up into a trial group he actually chooses from.
+  // 5.2. Top the user's intake up to his academy's yearly group.
   //
   // THREE THINGS KEEP THIS OUT OF THE WORLD'S GENERATION, and all three are
   // required — any one of them missing and one club's academy silently
@@ -778,17 +796,19 @@ export function simOffseasonReporting(
   //       changes who is a wonderkid world-wide.
   //   (b) the extras are drawn on their own seeded stream, never the shared
   //       `rng`, so the shared draw count is identical either way.
-  //   (c) the user's ordinary intake was drawn inside the loop exactly as
-  //       before, so even his own club's first few prospects are unchanged.
+  //   (c) the user's ordinary intake was drawn inside the loop with exactly the
+  //       draws it always spent (arriving at USER_ACADEMY_ENTRY_AGE changes
+  //       only the birth year), so even his own club's first few prospects are
+  //       the same players.
   // The result is a world bit-identical to one without this feature, apart
-  // from the extra players on the user's own trial list.
+  // from the extra players in the user's own academy.
   if (userYouth.length > 0) {
     const userTeam = teams.find((t) => t.tid === league.meta.userTid);
     const trialRng = mulberry32(
       hashInts(league.lid, nextSeason, league.meta.userTid, YOUTH_TRIAL_STREAM),
     );
-    const groupSize = YOUTH_TRIAL_GROUP_MIN
-      + Math.floor(trialRng() * (YOUTH_TRIAL_GROUP_MAX - YOUTH_TRIAL_GROUP_MIN + 1));
+    const groupSize = USER_ACADEMY_INTAKE_MIN
+      + Math.floor(trialRng() * (USER_ACADEMY_INTAKE_MAX - USER_ACADEMY_INTAKE_MIN + 1));
     const extras = Math.max(0, groupSize - userYouth.length);
     const directions = scoutDirectionsOf(userTeam);
     if (userTeam && extras > 0) {
@@ -811,6 +831,7 @@ export function simOffseasonReporting(
         // and re-roll every club generated after his.
         { positions: directions.positions },
         league.progressionModel,
+        USER_ACADEMY_ENTRY_AGE,
       );
       nextPid = afterExtras;
       userYouth = [...userYouth, ...extraYouth];
@@ -846,20 +867,25 @@ export function simOffseasonReporting(
       });
     }
 
+    // Enrolled straight into the academy on a deal that runs to the scholarship
+    // cut. Nothing to sign: the decisions come at the checkpoints.
+    userYouth = userYouth.map((p) => enrolAcademyYouth(p, nextSeason));
     players.push(...userYouth);
+    const intakePids = userYouth.map((p) => p.pid);
+    teams = teams.map((t) =>
+      t.tid === league.meta.userTid
+        ? { ...t, academyRoster: [...t.academyRoster, ...intakePids] }
+        : t,
+    );
   }
-  // Assigned unconditionally, and it REPLACES rather than appends: last year's
-  // group is resolved by this line whether or not the user ever opened the
-  // screen, and the ones he didn't sign simply stop being held — they own no
-  // contract and sit on no roster, so dropping the pid makes them free agents
-  // and nothing has to release them. That is what stops a trial group becoming
-  // the kind of permanent zombie an unmanaged academyRoster would.
-  const trialPids = userYouth.map((p) => p.pid);
-  teams = teams.map((t) =>
-    t.tid === league.meta.userTid
-      ? { ...t, youthTrialists: trialPids, youthTrialSignings: 0 }
-      : t,
-  );
+
+  // 5.4. The scholarship cut's default, now the academy's real headcount is
+  //      known: over the cap, the kids turning sixteen that the user's scouts
+  //      rate lowest go. Before the safety call-up, so a kid kept here can still
+  //      be called up to the senior squad at 5.5.
+  ({ teams } = trimAcademyToCap(
+    teams, players, league.meta.userTid, endingSeason, nextSeason, league.difficulty,
+  ));
 
   // 5.5. Emergency call-up for the user's own roster. Anyone taken off the open
   //      market is logged as a fee-0 arrival from the sentinel, exactly as an AI

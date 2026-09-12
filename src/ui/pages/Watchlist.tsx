@@ -113,8 +113,8 @@ export function Watchlist() {
             <>
               Star anyone from his profile, from the search on{" "}
               <Link to="/transfers">Transfers</Link>, or from{" "}
-              <Link to="/free-agents">Free Agents</Link> and{" "}
-              <Link to="/incoming-talent">Incoming Talent</Link>.
+              <Link to="/free-agents">Free Agents</Link> and your{" "}
+              <Link to="/academy">Academy</Link>.
             </>
           }
         >
