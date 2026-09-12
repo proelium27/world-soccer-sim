@@ -139,8 +139,34 @@ const SEASON = simSeason(mulberry32(12345));
  * 819326546, together 1044906061). A conflict here is never resolved by picking
  * a side — two independent outcome changes compose into a third world, and
  * taking either number would leave the test asserting a season nothing produces.
+ *
+ * And again on 2026-09-10, when the two halves became REAL PERIODS. The clock had
+ * no half-time in it: both halves' stoppage was computed and then played together
+ * at the end of the second half, so first-half stoppage never existed as a
+ * passage of play. Three things move the stream — the first half now ends with
+ * its own stoppage, a goal consumes clock for the celebration (and the referee
+ * credits it straight back, which is what keeps the football conserved), and the
+ * substitution windows re-key onto MATCH time so they still fire at the minutes
+ * #354 measured them at.
+ *
+ * The football is conserved where it can be measured: shots/match — the direct
+ * read on how much football gets played, with a fraction of goals' variance —
+ * moves 26.947 -> 26.863 (-0.3%) against the merge base over 10 seeded seasons,
+ * against goals/match 3.1674 -> 3.1211 at ~1.5 SE. `scripts/clockAB.ts` runs
+ * unmodified on both trees; `scripts/matchClockProbe.ts` is the timeline gate.
+ *
+ * Rebased once more in the same change (887484813 -> 381020712), when minutes
+ * played moved onto the MATCH clock (engine/matchTime.ts). `liveMinutesFor` feeds
+ * the live rating that `subPriority` and the bench gate read, and counting
+ * playing time there had a starter at the 60th minute reading 60 plus the first
+ * half's stoppage — the first rebase quietly loosened the damping behind every
+ * second-half sub. On the match clock he reads 60, which is what the merge base
+ * read, and three of four metrics moved back toward it: shots/match 26.863 ->
+ * 26.898 (base 26.947), home-win .4066 -> .4118 (base .4211), champion points
+ * 84.30 -> 82.20 (base 82.00). Goals/match 3.1211 -> 3.1116 did not, and sits
+ * ~2 SE under the base's 3.1674 with shots flat; the M1/M3 gates band it.
  */
-const BASELINE_SCORELINE_HASH = 1044906061;
+const BASELINE_SCORELINE_HASH = 381020712;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");

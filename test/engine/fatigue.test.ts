@@ -69,6 +69,15 @@ describe("fatigue + substitutions", () => {
       makeBench(2000),
     );
 
+    // Windows are keyed on MATCH time, not on raw playing time: first-half
+    // stoppage is played before the second half starts, so an `elapsed` reading
+    // sits that much further down the clock than the minute it names. Discounting
+    // it here is the same correction `matchElapsedNow` makes in the engine —
+    // without it every second-half window reads up to eight minutes late and the
+    // half-time window is not at 2700 at all.
+    const h1 = result.boxScore.firstHalfStoppage ?? 0;
+    const matchElapsedOf = (clock: number) => MATCH_SECONDS - clock - h1;
+
     for (const side of ["home", "away"] as const) {
       const subs = result.boxScore.events.filter(
         (e) => e.type === "substitution" && e.side === side,
@@ -93,7 +102,7 @@ describe("fatigue + substitutions", () => {
       // Each in-play window lands within the jitter of one of the nominal
       // moments (plus a tick, since a moment fires on the first tick past it).
       for (const c of clocks) {
-        const elapsed = MATCH_SECONDS - c;
+        const elapsed = matchElapsedOf(c);
         if (Math.abs(elapsed - SUB_WINDOW_HALFTIME_ELAPSED) <= MAX_DT) continue;
         const near = SUB_WINDOW_MOMENTS_ELAPSED.some(
           (m) =>
@@ -107,9 +116,7 @@ describe("fatigue + substitutions", () => {
       // windows (half-time is free and additional), and at most
       // SUB_MAX_PER_WINDOW changes inside any one of them.
       const inPlayWindows = new Set(
-        clocks.filter(
-          (c) => MATCH_SECONDS - c > SUB_WINDOW_HALFTIME_ELAPSED + MAX_DT,
-        ),
+        clocks.filter((c) => matchElapsedOf(c) > SUB_WINDOW_HALFTIME_ELAPSED + MAX_DT),
       );
       expect(inPlayWindows.size).toBeLessThanOrEqual(SUB_WINDOWS_IN_PLAY);
       for (const c of new Set(clocks)) {
@@ -167,38 +174,53 @@ describe("fatigue + substitutions", () => {
     expect(result.boxScore.away).toHaveLength(11);
   });
 
-  it("low-stamina squads generate fewer shots than an otherwise-identical high-stamina squad", () => {
-    // Same composites, same seed, same everything except stamina — fatigue should be the
-    // only thing driving a difference, and tired legs should mean fewer created chances.
-    // trials was 40 pre-interception-split; the three-way tackle/interception credit roll
-    // added an extra rng() draw per turnover, shifting the downstream tick sequence enough
-    // that 40 trials occasionally failed on a borderline seed. Bumped to 200 to smooth that
-    // noise back out rather than change the (intentional, approved) credit-roll logic.
-    const trials = 200;
-    let lowShots = 0;
-    let highShots = 0;
+  it("a tired side generates fewer shots than the fresh side it is playing", () => {
+    /**
+     * Stamina has to be measured ASYMMETRICALLY, and this test used to measure it
+     * the other way: both sides tired against both sides fresh.
+     *
+     * That is very nearly a null measurement. `chanceP` is driven by
+     * `off.attack - def.defense`, so fatigue applied equally to both sides
+     * cancels out of the difference and only the residual survives — attack and
+     * defense sit on slightly different fatigue curves. Measured, the symmetric
+     * form is worth 0.12% and `origin/main` passed it BY ONE SHOT IN 5052. It had
+     * been re-tuned once already (40 trials -> 200) after an earlier rng-stream
+     * shift tipped it, which was the same symptom read as a sampling problem.
+     *
+     * One tired side against one fresh side is worth 6.5-7.0% on the same
+     * fixture, i.e. ~50x the signal, because the fatigue gap now lands squarely
+     * in the term that decides a chance. The orientation is flipped and summed so
+     * HOME_ATTACK_BONUS cancels across the pair rather than being mistaken for
+     * the effect. Verified on both `origin/main` (+6.98%) and this branch
+     * (+6.50%) before it was adopted, so it is not a gate tuned to whichever
+     * change happened to need it — see `scripts/staminaShotProbe.ts`, which
+     * prints both forms side by side.
+     */
+    const trials = 300;
+    let tiredShots = 0;
+    let freshShots = 0;
     for (let seed = 1; seed <= trials; seed++) {
-      const lowRng = mulberry32(seed);
-      const low = simMatchDetailed(
-        lowRng,
-        makeTeam("Home"),
-        makeTeam("Away"),
-        makeSquad(0, 1),
-        makeSquad(100, 1),
-      );
-      lowShots += low.stat.home.shots + low.stat.away.shots;
-
-      const highRng = mulberry32(seed);
-      const high = simMatchDetailed(
-        highRng,
+      const freshAtHome = simMatchDetailed(
+        mulberry32(seed),
         makeTeam("Home"),
         makeTeam("Away"),
         makeSquad(0, 99),
+        makeSquad(100, 1),
+      );
+      freshShots += freshAtHome.stat.home.shots;
+      tiredShots += freshAtHome.stat.away.shots;
+
+      const freshAway = simMatchDetailed(
+        mulberry32(seed),
+        makeTeam("Home"),
+        makeTeam("Away"),
+        makeSquad(0, 1),
         makeSquad(100, 99),
       );
-      highShots += high.stat.home.shots + high.stat.away.shots;
+      tiredShots += freshAway.stat.home.shots;
+      freshShots += freshAway.stat.away.shots;
     }
-    expect(lowShots).toBeLessThan(highShots);
+    expect(tiredShots).toBeLessThan(freshShots);
   });
 
   it("red-carded players are removed from the pitch and can't be subbed off or on again", () => {

@@ -330,16 +330,62 @@ export const PENALTY_MISS_SAVED_PROB = 0.65;
 // the tackle itself, since that's the sim's only notion of player-on-player contact).
 export const INJURY_PROB_ON_TACKLE = 0.003;
 
-// --- Stoppage time (M5) ---
-// The engine's tick loop has no halftime break to insert extra time into, so
-// both halves' stoppage is computed from their own event counts (goals,
-// cards, subs, corners, penalties, injuries) and played out together at the
-// very end — statistically equivalent to inserting it mid-match, since every
-// per-tick roll is memoryless, and it avoids reworking clock semantics.
+// --- Stoppage time (M5; halves became real periods 2026-09-10) ---
+// Each half now ends with its OWN stoppage, played where it belongs, so the
+// timeline reads 45+n and 90+n the way a real one does.
+//
+// This replaced a model that computed both halves' stoppage from their own
+// event counts and then played the whole lot at the end of the second half.
+// That was defended as "statistically equivalent, since every per-tick roll is
+// memoryless" — true of the SCORELINE, and false of everything a viewer reads:
+// there was no half-time in the clock at all, so first-half stoppage did not
+// exist as a passage of play, no event could ever be stamped 45+1, and a
+// first-half injury bought three minutes that were handed to the 93rd.
+//
+// A half's stoppage is a floor plus the time the half actually lost:
+//   STOPPAGE_MIN + STOPPAGE_SECONDS_PER_EVENT * (notable events)
+//                + (clock genuinely consumed by goal celebrations)
+// The first term is the referee's standing allowance, the second a flat stand-in
+// for the time a card, injury, penalty or substitution eats, and the third is
+// real: GOAL_RESTART lets a goal consume clock, and this hands that time back.
+// See simMatchDetailed's celebration note for why those two must stay paired.
 export const HALF_SECONDS = MATCH_SECONDS / 2;
 export const STOPPAGE_MIN_SECONDS_PER_HALF = 60; // 1 minute floor, per spec
-export const STOPPAGE_MAX_SECONDS_PER_HALF = 300; // 5 minute ceiling, per spec
+// 5 minutes, "per spec" — and still exactly that for the composite-only
+// `simMatch`, which is the M1 benchmark path and must not move. See
+// STOPPAGE_BOARD_MAX_SECONDS for the detailed engine's own cap.
+export const STOPPAGE_MAX_SECONDS_PER_HALF = 300;
 export const STOPPAGE_SECONDS_PER_EVENT = 20;
+// The detailed engine's cap on one half's board: 8 minutes. On its own the raise
+// from 5 is very nearly inert — at 20s an event a half needs 12+ notable events
+// to reach 300 — and it exists FOR the celebration credit, which routinely adds
+// two minutes to a half that saw two goals. A clipped credit is not a cosmetic
+// loss: it is playing time deleted from exactly the most eventful halves, a quiet
+// negative feedback on scoring. Modern top-flight halves genuinely run this long.
+//
+// A SEPARATE constant, not a retune of the one above, and that is load-bearing:
+// the first cut of this change raised STOPPAGE_MAX_SECONDS_PER_HALF itself and
+// rounded inside the shared `computeStoppageSeconds`, which leaked straight into
+// `simMatch` and moved its golden snapshot — while the code, the commit and
+// CLAUDE.md all said simMatch was untouched. CI caught it; no local run did,
+// because test/matchSim.test.ts sits outside every directory that was run.
+export const STOPPAGE_BOARD_MAX_SECONDS = 480;
+
+// How long the ball is out of play after a goal: the celebration, the walk back,
+// the restart. Drawn per goal on the MAIN rng, because it is a real quantity
+// that changes how much football is left, not decoration.
+//
+// It exists because goals used to cost nothing: `dt` is 2-10 seconds, so two
+// goals could — and did — land in the same displayed minute, including straight
+// after a kickoff. A minimum of a minute makes that arithmetically impossible.
+//
+// Every second spent here is credited back to the half's stoppage (above), so
+// the amount of football played in a match is unchanged. That pairing is the
+// whole reason this could ship without a rebalance: consuming clock WITHOUT the
+// credit deletes ~2 minutes of play per match, which is a scoring change wearing
+// a presentation change's clothes.
+export const GOAL_RESTART_MIN_SECONDS = 55;
+export const GOAL_RESTART_MAX_SECONDS = 95;
 
 // --- Out-of-position familiarity (slot-aware composites) ---
 // The cost, in raw rating points (the same 0-100 scale as a player's skills), of

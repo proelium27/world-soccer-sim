@@ -2285,6 +2285,32 @@ a:hover {
   font-size: var(--sg-text-xs);
   text-align: center;
 }
+/* A beat of the clock — the board, half time, full time. Spans the timeline
+   rather than taking a column, because it belongs to neither club, which is also
+   what makes it read as punctuation between the halves rather than as another
+   event in the list. */
+.bs-ev--marker {
+  grid-template-columns: 1fr;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+.bs-ev-marker {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.bs-ev-marker-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--sg-border);
+}
+.bs-ev-marker-text {
+  color: var(--sg-text-muted);
+  font-size: var(--sg-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
 .bs-ev-chip.bs-chip--goal {
   background: var(--sg-green);
   border-color: var(--sg-green);

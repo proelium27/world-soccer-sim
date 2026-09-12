@@ -169,6 +169,8 @@ function cupCandidate(
         away: m.away,
         matchday,
         events: m.boxScore!.events,
+        finalClock: m.boxScore!.finalClock,
+        firstHalfStoppage: m.boxScore!.firstHalfStoppage,
       });
       return build(
         asLive(ours),
@@ -190,6 +192,8 @@ function cupCandidate(
         away: t.away,
         matchday,
         events: t.boxScore!.events,
+        finalClock: t.boxScore!.finalClock,
+        firstHalfStoppage: t.boxScore!.firstHalfStoppage,
       });
       return build(
         asLive(ours),
@@ -211,6 +215,8 @@ function cupCandidate(
         away: l.away,
         matchday,
         events: l.boxScore.events,
+        finalClock: l.boxScore.finalClock,
+        firstHalfStoppage: l.boxScore.firstHalfStoppage,
       });
       return build(
         asLive(ours),
@@ -232,7 +238,14 @@ function cupCandidate(
         ? // Leg 2 is played at the other ground, so the clubs swap and the
           // events already use that orientation — no flipping needed.
           { home: t.away, away: t.home, matchday, events: splitTwoLeggedEvents(t.boxScore!.events)[1] }
-        : { home: t.home, away: t.away, matchday, events: t.boxScore!.events };
+        : {
+            home: t.home,
+            away: t.away,
+            matchday,
+            events: t.boxScore!.events,
+            finalClock: t.boxScore!.finalClock,
+            firstHalfStoppage: t.boxScore!.firstHalfStoppage,
+          };
     const round = cupRoundName(ours.round, koRounds);
     return build(
       asLive(ours),
@@ -276,6 +289,8 @@ function domesticCandidate(
       away: t.away,
       matchday,
       events: t.boxScore!.events,
+      finalClock: t.boxScore!.finalClock,
+      firstHalfStoppage: t.boxScore!.firstHalfStoppage,
     });
     const subtitle = domesticRoundName(cup, round.round);
     return {

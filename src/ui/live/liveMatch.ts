@@ -12,7 +12,17 @@
 import type { MatchEvent, MatchEventType } from "../../engine/attribution.js";
 import type { MatchScore, PlayedMatch, StandingsRow } from "../../core/standings.js";
 import { computeStandings } from "../../core/standings.js";
-import { MATCH_SECONDS } from "../../engine/constants.js";
+import { eventMinute, REGULATION_MINUTES } from "../matchClock.js";
+
+export {
+  eventMinute,
+  formatClock,
+  halfTimeMinute,
+  matchMinuteLabel,
+  stoppageMinutes,
+  HALF_TIME_MINUTE,
+  REGULATION_MINUTES,
+} from "../matchClock.js";
 
 /**
  * The least a match needs to be watchable: two clubs and a timestamped event
@@ -31,6 +41,13 @@ export interface LiveMatch {
   events: MatchEvent[];
   /** The whistle, when the box score recorded it. See `BoxScore.finalClock`. */
   finalClock?: number;
+  /**
+   * Seconds of stoppage at the end of the first half. See
+   * `BoxScore.firstHalfStoppage` — it is what turns a playing-time minute into
+   * `45+2` rather than `47`, and absent means a match whose first half genuinely
+   * had none.
+   */
+  firstHalfStoppage?: number;
 }
 
 /** A league fixture as something the viewer can play. */
@@ -41,24 +58,8 @@ export function toLiveMatch(m: PlayedMatch): LiveMatch {
     matchday: m.matchday,
     events: m.boxScore.events,
     finalClock: m.boxScore.finalClock,
+    firstHalfStoppage: m.boxScore.firstHalfStoppage,
   };
-}
-
-/** Regulation length. Stoppage pushes real matches past this. */
-export const REGULATION_MINUTES = MATCH_SECONDS / 60;
-
-/** The minute the half-time break falls on. */
-export const HALF_TIME_MINUTE = REGULATION_MINUTES / 2;
-
-/**
- * The match minute an event belongs to. The clock counts DOWN from
- * MATCH_SECONDS, so elapsed time is the remainder; stoppage-time events run the
- * clock below zero and so land past 90. Deliberately identical to BoxScore's
- * `formatClock`, or the same event would be labelled differently on the two
- * surfaces.
- */
-export function eventMinute(clock: number): number {
-  return Math.max(1, Math.ceil((MATCH_SECONDS - clock) / 60));
 }
 
 /**

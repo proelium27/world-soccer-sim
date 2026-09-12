@@ -601,6 +601,25 @@ export function Manual() {
             yet, and possession and xG appear only at full time (they aren't tracked minute by
             minute).
           </p>
+          <p>
+            The feed says what a booking was for, and where a shot came from. A card reads "late
+            challenge" or "tactical foul, breaks up the counter" or "time wasting"; a shot reads
+            "from the spot", "header from the corner", "tap-in" or "from the edge of the box". These
+            follow what actually happened in the match rather than being picked at random: a booking
+            that gave away a penalty can only be a foul in the box and will never claim to be time
+            wasting, while one shown late on by a side protecting a lead can be. A second yellow is
+            recognised as one rather than guessed at.
+          </p>
+          <p>
+            Shot locations have one honest limit: the match engine doesn't track where anyone is on
+            the pitch. Penalties, corner headers and free kicks are real, because the engine really
+            played them. For every other shot the game picks a spot that fits how the shot ended,
+            so goals mostly come from inside the box, blocked shots more often from outside it, and
+            a striker's efforts sit closer to goal than a holding midfielder's. Over a season that
+            lands on the same split real top flights have. The location is a description, though,
+            not a cause: it doesn't change the xG. It's all worked out from the match itself, not
+            stored, so old box scores have it too &mdash; right back to your first season.
+          </p>
           <p>After matchday 38, the offseason runs on its own, in this order:</p>
           <ol>
             <li>AI clubs renew expiring contracts for players they still rate (<a href="#ai">details</a>).</li>
@@ -1720,7 +1739,7 @@ export function Manual() {
             <li><strong>Fatigue &amp; substitutions</strong>. Players tire as the match runs, and the coach has five substitutions to spend. Like real football, they're limited by <em>opportunities</em> rather than one at a time: he gets three chances to make changes during play, and he can bring on up to three players at a single one of them, so a triple change costs him one chance and not three. Half-time is a free extra chance that doesn't count against those three. That's why you'll see two or three players go on together around the hour, and why a coach who's already used all three chances has nothing left to respond with late on. Managers pick their own minutes rather than every club in the world changing its team at the same moment. Most sides end up making four or five changes, some fewer, which is roughly what a real top-flight team does. Subs aren't automatic anymore: the coach weighs how good the fresh bench player is against the tired starter he'd replace, and also how that starter is actually playing on the day. A close-quality bench refreshes freely, but he won't pull a good starter for a much weaker reserve unless that starter is genuinely gassed, so a shallow bench leaves your tired legs on. A starter tearing the game up is harder to justify hooking than one having a stinker, even at the same fitness. The coach also cares where a replacement would have to play: he's filling a specific hole in the shape, so a bench striker who'd have to cover at centre-back has to be a lot better to be worth it, and if nobody on the bench fits, the tired starter stays on rather than the shape getting wrecked. The one exception is the chase-the-game sub late on when you're losing, where the coach deliberately changes shape instead, pulling a defender for an attacker who plays his own position. He also gets less fussy as the clock runs down. A player brought on with five minutes left only has five minutes to be worse in, so a drop in quality that would be daft at half-time costs almost nothing at 85 minutes, and that's where the familiar late run-out for a fringe player comes from. Half-time is the opposite: nobody is tired yet and there's a whole half to play, so he only makes one when the bench is a genuine upgrade, usually on someone having a poor half. And if you've spent all five and then someone gets injured, you finish the game with ten men. Your matches use the same in-match sub logic. You can also flag any bench player for <strong>More minutes</strong> on the Roster page, which tips the coach toward bringing him on more often.</li>
             <li><strong>Suspensions</strong>. Cards follow a player around. Pick up 5 yellows over the league season and he misses the next match; get sent off for a second yellow and he misses 1; get a straight red and he misses 3. If a sending-off and your fifth yellow land in the same game you serve the longer of the two, not both. Bans only cover league matches, so a suspended player is still available for the Continental Cup, and only league cards count toward them. He shows a red card marker on your Roster and his profile, your Dashboard lists everyone banned, and he's left out of your XI automatically until he's served it. Everything resets when the season does.</li>
             <li><strong>Injuries</strong>. A player can go down mid-match and miss 1&ndash;6 matches. Recovery ticks down as you sim, and he comes back on his own. While he's hurt he shows a red cross on your Roster (both the pitch and the tables) and on his profile, and your Dashboard lists everyone currently sidelined. He's automatically left out of your XI until he's fit.</li>
-            <li><strong>Stoppage time</strong>. Scaled to how eventful the half was.</li>
+            <li><strong>Stoppage time</strong>. Each half ends with its own, so the clock reads 45+2 and 90+4 rather than running straight past 90. The board is a standing minute, plus time for each notable thing that happened in that half, plus the time the goals actually took &mdash; a goal costs about a minute for the celebration and the restart, and the referee gives it back. Score in stoppage and the board goes up again, because that celebration has to be added on too. Expect around three minutes at the break and six at the end, more in a busy half. The feed marks the board, half time and full time as they happen. Minutes played are counted the way a scoreboard counts them: the clock holds at 45 and 90 through stoppage, so a player who lasts the whole match is down for 90 however much was added, and per-90 figures divide by exactly that.</li>
           </ul>
           <p>
             When the XI changes mid-match (a sub, a red card, an injury), the team's effective

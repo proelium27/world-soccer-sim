@@ -82,7 +82,11 @@ const MATCHES = SEEDS.map(playedMatch);
  */
 function atFullTime(box: BoxScore, lineups = matchLineups(box)) {
   const last = finalMinute(box.events, box.finalClock);
-  return liveMatchState(lineups, box.events, last, box.finalClock);
+  // `firstHalfStoppage` too, for the same reason as `finalClock`: minutes are
+  // counted on the match clock, which holds through stoppage, so without it the
+  // derivation falls back to the legacy playing-time rule and credits every
+  // player with the stoppage the engine no longer counts.
+  return liveMatchState(lineups, box.events, last, box.finalClock, box.firstHalfStoppage);
 }
 
 /**

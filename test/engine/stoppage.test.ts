@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { mulberry32 } from "../../src/engine/rng.js";
 import { makeTeam } from "../../src/engine/composites.js";
-import { simMatch, simMatchDetailed, computeStoppageSeconds } from "../../src/engine/matchSim.js";
+import { simMatch, simMatchDetailed, computeStoppageSeconds, stoppageBoardSeconds } from "../../src/engine/matchSim.js";
 import {
   STOPPAGE_MIN_SECONDS_PER_HALF,
   STOPPAGE_MAX_SECONDS_PER_HALF,
+  STOPPAGE_BOARD_MAX_SECONDS,
   STOPPAGE_SECONDS_PER_EVENT,
 } from "../../src/engine/constants.js";
 import type { MatchPlayer } from "../../src/engine/attribution.js";
@@ -55,9 +56,10 @@ describe("stoppage time", () => {
       for (const e of result.boxScore.events) {
         if (e.clock < 0) {
           sawStoppageEvent = true;
-          // Clock shouldn't run away indefinitely: bounded by the max stoppage
-          // for both halves combined.
-          expect(e.clock).toBeGreaterThanOrEqual(-2 * STOPPAGE_MAX_SECONDS_PER_HALF);
+          // Clock shouldn't run away indefinitely: bounded by the detailed
+          // engine's board cap for both halves combined. That is its OWN cap,
+          // not simMatch's STOPPAGE_MAX_SECONDS_PER_HALF — see the constants.
+          expect(e.clock).toBeGreaterThanOrEqual(-2 * STOPPAGE_BOARD_MAX_SECONDS);
         }
       }
     }
@@ -78,5 +80,28 @@ describe("stoppage time", () => {
       expect(s).toBeGreaterThanOrEqual(STOPPAGE_MIN_SECONDS_PER_HALF);
       expect(s).toBeLessThanOrEqual(STOPPAGE_MAX_SECONDS_PER_HALF);
     }
+  });
+
+  it("simMatch's stoppage is NOT rounded — it is the M1 benchmark path and must not move", () => {
+    // One event is 60 + 20 = 80 seconds. The detailed board would round that to
+    // 60; simMatch must keep it at 80, or its golden snapshot and the M1 bands
+    // it is calibrated against move. This is the exact leak the half-time
+    // rework's first cut shipped with.
+    expect(computeStoppageSeconds(1)).toBe(80);
+  });
+
+  it("the detailed engine's board is whole minutes, credits the celebrations, and caps at its own maximum", () => {
+    for (const events of [0, 1, 2, 5, 9]) {
+      for (const lost of [0, 55, 140, 260]) {
+        const s = stoppageBoardSeconds(events, lost);
+        expect(s % 60).toBe(0);
+        expect(s).toBeGreaterThanOrEqual(STOPPAGE_MIN_SECONDS_PER_HALF);
+        expect(s).toBeLessThanOrEqual(STOPPAGE_BOARD_MAX_SECONDS);
+      }
+    }
+    // Celebration time is added, not ignored...
+    expect(stoppageBoardSeconds(2, 150)).toBeGreaterThan(stoppageBoardSeconds(2, 0));
+    // ...and the cap holds however much the half lost.
+    expect(stoppageBoardSeconds(1000, 1000)).toBe(STOPPAGE_BOARD_MAX_SECONDS);
   });
 });

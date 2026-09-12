@@ -10,12 +10,7 @@
  */
 import { Link } from "react-router-dom";
 import type { MatchEvent, MatchEventType } from "../../engine/attribution.js";
-
-/** Match clock counts down from 5400s, so elapsed minutes read off the remainder. */
-export function formatClock(seconds: number): string {
-  const mins = Math.max(1, Math.ceil((5400 - seconds) / 60));
-  return `${mins}'`;
-}
+import { formatClock, type PeriodMarker } from "../matchClock.js";
 
 /* ---------------------------------------------------------------------------
    Icons
@@ -120,9 +115,12 @@ export function chipTone(type: MatchEventType): string {
 export function EventBody({
   event,
   playerName,
+  detail,
 }: {
   event: MatchEvent;
   playerName: (pid: number) => string;
+  /** Why the card, or where the shot came from. See matchNarration.ts. */
+  detail?: string | null;
 }) {
   const link = (pid: number) => (
     <Link key={pid} to={`/player/${pid}`}>
@@ -139,6 +137,7 @@ export function EventBody({
           </span>
           <span>
             <strong className="bs-ev-headline">Goal</strong> {link(event.pids[0])}
+            {detail && <span className="bs-ev-sub">{detail}</span>}
             {event.pids[1] !== undefined && (
               <span className="bs-ev-sub">assist {playerName(event.pids[1])}</span>
             )}
@@ -156,6 +155,7 @@ export function EventBody({
           <span>
             <span className="bs-ev-kind">{red ? "Red card" : "Yellow card"}</span>{" "}
             {link(event.pids[0])}
+            {detail && <span className="bs-ev-sub">{detail}</span>}
           </span>
         </div>
       );
@@ -214,8 +214,16 @@ export function EventBody({
             ? "Blocked"
             : "Off target";
       return (
+        // Wrapped in ONE span, like the goal and card rows above. The home column
+        // mirrors the timeline with `flex-direction: row-reverse`, which reverses
+        // a body's direct children — so an unwrapped row renders its parts
+        // backwards ("from distance Marcel Schmidt Blocked"). One child means the
+        // reversal has nothing to reorder and the clause stays beside the player.
         <div className="bs-ev-body bs-ev-body--quiet">
-          <span className="bs-ev-kind">{label}</span> {link(event.pids[0])}
+          <span>
+            <span className="bs-ev-kind">{label}</span> {link(event.pids[0])}
+            {detail && <span className="bs-ev-sub">{detail}</span>}
+          </span>
         </div>
       );
     }
@@ -240,17 +248,21 @@ export function eventSummary(
   event: MatchEvent,
   playerName: (pid: number) => string,
   clubName?: string,
+  firstHalfStoppage?: number,
+  detail?: string | null,
 ): string {
   const who = (i: number) => playerName(event.pids[i]);
   const club = clubName ? `${clubName}. ` : "";
-  const at = `${formatClock(event.clock)} ${club}`;
+  const at = `${formatClock(event.clock, firstHalfStoppage)} ${club}`;
+  // Spoken the same way it is shown, so a screen reader is not told less.
+  const why = detail ? `, ${detail}` : "";
   switch (event.type) {
     case "goal":
-      return `${at}Goal, ${who(0)}${event.pids[1] !== undefined ? `, assisted by ${who(1)}` : ""}.`;
+      return `${at}Goal, ${who(0)}${why}${event.pids[1] !== undefined ? `, assisted by ${who(1)}` : ""}.`;
     case "yellow_card":
-      return `${at}Yellow card, ${who(0)}.`;
+      return `${at}Yellow card, ${who(0)}${why}.`;
     case "red_card":
-      return `${at}Red card, ${who(0)}.`;
+      return `${at}Red card, ${who(0)}${why}.`;
     case "substitution":
       return `${at}Substitution, ${who(1)} on for ${who(0)}.`;
     case "penalty":
@@ -260,7 +272,7 @@ export function eventSummary(
     case "corner":
       return `${at}Corner.`;
     case "shot_saved":
-      return `${at}Shot saved, ${who(0)}.`;
+      return `${at}Shot saved, ${who(0)}${why}.`;
     case "shot_blocked":
       return `${at}Shot blocked, ${who(0)}.`;
     case "shot_off_target":
@@ -274,13 +286,19 @@ export function TimelineRow({
   event,
   playerName,
   clubName,
+  firstHalfStoppage,
+  detail,
 }: {
   event: MatchEvent;
   playerName: (pid: number) => string;
   /** Which club this belongs to. Sighted readers get it from the column; nobody else does. */
   clubName?: string;
+  /** See BoxScore.firstHalfStoppage — what makes a stoppage minute read 45+2. */
+  firstHalfStoppage?: number;
+  /** Why the card, or where the shot came from. See matchNarration.ts. */
+  detail?: string | null;
 }) {
-  const body = <EventBody event={event} playerName={playerName} />;
+  const body = <EventBody event={event} playerName={playerName} detail={detail} />;
   if (!body) return null;
   // The clock chip is real text in the middle column, so the hidden summary
   // deliberately leads with the club rather than repeating the minute.
@@ -296,10 +314,34 @@ export function TimelineRow({
       <div className="bs-ev-cell bs-ev-cell--home">{event.side === "home" && cell}</div>
       <div className="bs-ev-spine">
         <span className={`bs-ev-chip stat-num ${chipTone(event.type)}`}>
-          {formatClock(event.clock)}
+          {formatClock(event.clock, firstHalfStoppage)}
         </span>
       </div>
       <div className="bs-ev-cell bs-ev-cell--away">{event.side === "away" && cell}</div>
+    </div>
+  );
+}
+
+/**
+ * A beat of the clock rather than something a player did: the fourth official's
+ * board, half time, full time.
+ *
+ * Spans the timeline instead of picking a column, because it belongs to neither
+ * club — which is also what makes it read as punctuation between the two halves
+ * rather than as another event in the list.
+ */
+export function TimelineMarkerRow({ marker }: { marker: PeriodMarker }) {
+  const text =
+    marker.addedMinutes === undefined
+      ? marker.label
+      : `${marker.addedMinutes} ${marker.addedMinutes === 1 ? "minute" : "minutes"} added`;
+  return (
+    <div className="bs-ev bs-ev--marker">
+      <div className="bs-ev-marker">
+        <span className="bs-ev-marker-rule" aria-hidden="true" />
+        <span className="bs-ev-marker-text">{text}</span>
+        <span className="bs-ev-marker-rule" aria-hidden="true" />
+      </div>
     </div>
   );
 }
