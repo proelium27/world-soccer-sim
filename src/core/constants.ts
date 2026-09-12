@@ -5069,6 +5069,23 @@ export const MANAGER_OFFER_MAX_CHANCE = 0.8;
  */
 export const MANAGER_SACKED_PRESTIGE_PENALTY = 0.18;
 
+/**
+ * Clubs you can say you'd like to manage at once. Small on purpose: "I want
+ * these three jobs" is a statement of intent, and a list of thirty would just be
+ * a second, worse offer generator.
+ */
+export const MANAGER_MAX_INTERESTS = 3;
+/**
+ * Per-offseason chance a club you've asked about comes calling, when you're
+ * comfortably good enough for it. Scaled down by how far the club sits above your
+ * level (see `interestReach`), so it never reaches a job the ordinary band would
+ * call out of reach. More than double `MANAGER_OFFER_BASE_CHANCE`, since telling a
+ * club you want it is supposed to matter, and well short of certain, since a
+ * club still picks its manager rather than the other way round.
+ */
+export const MANAGER_INTEREST_CHANCE = 0.5;
+export const MANAGER_INTEREST_MAX_CHANCE = 0.85;
+
 /** Reputation a manager starts a career on, before any results, 0-100. */
 export const MANAGER_REP_BASE = 30;
 export const MANAGER_REP_TITLE_WEIGHT = 13;
@@ -5204,6 +5221,16 @@ export const NATIONAL_OFFER_FORM_WEIGHT = 0.7;
 export const NATIONAL_OFFER_MAX_CHANCE = 0.85;
 /** Losing a job drops the calibre of nation that will take you next. */
 export const NATIONAL_SACKED_PRESTIGE_PENALTY = 0.2;
+
+/** Countries you can say you'd like to manage at once. The club side's reasoning. */
+export const NATIONAL_MAX_INTERESTS = 3;
+/**
+ * Per-offseason chance a country you've asked about gets in touch, when you're
+ * good enough for it — scaled by `interestReach` against `NATIONAL_OFFER_BAND`
+ * exactly as the club version is.
+ */
+export const NATIONAL_INTEREST_CHANCE = 0.5;
+export const NATIONAL_INTEREST_MAX_CHANCE = 0.85;
 
 /** Reputation as an international manager, 0-100, derived from the stint record. */
 export const NATIONAL_REP_BASE = 30;

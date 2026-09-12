@@ -450,6 +450,17 @@ export function Manual() {
             your peers &mdash; fewer of them, and all from clubs in the same bracket as yours.
           </p>
           <p>
+            <strong>You can also say which jobs you'd like.</strong> Under Jobs you'd like on the
+            Manager page, pick up to three clubs and three countries. Every summer each one gets
+            its own chance to call, on top of the usual offers, and it doesn't care about the
+            "never a step down" rule: any club or country at your level or below would be glad to
+            have you, so a decorated manager can go back to the small club they started at. A job
+            above your level only calls if your record is close to good enough for it, and the
+            closer you are the likelier it gets. Each pick shows whether it's within reach, a long
+            shot, or out of reach for now. Asking never hands you a job; it only makes the call
+            more likely, and a club you ask for comes off the list once you take it.
+          </p>
+          <p>
             Taking a job has real costs, and they're worth knowing before you click. Your current
             squad goes straight to the AI. Your youth academy graduates onto that club's senior
             roster on the way out, so those prospects are gone. Any transfer talks, incoming bids and
@@ -1460,6 +1471,9 @@ export function Manual() {
             off entirely and approaches arrive far more readily, because that's the only way back
             in. Approaches are rarer at the top: manage one of the best teams in the world and only
             a handful of jobs are even a sideways move, so it might be a few summers between calls.
+            If there's a particular country you want, pick it under Jobs you'd like on the Manager
+            page and it gets its own chance to get in touch each summer, the same way a club you
+            ask for does.
           </p>
           <p>
             Your club career isn't invisible to federations, but they discount it heavily. A big

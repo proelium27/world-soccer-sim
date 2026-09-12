@@ -124,6 +124,15 @@ export interface ManagerState {
    * and on any save whose seasons all predate the board.
    */
   lastVerdict: ManagerVerdictRecord | null;
+  /**
+   * Clubs the user has said they'd like to manage (tids, at most
+   * `MANAGER_MAX_INTERESTS`). Each gets its own extra roll when offers are drawn,
+   * if the user is good enough for it — it never creates a job out of nothing.
+   *
+   * Optional, absent meaning none, so no save needed migrating: nobody had asked
+   * for anything before this existed. Read through `clubInterests`.
+   */
+  interests?: number[];
 }
 
 /**

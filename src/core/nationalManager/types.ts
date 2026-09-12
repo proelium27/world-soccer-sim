@@ -102,6 +102,12 @@ export interface NationalManagerState {
   sackingEnabled: boolean;
   /** The federation's verdict on the most recent campaign it judged. */
   lastVerdict: NationalVerdictRecord | null;
+  /**
+   * Countries the user has said they'd like to manage (at most
+   * `NATIONAL_MAX_INTERESTS`). The national twin of `ManagerState.interests`, and
+   * optional for the same reason. Read through `nationInterests`.
+   */
+  interests?: string[];
 }
 
 /**

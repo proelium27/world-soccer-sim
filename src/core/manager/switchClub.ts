@@ -185,6 +185,11 @@ export function switchClub(
     stints: [...stints, newStint(newTid, startSeason)],
     offers: [],
     sacked: false,
+    // You got the job, so it's no longer one you're asking for. The rest of the
+    // list stays: wanting Barcelona is about the manager, not the club he's at.
+    ...(league.manager.interests
+      ? { interests: league.manager.interests.filter((t) => t !== newTid) }
+      : {}),
     // Belongs to the club just left. Kept, it renders beside the new club's
     // fresh bar as "confidence went 12 -> 0" with no club named, which reads as
     // the new board's verdict on a season it never saw.

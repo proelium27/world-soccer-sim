@@ -7,6 +7,7 @@ import { confidenceMood, confidenceLabel } from "../../core/manager/confidence.j
 import { managerReputation } from "../../core/manager/jobOffers.js";
 import { cachedExpectations } from "../../core/manager/expectation.js";
 import { ExpectationPanel, LastSeasonPanel } from "./managerPanels.js";
+import { JobInterestsPanel } from "./JobInterestsPanel.js";
 import { difficultyProfile } from "../../core/constants.js";
 import type { JobOffer, ManagerStint } from "../../core/manager/types.js";
 
@@ -28,6 +29,7 @@ const MOOD_CLASS: Record<string, string> = {
 export function Manager() {
   const {
     league, acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction, simming,
+    setClubInterestAction, setNationInterestAction,
   } = useLeague();
   const navigate = useNavigate();
 
@@ -67,7 +69,12 @@ export function Manager() {
           size={32}
         />
         <div className="flex-grow-1">
-          <div className="fw-semibold">{clubName(offer.tid)}</div>
+          <div className="fw-semibold">
+            {clubName(offer.tid)}
+            {manager.interests?.includes(offer.tid) && (
+              <span className="badge bg-primary ms-2">You asked about them</span>
+            )}
+          </div>
           <div className="text-muted small">
             {compName(offer.compId)}
             {offer.moving === "promoted" && (
@@ -229,6 +236,13 @@ export function Manager() {
           )}
         </>
       )}
+
+      <JobInterestsPanel
+        league={league}
+        simming={simming}
+        onClub={(tid, on) => { void setClubInterestAction(tid, on); }}
+        onNation={(nation, on) => { void setNationInterestAction(nation, on); }}
+      />
 
       <h5 className="mt-4">Career</h5>
       <div className="table-responsive">

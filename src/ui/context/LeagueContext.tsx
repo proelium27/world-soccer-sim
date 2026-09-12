@@ -37,7 +37,8 @@ import {
   type PlayerEdit, type NewPlayerSpec,
 } from "../../core/godMode.js";
 import { switchClub } from "../../core/manager/switchClub.js";
-import { takeNationalJob, leaveNationalJob } from "../../core/nationalManager/index.js";
+import { takeNationalJob, leaveNationalJob, setNationInterest } from "../../core/nationalManager/index.js";
+import { setClubInterest } from "../../core/manager/interests.js";
 import {
   editableSquad, writeSquad, isValidNationSquad, squadRating, isEligibleNation,
 } from "../../core/international/index.js";
@@ -143,6 +144,10 @@ interface LeagueContextValue {
   declineJobOffersAction: () => Promise<void>;
   /** Save-level switch for whether the board can sack you at all. */
   setSackingEnabledAction: (on: boolean) => Promise<void>;
+  /** Add or remove a club from the jobs you'd like. */
+  setClubInterestAction: (tid: number, on: boolean) => Promise<void>;
+  /** Add or remove a country from the national jobs you'd like. */
+  setNationInterestAction: (nation: string, on: boolean) => Promise<void>;
   /** Take charge of a national team, leaving whichever one you had. */
   takeNationalJobAction: (nation: string) => Promise<void>;
   /** Step down from the national job, going back to club football only. */
@@ -961,6 +966,18 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     [mutate],
   );
 
+  // Interests only ever change which offers get drawn at the next review, so
+  // they're safe at any point in the season and need no phase gate.
+  const setClubInterestAction = useCallback(
+    (tid: number, on: boolean) => mutate((l) => setClubInterest(l, tid, on)),
+    [mutate],
+  );
+
+  const setNationInterestAction = useCallback(
+    (nation: string, on: boolean) => mutate((l) => setNationInterest(l, nation, on)),
+    [mutate],
+  );
+
   // --- National team ------------------------------------------------------
   // Every squad edit goes through the same three steps: find which campaign the
   // pending stage belongs to (editableSquad is the one answer to that), validate
@@ -1284,6 +1301,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     playSuperCupsAction,
     setGodModeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
+    setClubInterestAction, setNationInterestAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,
     setNationalFormationAction, autoPickNationalXIAction,
@@ -1326,6 +1344,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSetProgressionModelAction,
     setWorldCupSizeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
+    setClubInterestAction, setNationInterestAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,
     setNationalFormationAction, autoPickNationalXIAction,
