@@ -92,6 +92,50 @@ export interface IntlQualifyingCampaign {
    * drawn under — see planQualifying.
    */
   places?: Record<string, number>;
+  /**
+   * The playoffs that decided each confederation's last places, filled when the
+   * final leg is played (see qualifyingPlayoff.ts). Optional so a campaign
+   * finished before playoffs existed, which filled those places on points,
+   * needs no backfill: absent is exactly what happened.
+   */
+  playoffs?: IntlQualifyingPlayoff[];
+}
+
+/**
+ * One round of a qualifying playoff. In a `qualifies` round every winner is
+ * through; otherwise the winners play on and the losers are out.
+ */
+export interface IntlQualifyingPlayoffRound {
+  qualifies: boolean;
+  /** Single-leg ties, better seed at home. `boxScore` is always null, as for every qualifier. */
+  ties: CupTie[];
+}
+
+/**
+ * The playoff between every nation that finished in a confederation's partly
+ * qualifying position (the third-placed sides, say) for the places that
+ * position was given. Group record only seeds it.
+ */
+export interface IntlQualifyingPlayoff {
+  confederation: string;
+  /** Finishing position the entrants shared, 0 = group winners. */
+  position: number;
+  places: number;
+  /** Entrants' nids, best group record first (per-game, see rankAcrossGroups). */
+  entrants: number[];
+  rounds: IntlQualifyingPlayoffRound[];
+  /** Nids that won a place, in the order they won it. */
+  qualified: number[];
+}
+
+/** An archived qualifying playoff: the same record keyed by nation name. */
+export interface IntlQualifyingPlayoffSummary {
+  confederation: string;
+  position: number;
+  places: number;
+  entrants: string[];
+  rounds: { qualifies: boolean; results: IntlKnockoutResult[] }[];
+  qualified: string[];
 }
 
 /**
@@ -217,6 +261,8 @@ export interface IntlQualifyingSummary {
   entered: number;
   groups: IntlGroupTable[];
   qualified: string[];
+  /** Absent on a campaign that finished before qualifying playoffs existed. */
+  playoffs?: IntlQualifyingPlayoffSummary[];
 }
 
 /**

@@ -1339,14 +1339,23 @@ export function Manual() {
           </p>
           <p>
             How many go through from any one qualifying group isn't fixed. Every group winner
-            qualifies, and then the runners-up from all of that confederation's groups are ranked
-            against each other for whatever places are left, so a strong runner-up can go through
-            while a weaker one in the next group misses out. Both the confederation's share of the
-            places and the groups it plays in are settled the moment the campaign is drawn, three
-            offseasons before the last round is played, so the Qualifying page tells you what each
-            confederation is playing for from the start. In the tables, a solid bar down the left
-            marks a place that qualifies outright and a fainter one marks a place that's in the
-            running for whatever's left.
+            qualifies, and it works down the table from there: if the confederation has a place for
+            every group's runner-up, they're all through too, and so on. When the places run out
+            part way through a finishing position (four places left for six third-placed nations,
+            say), everyone who finished there goes into a <strong>playoff</strong> for them. Each tie
+            is one match at the ground of whoever had the better group record, with extra time and
+            penalties if it's level. If there are at least half as many places as nations, every
+            winner is through and the losers play on for what's left, so nobody gets in without
+            winning a game. Your group record only decides who you draw and whether you're at home.
+            The playoff is played straight after the last round of qualifying, in the same click, and
+            the results sit under that confederation's groups on the Qualifying page.
+          </p>
+          <p>
+            Both the confederation's share of the places and the groups it plays in are settled the
+            moment the campaign is drawn, three offseasons before the last round is played, so the
+            Qualifying page tells you what each confederation is playing for from the start. In the
+            tables, a solid bar down the left marks a place that qualifies outright and a fainter one
+            marks a place that goes into the playoff.
           </p>
           <p>
             A big field can be most of the nations that can field a squad at all, so some

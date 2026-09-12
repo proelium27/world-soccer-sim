@@ -3,7 +3,8 @@ import { useLeague } from "../../context/LeagueContext.js";
 import { seasonYear } from "../../format.js";
 import { INTL_TOURNAMENT_NAME, INTL_FIELD_SIZE } from "../../../core/constants.js";
 import {
-  qualifyingPlan, manageableNations, type ConfederationQualifyingPlan,
+  qualifyingPlan, manageableNations, summarizeQualifying, type ConfederationQualifyingPlan,
+  type IntlQualifyingPlayoffSummary,
 } from "../../../core/international/index.js";
 import { resolveWorldCupSize } from "../../../core/international/format.js";
 import { WorldCupSizeSelect, worldCupSizeBlurb } from "../../components/WorldCupSizeSelect.js";
@@ -18,6 +19,8 @@ interface ConfGroups {
   groups: StandingRow[][];
   /** Its allocation, when the campaign is live enough to derive one. */
   plan?: ConfederationQualifyingPlan;
+  /** Its playoff, once played. */
+  playoff?: IntlQualifyingPlayoffSummary;
 }
 
 /** What to call the nations finishing in a given group position, index 0 = first. */
@@ -51,19 +54,22 @@ function planSentence(plan: ConfederationQualifyingPlan, fieldSize: number): str
         + "playing a qualifier.";
   }
 
-  // The quota is always some run of positions that take every group's place,
-  // then at most one that takes only part of the next (placesByPosition stops
-  // the moment the places run out). Saying the run as a run reads far better
-  // than listing it: "every group's top three" over "every group's winner,
-  // every group's runner-up, every group's third-placed nation".
-  const full = plan.byPosition.filter((take) => take === plan.groups).length;
-  const partial = plan.byPosition.length > full ? plan.byPosition[full] : 0;
+  // The quota is always some run of positions that go through outright, then
+  // at most one that is decided by a playoff (placesByPosition stops the
+  // moment the places run out). Saying the run as a run reads far better than
+  // listing it: "every group's top three" over "every group's winner, every
+  // group's runner-up, every group's third-placed nation".
+  const full = plan.playoff ? plan.byPosition.length - 1 : plan.byPosition.length;
   const each = plan.groups === 1 ? "the" : "every group's";
 
   const parts: string[] = [];
   if (full === 1) parts.push(plan.groups === 1 ? "the group winner" : "every group winner");
   else if (full > 1) parts.push(`${each} top ${count(full)}`);
-  if (partial > 0) parts.push(`the ${count(partial)} best ${placeName(full)}`);
+  if (plan.playoff) {
+    const { entrants, places, position } = plan.playoff;
+    const last = places === 1 ? "the last place" : `the last ${count(places)}`;
+    parts.push(`a playoff between the ${count(entrants)} ${placeName(position)} for ${last}`);
+  }
 
   const groups = `${count(plan.groups)} ${plan.groups === 1 ? "group" : "groups"}`;
   return `${places}, from ${groups}: ${parts.join(", plus ")}.`;
@@ -85,16 +91,63 @@ function nth(n: number): string {
 
 /**
  * Which finishing places are marked while a campaign is still being played. A
- * position that takes every group's place is settled, so it is marked as
- * qualifying; one that takes only some is a contest across the confederation's
- * groups, so it can only be marked as contended.
+ * position that goes through outright is marked as qualifying; the one that
+ * goes into the playoff can only be marked as contended.
  */
 function zonesOf(plan: ConfederationQualifyingPlan): (position: number) => RowMark {
   return (position) => {
-    const take = plan.byPosition[position];
-    if (take === undefined) return null;
-    return take === plan.groups ? "through" : "contending";
+    if (plan.byPosition[position] === undefined) return null;
+    return plan.playoff?.position === position ? "contending" : "through";
   };
+}
+
+/**
+ * One confederation's qualifying playoff, round by round. Live and archived
+ * campaigns both arrive as the archived summary shape, so they render alike.
+ */
+function PlayoffCards({ playoff }: { playoff: IntlQualifyingPlayoffSummary }) {
+  const through = new Set(playoff.qualified);
+  const places = playoff.places === 1 ? "the last place" : `the last ${count(playoff.places)} places`;
+  return (
+    <div className="mt-3">
+      <p className="small fw-bold mb-2">
+        Playoff: the {count(playoff.entrants.length)} {placeName(playoff.position)} for {places}
+      </p>
+      <div className="row g-3">
+        {playoff.rounds.map((round, i) => (
+          <div className="col-12 col-md-4" key={i}>
+            <div className="card">
+              <div className="card-header py-1 small fw-bold">
+                Round {i + 1}
+                <span className="text-muted fw-normal">
+                  {round.qualifies ? " · winners qualify" : " · winners play on"}
+                </span>
+              </div>
+              <ul className="list-group list-group-flush">
+                {round.results.map((tie, j) => (
+                  <li className="list-group-item py-2 small" key={j}>
+                    <div className={tie.winner === tie.home ? "fw-bold" : undefined}>
+                      <NationName nation={tie.home} /> {tie.homeGoals}
+                    </div>
+                    <div className={tie.winner === tie.away ? "fw-bold" : undefined}>
+                      <NationName nation={tie.away} /> {tie.awayGoals}
+                    </div>
+                    {tie.pens && (
+                      <div className="text-muted">{tie.pens.home}-{tie.pens.away} on penalties</div>
+                    )}
+                    {tie.extraTime && !tie.pens && <div className="text-muted">after extra time</div>}
+                    {round.qualifies && through.has(tie.winner) && (
+                      <div className="text-success">{tie.winner} qualifies</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function QualifyingView({
@@ -140,13 +193,13 @@ function QualifyingView({
             <span className="qual-bar qual-key-swatch qual-bar-through" /> qualifies
           </span>
           <span className="qual-key-item">
-            <span className="qual-bar qual-key-swatch qual-bar-contending" /> in the running for
-            the places left
+            <span className="qual-bar qual-key-swatch qual-bar-contending" /> into the playoff
+            for the last places
           </span>
         </div>
       )}
 
-      {byConfederation.map(({ confederation, groups, plan }) => (
+      {byConfederation.map(({ confederation, groups, plan, playoff }) => (
         <div className="mb-3" key={confederation}>
           <h6 className="mb-1">{confederation}</h6>
           {plan && <p className="text-muted small mb-2">{planSentence(plan, fieldSize)}</p>}
@@ -168,6 +221,7 @@ function QualifyingView({
               </div>
             ))}
           </div>
+          {playoff && <PlayoffCards playoff={playoff} />}
         </div>
       ))}
     </>
@@ -187,6 +241,7 @@ function QualifyingView({
 function bucketByConfederation(
   groups: { confederation: string | null; rows: StandingRow[] }[],
   plans: ConfederationQualifyingPlan[] = [],
+  playoffs: IntlQualifyingPlayoffSummary[] = [],
 ): ConfGroups[] {
   const map = new Map<string, StandingRow[][]>();
   for (const plan of plans) map.set(plan.confederation, []);
@@ -197,10 +252,12 @@ function bucketByConfederation(
     else map.set(key, [g.rows]);
   }
   const planOf = new Map(plans.map((p) => [p.confederation, p]));
+  const playoffOf = new Map(playoffs.map((p) => [p.confederation, p]));
   return [...map.entries()].map(([confederation, groups]) => ({
     confederation,
     groups,
     plan: planOf.get(confederation),
+    playoff: playoffOf.get(confederation),
   }));
 }
 
@@ -239,6 +296,7 @@ export function NTQualifying() {
           // shows the qualifiers themselves instead, which is the better answer
           // once they're known anyway.
           qualifyingPlan(current),
+          summarizeQualifying(current).playoffs,
         )}
       />
     );
@@ -248,7 +306,7 @@ export function NTQualifying() {
         entered={archived.entered}
         qualified={archived.qualified}
         fieldSize={archived.qualified.length}
-        byConfederation={bucketByConfederation(archived.groups)}
+        byConfederation={bucketByConfederation(archived.groups, [], archived.playoffs)}
       />
     );
   } else {
