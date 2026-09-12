@@ -3167,22 +3167,44 @@ export const POTY_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = 
   FWD: 0.05, MID: 0.07, DEF: 0.09, GK: 0.16,
 };
 
-/** Team of the Season: avgRating plus every position-relevant season stat, not just goals/assists. */
-export const TOTS_GOAL_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.06, MID: 0.08, DEF: 0.11, GK: 0.3,
-};
-export const TOTS_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.04, MID: 0.055, DEF: 0.07, GK: 0.2,
-};
-export const TOTS_TACKLE_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.01, MID: 0.02, DEF: 0.03, GK: 0,
-};
-export const TOTS_INTERCEPTION_WEIGHT = TOTS_TACKLE_WEIGHT;
-/** Goalkeepers only. */
-export const TOTS_SAVE_WEIGHT = 0.035;
-/** Penalty per goal conceded across the season, heaviest for GK/DEF. */
-export const TOTS_GOALS_AGAINST_PENALTY: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0, MID: 0.006, DEF: 0.02, GK: 0.03,
+/**
+ * Team of the Season: each position has its own formula, built as the Player of
+ * the Season score (match rating, goals, assists, ovr) plus the work that
+ * position does and the scoreline can't show (`totsScore` in core/awards.ts):
+ *
+ *  - `defendingPerGame` × (tackles + interceptions) per appearance.
+ *  - `concededPerGame` × goals conceded per appearance, subtracted. Keepers
+ *    only, because goalsAgainst is only recorded for keepers.
+ *
+ * **Per appearance, never season totals (2026-09-12).** The old formula paid
+ * 0.01-0.03 per tackle and interception on season totals, which rewarded a
+ * defence for how much it had to defend rather than how well: a centre-back's
+ * ~160 a season was worth ~5 points against a rating spread of ~1, and a
+ * forward's 0.01 was enough for a busy striker to take the one ST slot off a
+ * Ballon d'Or winner. Measured over 10 simmed seasons of tier-1 players, the per-game
+ * rate DOES track quality (correlation with ovr: CB 0.41, DM 0.35, CM 0.36,
+ * FB 0.31), so it measures the right thing once volume is taken out.
+ *
+ * **Keepers are judged on goals conceded per game, not saves.** Correlation with
+ * ovr: goals conceded -0.56, saves -0.27 (a busier keeper is usually a worse
+ * one), goals prevented against xG only 0.10.
+ *
+ * **Attackers (AM, W, ST) add nothing**, so their Team of the Season score IS
+ * the Player of the Season score. That is what makes a forward who wins his
+ * league's Player of the Season the best at his position by construction.
+ */
+export const TOTS_POSITION_WORK: Record<
+  "GK" | "CB" | "FB" | "DM" | "CM" | "AM" | "W" | "ST",
+  { defendingPerGame: number; concededPerGame: number }
+> = {
+  GK: { defendingPerGame: 0, concededPerGame: 1.2 },
+  CB: { defendingPerGame: 0.3, concededPerGame: 0 },
+  FB: { defendingPerGame: 0.24, concededPerGame: 0 },
+  DM: { defendingPerGame: 0.24, concededPerGame: 0 },
+  CM: { defendingPerGame: 0.06, concededPerGame: 0 },
+  AM: { defendingPerGame: 0, concededPerGame: 0 },
+  W: { defendingPerGame: 0, concededPerGame: 0 },
+  ST: { defendingPerGame: 0, concededPerGame: 0 },
 };
 
 /* ────────────────────────────────────────────────────────────────────────

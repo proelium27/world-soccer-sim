@@ -16,7 +16,7 @@ import {
   WORLD_POSITION_AWARD_SHORTLIST, WORLD_TOTS_TROPHY_MULTIPLIER,
   WORLD_AWARD_TROPHY_STRENGTH_WEIGHT, WORLD_AWARD_TROPHY_STRENGTH_FLOOR,
   WORLD_AWARD_TROPHY_STRENGTH_CAP, WORLD_AWARD_OVR_WEIGHT,
-  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT, TOTS_GOAL_WEIGHT, TOTS_ASSIST_WEIGHT,
+  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
   WORLD_AWARD_LEAGUE_STRENGTH_WEIGHT, WORLD_AWARD_CUP_MULTIPLIER,
   WORLD_AWARD_CUP_RATING_WEIGHT, WORLD_AWARD_CUP_FULL_INVOLVEMENT, WORLD_AWARD_CUP_RUN_BONUS,
   WORLD_AWARD_LEAGUE_TITLE_BONUS, WORLD_AWARD_TITLE_FULL_SEASON, WORLD_AWARD_INTL_GOAL_WEIGHT, WORLD_AWARD_INTL_ASSIST_WEIGHT,
@@ -410,8 +410,10 @@ function ballonDOrParts(e: Entry, s: Scoring): WorldAwardEntry {
  * exactly that reason — see WORLD_TOTS_TROPHY_MULTIPLIER's history note.
  */
 function worldTotsParts(e: Entry, s: Scoring): WorldAwardEntry {
+  // Cup end product is priced with the Player of the Season columns, the same
+  // ones `totsScore` now uses for his league goals and assists.
   const base = worldAwardParts(
-    e, s, totsScore(e.player, e.stats, s.season), TOTS_GOAL_WEIGHT, TOTS_ASSIST_WEIGHT,
+    e, s, totsScore(e.player, e.stats, s.season), POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
   );
   // Everything beyond his own league season counts for more here than it does
   // in the Ballon d'Or, because this base is inflated by season-long counting
@@ -500,29 +502,6 @@ function pickWorldTeam(
     used.add(best.player.pid);
     return best.player.pid;
   });
-}
-
-/**
- * The players a season's worldwide honours named, in the priority a league's
- * Team of the Season seats them: the Ballon d'Or winner, then the Goalkeeper and
- * Defender of the Year, then the rest of the World Team of the Year in slot
- * order. Each is guaranteed a place in his own league's XI (see
- * `computeSeasonAwards`); passing the list to every competition is safe, since a
- * competition only seats the pids it actually contains.
- *
- * Only the Ballon d'Or WINNER, not his shortlist: a tenth place is a ranking,
- * not an honour, and seating ten players a season would hand out league places
- * on a score that isn't the league's.
- */
-export function worldHonourees(world: WorldAwards | undefined): number[] {
-  if (!world) return [];
-  const pids = [
-    world.ballonDOr[0]?.pid,
-    world.goalkeeperOfYear?.[0]?.pid,
-    world.defenderOfYear?.[0]?.pid,
-    ...world.worldTeamOfYear,
-  ];
-  return pids.filter((pid): pid is number => typeof pid === "number");
 }
 
 /**

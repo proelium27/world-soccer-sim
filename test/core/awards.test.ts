@@ -2,22 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   computeSeasonAwards, positionGroup, potyScore, totsScore, TOTS_SLOTS,
 } from "../../src/core/awards.js";
-import { worldHonourees, type WorldAwards } from "../../src/core/worldAwards.js";
-
-describe("worldHonourees", () => {
-  it("lists the Ballon d'Or winner, the position awards, then the World XI", () => {
-    const entry = (pid: number) => ({ pid, tid: 0, score: 0, league: 0, cup: 0, intl: 0, title: 0 });
-    const world = {
-      ballonDOr: [entry(7), entry(8)],
-      goalkeeperOfYear: [entry(1)],
-      defenderOfYear: [entry(2)],
-      worldTeamOfYear: [1, 2, null, 3],
-    } as unknown as WorldAwards;
-    // The shortlist behind the winner (pid 8) is a ranking, not an honour.
-    expect(worldHonourees(world)).toEqual([7, 1, 2, 1, 2, 3]);
-    expect(worldHonourees(undefined)).toEqual([]);
-  });
-});
 import { emptySeasonStats, type Player, type Position } from "../../src/core/players/types.js";
 
 const SEASON = 5;
@@ -117,62 +101,62 @@ describe("Team of the Season slots", () => {
   });
 });
 
-/** A striker whose Team of the Season case beats a better player's on tackles alone. */
-function withDefending(p: Player, tacklesAndInterceptions: number): Player {
-  const s = p.stats[0];
-  return { ...p, stats: [{ ...s, tackles: tacklesAndInterceptions, interceptions: tacklesAndInterceptions }] };
+/** Same player with a season's defensive work, keeper numbers, or a different appearance count. */
+function withStats(p: Player, extra: Partial<Player["stats"][number]>): Player {
+  return { ...p, stats: [{ ...p.stats[0], ...extra }] };
 }
 
-describe("Team of the Season agrees with the bigger honours", () => {
-  // Two strikers for one ST slot. The busy one wins totsScore on defensive
-  // work (0.01 a tackle for a forward), while the elite one scores more and
-  // rates higher — the shape of the report that prompted this.
-  const elite = () => player({ pid: 1, pos: "ST", ovr: 80, goals: 22, assists: 6, avgRating: 7.0 });
-  const busy = () => withDefending(player({ pid: 2, pos: "ST", ovr: 78, goals: 21, assists: 6, avgRating: 6.9 }), 60);
-
-  it("sets up a real disagreement between the two formulas", () => {
-    // Guards the fixture: the busy striker must win on totsScore while the
-    // elite one wins Player of the Season, or the tests below prove nothing.
-    const e = elite();
-    const b = busy();
-    expect(totsScore(b, b.stats[0], SEASON)).toBeGreaterThan(totsScore(e, e.stats[0], SEASON));
-    expect(computeSeasonAwards([e, b], SEASON).playerOfSeasonPid).toBe(1);
+describe("Team of the Season: a formula per position", () => {
+  it("scores an attacker on exactly his Player of the Season score", () => {
+    // Defensive work adds nothing up front, which is what makes a forward who
+    // wins Player of the Season the best at his position by construction.
+    for (const pos of ["AM", "W", "ST"] as Position[]) {
+      const p = withStats(player({ pid: 1, pos, goals: 14, assists: 6 }), { tackles: 40, interceptions: 30 });
+      expect(totsScore(p, p.stats[0], SEASON)).toBeCloseTo(potyScore(p, p.stats[0], SEASON), 10);
+    }
   });
 
-  it("always includes the league's Player of the Season", () => {
-    const awards = computeSeasonAwards([elite(), busy()], SEASON);
-    expect(awards.teamOfSeason).toContain(awards.playerOfSeasonPid);
+  it("no longer lets a busier striker take the spot off a better one", () => {
+    // The reported shape: the old formula paid a forward 0.01 per tackle and
+    // interception on season totals, so 120 of them outweighed a goal and a
+    // point of rating.
+    const better = player({ pid: 1, pos: "ST", ovr: 90, goals: 22, assists: 6, avgRating: 7.1 });
+    const busier = withStats(
+      player({ pid: 2, pos: "ST", ovr: 88, goals: 21, assists: 6, avgRating: 7.0 }),
+      { tackles: 60, interceptions: 60 },
+    );
+    const awards = computeSeasonAwards([better, busier], SEASON);
+    expect(awards.playerOfSeasonPid).toBe(1);
+    expect(awards.teamOfSeason).toContain(1);
+    expect(awards.teamOfSeason).not.toContain(2);
   });
 
-  it("always includes the league's Golden Boot winner", () => {
-    const scorer = player({ pid: 3, pos: "ST", ovr: 70, goals: 30, avgRating: 6.4 });
-    const awards = computeSeasonAwards([elite(), scorer], SEASON);
-    expect(awards.goldenBootPid).toBe(3);
-    // POTY and Golden Boot are different strikers and there is one ST slot, so
-    // the higher-priority honour keeps it.
-    expect(awards.teamOfSeason).toContain(awards.playerOfSeasonPid);
+  it("counts defending per game, not over the season", () => {
+    // Same rate over more games is the same defender, not a better one.
+    const base = player({ pid: 1, pos: "CB", avgRating: 6.6 });
+    const regular = withStats(base, { appearances: 34, tackles: 68, interceptions: 68 });
+    const longer = withStats(base, { appearances: 38, tackles: 76, interceptions: 76 });
+    expect(totsScore(regular, regular.stats[0], SEASON))
+      .toBeCloseTo(totsScore(longer, longer.stats[0], SEASON), 10);
+    // A higher rate is.
+    const busier = withStats(base, { appearances: 34, tackles: 102, interceptions: 102 });
+    expect(totsScore(busier, busier.stats[0], SEASON)).toBeGreaterThan(totsScore(regular, regular.stats[0], SEASON));
   });
 
-  it("seats a worldwide honouree ahead of the league's own winners", () => {
-    // The Ballon d'Or winner is the busy striker's team-mate here; he takes the
-    // one ST slot even though the league named someone else.
-    const awards = computeSeasonAwards([elite(), busy()], SEASON, [2]);
-    expect(awards.teamOfSeason).toContain(2);
-    expect(awards.teamOfSeason.filter((pid) => pid !== null)).toHaveLength(1);
+  it("gives a centre-back more for his defending than a central midfielder", () => {
+    const cb = withStats(player({ pid: 1, pos: "CB" }), { tackles: 60, interceptions: 60 });
+    const cm = withStats(player({ pid: 2, pos: "CM" }), { tackles: 60, interceptions: 60 });
+    const work = (p: Player) => totsScore(p, p.stats[0], SEASON) - potyScore(p, p.stats[0], SEASON);
+    expect(work(cb)).toBeGreaterThan(work(cm));
+    expect(work(cm)).toBeGreaterThan(0);
   });
 
-  it("only seats a player at his own position and never twice", () => {
-    const winger = player({ pid: 4, pos: "W", goals: 10 });
-    const xi = computeSeasonAwards([winger], SEASON, [4, 4]).teamOfSeason;
-    expect(xi.filter((pid) => pid === 4)).toHaveLength(1);
-    TOTS_SLOTS.forEach((slot, i) => {
-      if (xi[i] === 4) expect(slot).toBe("W");
-    });
-  });
-
-  it("ignores honourees who aren't in this league", () => {
-    const xi = computeSeasonAwards([elite()], SEASON, [999]).teamOfSeason;
-    expect(xi).toContain(1);
-    expect(xi).not.toContain(999);
+  it("judges a keeper on goals conceded per game, not on saves", () => {
+    // A keeper facing a barrage makes more saves and concedes more; that is a
+    // busier keeper, not a better one.
+    const calm = withStats(player({ pid: 1, pos: "GK" }), { goalsAgainst: 30, saves: 60 });
+    const busy = withStats(player({ pid: 2, pos: "GK" }), { goalsAgainst: 50, saves: 140 });
+    expect(totsScore(calm, calm.stats[0], SEASON)).toBeGreaterThan(totsScore(busy, busy.stats[0], SEASON));
+    expect(computeSeasonAwards([calm, busy], SEASON).teamOfSeason[0]).toBe(1);
   });
 });

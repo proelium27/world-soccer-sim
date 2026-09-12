@@ -1812,16 +1812,19 @@ export function Manual() {
             goalscorer. <strong>Team of the Season</strong> fills an 11-man pitch, laid out as a
             4-3-3 &mdash; a keeper, a back four, a midfield three of a holding man, a central
             midfielder and an attacking midfielder, and a front three of two wingers and a striker
-            &mdash; with whoever rates highest at each of those positions across the whole league,
-            blending match rating with the stats that matter most for the role: goals and assists up
-            front, tackles and interceptions in defense and midfield, saves for the keeper. Every
-            slot takes a player who actually plays that position. <strong>Anyone who wins a bigger
-            award is always in his league's Team of the Season</strong>: the Ballon d'Or winner,
-            the Goalkeeper and Defender of the Year, everyone in the World Team of the Year, and the
-            league's own Player of the Season and Golden Boot. They get their places first and the
-            rest of the XI is picked around them. The one way one of them can still miss out is
-            two of them playing a position the shape only has one of (striker, say), in which
-            case the bigger award keeps the place, in the order just listed. Both Player of
+            &mdash; with whoever rates highest at each of those positions across the whole league.
+            Every position has its own formula, and they all start from the same place: the Player
+            of the Season score, so match rating, goals and assists, and overall quality.
+            Attackers (attacking midfielders, wingers and strikers) are judged on that alone, which
+            means a forward who wins Player of the Season is always the best at his position in
+            that league. Defenders and midfielders also get credit for their defending, counted as
+            tackles and interceptions <em>per game</em> rather than over the whole season, so a
+            defence that spent all year under siege isn't rewarded just for being busy. It counts
+            most for centre-backs, then full-backs and holding midfielders, and only a little for
+            central midfielders. Keepers are judged on goals conceded per game rather than saves,
+            because a keeper making loads of saves is usually one facing loads of shots. Every
+            slot takes a player who actually plays that position, so a great season at a position
+            the shape has only one of (striker, say) can still miss out. Both Player of
             the Season and Team of the Season also factor in overall quality, not just the stat
             line, so a modest player who piled up a big statistical season (often just from facing
             heavy pressure on a weaker side) won't out-rank a genuinely elite one. Only players who
@@ -1906,21 +1909,19 @@ export function Manual() {
             trophy instead of pretending otherwise.
           </p>
           <p>
-            So these two are judged on the things the Ballon d'Or ignores. The keeper's award counts
-            saves and holds goals conceded against him; the defender's counts tackles and
-            interceptions and goals conceded, and is open to centre-backs and full-backs. On top of
-            that come the same worldwide extras the Ballon d'Or uses: the league-strength
-            correction, your Continental Cup run, your summer with your country, your league title,
-            your domestic cup.
+            So these two are judged on the things the Ballon d'Or ignores, using the same formulas
+            as the Team of the Season. The keeper's award holds goals conceded per game against
+            him; the defender's counts tackles and interceptions per game, and is open to
+            centre-backs and full-backs. On top of that come the same worldwide extras the Ballon
+            d'Or uses: the league-strength correction, your Continental Cup run, your summer with
+            your country, your league title, your domestic cup.
           </p>
           <p>
-            Those extras count for three times as much here as they do in the Ballon d'Or, and
-            there's a reason for the difference. Tackles, interceptions and saves are counted up
-            over a season and they get big, so a defender's raw defensive work can reach half his
-            score and leave everything else as rounding. A league title was worth under 4% of a
-            defender's total. Tripling the rest puts trophies back roughly where they sit in the
-            Ballon d'Or: about a fifth of a defender's winning score now comes from outside his
-            league, against a sixth for a Ballon d'Or winner.
+            Those extras count for three times as much here as they do in the Ballon d'Or. That was
+            set back when defending was still added up over a whole season, and a defender's raw
+            totals were big enough to drown out everything else. Defending is counted per game now,
+            so the totals no longer swamp the score, but trophies still weigh more in these two
+            awards than they do in the Ballon d'Or.
           </p>
           <p>
             It has a second effect that's worth knowing about, because it's the reason the defender
@@ -1940,11 +1941,10 @@ export function Manual() {
           </p>
           <p>
             One thing worth knowing about how the defender's award reads. Tackles and interceptions
-            are counted up raw over a season rather than as rates, and they vary a lot from one
-            defender to the next. A defender who spends every week under siege makes more of both
-            than an equally good one at a club that controls its games, so the award favours
-            defenders with plenty of defending to do, and centre-backs take it more often than
-            full-backs. It's the same measure the World Team of the Year has always picked its back
+            are counted per game rather than added up over the season, so a defender isn't rewarded
+            just for how much defending his club left him to do. Centre-backs get a little more
+            credit for it than full-backs, because it's a bigger part of the job. It's the same
+            measure every league's Team of the Season and the World Team of the Year pick their back
             four with.
           </p>
           <p>

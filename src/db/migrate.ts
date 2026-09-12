@@ -6,7 +6,7 @@ import type {
 import type { PlayerMatchLine } from "../engine/attribution.js";
 import type { TeamSeasonStats } from "../core/standings.js";
 import { computeSeasonAwards, type SeasonAwards } from "../core/awards.js";
-import { computeWorldAwards, worldHonourees, type WorldAwards } from "../core/worldAwards.js";
+import { computeWorldAwards, type WorldAwards } from "../core/worldAwards.js";
 import { backfillAwardWinners } from "../core/awardWinners.js";
 import {
   HYPE_INITIAL, SCOUTING_SPEND_DEFAULT,
@@ -614,9 +614,19 @@ function migrateFields(league: LeagueStore): LeagueStore {
         ?? h.divisionsByTid
         ?? Object.fromEntries(league.teams.map((t) => [t.tid, 0]));
       // Player.stats is append-only and never pruned, so unlike teamStats
-      // above, past seasons' awards CAN be reconstructed after the fact (see
-      // `awards` below, built once the world awards exist).
+      // above, past seasons' awards CAN be reconstructed after the fact.
+      // Detect which of the three historical shapes this entry has: a
+      // Record already (post-refactor, nothing to do), a [D1, D2] tuple
+      // (second-division era), or a single SeasonAwards object
+      // (pre-second-division, single competition), or missing entirely.
       const rawAwards = h.awards;
+      const awards: Record<number, SeasonAwards> = Array.isArray(rawAwards)
+        ? { 0: rawAwards[0], 1: rawAwards[1] }
+        : rawAwards && "playerOfSeasonPid" in rawAwards
+          ? { 0: rawAwards }
+          : rawAwards
+            ? rawAwards
+            : { 0: computeSeasonAwards(migratedPlayers, h.season) };
       const championTidByCompId: Record<number, number> = h.championTidByCompId
         ?? (h.championTid !== undefined ? { 0: h.championTid } : { 0: h.table[0]?.tid ?? 0 });
       // Worldwide honors reconstruct from the same append-only records, so a
@@ -657,20 +667,6 @@ function migrateFields(league: LeagueStore): LeagueStore {
             .map((t) => t.champion),
         ),
       });
-      // Detect which of the three historical shapes this entry's awards have: a
-      // Record already (post-refactor, nothing to do), a [D1, D2] tuple
-      // (second-division era), or a single SeasonAwards object
-      // (pre-second-division, single competition), or missing entirely. Built
-      // after the world awards because a missing set is picked with the
-      // worldwide winners guaranteed a Team of the Season place, the same as a
-      // freshly played season.
-      const awards: Record<number, SeasonAwards> = Array.isArray(rawAwards)
-        ? { 0: rawAwards[0], 1: rawAwards[1] }
-        : rawAwards && "playerOfSeasonPid" in rawAwards
-          ? { 0: rawAwards }
-          : rawAwards
-            ? rawAwards
-            : { 0: computeSeasonAwards(migratedPlayers, h.season, worldHonourees(world)) };
       // Names for the pids above. Unlike the awards themselves this can NOT be
       // reconstructed later — a winner who has retired and fallen out of the
       // capped archive is gone from the save entirely — so the backfill records
