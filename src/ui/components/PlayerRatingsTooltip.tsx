@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { SKILL_KEYS } from "../../core/players/types.js";
 import type { Player, SkillKey } from "../../core/players/types.js";
@@ -6,6 +6,7 @@ import { getRatingColor } from "../utils/ratingColor.js";
 import { useLeague } from "../context/LeagueContext.js";
 import { Flag } from "./Flag.js";
 import { PotDisplay } from "./PotDisplay.js";
+import { AnchoredPanel } from "./anchoredPanel.js";
 
 export const SKILL_LABELS: Record<SkillKey, string> = {
   speed: "Speed",
@@ -61,9 +62,14 @@ export function PlayerRatingsTooltip({ player, children }: { player: Player; chi
   const [visible, setVisible] = useState(false);
   const { league } = useLeague();
   const panelId = `player-ratings-tooltip-${player.pid}`;
+  // The panel is rendered through a portal rather than inside this span: most
+  // of the tables that carry it sit in a `.table-responsive`, which clips
+  // vertically and would cut the panel off (see anchoredPanel.tsx).
+  const anchorRef = useRef<HTMLSpanElement>(null);
 
   return (
     <span
+      ref={anchorRef}
       className="player-ratings-tooltip-anchor"
       tabIndex={0}
       aria-describedby={visible ? panelId : undefined}
@@ -77,7 +83,13 @@ export function PlayerRatingsTooltip({ player, children }: { player: Player; chi
     >
       {children}
       {visible && (
-        <span id={panelId} role="tooltip" className="player-ratings-tooltip-panel">
+        <AnchoredPanel
+          anchor={anchorRef.current}
+          onDismiss={() => setVisible(false)}
+          id={panelId}
+          role="tooltip"
+          className="player-ratings-tooltip-panel"
+        >
           <span className="player-ratings-tooltip-title">
             {player.name} <Flag nationality={player.nationality} />
             {league && <>{" "}&middot; Age {league.season - player.born}</>}
@@ -96,7 +108,7 @@ export function PlayerRatingsTooltip({ player, children }: { player: Player; chi
               </span>
             ))}
           </span>
-        </span>
+        </AnchoredPanel>
       )}
     </span>
   );

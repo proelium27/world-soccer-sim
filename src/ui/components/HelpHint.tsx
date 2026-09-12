@@ -1,5 +1,6 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { AnchoredPanel } from "./anchoredPanel.js";
 
 /**
  * A small circular "?" badge shown next to a section title. On hover or
@@ -20,9 +21,13 @@ export function HelpHint({
 }) {
   const [visible, setVisible] = useState(false);
   const panelId = useId();
+  // Portalled for the same reason the ratings tooltip is: a "?" in a table
+  // header sits inside a scroll container that clips it. See anchoredPanel.tsx.
+  const anchorRef = useRef<HTMLSpanElement>(null);
 
   return (
     <span
+      ref={anchorRef}
       className="help-hint"
       role="button"
       tabIndex={0}
@@ -39,9 +44,15 @@ export function HelpHint({
     >
       <span className="help-hint-icon" aria-hidden="true">?</span>
       {visible && (
-        <span id={panelId} role="tooltip" className="help-hint-panel">
+        <AnchoredPanel
+          anchor={anchorRef.current}
+          onDismiss={() => setVisible(false)}
+          id={panelId}
+          role="tooltip"
+          className="help-hint-panel"
+        >
           {children}
-        </span>
+        </AnchoredPanel>
       )}
     </span>
   );

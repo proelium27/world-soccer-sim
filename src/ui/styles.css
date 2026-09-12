@@ -1359,11 +1359,11 @@ a:hover {
   /* Renders as spans (lives inside inline table-cell content where divs would
      be invalid HTML), so block display is set explicitly. */
   display: block;
-  position: absolute;
-  top: 100%;
-  left: 0;
+  /* Positioned by AnchoredPanel, which portals it onto document.body and sets
+     `position: fixed` with the coordinates — an absolutely-positioned panel is
+     clipped by the `.table-responsive` most of these tables sit in, however
+     high its z-index. */
   z-index: 1060;
-  margin-top: 4px;
   width: 220px;
   background: var(--sg-surface-2);
   border: 1px solid var(--sg-border-strong);
@@ -1435,11 +1435,8 @@ a:hover {
 }
 .help-hint-panel {
   display: block;
-  position: absolute;
-  top: 100%;
-  left: 0;
+  /* Positioned by AnchoredPanel — see .player-ratings-tooltip-panel. */
   z-index: 1060;
-  margin-top: 6px;
   width: 260px;
   max-width: 76vw;
   background: var(--sg-surface-2);
