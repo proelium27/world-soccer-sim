@@ -87,7 +87,7 @@ import { competitionOf } from "../src/core/competitions.js";
 import { protectedStarPids, lastCompletedSeason } from "../src/core/transfers/protectedStars.js";
 import { positionGroup, ovrDuringSeason, statsFor } from "../src/core/awards.js";
 import {
-  PROTECTED_STAR_OVR, TOTS_TACKLE_WEIGHT, TOTS_SAVE_WEIGHT,
+  PROTECTED_STAR_OVR, TOTS_POSITION_WORK,
   WORLD_TOTS_TROPHY_MULTIPLIER,
 } from "../src/core/constants.js";
 
@@ -228,10 +228,7 @@ const summary = {
   seeds: SEEDS,
   seasons: SEASONS,
   weights: {
-    tackleDEF: TOTS_TACKLE_WEIGHT.DEF,
-    tackleMID: TOTS_TACKLE_WEIGHT.MID,
-    tackleFWD: TOTS_TACKLE_WEIGHT.FWD,
-    save: TOTS_SAVE_WEIGHT,
+    work: TOTS_POSITION_WORK,
     trophyMultiplier: WORLD_TOTS_TROPHY_MULTIPLIER,
   },
   protectedTotal: mean(rows.map((r) => r.protectedTotal)),
@@ -249,7 +246,10 @@ const out = `/tmp/totsWeightProbe-${RUN}.json`;
 writeFileSync(out, JSON.stringify(summary, null, 2));
 
 console.log(`\n=== ${RUN}: ${SEEDS.length} seed(s) x ${SEASONS} seasons ===`);
-console.log(`  weights: tackle DEF ${TOTS_TACKLE_WEIGHT.DEF}, save ${TOTS_SAVE_WEIGHT}, trophy x${WORLD_TOTS_TROPHY_MULTIPLIER}`);
+console.log(
+  `  weights: CB defending/game ${TOTS_POSITION_WORK.CB.defendingPerGame},` +
+  ` GK conceded/game ${TOTS_POSITION_WORK.GK.concededPerGame}, trophy x${WORLD_TOTS_TROPHY_MULTIPLIER}`,
+);
 console.log(`  protected stars per season:      ${summary.protectedTotal.toFixed(1)}`);
 console.log(`    ...clearing the ovr bar alone: ${summary.protectedByOvr.toFixed(1)}`);
 console.log(`    ...carried by an honour:       ${summary.protectedByHonourOnly.toFixed(1)}   <- only these can move`);

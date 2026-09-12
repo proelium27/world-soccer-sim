@@ -642,8 +642,10 @@ describe("position awards", () => {
   });
 
   it("prefers a qualified player over an unqualified one who scored higher", () => {
+    // Keepers are scored on goals conceded per game, so the full-timer needs a
+    // believable season to beat the squad keepers below, who concede nothing.
     const parttime = keeper(1, 1, 90, { saves: 500, goalsAgainst: 0 });
-    const fulltime = keeper(2, 1, 60, { saves: 50, goalsAgainst: 50 });
+    const fulltime = keeper(2, 1, 70, { saves: 50, goalsAgainst: 30, avgRating: 7.0 });
     const players = [
       { ...parttime, stats: [{ ...parttime.stats[0], appearances: AWARD_MIN_APPEARANCES - 1 }] },
       fulltime,
@@ -757,10 +759,13 @@ describe("position awards", () => {
   it("lets a title overturn a league season the title bonus alone could not", () => {
     // The better keeper is at a club that won nothing; the slightly worse one
     // won his league. Both play a full season so the bonus isn't pro-rated.
+    // Keepers are judged on goals conceded per game, so the gap between them is
+    // built from rating and goals conceded; it has to stay wider than an
+    // unmultiplied title for this test to mean anything (asserted below).
     const apps = WORLD_AWARD_TITLE_FULL_SEASON;
     const players = [
-      keeper(1, 2, 78, { saves: 180, goalsAgainst: 28, avgRating: 7.3, appearances: apps }),
-      keeper(2, 1, 78, { saves: 130, goalsAgainst: 34, avgRating: 7.0, appearances: apps }),
+      keeper(1, 2, 78, { saves: 180, goalsAgainst: 26, avgRating: 7.6, appearances: apps }),
+      keeper(2, 1, 78, { saves: 130, goalsAgainst: 36, avgRating: 7.0, appearances: apps }),
       ...squad(100, 11, 55),
     ];
     const noTrophies = computeWorldAwards(players, SEASON, ctx());

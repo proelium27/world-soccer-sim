@@ -1,9 +1,7 @@
 import type { Player, Position, SeasonStats } from "./players/types.js";
 import {
   AWARD_MIN_APPEARANCES, AWARD_OVR_BASELINE, AWARD_OVR_WEIGHT,
-  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
-  TOTS_GOAL_WEIGHT, TOTS_ASSIST_WEIGHT, TOTS_TACKLE_WEIGHT, TOTS_INTERCEPTION_WEIGHT,
-  TOTS_SAVE_WEIGHT, TOTS_GOALS_AGAINST_PENALTY,
+  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT, TOTS_POSITION_WORK,
 } from "./constants.js";
 
 export type PositionGroup = "GK" | "DEF" | "MID" | "FWD";
@@ -85,10 +83,11 @@ export function positionGroup(pos: Position): PositionGroup {
  * of all slots and wingers fall from 18.2% to under 1%.
  *
  * The cause is not the versatility model, and this is the durable lesson.
- * `totsScore` is a *within-position* statistic: TOTS_TACKLE_WEIGHT and
- * TOTS_INTERCEPTION_WEIGHT pay a defender 0.03 apiece against a forward's 0.01,
- * on stats defenders collect in vastly greater volume, so a centre-back's score
- * is not commensurable with a winger's at all. Exact matching is not an
+ * `totsScore` is a *within-position* statistic: every position has its own
+ * formula (TOTS_POSITION_WORK), and at the time this was measured the formula
+ * paid a defender 0.03 per tackle and interception on season totals against a
+ * forward's 0.01, on stats defenders collect in vastly greater volume, so a
+ * centre-back's score was not commensurable with a winger's at all. Exact matching is not an
  * oversight hiding that — it is the guardrail that keeps the formula valid, by
  * only ever comparing a player against others at his own position.
  * `secondaryPositions` is the *better* of the two cover-rules by construction
@@ -147,17 +146,21 @@ export function potyScore(p: Player, s: SeasonStats, season: number): number {
     + ovrBonus(p, season);
 }
 
+/**
+ * A player's Team of the Season case, on his own position's formula: his Player
+ * of the Season score plus the work his position does per game. See
+ * TOTS_POSITION_WORK for the weights and the measurements behind them.
+ *
+ * Built on `potyScore` deliberately, so the two awards can only disagree about
+ * a player by what his position does beyond the scoreline. For an attacker they
+ * cannot disagree at all.
+ */
 export function totsScore(p: Player, s: SeasonStats, season: number): number {
-  const group = positionGroup(p.pos);
-  let score = s.avgRating;
-  score += s.goals * TOTS_GOAL_WEIGHT[group];
-  score += s.assists * TOTS_ASSIST_WEIGHT[group];
-  score += s.tackles * TOTS_TACKLE_WEIGHT[group];
-  score += s.interceptions * TOTS_INTERCEPTION_WEIGHT[group];
-  if (group === "GK") score += s.saves * TOTS_SAVE_WEIGHT;
-  score -= s.goalsAgainst * TOTS_GOALS_AGAINST_PENALTY[group];
-  score += ovrBonus(p, season);
-  return score;
+  const work = TOTS_POSITION_WORK[p.pos];
+  const games = Math.max(1, s.appearances);
+  return potyScore(p, s, season)
+    + ((s.tackles + s.interceptions) / games) * work.defendingPerGame
+    - (s.goalsAgainst / games) * work.concededPerGame;
 }
 
 function pickPlayerOfSeason(

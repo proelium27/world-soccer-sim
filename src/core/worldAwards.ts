@@ -16,7 +16,7 @@ import {
   WORLD_POSITION_AWARD_SHORTLIST, WORLD_TOTS_TROPHY_MULTIPLIER,
   WORLD_AWARD_TROPHY_STRENGTH_WEIGHT, WORLD_AWARD_TROPHY_STRENGTH_FLOOR,
   WORLD_AWARD_TROPHY_STRENGTH_CAP, WORLD_AWARD_OVR_WEIGHT,
-  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT, TOTS_GOAL_WEIGHT, TOTS_ASSIST_WEIGHT,
+  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
   WORLD_AWARD_LEAGUE_STRENGTH_WEIGHT, WORLD_AWARD_CUP_MULTIPLIER,
   WORLD_AWARD_CUP_RATING_WEIGHT, WORLD_AWARD_CUP_FULL_INVOLVEMENT, WORLD_AWARD_CUP_RUN_BONUS,
   WORLD_AWARD_LEAGUE_TITLE_BONUS, WORLD_AWARD_TITLE_FULL_SEASON, WORLD_AWARD_INTL_GOAL_WEIGHT, WORLD_AWARD_INTL_ASSIST_WEIGHT,
@@ -410,8 +410,10 @@ function ballonDOrParts(e: Entry, s: Scoring): WorldAwardEntry {
  * exactly that reason — see WORLD_TOTS_TROPHY_MULTIPLIER's history note.
  */
 function worldTotsParts(e: Entry, s: Scoring): WorldAwardEntry {
+  // Cup end product is priced with the Player of the Season columns, the same
+  // ones `totsScore` now uses for his league goals and assists.
   const base = worldAwardParts(
-    e, s, totsScore(e.player, e.stats, s.season), TOTS_GOAL_WEIGHT, TOTS_ASSIST_WEIGHT,
+    e, s, totsScore(e.player, e.stats, s.season), POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
   );
   // Everything beyond his own league season counts for more here than it does
   // in the Ballon d'Or, because this base is inflated by season-long counting
