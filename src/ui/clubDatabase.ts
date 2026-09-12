@@ -1,10 +1,11 @@
 import type { LeagueStore } from "../core/leagueState.js";
 import type { Player } from "../core/players/types.js";
 import type { StoredTeam } from "../core/teams/clubs.js";
-import type { StandingsRow, TeamSeasonStats } from "../core/standings.js";
+import type { MatchScore, StandingsRow, TeamSeasonStats } from "../core/standings.js";
 import { computeStandings, computeTeamSeasonStats } from "../core/standings.js";
 import { computePowerRankingSnapshot } from "../core/teams/powerRanking.js";
 import { budgetCap, financeScaleFor, wageBill } from "../core/finance/budget.js";
+import { pointsDeductionMap } from "../core/finance/debt.js";
 import { isFreeAgentTid } from "../core/transfers/negotiation.js";
 import type { CompetitionScope } from "../core/competitions.js";
 import { scopeCompIds } from "../core/competitions.js";
@@ -76,11 +77,38 @@ export function buildClubRows(league: LeagueStore): ClubDbRow[] {
   const powerByTid = new Map(snapshot.rows.map((r) => [r.tid, r]));
 
   // Standings are per competition — a league position only means anything
-  // inside the division that produced it.
+  // inside the division that produced it — and each table has to be built from
+  // ITS OWN matches. `computeStandings` looks every club of every match it is
+  // given up in the ids it was given and asserts the row is there
+  // (`rows.get(tid)!`), so handing one division's table the whole world's
+  // matches throws on the first fixture from another division. That crashed
+  // this page outright for any save with a ball kicked; it survived review and
+  // its own tests because both only ever saw a fresh world, where
+  // `league.played` is empty. Every other caller filters — see Standings,
+  // Dashboard, Finance, clubSeason and manager/index.
+  //
+  // Bucketed in one pass rather than filtered per competition: the filter is 36
+  // scans of up to ~10,500 matches, this is one.
+  const compByTid = new Map(league.teams.map((t) => [t.tid, t.compId]));
+  const playedByComp = new Map<number, MatchScore[]>();
+  for (const m of league.played) {
+    // Keyed on the home club, as every other caller keys it. A match whose two
+    // clubs are in different divisions is not a league fixture and belongs in
+    // no table.
+    const compId = compByTid.get(m.home);
+    if (compId === undefined || compByTid.get(m.away) !== compId) continue;
+    const bucket = playedByComp.get(compId);
+    if (bucket) bucket.push(m);
+    else playedByComp.set(compId, [m]);
+  }
+
+  // The same points deductions every other live table applies, so a sanctioned
+  // club's Pts here agrees with its Pts on Standings.
+  const deductions = pointsDeductionMap(league.debtSanctions, season);
   const rankByTid = new Map<number, { row: StandingsRow; rank: number }>();
   for (const comp of league.competitions) {
     const tids = league.teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
-    const rows = computeStandings(tids, league.played);
+    const rows = computeStandings(tids, playedByComp.get(comp.id) ?? [], deductions);
     // A table with nothing played is array order, not a ranking — see Finance,
     // which gates its "1st of 20" line on the same thing.
     const started = rows.some((r) => r.played > 0);
