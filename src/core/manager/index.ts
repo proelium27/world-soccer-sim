@@ -36,6 +36,7 @@ export * from "./types.js";
 export * from "./expectation.js";
 export * from "./confidence.js";
 export * from "./jobOffers.js";
+export * from "./interests.js";
 export { switchClub } from "./switchClub.js";
 
 /** Final tables for every competition, keyed by compId. */
@@ -191,6 +192,7 @@ export function reviewSeason(input: ReviewInput): ManagerReview {
     reputation: managerReputation(stints),
     lastOverperformance: verdict.overperformance,
     moves,
+    interests: manager.interests,
   });
 
   // `ManagerState.sacked` promises a non-empty offer list, because there is no
