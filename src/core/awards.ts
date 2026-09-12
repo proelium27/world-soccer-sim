@@ -203,13 +203,44 @@ function pickGoldenBoot(entries: { player: Player; stats: SeasonStats }[]): numb
   return best.player.pid;
 }
 
+/**
+ * Picks the XI. Players in `honoured` are seated first, in the order given, each
+ * in the first open slot at his own position; everyone else is picked into the
+ * slots left over by `totsScore`, exactly as before.
+ *
+ * **Why seat anyone at all, rather than just score better.** The Team of the
+ * Season and the bigger honours are scored on different numbers for good
+ * reasons — `potyScore` has no defending in it, and the worldwide awards add a
+ * second ovr term and trophies — so no single formula can make them agree.
+ * Without this, a player could win the Ballon d'Or and not make his own
+ * league's XI, because a team-mate at the same position piled up more tackles.
+ * An honour ladder has to nest: whoever the season named best in the world, or
+ * best in the league, is by definition in that league's best XI.
+ *
+ * Seating only ever fills a slot at the player's listed position, so it keeps
+ * the exact-match rule `TOTS_SLOTS` depends on, and an honouree who finds his
+ * position's slots already taken by higher-priority honourees simply competes
+ * for nothing extra rather than displacing one of them.
+ */
 function pickTeamOfSeason(
   entries: { player: Player; stats: SeasonStats }[],
   formation: Position[],
   season: number,
+  honoured: readonly number[],
 ): (number | null)[] {
+  const xi: (number | null)[] = formation.map(() => null);
   const used = new Set<number>();
-  return formation.map((slotPos) => {
+  const byPid = new Map(entries.map((e) => [e.player.pid, e]));
+  for (const pid of honoured) {
+    const e = byPid.get(pid);
+    if (!e || used.has(pid)) continue;
+    const slot = formation.findIndex((pos, i) => pos === e.player.pos && xi[i] === null);
+    if (slot < 0) continue;
+    xi[slot] = pid;
+    used.add(pid);
+  }
+  return formation.map((slotPos, slotIndex) => {
+    if (xi[slotIndex] !== null) return xi[slotIndex];
     const candidates = entries.filter(
       (e) => e.player.pos === slotPos && e.stats.appearances > 0 && !used.has(e.player.pid),
     );
@@ -242,17 +273,32 @@ function pickTeamOfSeason(
  * pruned, so this can be run for any past season, not just the one that
  * just ended — used both by simOffseason (fresh) and migrateLeague
  * (backfilling old saves that predate this feature).
+ *
+ * `honoured` is the worldwide winners (`worldHonourees`), seated in the Team of
+ * the Season ahead of everyone, and then this league's own Player of the Season
+ * and Golden Boot, in that order. A player who can't find an open slot at his
+ * position (two honourees at a one-slot position) goes back into the ordinary
+ * pick for whatever is left.
  */
-export function computeSeasonAwards(players: Player[], season: number): SeasonAwards {
+export function computeSeasonAwards(
+  players: Player[],
+  season: number,
+  honoured: readonly number[] = [],
+): SeasonAwards {
   const entries: { player: Player; stats: SeasonStats }[] = [];
   for (const player of players) {
     const stats = statsFor(player, season);
     if (stats && stats.appearances > 0) entries.push({ player, stats });
   }
 
+  const playerOfSeasonPid = pickPlayerOfSeason(entries, season);
+  const goldenBootPid = pickGoldenBoot(entries);
+  const seated = [...honoured];
+  if (playerOfSeasonPid !== null) seated.push(playerOfSeasonPid);
+  if (goldenBootPid !== null) seated.push(goldenBootPid);
   return {
-    playerOfSeasonPid: pickPlayerOfSeason(entries, season),
-    goldenBootPid: pickGoldenBoot(entries),
-    teamOfSeason: pickTeamOfSeason(entries, TOTS_SLOTS, season),
+    playerOfSeasonPid,
+    goldenBootPid,
+    teamOfSeason: pickTeamOfSeason(entries, TOTS_SLOTS, season, seated),
   };
 }

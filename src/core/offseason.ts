@@ -34,7 +34,7 @@ import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
 import { processLoanReturns, runAILoanMarket } from "./loans.js";
 import { computeStandings, computeTeamSeasonStats, type SeasonHistoryEntry, type StandingsRow, type TeamSeasonStats } from "./standings.js";
 import { computeSeasonAwards, type SeasonAwards } from "./awards.js";
-import { computeWorldAwards } from "./worldAwards.js";
+import { computeWorldAwards, worldHonourees } from "./worldAwards.js";
 import { snapshotAwardWinners } from "./awardWinners.js";
 import { buildCupState } from "./cup/cup.js";
 import type { QualificationContext } from "./cup/qualification.js";
@@ -73,17 +73,23 @@ import {
 /** rng-stream tag for rolling carried-over international injury durations. */
 const INTL_INJURY_STREAM = 840;
 
-/** Awards for the season that just ended, computed separately per competition from players' current club membership. */
+/**
+ * Awards for the season that just ended, computed separately per competition
+ * from players' current club membership. `honoured` is the worldwide winners
+ * (see `worldHonourees`), each guaranteed a place in his own league's Team of
+ * the Season.
+ */
 function awardsByCompetition(
   players: Player[],
   teams: StoredTeam[],
   competitions: Competition[],
   season: number,
+  honoured: readonly number[],
 ): Record<number, SeasonAwards> {
   const result: Record<number, SeasonAwards> = {};
   for (const comp of competitions) {
     const roster = new Set(teams.filter((t) => t.compId === comp.id).flatMap((t) => t.roster));
-    result[comp.id] = computeSeasonAwards(players.filter((p) => roster.has(p.pid)), season);
+    result[comp.id] = computeSeasonAwards(players.filter((p) => roster.has(p.pid)), season, honoured);
   }
   return result;
 }
@@ -269,7 +275,11 @@ export function simOffseasonReporting(
   for (const t of league.teams) {
     for (const pid of [...t.roster, ...t.academyRoster]) tidLastSeason.set(pid, t.tid);
   }
-  const awards = awardsByCompetition(league.players, league.teams, league.competitions, endingSeason);
+  // The per-competition awards are picked at step 3.6, right after the
+  // worldwide ones they have to agree with. Snapshotted here so they still read
+  // the pool and rosters as they stood when the season ended.
+  const awardPlayers = league.players;
+  const awardTeams = league.teams;
 
   // 0. Proactive AI contract renewals (cross-division: a club's own player,
   //    regardless of which division that club plays in). "Own" means owns, not
@@ -492,6 +502,15 @@ export function simOffseasonReporting(
     // staged them (see core/international/confederationCup.ts).
     confederationCupChampions: confederationCupChampions(league.international.confederationCupHistory, endingSeason),
   });
+
+  //      Then each competition's own awards, which have to come second: the
+  //      Team of the Season guarantees a place to the Ballon d'Or winner and the
+  //      World Team of the Year, so it needs to know who they were. Read off the
+  //      snapshot taken before step 0, i.e. the same pool the world awards just
+  //      scored. Pure, no rng.
+  const awards = awardsByCompetition(
+    awardPlayers, awardTeams, league.competitions, endingSeason, worldHonourees(world),
+  );
 
   // 3.65. Who those winners actually were. Every award above is stored as a
   //       bare pid, and a pid stops resolving the moment retirement deletes the

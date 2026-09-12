@@ -1815,8 +1815,13 @@ export function Manual() {
             &mdash; with whoever rates highest at each of those positions across the whole league,
             blending match rating with the stats that matter most for the role: goals and assists up
             front, tackles and interceptions in defense and midfield, saves for the keeper. Every
-            slot takes a player who actually plays that position, so a great season at a position
-            the shape has only one of (striker, say) can still miss out. Both Player of
+            slot takes a player who actually plays that position. <strong>Anyone who wins a bigger
+            award is always in his league's Team of the Season</strong>: the Ballon d'Or winner,
+            the Goalkeeper and Defender of the Year, everyone in the World Team of the Year, and the
+            league's own Player of the Season and Golden Boot. They get their places first and the
+            rest of the XI is picked around them. The one way one of them can still miss out is
+            two of them playing a position the shape only has one of (striker, say), in which
+            case the bigger award keeps the place, in the order just listed. Both Player of
             the Season and Team of the Season also factor in overall quality, not just the stat
             line, so a modest player who piled up a big statistical season (often just from facing
             heavy pressure on a weaker side) won't out-rank a genuinely elite one. Only players who

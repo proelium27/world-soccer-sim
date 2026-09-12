@@ -1,7 +1,23 @@
 import { describe, it, expect } from "vitest";
 import {
-  computeSeasonAwards, positionGroup, potyScore, TOTS_SLOTS,
+  computeSeasonAwards, positionGroup, potyScore, totsScore, TOTS_SLOTS,
 } from "../../src/core/awards.js";
+import { worldHonourees, type WorldAwards } from "../../src/core/worldAwards.js";
+
+describe("worldHonourees", () => {
+  it("lists the Ballon d'Or winner, the position awards, then the World XI", () => {
+    const entry = (pid: number) => ({ pid, tid: 0, score: 0, league: 0, cup: 0, intl: 0, title: 0 });
+    const world = {
+      ballonDOr: [entry(7), entry(8)],
+      goalkeeperOfYear: [entry(1)],
+      defenderOfYear: [entry(2)],
+      worldTeamOfYear: [1, 2, null, 3],
+    } as unknown as WorldAwards;
+    // The shortlist behind the winner (pid 8) is a ranking, not an honour.
+    expect(worldHonourees(world)).toEqual([7, 1, 2, 1, 2, 3]);
+    expect(worldHonourees(undefined)).toEqual([]);
+  });
+});
 import { emptySeasonStats, type Player, type Position } from "../../src/core/players/types.js";
 
 const SEASON = 5;
@@ -98,5 +114,65 @@ describe("Team of the Season slots", () => {
   it("actually picks an attacking midfielder into the XI", () => {
     const am = player({ pid: 1, pos: "AM", goals: 15, assists: 12 });
     expect(computeSeasonAwards([am], SEASON).teamOfSeason).toContain(1);
+  });
+});
+
+/** A striker whose Team of the Season case beats a better player's on tackles alone. */
+function withDefending(p: Player, tacklesAndInterceptions: number): Player {
+  const s = p.stats[0];
+  return { ...p, stats: [{ ...s, tackles: tacklesAndInterceptions, interceptions: tacklesAndInterceptions }] };
+}
+
+describe("Team of the Season agrees with the bigger honours", () => {
+  // Two strikers for one ST slot. The busy one wins totsScore on defensive
+  // work (0.01 a tackle for a forward), while the elite one scores more and
+  // rates higher — the shape of the report that prompted this.
+  const elite = () => player({ pid: 1, pos: "ST", ovr: 80, goals: 22, assists: 6, avgRating: 7.0 });
+  const busy = () => withDefending(player({ pid: 2, pos: "ST", ovr: 78, goals: 21, assists: 6, avgRating: 6.9 }), 60);
+
+  it("sets up a real disagreement between the two formulas", () => {
+    // Guards the fixture: the busy striker must win on totsScore while the
+    // elite one wins Player of the Season, or the tests below prove nothing.
+    const e = elite();
+    const b = busy();
+    expect(totsScore(b, b.stats[0], SEASON)).toBeGreaterThan(totsScore(e, e.stats[0], SEASON));
+    expect(computeSeasonAwards([e, b], SEASON).playerOfSeasonPid).toBe(1);
+  });
+
+  it("always includes the league's Player of the Season", () => {
+    const awards = computeSeasonAwards([elite(), busy()], SEASON);
+    expect(awards.teamOfSeason).toContain(awards.playerOfSeasonPid);
+  });
+
+  it("always includes the league's Golden Boot winner", () => {
+    const scorer = player({ pid: 3, pos: "ST", ovr: 70, goals: 30, avgRating: 6.4 });
+    const awards = computeSeasonAwards([elite(), scorer], SEASON);
+    expect(awards.goldenBootPid).toBe(3);
+    // POTY and Golden Boot are different strikers and there is one ST slot, so
+    // the higher-priority honour keeps it.
+    expect(awards.teamOfSeason).toContain(awards.playerOfSeasonPid);
+  });
+
+  it("seats a worldwide honouree ahead of the league's own winners", () => {
+    // The Ballon d'Or winner is the busy striker's team-mate here; he takes the
+    // one ST slot even though the league named someone else.
+    const awards = computeSeasonAwards([elite(), busy()], SEASON, [2]);
+    expect(awards.teamOfSeason).toContain(2);
+    expect(awards.teamOfSeason.filter((pid) => pid !== null)).toHaveLength(1);
+  });
+
+  it("only seats a player at his own position and never twice", () => {
+    const winger = player({ pid: 4, pos: "W", goals: 10 });
+    const xi = computeSeasonAwards([winger], SEASON, [4, 4]).teamOfSeason;
+    expect(xi.filter((pid) => pid === 4)).toHaveLength(1);
+    TOTS_SLOTS.forEach((slot, i) => {
+      if (xi[i] === 4) expect(slot).toBe("W");
+    });
+  });
+
+  it("ignores honourees who aren't in this league", () => {
+    const xi = computeSeasonAwards([elite()], SEASON, [999]).teamOfSeason;
+    expect(xi).toContain(1);
+    expect(xi).not.toContain(999);
   });
 });

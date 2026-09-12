@@ -503,6 +503,29 @@ function pickWorldTeam(
 }
 
 /**
+ * The players a season's worldwide honours named, in the priority a league's
+ * Team of the Season seats them: the Ballon d'Or winner, then the Goalkeeper and
+ * Defender of the Year, then the rest of the World Team of the Year in slot
+ * order. Each is guaranteed a place in his own league's XI (see
+ * `computeSeasonAwards`); passing the list to every competition is safe, since a
+ * competition only seats the pids it actually contains.
+ *
+ * Only the Ballon d'Or WINNER, not his shortlist: a tenth place is a ranking,
+ * not an honour, and seating ten players a season would hand out league places
+ * on a score that isn't the league's.
+ */
+export function worldHonourees(world: WorldAwards | undefined): number[] {
+  if (!world) return [];
+  const pids = [
+    world.ballonDOr[0]?.pid,
+    world.goalkeeperOfYear?.[0]?.pid,
+    world.defenderOfYear?.[0]?.pid,
+    ...world.worldTeamOfYear,
+  ];
+  return pids.filter((pid): pid is number => typeof pid === "number");
+}
+
+/**
  * Compute a completed season's worldwide honors — the Ballon d'Or ranking, the
  * World Team of the Year, and the Goalkeeper and Defender of the Year — from
  * every player in the world who featured that season, however many competitions
