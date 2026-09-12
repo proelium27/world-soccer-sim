@@ -24,6 +24,7 @@ import type { Player } from "./players/types.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import {
   canExtend, contractTerms, academyContractTerms, extendContracts, extendAcademyContracts,
+  academyCheckpointExpiry,
 } from "./contracts.js";
 import { wouldRefuseExtension } from "./ai/breakoutRefusal.js";
 
@@ -84,6 +85,10 @@ export function renewalsDue(league: LeagueStore, group: RenewalGroup): RenewalsD
     const p = byPid.get(pid);
     if (!p || !canExtend(p, league.season)) continue;
     if (group === "academy") {
+      // A kid short of the professional cut isn't out of contract, he is in
+      // front of a checkpoint, which the offseason resolves (academyPipeline.ts)
+      // and a re-signing cannot move — his deal already runs to it.
+      if (academyCheckpointExpiry(p.born, league.season) !== null) continue;
       pids.push(pid);
       totalSalary += stipend;
       continue;

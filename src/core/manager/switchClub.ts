@@ -75,28 +75,15 @@ function handToAI(team: StoredTeam, players: Player[]): StoredTeam {
     starters: null,
     transferListed: [],
     moreMinutes: [],
-    // Dropped rather than graduated, unlike the academy above: a trialist was
-    // never signed, holds no contract and sits on no roster, so releasing the
-    // pid is all it takes to make him an ordinary free agent anyone can sign.
-    //
-    // It has to happen HERE or the group is stranded for the life of the save.
-    // The offseason only resets the group belonging to the current userTid, and
-    // freeAgentPids counts trialists as rostered — so a group left on a club the
-    // AI now runs is invisible to every signing path, never plays again, and
-    // (being high-potential) escapes the free-agent cull too. Same permanent
-    // zombie an unmanaged academyRoster would be, which is why dissolveAcademy
-    // exists directly above.
-    youthTrialists: [],
-    youthTrialSignings: 0,
     // Both scout directions — scoutingRegions and scoutingPositions — are
     // deliberately NOT cleared, though both are just as user-only. Nothing
     // reads them except the intake pass, and only for the club matching
     // userTid — so on a club the AI now runs they are inert rather than
-    // zombies, which is the whole distinction: a stranded trial group makes
-    // real players invisible to every signing path, a stranded setting makes
-    // nothing happen at all. Left in place so a manager who comes back to a
-    // club finds the scouting network he set up, and both are visible and
-    // editable on Youth Intake either way.
+    // zombies, which is the whole distinction: a stranded academy makes real
+    // players invisible to every signing path (hence dissolveAcademy above), a
+    // stranded setting makes nothing happen at all. Left in place so a manager
+    // who comes back to a club finds the scouting network he set up, and both
+    // are visible and editable on the Academy page either way.
     scoutingObserved: {},
     nextScoutingSpend: team.scoutingSpend,
     formation: roster.length > 0 ? chooseBestFormation(roster) : team.formation,

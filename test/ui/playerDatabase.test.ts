@@ -91,7 +91,7 @@ describe("buildPlayerRows", () => {
 });
 
 describe("matchesStatus", () => {
-  it("puts academy and trial players under 'at a club' as well as 'youth'", () => {
+  it("puts academy players under 'at a club' as well as 'youth'", () => {
     const academy = { status: "academy" } as never;
     expect(matchesStatus(academy, "contracted")).toBe(true);
     expect(matchesStatus(academy, "academy")).toBe(true);

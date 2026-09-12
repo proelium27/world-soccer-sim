@@ -14,6 +14,7 @@ import { cupFinalists, isCupComplete } from "../../core/cup/cup.js";
 import { domesticFinalists } from "../../core/domesticCup/cup.js";
 import { isIntlStagePending, editableSquad } from "../../core/international/index.js";
 import { superCupsPending } from "../../core/superCup/superCup.js";
+import { projectAcademyCheckpoints } from "../../core/academyPipeline.js";
 import {
   intlStageButton,
   intlStageHeadline,
@@ -485,20 +486,24 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
         </div>
       </div>
 
-      {/* Youth trialists waiting on a decision. Load-bearing rather than a
-          nicety: the group is replaced at the next offseason whether or not it
-          was ever looked at, so a user who never finds the page silently loses
-          a dozen prospects a year and never learns the screen exists. */}
-      {(userTeam.youthTrialists?.length ?? 0) > 0 && (
-        <div className="alert alert-info d-flex justify-content-between align-items-center mb-3">
-          <span>
-            {userTeam.youthTrialists!.length} youngster
-            {userTeam.youthTrialists!.length === 1 ? " is" : "s are"} on trial at your academy.
-            Offer contracts before the season starts or they'll leave.
-          </span>
-          <Link to="/youth-intake" className="btn btn-sm btn-outline-primary">Youth intake</Link>
-        </div>
-      )}
+      {/* Academy kids reaching a cut at the rollover the user is about to
+          advance into. Offseason only: the defaults are sensible, so a nudge
+          all season would be noise, but this is the last moment a decision
+          can still beat them. */}
+      {league.phase === "offseason" && (() => {
+        const due = projectAcademyCheckpoints(userTeam, league.players, league.season, league.difficulty);
+        if (due.size === 0) return null;
+        const leaving = [...due.values()].filter((d) => d.outcome === "release" || d.outcome === "atRisk").length;
+        return (
+          <div className="alert alert-info d-flex justify-content-between align-items-center mb-3">
+            <span>
+              {due.size} academy {due.size === 1 ? "kid reaches a cut" : "kids reach a cut"} when the
+              new season starts{leaving > 0 ? `, and ${leaving} could leave if you don't step in` : ""}.
+            </span>
+            <Link to="/academy" className="btn btn-sm btn-outline-primary">Academy</Link>
+          </div>
+        );
+      })()}
 
       {/* A continental final: the season sim halts before it, so flag why. The
           user's club can only be in one of the two competitions. */}

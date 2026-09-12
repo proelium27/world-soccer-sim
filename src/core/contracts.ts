@@ -4,6 +4,7 @@ import {
   WAGE_WEEKLY_MIN, WAGE_OVR_FLOOR, WAGE_WEEKLY_COEFF, WAGE_VARIATION,
   EXTENSION_LENGTH_YOUNG, EXTENSION_LENGTH_MID, EXTENSION_LENGTH_OLD,
   EXTENSION_AGE_MID, EXTENSION_AGE_OLD, ACADEMY_STIPEND_WEEKLY, YOUTH_CONTRACT_LENGTH,
+  ACADEMY_SCHOLARSHIP_AGE, ACADEMY_GRADUATION_AGE,
 } from "./constants.js";
 
 /** Stored salaries are per-season totals; the UI presents them weekly. */
@@ -85,22 +86,44 @@ export function extendContract(
 }
 
 /**
+ * The last season an academy deal covers for a kid born in `born`: the season
+ * before his next checkpoint. The checkpoints are decisions (see
+ * core/academyPipeline.ts), and making the deal run out exactly there is what
+ * puts every kid in front of one on the right rollover — the offseason resolves
+ * them instead of letting the deal lapse. Null once he is past the professional
+ * cut, where an ordinary academy deal applies.
+ */
+export function academyCheckpointExpiry(born: number, season: number): number | null {
+  const age = season - born;
+  if (age < ACADEMY_SCHOLARSHIP_AGE) return born + ACADEMY_SCHOLARSHIP_AGE - 1;
+  if (age < ACADEMY_GRADUATION_AGE) return born + ACADEMY_GRADUATION_AGE - 1;
+  return null;
+}
+
+/**
  * Academy contract terms: a flat stipend regardless of ovr (see
  * ACADEMY_STIPEND_WEEKLY), not the normal ovr-cubic formula — an academy
- * prospect isn't yet competing for a senior wage. Length is always
- * YOUTH_CONTRACT_LENGTH, same as the initial youth-intake contract.
+ * prospect isn't yet competing for a senior wage.
+ *
+ * Length runs to the kid's next checkpoint when `born` is given and he is still
+ * short of the professional cut; otherwise YOUTH_CONTRACT_LENGTH, which is what
+ * an older prospect signed out of free agency gets.
  */
-export function academyContractTerms(season: number): ContractTerms {
+export function academyContractTerms(season: number, born?: number): ContractTerms {
+  const checkpoint = born === undefined ? null : academyCheckpointExpiry(born, season);
+  const expiresSeason = checkpoint ?? season + YOUTH_CONTRACT_LENGTH;
   return {
     salary: ACADEMY_STIPEND_WEEKLY * WEEKS_PER_SEASON,
-    lengthSeasons: YOUTH_CONTRACT_LENGTH,
-    expiresSeason: season + YOUTH_CONTRACT_LENGTH,
+    lengthSeasons: expiresSeason - season,
+    expiresSeason,
   };
 }
 
 /** Re-sign an academy player to fresh flat-stipend terms, effective immediately. */
 export function extendAcademyContract(players: Player[], pid: number, season: number): Player[] {
-  return applyContractTerms(players, pid, academyContractTerms(season));
+  const p = players.find((q) => q.pid === pid);
+  if (!p) return players;
+  return applyContractTerms(players, pid, academyContractTerms(season, p.born));
 }
 
 /**
@@ -131,10 +154,9 @@ export function extendAcademyContracts(
 ): Player[] {
   const set = new Set(pids);
   if (set.size === 0) return players;
-  const terms = academyContractTerms(season);
-  return players.map((p) => (
-    set.has(p.pid)
-      ? { ...p, contract: { salary: terms.salary, expiresSeason: terms.expiresSeason } }
-      : p
-  ));
+  return players.map((p) => {
+    if (!set.has(p.pid)) return p;
+    const terms = academyContractTerms(season, p.born);
+    return { ...p, contract: { salary: terms.salary, expiresSeason: terms.expiresSeason } };
+  });
 }

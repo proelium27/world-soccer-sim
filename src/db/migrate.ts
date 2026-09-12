@@ -53,7 +53,17 @@ function migrateIntlStage(stage: unknown): IntlStage {
 type StoredTeamAnyVersion =
   Omit<StoredTeam, "budget" | "hype" | "scoutingSpend" | "nextScoutingSpend" | "academyBase" | "starters" | "formation" | "academyRoster" | "compId" | "divisionConvergence" | "transferListed" | "moreMinutes" | "scoutingObserved"> &
   Partial<Pick<StoredTeam, "budget" | "hype" | "scoutingSpend" | "nextScoutingSpend" | "academyBase" | "starters" | "formation" | "academyRoster" | "compId" | "divisionConvergence" | "transferListed" | "moreMinutes" | "scoutingObserved">> &
-  { division?: 0 | 1 };
+  {
+    division?: 0 | 1;
+    /**
+     * The youth trial group (2026-08-31 to 2026-09-12), gone since the academy
+     * started filling itself. Stripped on load rather than converted: a
+     * trialist was never signed, so dropping the pid is exactly what the next
+     * rollover would have done to anyone left undecided — he is a free agent.
+     */
+    youthTrialists?: number[];
+    youthTrialSignings?: number;
+  };
 
 /**
  * Generation constants frozen at the values active when academyBase was
@@ -503,7 +513,11 @@ function migrateFields(league: LeagueStore): LeagueStore {
   return {
     ...league,
     competitions,
-    teams: (league.teams as StoredTeamAnyVersion[]).map((t) => {
+    teams: (league.teams as StoredTeamAnyVersion[]).map((legacy) => {
+      // Spread-then-override keeps every field this list doesn't name, so the
+      // retired trial-group fields have to be taken out explicitly or they ride
+      // along on the club record forever.
+      const { youthTrialists: _trialists, youthTrialSignings: _signings, ...t } = legacy;
       const compId = t.compId ?? t.division ?? 0;
       return {
         ...t,
@@ -523,12 +537,6 @@ function migrateFields(league: LeagueStore): LeagueStore {
         // every team fielded before formations were selectable.
         formation: t.formation ?? "4-3-3",
         academyRoster: t.academyRoster ?? [],
-        // Youth trial group (added 2026-08-31). Empty on every old save, which
-        // is exact rather than a guess: the intake those saves already ran
-        // signed itself straight into the academy, so there is no pending
-        // decision to reconstruct. The next offseason lays out a real group.
-        youthTrialists: t.youthTrialists ?? [],
-        youthTrialSignings: t.youthTrialSignings ?? 0,
         // Scout directions (added 2026-09-01). Empty is exact rather than a
         // guess: an old save's scouts had nothing to go on, so they looked
         // close to home for whoever the academy happened to turn up — which is

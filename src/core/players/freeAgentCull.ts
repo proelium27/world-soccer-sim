@@ -64,12 +64,6 @@ export function cullablePids(
   for (const t of league.teams) {
     for (const pid of t.roster) rostered.add(pid);
     for (const pid of t.academyRoster) rostered.add(pid);
-    // Trialists too. Today the age gate alone would spare them (16 against
-    // FREE_AGENT_CULL_MIN_AGE 24), so nothing is currently lost — but this set
-    // is hand-rolled rather than taken from freeAgentPids, so the protection
-    // that function documents is not actually inherited here, and the masking
-    // ends the moment an older player can sit on a trial list.
-    for (const pid of t.youthTrialists ?? []) rostered.add(pid);
   }
   // A loaned player sits on the loanee's roster, so he's already covered above;
   // this is belt-and-braces in case a loan is ever mid-flight.
@@ -137,8 +131,6 @@ export function freeAgentCount(league: LeagueStore): number {
   for (const t of league.teams) {
     for (const pid of t.roster) rostered.add(pid);
     for (const pid of t.academyRoster) rostered.add(pid);
-    // Held by a club, so not part of the unsigned pool this count bounds.
-    for (const pid of t.youthTrialists ?? []) rostered.add(pid);
   }
   let n = 0;
   for (const p of league.players) if (!rostered.has(p.pid)) n++;
