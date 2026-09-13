@@ -662,9 +662,11 @@ export function Manual() {
             you're in first, so jumping 1 season always means "get me to next year".
           </p>
           <p>
-            While you're gone your club is treated as an AI club in every respect. It picks its own
+            While you're gone your club is treated as an AI club in almost every respect. It picks its own
             formation and XI, buys and sells, renews contracts, signs free agents and trims itself
-            back to 25. Other clubs can bid for your players, and your stars are protected exactly
+            back to 25. The one exception is your <a href="#youth">academy</a>, which keeps running
+            the way it does when you leave it alone: new kids join every summer and the cuts at 16
+            and 18 go to the defaults. Other clubs can bid for your players, and your stars are protected exactly
             the way an AI club's are &mdash; by price, not by a veto. If it gets relegated its best
             players can be pulled up to the first division like anyone else's, and your{" "}
             <a href="#squad">saved starting XI</a>, transfer listings and any talks you had open

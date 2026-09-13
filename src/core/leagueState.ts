@@ -94,6 +94,15 @@ export interface LeagueStore {
      */
     startYear?: number;
     /**
+     * The club the user really manages, set only on a multi-season jump's
+     * working copy while `userTid` is parked at the autopilot sentinel.
+     * Everything else in the sim reads `userTid` and so hands the club to the
+     * AI; the academy pipeline reads this instead, because it runs on defaults
+     * and there is no reason a jump should empty it. `endAutopilot` deletes it,
+     * so it never reaches disk, and absent means "same as userTid".
+     */
+    autopilotTid?: number;
+    /**
      * Which rating scale this save's stored ratings are on, as the
      * `OVR_SCALE_SHIFT` in force when they were generated.
      *

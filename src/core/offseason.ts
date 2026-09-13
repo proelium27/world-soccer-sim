@@ -209,7 +209,14 @@ export function simOffseasonReporting(
   // before progression re-estimates anyone's potential and before next season's
   // scouting spend locks in. Either could otherwise reorder two kids the Academy
   // page had just shown the other way round (see academyPipeline.ts).
-  const userAtStart = league.teams.find((t) => t.tid === league.meta.userTid);
+  //
+  // Every academy step keys off `academyTid` rather than `userTid`. They are the
+  // same number except on a multi-season jump, where `userTid` is parked at the
+  // autopilot sentinel so the AI runs the club, and the academy still belongs
+  // to the real one: its cuts are defaults, so a jump should keep it going
+  // rather than let every kid lapse and send the intake to the senior roster.
+  const academyTid = league.meta.autopilotTid ?? league.meta.userTid;
+  const userAtStart = league.teams.find((t) => t.tid === academyTid);
   const academyOrder = userAtStart
     ? academyRanking(userAtStart, league.players, endingSeason, league.difficulty)
     : new Map<number, number>();
@@ -330,7 +337,7 @@ export function simOffseasonReporting(
   //      user's academy kids whose deal is up. Theirs isn't a lapse, it is a
   //      checkpoint, and step 5.0 resolves it (see academyPipeline.ts).
   const academyDue = academyDuePids(
-    loanReturns.teams.find((t) => t.tid === league.meta.userTid), renewals.players, endingSeason,
+    loanReturns.teams.find((t) => t.tid === academyTid), renewals.players, endingSeason,
   );
   let teams: StoredTeam[] = releaseExpiredContracts(
     loanReturns.teams, renewals.players, endingSeason,
@@ -730,7 +737,7 @@ export function simOffseasonReporting(
   //      here developed through the season just ended as the academy player he
   //      was.
   ({ teams, players } = resolveAcademyCheckpoints(
-    teams, players, league.meta.userTid, endingSeason, nextSeason, academyOrder,
+    teams, players, academyTid, endingSeason, nextSeason, academyOrder,
   ));
 
   // The user's intake is held back from the loop below and enrolled in his
@@ -772,19 +779,19 @@ export function simOffseasonReporting(
         // both user's club only and both applied the same way and for the same
         // reason: as intake-time modifiers, never written back into
         // academyBase (see academyFacilities.ts).
-        + (t.tid === league.meta.userTid ? academyOffset + academyFacilitiesBonus(t) : 0),
+        + (t.tid === academyTid ? academyOffset + academyFacilitiesBonus(t) : 0),
       nextSeason, nextPid, genSeed, homeCountry, nationalities,
       undefined, undefined, league.progressionModel,
       // The user's academy takes its kids younger. Same draws either way (see
       // generateYouthIntake's `age`), so the shared stream doesn't move.
-      t.tid === league.meta.userTid ? USER_ACADEMY_ENTRY_AGE : undefined,
+      t.tid === academyTid ? USER_ACADEMY_ENTRY_AGE : undefined,
     );
     nextPid = updatedNextPid;
     // Note: a generational talent's arrival is deliberately NOT announced.
     // The trait is meant to be hidden — a scout can infer it from an unusually
     // high potential estimate, which is the only intended tell. See the
     // generational-talent entry in CLAUDE.md.
-    if (t.tid === league.meta.userTid) {
+    if (t.tid === academyTid) {
       // Held back: enrolled below, once the academy's extras have been
       // generated. Nothing is pushed to `players` here for the same reason.
       userYouth = youth;
@@ -812,9 +819,9 @@ export function simOffseasonReporting(
   // The result is a world bit-identical to one without this feature, apart
   // from the extra players in the user's own academy.
   if (userYouth.length > 0) {
-    const userTeam = teams.find((t) => t.tid === league.meta.userTid);
+    const userTeam = teams.find((t) => t.tid === academyTid);
     const trialRng = mulberry32(
-      hashInts(league.lid, nextSeason, league.meta.userTid, YOUTH_TRIAL_STREAM),
+      hashInts(league.lid, nextSeason, academyTid, YOUTH_TRIAL_STREAM),
     );
     const groupSize = USER_ACADEMY_INTAKE_MIN
       + Math.floor(trialRng() * (USER_ACADEMY_INTAKE_MAX - USER_ACADEMY_INTAKE_MIN + 1));
@@ -882,7 +889,7 @@ export function simOffseasonReporting(
     players.push(...userYouth);
     const intakePids = userYouth.map((p) => p.pid);
     teams = teams.map((t) =>
-      t.tid === league.meta.userTid
+      t.tid === academyTid
         ? { ...t, academyRoster: [...t.academyRoster, ...intakePids] }
         : t,
     );
@@ -893,7 +900,7 @@ export function simOffseasonReporting(
   //      rate lowest go. Before the safety call-up, so a kid kept here can still
   //      be called up to the senior squad at 5.5.
   ({ teams } = trimAcademyToCap(
-    teams, players, league.meta.userTid, nextSeason, academyOrder,
+    teams, players, academyTid, nextSeason, academyOrder,
   ));
 
   // 5.5. Emergency call-up for the user's own roster. Anyone taken off the open

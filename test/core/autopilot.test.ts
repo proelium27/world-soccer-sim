@@ -5,7 +5,9 @@ import {
   AUTOPILOT_TID, MAX_JUMP_SEASONS, beginAutopilot, clampJumpSeasons, endAutopilot, jumpSeasons,
 } from "../../src/core/autopilot.js";
 import { FREE_AGENT_TID } from "../../src/core/transfers/negotiation.js";
-import { ROSTER_CAP } from "../../src/core/constants.js";
+import {
+  ROSTER_CAP, USER_ACADEMY_ENTRY_AGE, USER_ACADEMY_INTAKE_MIN,
+} from "../../src/core/constants.js";
 
 describe("autopilot sentinel", () => {
   it("is not a real tid and is not the free-agent sentinel", () => {
@@ -143,5 +145,20 @@ describe("jumpSeasons over a real season", () => {
     // Every rostered pid still resolves — a jump that orphaned one would crash
     // the next matchday rather than fail here.
     expect(club.roster.every((pid) => byPid.has(pid))).toBe(true);
+  });
+
+  it("keeps the academy running, so the jump's intake is waiting in it", () => {
+    // The academy runs on defaults, so nobody needs to be in charge for it to
+    // work. Before this it keyed off the parked tid like everything else: the
+    // intake went to the senior roster as ordinary AI youth and every kid
+    // already there lapsed, and a jump handed back an empty academy.
+    const club = result.teams.find((t) => t.tid === userTid)!;
+    const byPid = new Map(result.players.map((p) => [p.pid, p]));
+    const arrivals = club.academyRoster
+      .map((pid) => byPid.get(pid)!)
+      .filter((p) => result.season - p.born === USER_ACADEMY_ENTRY_AGE);
+    expect(arrivals.length).toBeGreaterThanOrEqual(USER_ACADEMY_INTAKE_MIN);
+    // The working copy's pointer at the real club must not reach a save.
+    expect(result.meta.autopilotTid).toBeUndefined();
   });
 });
