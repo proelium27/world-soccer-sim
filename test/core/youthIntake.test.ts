@@ -5,6 +5,7 @@ import { playSeason } from "../helpers/offseasonLeague.js";
 import { simOffseason } from "../../src/core/offseason.js";
 import { freeAgentPids, ensureUserRosterSafety } from "../../src/core/freeAgency.js";
 import { academyFacilitiesBonus } from "../../src/core/players/academyFacilities.js";
+import { computeOvr } from "../../src/core/players/ovr.js";
 import {
   USER_ACADEMY_INTAKE_MIN, USER_ACADEMY_INTAKE_MAX, USER_ACADEMY_ENTRY_AGE,
   ACADEMY_SCHOLARSHIP_AGE, ACADEMY_GRADUATION_AGE, ACADEMY_ROSTER_CAP,
@@ -136,19 +137,29 @@ describe("the academy fills itself", () => {
     for (const p of first) expect(squad.has(p.pid)).toBe(true);
   });
 
-  it("holds a kid's ratings still until the age development starts", () => {
-    // The whole reason the academy can take kids younger than the world's
-    // YOUTH_AGE: a kid generated at 14 is generated off the same base as a
-    // 16-year-old, so letting him develop from 14 would hand every graduate two
-    // growth years nobody else gets.
-    const before = byPidOf(world);
-    const after = byPidOf(nextWorld);
+  it("grows each kid toward the ratings he was rolled with and lands on them at sixteen", () => {
+    // A kid generated at 14 is generated off the same base as a 16-year-old, so
+    // those rolled ratings are exactly what he must be at 16 — landing on them
+    // is what keeps the sixteen-year-old average where it was. Through two real
+    // offseasons: shown younger on arrival, older a year on, exactly the target
+    // the season he turns sixteen, potential untouched the whole way.
+    const at15 = byPidOf(nextWorld);
+    const at16 = byPidOf(scholarshipWorld);
     const checked = intakeOf(world, preIntake);
     expect(checked.length).toBeGreaterThan(0);
     for (const kid of checked) {
-      const later = after.get(kid.pid)!;
-      expect(later.ratings).toEqual(before.get(kid.pid)!.ratings);
-      expect(later.ovr).toBe(before.get(kid.pid)!.ovr);
+      const target = kid.youthTarget;
+      expect(target).toBeDefined();
+      expect(kid.ovr).toBeLessThan(computeOvr(kid.pos, target!, kid.heightCm));
+
+      const older = at15.get(kid.pid)!;
+      expect(older.ovr).toBeGreaterThanOrEqual(kid.ovr);
+      expect(older.youthTarget).toEqual(target);
+
+      const landed = at16.get(kid.pid)!;
+      expect(landed.ratings).toEqual(target);
+      expect(landed.youthTarget).toBeUndefined();
+      expect(landed.potential).toBe(kid.potential);
     }
   });
 });

@@ -5313,6 +5313,15 @@ export const USER_ACADEMY_ENTRY_AGE = 14;
 export const USER_ACADEMY_INTAKE_MIN = 6;
 export const USER_ACADEMY_INTAKE_MAX = 8;
 /**
+ * How unevenly an academy kid's last year before YOUTH_BASE_REFERENCE_AGE is
+ * split: each kid closes between (1 - spread) and (1 + spread) seasons' worth
+ * of growth in his first year and the rest in his second, keyed off his pid.
+ * Only the path moves — every kid still lands on the ratings he was rolled with
+ * the season he turns sixteen (see `youthRatingsAt`), so this cannot move the
+ * sixteen-year-old average. Below 1 so no kid ever goes backwards.
+ */
+export const ACADEMY_GROWTH_TIMING_SPREAD = 0.5;
+/**
  * The scholarship cut: at this age a kid's first academy deal is up. Undecided,
  * he is kept to ACADEMY_GRADUATION_AGE while the academy has room, and the ones
  * the user's scouts rate lowest go when it doesn't.

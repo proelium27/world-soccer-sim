@@ -869,7 +869,7 @@ export function simOffseasonReporting(
 
     // Enrolled straight into the academy on a deal that runs to the scholarship
     // cut. Nothing to sign: the decisions come at the checkpoints.
-    userYouth = userYouth.map((p) => enrolAcademyYouth(p, nextSeason));
+    userYouth = userYouth.map((p) => enrolAcademyYouth(p, nextSeason, league.progressionModel));
     players.push(...userYouth);
     const intakePids = userYouth.map((p) => p.pid);
     teams = teams.map((t) =>

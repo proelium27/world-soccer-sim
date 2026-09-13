@@ -138,8 +138,8 @@ export function Academy() {
       </h4>
       <p className="text-muted" style={{ maxWidth: "48rem" }}>
         Every summer {USER_ACADEMY_INTAKE_MIN} to {USER_ACADEMY_INTAKE_MAX} kids join at{" "}
-        {USER_ACADEMY_ENTRY_AGE}. Nobody develops until {ACADEMY_SCHOLARSHIP_AGE}, so you get two
-        seasons to watch them first. At {ACADEMY_SCHOLARSHIP_AGE} their first deal is up: they're
+        {USER_ACADEMY_ENTRY_AGE} and grow a bit every season on the way to {ACADEMY_SCHOLARSHIP_AGE},
+        so their first two years are for watching them come along. At {ACADEMY_SCHOLARSHIP_AGE} their first deal is up: they're
         kept on while there's room (up to {ACADEMY_ROSTER_CAP} in the academy), and when there isn't,
         the ones your scouts rate lowest go. At {ACADEMY_GRADUATION_AGE} they join your first team
         if there's space, or leave. Release anyone early, or promote them early, whenever you like.

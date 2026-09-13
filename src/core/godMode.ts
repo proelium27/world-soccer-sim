@@ -1,8 +1,23 @@
 import type { LeagueStore } from "./leagueState.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import { computeOvr } from "./players/ovr.js";
-import type { Player, PlayerRatings, Position } from "./players/types.js";
+import type { Player, PlayerRatings, Position, SkillKey } from "./players/types.js";
 import { emptyCareerSummary } from "./players/careerSummary.js";
+import { RATING_MIN, RATING_MAX } from "./constants.js";
+
+/**
+ * Move an academy kid's rolled target by exactly what an edit moved each of his
+ * shown ratings, so the edited kid keeps growing toward where the edit implies
+ * rather than snapping back to what he was rolled as.
+ */
+function shiftTarget(target: PlayerRatings, before: PlayerRatings, after: PlayerRatings): PlayerRatings {
+  const next = { ...target };
+  for (const key of Object.keys(target) as SkillKey[]) {
+    const moved = after[key] - before[key];
+    if (moved !== 0) next[key] = Math.max(RATING_MIN, Math.min(RATING_MAX, target[key] + moved));
+  }
+  return next;
+}
 
 /**
  * God Mode sandbox helpers. Every function here is pure — it returns new
@@ -126,6 +141,12 @@ export function applyPlayerEdit(
       // means unlocked" stays literally true of every player in the save and
       // not just of the ones nobody has edited.
       ratingsLocked: (edit.ratingsLocked ?? p.ratingsLocked) ? true : undefined,
+      // An academy kid still growing toward his rolled ratings keeps growing
+      // after an edit: his target moves by exactly what the edit moved each
+      // rating, so he lands where the edit implies rather than snapping back.
+      youthTarget: p.youthTarget && edit.ratings
+        ? shiftTarget(p.youthTarget, p.ratings, ratings)
+        : p.youthTarget,
     };
   });
 }

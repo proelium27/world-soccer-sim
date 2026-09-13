@@ -2603,9 +2603,10 @@ export function Manual() {
             (and some won't, see <a href="#players">potential</a>).
           </p>
           <p>
-            Nobody develops before 16. The two seasons before that are time to watch a kid, not time
-            to improve him, so a 14-year-old reaches 16 exactly as good as he arrived and grows from
-            there like anyone else.
+            Kids grow through their first two seasons. Each one arrives a couple of seasons short of
+            the player he'll be at 16 and catches up by then, some doing most of it in the first year
+            and some in the second. Where he ends up at 16 doesn't depend on how fast he got there, so
+            a quick start isn't a sign of a better player. From 16 he develops like anyone else.
           </p>
           <p>
             Academy quality starts from a fixed trait each club has, set when the league is created,

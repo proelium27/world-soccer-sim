@@ -15,7 +15,7 @@ import {
   RETIREMENT_START_AGE, RETIREMENT_BASE_PROB, RETIREMENT_PROB_PER_YEAR,
   RETIREMENT_ROSTERED_DAMPING, RETIREMENT_UNROSTERED_BASE, RETIREMENT_MAX_PROB,
   RETIREMENT_PROSPECT_POT_THRESHOLD, RETIREMENT_PROSPECT_MAX_AGE,
-  YOUTH_BASE_REFERENCE_AGE,
+  YOUTH_BASE_REFERENCE_AGE, ACADEMY_GROWTH_TIMING_SPREAD,
 } from "../constants.js";
 
 /** Salt distinguishing this hash use from other pid-keyed hashes (e.g. identity rng). */
@@ -249,9 +249,10 @@ export function estimatePotential(
   for (let trial = 0; trial < POTENTIAL_SIM_TRIALS; trial++) {
     let simRatings = ratings;
     let peak = ovr;
-    // Starts at the reference age, not at `age`, for players below it: nothing
-    // develops before then (see `progressPlayer`), so a 15-year-old's ceiling is
-    // forecast over exactly the years a 16-year-old's is. Without this clamp a
+    // Starts at the reference age, not at `age`, for players below it: the model
+    // does not step before then (see `progressPlayer`; an academy kid's growth
+    // toward his `youthTarget` lands on ratings this was forecast from), so a
+    // 15-year-old's ceiling is forecast over exactly the years a 16-year-old's is. Without this clamp a
     // younger intake reads a HIGHER potential purely for having one more
     // simulated year, which then slides every absolute potential gate in the
     // game (AI_PROSPECT_MIN_POT, FREE_AGENT_CULL_MAX_POT).
@@ -266,6 +267,67 @@ export function estimatePotential(
   peaks.sort((a, b) => a - b);
   const idx = Math.min(peaks.length - 1, Math.floor(POTENTIAL_SIM_PERCENTILE * peaks.length));
   return peaks[idx];
+}
+
+/** Salt for an academy kid's early-or-late growth timing (must differ from every other pid-keyed salt). */
+const YOUTH_TIMING_SALT = 0x5954_494d; // "YTIM"
+
+/**
+ * One season of growth for a kid below YOUTH_BASE_REFERENCE_AGE, in rating
+ * points on every rating.
+ *
+ * Read off the model's own curve AT the reference age, averaged over the two
+ * rating groups at full academy minutes, so the years before sixteen move at the
+ * pace of the year just after it. Derived rather than tuned, the same argument
+ * generation's age offsets make: a curve retune reaches both sides at once.
+ */
+export function youthGrowthPerSeason(model: ProgressionModel = "random"): number {
+  const profile = PROGRESSION_PROFILES[model];
+  const physical = baseAgeDelta(profile, YOUTH_BASE_REFERENCE_AGE + PHYSICAL_AGE_SHIFT);
+  const skill = baseAgeDelta(profile, YOUTH_BASE_REFERENCE_AGE + SKILL_AGE_SHIFT);
+  return (MINUTES_FACTOR_MAX * (physical + skill)) / 2;
+}
+
+/**
+ * How far below the ratings he was rolled with an academy kid sits at `age`.
+ *
+ * A full season's growth per year short, except the final year, which a pid
+ * hash splits between early and late developers (`ACADEMY_GROWTH_TIMING_SPREAD`).
+ * Zero at and past the reference age — which is the whole guarantee: the path
+ * varies, the landing does not.
+ */
+export function youthShortfall(pid: number, age: number, model: ProgressionModel = "random"): number {
+  const years = YOUTH_BASE_REFERENCE_AGE - age;
+  if (years <= 0) return 0;
+  const growth = youthGrowthPerSeason(model);
+  if (years > 1) return growth * years;
+  const timing = mulberry32(hashInts(YOUTH_TIMING_SALT, pid))() * 2 - 1;
+  return growth * (1 - ACADEMY_GROWTH_TIMING_SPREAD * timing);
+}
+
+/**
+ * The ratings an academy kid shows at `age`, given the ratings he was rolled
+ * with (`Player.youthTarget`).
+ *
+ * The SAME amount comes off every rating, deliberately. A uniform shift cancels
+ * out of every position's OVR comparison (each weight row sums to 100), so the
+ * position a kid rates best at is the same at 14 as at 16 and the snapshots
+ * `changedPosition` reads never carry a growth artifact. Clamped at RATING_MIN,
+ * which is the only place a kid's shape can bend, and it bends back on landing.
+ */
+export function youthRatingsAt(
+  target: PlayerRatings,
+  pid: number,
+  age: number,
+  model: ProgressionModel = "random",
+): PlayerRatings {
+  const shortfall = youthShortfall(pid, age, model);
+  if (shortfall === 0) return target;
+  const shown = { ...target };
+  for (const key of Object.keys(target) as SkillKey[]) {
+    shown[key] = clampRating(target[key] - shortfall);
+  }
+  return shown;
 }
 
 /**
@@ -335,15 +397,34 @@ export function progressPlayer(
   // under a point. Paying for it here does, because a discarded step is
   // discarded for every player at every academy regardless of where he starts.
   //
-  // So he trains, and is scouted, and simply does not develop until the age the
-  // model was calibrated at. Inert while YOUTH_AGE >= YOUTH_BASE_REFERENCE_AGE,
-  // which is what makes this a no-op for a save at the reference age.
+  // So the model's own step never runs below the age it was calibrated at. An
+  // academy kid carrying a `youthTarget` does still grow, toward ratings rolled
+  // at that age (below), which is growth that cannot move where he lands. Inert
+  // while YOUTH_AGE >= YOUTH_BASE_REFERENCE_AGE, which is what makes this a
+  // no-op for a save at the reference age.
   const preDevelopment = age < YOUTH_BASE_REFERENCE_AGE;
   const locked = player.ratingsLocked === true || preDevelopment;
-  const ratings = locked ? player.ratings : stepped;
+
+  // An academy kid carrying the ratings he was rolled with grows toward them
+  // instead of holding still, and lands on them exactly the season he reaches
+  // the reference age. The shared-rng step above is still spent and discarded,
+  // so this changes no draw count; potential stays as it was because it was
+  // already forecast from those rolled ratings. God Mode's lock wins, as it
+  // does over everything else here.
+  const target = preDevelopment && player.ratingsLocked !== true ? player.youthTarget : undefined;
+  const grown = target ? youthRatingsAt(target, player.pid, age + 1, model) : undefined;
+  const ratings = grown ?? (locked ? player.ratings : stepped);
   const pos = locked ? player.pos : steppedPos;
-  const ovr = locked ? player.ovr : steppedOvr;
+  const ovr = grown
+    ? computeOvr(player.pos, grown, player.heightCm)
+    : (locked ? player.ovr : steppedOvr);
   const potential = locked ? player.potential : steppedPotential;
+  // Kept while he still has a year to go; dropped the season he lands (and off
+  // anyone already past the age, e.g. after a God Mode age edit).
+  const { youthTarget: _youthTarget, ...withoutTarget } = player;
+  const base = player.youthTarget !== undefined && age + 1 < YOUTH_BASE_REFERENCE_AGE
+    ? player
+    : withoutTarget;
 
   // Career peak, kept as a running maximum rather than re-derived from `hist`
   // by everyone who wants it. Compared against the snapshot being appended
@@ -352,7 +433,7 @@ export function progressPlayer(
   const beatsPeak = ovr > priorPeak;
 
   return {
-    ...player,
+    ...base,
     pos,
     ratings,
     ovr,

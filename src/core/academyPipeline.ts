@@ -33,9 +33,11 @@ import type { Player } from "./players/types.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import { potentialFog } from "./scouting/potentialFog.js";
 import { academyContractTerms, contractTerms } from "./contracts.js";
+import { computeOvr } from "./players/ovr.js";
+import { youthRatingsAt } from "./players/progression.js";
 import {
   ACADEMY_ROSTER_CAP, ACADEMY_SCHOLARSHIP_AGE, ACADEMY_GRADUATION_AGE, ROSTER_CAP,
-  USER_ACADEMY_INTAKE_MAX, type Difficulty,
+  USER_ACADEMY_INTAKE_MAX, YOUTH_BASE_REFERENCE_AGE, type Difficulty, type ProgressionModel,
 } from "./constants.js";
 
 /** Which cut a kid is in front of. */
@@ -106,12 +108,29 @@ function checkpointOf(p: Player, nextSeason: number): AcademyCheckpoint {
  * scholarship cut, and his ratings history started in the academy rather than
  * with a stray senior point before his first academy season.
  */
-export function enrolAcademyYouth(p: Player, season: number): Player {
+export function enrolAcademyYouth(
+  p: Player,
+  season: number,
+  model: ProgressionModel = "random",
+): Player {
   const terms = academyContractTerms(season, p.born);
+  // A kid below the reference age was rolled as the player he will be at it.
+  // Keep that as his target and show him the younger version, so he grows into
+  // it (see `youthRatingsAt`). Potential stays as generated: it was forecast
+  // from those rolled ratings, which is exactly what he lands on. peakOvr is
+  // authoritative once set, so it has to come down with the ovr it describes.
+  const age = season - p.born;
+  const growing = age < YOUTH_BASE_REFERENCE_AGE;
+  const ratings = growing ? youthRatingsAt(p.ratings, p.pid, age, model) : p.ratings;
+  const ovr = growing ? computeOvr(p.pos, ratings, p.heightCm) : p.ovr;
   return {
     ...p,
+    ratings,
+    ovr,
+    peakOvr: growing ? ovr : p.peakOvr,
+    ...(growing ? { youthTarget: p.ratings } : {}),
     contract: { salary: terms.salary, expiresSeason: terms.expiresSeason },
-    hist: p.hist.map((h) => ({ ...h, academy: true })),
+    hist: p.hist.map((h) => (growing ? { ...h, academy: true, ratings, ovr } : { ...h, academy: true })),
   };
 }
 
