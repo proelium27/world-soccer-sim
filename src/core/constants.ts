@@ -3176,7 +3176,7 @@ export const POTY_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = 
  *  - `savePct` × (his save percentage − TOTS_KEEPER_SAVE_PCT_BASELINE). Keepers
  *    only.
  *
- * **Per appearance, never season totals (2026-09-12).** The old formula paid
+ * **Per appearance, never season totals (2026-09-13).** The old formula paid
  * 0.01-0.03 per tackle and interception on season totals, which rewarded a
  * defence for how much it had to defend rather than how well: a centre-back's
  * ~160 a season was worth ~5 points against a rating spread of ~1, and a

@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-12",
+  date: "2026-09-13",
   title: "Team of the Season judges each position on its own terms",
   items: [
     "A player could win the Ballon d'Or and still miss his own league's Team of the Season. Every position was scored on the same formula, and it added up tackles and interceptions over the whole season, so a striker who did more running back could take the only striker spot off a better one.",
