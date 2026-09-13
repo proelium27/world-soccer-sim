@@ -246,7 +246,10 @@ describe("Country coefficients on the Cup page", () => {
     const league = withCupHistory(withCompetitions());
     const html = render(league, Cup);
     expect(html).toContain("Country coefficients");
-    for (const comp of league.competitions.filter((c) => c.tier === 1)) {
+    // Europe's top flights only — the coefficient ranks the countries that hold
+    // Continental Cup places, and no American league does.
+    const AMERICAS = ["Brazil", "Argentina", "Mexico", "United States"];
+    for (const comp of league.competitions.filter((c) => c.tier === 1 && !AMERICAS.includes(c.country))) {
       expect(html).toContain(comp.country);
     }
   });

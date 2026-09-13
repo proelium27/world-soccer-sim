@@ -47,7 +47,7 @@ describe("domestic cups through simThrough", () => {
     let league = makeLeague(0, 1);
     const rng = mulberry32(4242);
 
-    expect(league.domesticCups).toHaveLength(12); // one per country
+    expect(league.domesticCups).toHaveLength(16); // one per country
 
     // Countries no longer all field 40 clubs, so their cups no longer all have
     // the same number of rounds — and a shorter cup takes the LAST n matchdays

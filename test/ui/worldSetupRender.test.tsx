@@ -74,7 +74,7 @@ describe("WorldSetup renders", () => {
     for (const country of ["England", "Spain", "Italy", "Germany", "France", "Portugal", "Belgium", "Turkey"]) {
       expect(html).toContain(country);
     }
-    expect(html).toContain("12 countries, 36 divisions, 626 clubs");
+    expect(html).toContain("16 countries, 48 divisions, 852 clubs");
     expect(html).not.toContain("alert-warning");
   });
 
@@ -85,7 +85,7 @@ describe("WorldSetup renders", () => {
     expect(html).toContain("Money");
     expect(html).toContain("Continental Cup places");
     expect(html).toContain("Continental Shield places");
-    expect(html).toContain("13 countries, 38 divisions, 666 clubs");
+    expect(html).toContain("17 countries, 50 divisions, 892 clubs");
   });
 
   it("keeps the shipped rows collapsed, so eight panels don't bury the checkboxes", () => {
@@ -384,7 +384,7 @@ describe("WorldSetup wiring", () => {
   it("keeps the entries it renders in step with the world they build", () => {
     const entries = withAddedLeague();
     const countries = countriesOf(buildCompetitions(includedSpecs(entries)));
-    expect(countries).toHaveLength(13);
+    expect(countries).toHaveLength(17);
     expect(countries[countries.length - 1]).toBe("Neverland");
   });
 });
@@ -492,7 +492,7 @@ describe("the card can be collapsed", () => {
     // The whole case for collapsing rests on this line. Without it the player
     // has to open a twelve-row card to find out what they are about to get.
     const html = renderShut(defaultWorldEntries());
-    expect(html).toContain("12 countries, 36 divisions, 626 clubs");
+    expect(html).toContain("16 countries, 48 divisions, 852 clubs");
     expect(html).toContain("World setup");
   });
 
