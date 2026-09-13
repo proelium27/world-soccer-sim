@@ -263,14 +263,20 @@ const OUTFIELD_COLUMNS: StatColumn[] = [
   RATING_COLUMN,
 ];
 
-/** `totsScore` pays a keeper for saves and charges him for goals conceded. */
+/** `totsScore` judges a keeper on save percentage, not on saves or goals conceded. */
 const KEEPER_COLUMNS: StatColumn[] = [
   { label: "Saves", value: (s) => s.saves },
-  { label: "Conceded", value: (s) => s.goalsAgainst },
+  {
+    label: "Save %",
+    value: (s) => {
+      const faced = s.saves + s.goalsAgainst;
+      return faced > 0 ? `${Math.round((s.saves / faced) * 100)}%` : "—";
+    },
+  },
   RATING_COLUMN,
 ];
 
-/** And pays a defender for tackles and interceptions. */
+/** And pays a defender for tackles and interceptions, counted per game. */
 const DEFENDER_COLUMNS: StatColumn[] = [
   { label: "Tackles", value: (s) => s.tackles },
   { label: "Int", value: (s) => s.interceptions },
