@@ -72,7 +72,6 @@ const STATUS_OPTIONS: { key: PlayerStatusFilter; label: string }[] = [
 const STATUS_BADGE: Record<PlayerStatus, string | null> = {
   senior: null,
   academy: "Academy",
-  trial: "On trial",
   free: "Free agent",
 };
 

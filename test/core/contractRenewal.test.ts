@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { makeLeague } from "../helpers/league.js";
 import { renewalsDue, extendAllContracts } from "../../src/core/contractRenewal.js";
 import {
-  canExtend, contractTerms, academyContractTerms, extendContract,
+  canExtend, contractTerms, academyContractTerms, extendContract, academyCheckpointExpiry,
 } from "../../src/core/contracts.js";
 import { DIVISION_2_REFUSAL_OVR_THRESHOLD } from "../../src/core/constants.js";
 import { tierOf } from "../../src/core/competitions.js";
@@ -80,8 +80,11 @@ describe("renewalsDue", () => {
     const base = makeLeague(0, 1);
     const team = userTeamOf(base);
     // createLeagueState leaves the academy empty; stock it from the pool.
+    // Past the professional cut: a younger kid's academy deal runs to his next
+    // checkpoint and is resolved by the rollover, not re-signed.
     const prospects = base.players
       .filter((p) => !base.teams.some((t) => t.roster.includes(p.pid)))
+      .filter((p) => academyCheckpointExpiry(p.born, base.season) === null)
       .slice(0, 3)
       .map((p) => p.pid);
     const stocked: LeagueStore = {

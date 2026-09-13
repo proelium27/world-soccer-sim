@@ -323,6 +323,26 @@ describe("migrateLeague", () => {
     expect(migrated.teams.find((t) => t.tid === 0)!.academyRoster).toEqual([42]);
   });
 
+  it("strips the retired youth trial group rather than carrying it on the club forever", () => {
+    // migrateFields spreads each team before overriding what it names, so a
+    // field nothing reads any more would otherwise ride along on every save's
+    // club record. A trialist was never signed, so dropping the pid is exactly
+    // what the next rollover would have done: he is a free agent.
+    const league = makeLeague(0, 1);
+    // A fresh world has no free agents, and which pid it is doesn't matter here.
+    const trialist = league.players[0].pid;
+    const legacy = {
+      ...league,
+      teams: league.teams.map((t) => (t.tid === 0
+        ? { ...t, youthTrialists: [trialist], youthTrialSignings: 2 }
+        : t)),
+    } as unknown as LeagueStore;
+
+    const team = migrateLeague(legacy).teams.find((t) => t.tid === 0)! as unknown as Record<string, unknown>;
+    expect("youthTrialists" in team).toBe(false);
+    expect("youthTrialSignings" in team).toBe(false);
+  });
+
   it("leaves current saves' finance values untouched", () => {
     const league = makeLeague(0, 1);
     const custom = {
