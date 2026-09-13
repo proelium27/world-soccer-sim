@@ -22,8 +22,10 @@ const SECTIONS: [id: string, title: string][] = [
   ["world", "The World"],
   ["cup", "The Continental Cup"],
   ["shield", "The Continental Shield"],
+  ["americas-cup", "The Americas Cup"],
   ["domestic-cup", "The Domestic Cup"],
   ["champions-cups", "The Champions Cups"],
+  ["title-playoffs", "Title Playoffs"],
   ["international", "International Football"],
   ["players", "Players: Ratings, OVR & Potential"],
   ["development", "Player Development & Aging"],
@@ -480,6 +482,8 @@ export function Manual() {
             <li><strong>Standings</strong>. The league table, plus each club's current OVR/POT. A season dropdown lets you pull up any past season&apos;s final table next to the current one. The champion&apos;s row is highlighted, and the <a href="#cup">Continental Cup</a> and <a href="#shield">Continental Shield</a> qualification places are shaded.</li>
             <li><strong>Continental Cup</strong>. The live league-phase table and knockout bracket for the current season, plus past winners via a season dropdown. More in <a href="#cup">The Continental Cup</a>.</li>
             <li><strong>Continental Shield</strong>. The same page for the second competition, for clubs finishing just below the Cup places. More in <a href="#shield">The Continental Shield</a>.</li>
+            <li><strong>Americas Cup</strong>. The same page again for the Americas&apos; own competition. More in <a href="#americas-cup">The Americas Cup</a>.</li>
+            <li><strong>Title Playoffs</strong>. The brackets that decide the champions of the leagues that crown theirs in a knockout, for any country and any past season. More in <a href="#title-playoffs">Title Playoffs</a>.</li>
             <li><strong>Domestic Cup</strong>. Every round of your country&apos;s cup as it&apos;s drawn and played, with a dropdown for any other country and for past seasons. More in <a href="#domestic-cup">The Domestic Cup</a>.</li>
             <li><strong>National Teams</strong>. A whole section for the summer's national-team football: Player Pool (call players into your own country's squad) and My Squad (pick its eleven), Federation (your international career, and who wants you), the current World Cup, Qualifying and Confederation Cups (the Euro, Copa América and AFCON), Rosters showing every nation's named squad, a Schedule of fixtures, Power Rankings of every nation, Stat Leaders (top nations and top players, filterable by country), and History with past winners and each nation's record. More in <a href="#international">International Football</a>.</li>
             <li><strong>Power Rankings</strong>. Every club in the world ranked by a blended Power score: squad OVR (Starting XI plus bench, depth-weighted, same formula as Standings' OVR column) plus a current-season form bonus or penalty. Form isn't just your record. Beating a strong side counts for more than beating a weak one (and losing to a weak side hurts more than losing to a strong one), and goal difference factors in too, so a club can rank above or below its raw OVR depending on how it's actually playing. Record, goal difference, OVR, and the blended Power score all sit side by side, with a badge showing each club's competition and its rank within it. Click a team to expand its full roster in place. The rankings also get snapshotted every 10 matchdays (plus once after the final matchday), so four times a season, and a dropdown lets you browse any past snapshot from any season, with arrows showing how far each club rose or fell since the last one. Snapshots taken before this cadence changed are kept, so an older save has a denser dropdown for its early seasons. Historical views can't expand rosters, since past squads aren't stored, and snapshots only start piling up from the point this feature shipped.</li>
@@ -684,13 +688,27 @@ export function Manual() {
 
         <Section id="world" title="The World">
           <p>
-            A new save drops you into one shared world: twelve countries (<strong>England</strong>,{" "}
-            <strong>Spain</strong>, <strong>Italy</strong>, <strong>Germany</strong>,{" "}
-            <strong>France</strong>, the <strong>Netherlands</strong>, <strong>Portugal</strong>,{" "}
-            <strong>Belgium</strong>, <strong>Turkey</strong>, <strong>Greece</strong>,{" "}
-            <strong>Scotland</strong> and <strong>Serbia</strong>), each with its own league
-            pyramid, for 36 leagues and 626 clubs total. You pick any club in any country and
+            A new save drops you into one shared world: sixteen countries. Twelve are in Europe
+            (<strong>England</strong>, <strong>Spain</strong>, <strong>Italy</strong>,{" "}
+            <strong>Germany</strong>, <strong>France</strong>, the <strong>Netherlands</strong>,{" "}
+            <strong>Portugal</strong>, <strong>Belgium</strong>, <strong>Turkey</strong>,{" "}
+            <strong>Greece</strong>, <strong>Scotland</strong> and <strong>Serbia</strong>) and
+            four are in the Americas (<strong>Brazil</strong>, <strong>Argentina</strong>,{" "}
+            <strong>Mexico</strong> and the <strong>United States</strong>). Each has its own league
+            pyramid, for 48 leagues and 852 clubs total. You pick any club in any country and
             division when you start.
+          </p>
+          <p>
+            <strong>The Americas work a little differently.</strong> Their clubs play their
+            continental football in the <a href="#americas-cup">Americas Cup</a>, never in the
+            Continental Cup or Shield, so a Brazilian club and an English one only meet in a
+            transfer negotiation or the preseason <a href="#champions-cups">Intercontinental Cup</a>.
+            Brazil plays a straight table with four up and four down, and Argentina swaps two.{" "}
+            <strong>Mexico and the United States are closed leagues</strong>: nobody is promoted or
+            relegated, so a club starts and stays in its division, however well or badly it does.
+            Argentina, Mexico and the US also give their title to the winner of a{" "}
+            <a href="#title-playoffs">title playoff</a> rather than to whoever tops the table.
+            Argentina and the US are capped at 20 clubs because the season only has 38 matchdays.
           </p>
           <p>
             <strong>Every country runs three divisions.</strong> Sizes vary — England, Spain and
@@ -775,7 +793,13 @@ export function Manual() {
             <strong>Portugal</strong>, then <strong>Belgium</strong>, then <strong>Turkey</strong>,
             then <strong>Greece</strong>, then <strong>Scotland</strong>, then{" "}
             <strong>Serbia</strong> weakest of all, and their budgets step down in that same order.
-            All eight are selling leagues, and Serbia is the poorest as well as the weakest. Worth
+            All eight are selling leagues, and Serbia is the poorest as well as the weakest. The
+            American leagues sit on the same ladder: <strong>Brazil</strong> just below France,{" "}
+            <strong>Argentina</strong> between the Netherlands and Portugal, <strong>Mexico</strong>{" "}
+            level with Belgium and the <strong>United States</strong> level with Turkey. In real life
+            MLS has more money than Argentina, but here every league&apos;s budget follows its
+            strength, because a league that is weaker but richer climbs past its neighbours over a
+            long save. Worth
             knowing that these gaps close as a save gets long: weaker leagues develop players faster
             than the big four do, so by season 20 or so the bottom few leagues are bunched much
             closer together than they started. The order is real when you begin, and it softens from
@@ -802,11 +826,11 @@ export function Manual() {
             ones, with the last place up decided by a playoff) runs on its
             own within each country at the end of every season, so a rough season in Spain's top
             flight doesn't touch any other country's tables. Standings, Awards, and Stat Leaders each have a competition dropdown,
-            grouped by country, so you can browse any of the 36 leagues. It defaults to
+            grouped by country, so you can browse any of the 48 leagues. It defaults to
             whichever one your own club is currently in.
           </p>
           <p>
-            <strong>Shaping your own world.</strong> The twelve countries above are the default, not
+            <strong>Shaping your own world.</strong> The sixteen countries above are the default, not
             the only option. The <strong>World setup</strong> panel on the New League screen lets you
             switch any of them off and add leagues of your own. An added league's clubs get
             generated names and colours, since the game ships no real clubs. The panel is on both
@@ -1183,6 +1207,39 @@ export function Manual() {
           </p>
         </Section>
 
+        <Section id="americas-cup" title="The Americas Cup">
+          <p>
+            The Americas Cup is the continental competition for Brazil, Argentina, Mexico and the
+            United States, the way the Libertadores and the Champions Cup are in real life. The{" "}
+            <strong>top four</strong> in each of those four top flights get in, for{" "}
+            <strong>16 clubs</strong>. Clubs from Europe never play in it, and American clubs never
+            play in the Continental Cup or the Shield, so the two sides of the world only meet in
+            the preseason <a href="#champions-cups">Intercontinental Cup</a>.
+          </p>
+          <p>
+            There are two other ways in, the same two the European competitions use. The{" "}
+            <strong>holders</strong> keep their place however their league went, and each
+            country&apos;s <strong>domestic cup winner</strong> takes one of its four places. Either
+            one knocks out the fourth-placed club in that league, and most years it changes nothing
+            because the winner finished high enough anyway.
+          </p>
+          <p>
+            It plays like the others: a league phase of six games against clubs from other countries,
+            then the top eight go straight into two-legged quarter-finals and semi-finals and a
+            one-off final. There&apos;s no playoff round, because a 16-club field has none to fill.
+            It runs on the same matchdays as the European competitions, and the sim stops before
+            your final. Places don&apos;t move with results the way the Continental Cup&apos;s do:
+            every American league always sends four.
+          </p>
+          <p>
+            The prize money is the same as the Shield&apos;s: $4M for qualifying, $600k a win and
+            $200k a draw in the league phase, then $2.5M / $3.5M / $5.5M through the knockout. It
+            counts on a club&apos;s trophy case and the all-time boards, weighted between a Shield
+            and a Continental Cup, and it counts as the continental part of a treble for an
+            American club. Like the Shield, it doesn&apos;t currently feed the Ballon d&apos;Or.
+          </p>
+        </Section>
+
         <Section id="domestic-cup" title="The Domestic Cup">
           <p>
             Every country also runs its own cup, and this one is open to{" "}
@@ -1282,9 +1339,11 @@ export function Manual() {
             There's one in <strong>every country</strong>: your league champions against your{" "}
             <a href="#domestic-cup">domestic cup</a> winners. If the same club won both, the{" "}
             <strong>league runners-up</strong> take the other place, because a club can't play
-            itself. And there's one more on top of those, the only match of the year between the
-            two continental competitions: the <a href="#cup">Continental Cup</a> winners against
-            the <a href="#shield">Continental Shield</a> winners.
+            itself. And there are two more on top of those. The <a href="#cup">Continental Cup</a>{" "}
+            winners play the <a href="#shield">Continental Shield</a> winners, and the Continental
+            Cup winners also play the <a href="#americas-cup">Americas Cup</a> winners in the{" "}
+            <strong>Intercontinental Cup</strong>, the one match of the year between European and
+            American club football.
           </p>
           <p>
             They're <strong>one-off matches at a neutral ground</strong>, so nobody has home
@@ -1312,6 +1371,36 @@ export function Manual() {
             There's nothing to contest in season one, since nobody has won anything yet, so your
             first champions cups are at the start of season two. Older saves pick them up at their
             next offseason the same way.
+          </p>
+        </Section>
+
+        <Section id="title-playoffs" title="Title Playoffs">
+          <p>
+            Most leagues give the title to whoever finishes top. Three don&apos;t:{" "}
+            <strong>Argentina</strong>, <strong>Mexico</strong> and the{" "}
+            <strong>United States</strong> finish their season with a knockout for the title, the
+            way the Liguilla and MLS Cup work in real life.
+          </p>
+          <p>
+            Once the last matchday is played, the <strong>top eight</strong> go into a bracket:
+            1st v 8th, 4th v 5th, 2nd v 7th and 3rd v 6th, then semi-finals and a final. In
+            Argentina and the US every tie is a one-off game at the better-placed club&apos;s ground.
+            In Mexico every round, final included, is two legs, with the better-placed club at home
+            for the second. A level tie goes to extra time and penalties. The winner is the champion:
+            it&apos;s their name in the history books, on the trophy case and on the players&apos;
+            profiles, and they play in the champions cup.
+          </p>
+          <p>
+            <strong>The table still counts for everything else.</strong> Prize money, hype,
+            continental places and what your board makes of your season all come from where you
+            finished, so topping the table and going out in the quarter-finals is still a good year,
+            just not a title-winning one. The board does give you credit for the title if you win it.
+          </p>
+          <p>
+            It&apos;s played the moment the season ends, before anyone retires or moves clubs, with
+            injuries honoured and suspensions wiped, the same as the{" "}
+            <a href="#world">promotion playoffs</a>. The brackets are on the{" "}
+            <strong>Title Playoffs</strong> page.
           </p>
         </Section>
 
@@ -1412,9 +1501,10 @@ export function Manual() {
             quarter-final, while a confederation with only a handful of real football nations plays
             a single group and sends its top two straight to the final. A confederation that can't
             field even four nations doesn't hold one at all, which is why you'll usually see the
-            Euro, Copa América and AFCON and not the others: nearly every player in the world is
-            born into one of the twelve countries whose leagues you play in, so the rest of the world
-            is thin. Fill it out — with an imported roster, say — and those cups start
+            Euro, Copa América and AFCON, the Gold Cup only when North America has enough nations
+            with enough players, and never the Asian Cup or the OFC Nations Cup: nearly every
+            player in the world is born into one of the sixteen countries whose leagues you play
+            in, so the rest of the world is thin. Fill it out — with an imported roster, say — and those cups start
             being played on their own.
           </p>
           <p>
@@ -1569,7 +1659,7 @@ export function Manual() {
           <p>
             One consequence worth knowing: the lower you go, the further the game runs below what
             those games cover. A third division here sits in the 30s and 40s, because this world
-            has twelve countries and three divisions each &mdash; a lot of football that a game
+            has sixteen countries and three divisions each &mdash; a lot of football that a game
             built around the top flights never has to put a number on.
           </p>
           <p>

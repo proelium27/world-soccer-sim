@@ -44,7 +44,7 @@ import {
   NUM_TEAMS, NUM_TEAMS_D2, NUM_TEAMS_D3, PROMOTION_RELEGATION_COUNT,
   COUNTRY_PLAYOFF_FORMAT, DEFAULT_PLAYOFF_FORMAT, type PlayoffFormat,
   COUNTRY_REGION, DEFAULT_CONTINENTAL_REGION, type ContinentalRegion,
-  COUNTRY_TITLE_PLAYOFF, type TitlePlayoffFormat,
+  COUNTRY_TITLE_PLAYOFF, type TitlePlayoffFormat, AMERICAS_CUP_LEAGUE_SLOTS,
 } from "./constants.js";
 import {
   LEAGUE_NATIONALITY_WEIGHTS, sanitizeNationalityWeights, type NationalityWeights,
@@ -611,6 +611,7 @@ export interface ResolvedLeagueSpec {
   cupSlots: number;
   shieldSlots: number;
   nationalities: NationalityWeights;
+  region: ContinentalRegion;
 }
 
 export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
@@ -620,7 +621,13 @@ export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
   // shipped league the player has weakened takes the weak league's places, which
   // is what the world will actually do with it.
   const weak = strengthOffset > 0;
+  // A league outside Europe earns no European places whatever it asks for (see
+  // cupSlotsForCompetition), so its resolved European counts are zero — which is
+  // what keeps the field warnings below from counting it toward the Cup.
+  const region = spec.region ?? COUNTRY_REGION[spec.country] ?? DEFAULT_CONTINENTAL_REGION;
+  const european = region === "europe";
   return {
+    region,
     divisions: spec.divisions ?? 2,
     strengthOffset,
     budgetScale: spec.budgetScale ?? COUNTRY_BUDGET_SCALE[spec.country] ?? 1,
@@ -630,8 +637,12 @@ export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
     promotionSpots: spec.promotionSpots ?? PROMOTION_RELEGATION_COUNT,
     playoffFormat: spec.playoffFormat
       ?? COUNTRY_PLAYOFF_FORMAT[spec.country] ?? DEFAULT_PLAYOFF_FORMAT,
-    cupSlots: spec.cupSlots ?? (weak ? CUP_WEAK_LEAGUE_SLOTS : CUP_STRONG_LEAGUE_SLOTS),
-    shieldSlots: spec.shieldSlots ?? (weak ? SHIELD_WEAK_LEAGUE_SLOTS : SHIELD_STRONG_LEAGUE_SLOTS),
+    cupSlots: european
+      ? spec.cupSlots ?? (weak ? CUP_WEAK_LEAGUE_SLOTS : CUP_STRONG_LEAGUE_SLOTS)
+      : 0,
+    shieldSlots: european
+      ? spec.shieldSlots ?? (weak ? SHIELD_WEAK_LEAGUE_SLOTS : SHIELD_STRONG_LEAGUE_SLOTS)
+      : 0,
     // England's table is the honest answer for a country with no table of its
     // own, because England's is what pickNationality would actually draw from.
     nationalities: spec.nationalities
@@ -728,6 +739,13 @@ export function worldTuningWarnings(specs: LeagueSpec[]): string[] {
     ["Continental Cup", resolved.reduce((total, r) => total + r.cupSlots, 0)],
     ["Continental Shield", resolved.reduce((total, r) => total + r.shieldSlots, 0)],
   ];
+  // The Americas Cup is checked only in a world that has an American league at
+  // all — a European world has no Americas Cup to be too small, and saying so
+  // would be noise.
+  const americasLeagues = resolved.filter((r) => r.region === "americas").length;
+  if (americasLeagues > 0) {
+    fields.push(["Americas Cup", americasLeagues * AMERICAS_CUP_LEAGUE_SLOTS]);
+  }
 
   for (const [name, asked] of fields) {
     const played = largestValidCupField(asked);

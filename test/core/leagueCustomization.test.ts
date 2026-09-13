@@ -113,9 +113,10 @@ describe("per-league tuning falls back to the shipped country tables", () => {
 
   it("classifies the big four as strong and the rest as weak, as before", () => {
     const weak = comps.filter((c) => c.tier === 1 && isWeakLeague(c)).map((c) => c.country);
-    expect(weak).toEqual(
-      ["France", "Portugal", "Belgium", "Turkey", "Netherlands", "Scotland", "Greece", "Serbia"],
-    );
+    expect(weak).toEqual([
+      "France", "Portugal", "Belgium", "Turkey", "Netherlands", "Scotland", "Greece", "Serbia",
+      "Brazil", "Argentina", "Mexico", "United States",
+    ]);
   });
 
   it("academy offset defaults to the strength offset — one number doing both jobs", () => {
@@ -260,7 +261,7 @@ describe("building a world's competitions table", () => {
   it("a table with a country left out still chains every remaining country", () => {
     const table = buildCompetitions(worldLeagueSpecs().filter((s) => s.country !== "England"));
     const chains = countryDivisions(table);
-    expect(chains).toHaveLength(11);
+    expect(chains).toHaveLength(15);
     for (const { country, divisions } of chains) {
       expect(divisions.map((d) => d.tier)).toEqual([1, 2, 3]);
       expect(divisions.every((d) => d.country === country)).toBe(true);

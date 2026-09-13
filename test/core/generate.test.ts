@@ -74,8 +74,8 @@ describe("generateWorld", () => {
   // own generation because it is a different seed.
   const world = generateWorld(mulberry32(42));
 
-  it("produces 626 teams across 36 competitions, each its own size", () => {
-    expect(world.teams).toHaveLength(626);
+  it("produces 852 teams across 48 competitions, each its own size", () => {
+    expect(world.teams).toHaveLength(852);
     for (const comp of worldCompetitions()) {
       expect(world.teams.filter((t) => t.compId === comp.id))
         .toHaveLength(competitionTeamCount(comp));
@@ -113,8 +113,8 @@ describe("generateWorld", () => {
     }
   });
 
-  it("has 15650 players (626 teams x 25)", () => {
-    expect(world.players).toHaveLength(15650);
+  it("has 21300 players (852 teams x 25)", () => {
+    expect(world.players).toHaveLength(21300);
   });
 
   it("generates the weak leagues in coefficient order: England > France > Netherlands > Portugal > Belgium > Turkey > Greece > Scotland > Serbia", () => {

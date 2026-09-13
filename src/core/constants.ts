@@ -278,6 +278,11 @@ export type PlayoffFormat = "english" | "german" | "none";
 export const COUNTRY_PLAYOFF_FORMAT: Record<string, PlayoffFormat> = {
   Germany: "german",
   Scotland: "none",
+  // Closed leagues: they promote nobody, so there is no place to play for. Said
+  // outright rather than left to the zero-places guard, so World setup shows
+  // what the league really does.
+  Mexico: "none",
+  "United States": "none",
 };
 
 /** What a country not in COUNTRY_PLAYOFF_FORMAT plays, including invented ones. */
