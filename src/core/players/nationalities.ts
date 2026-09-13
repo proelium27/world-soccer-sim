@@ -3231,59 +3231,82 @@ export const LEAGUE_NATIONALITY_WEIGHTS: Record<string, Record<string, number>> 
     [REST]: 16,
   },
   // ── The Americas ──────────────────────────────────────────────────────────
-  // Built from published breakdowns where they exist and reconstructed where
-  // they do not; each table says which. Per 1000 players. REST is kept small on
-  // all four for the reason Serbia's comment gives — the rest-of-world bucket is
-  // ~40% English, and none of these leagues imports English players to speak of.
+  // All four are real published breakdowns, entered as PLAYER COUNTS (the table
+  // normalizes to its own total, so a count is as good a weight as a share).
+  // Each source lists only its top nationalities, so each under-sums; the gap is
+  // named explicitly as a tail of small nations rather than poured into REST,
+  // for the reason Serbia's comment gives — the rest-of-world bucket is ~40%
+  // English, and three of these leagues have no English players at all. REST is
+  // held to ~0.5-1% of each table. Tail nations are this file's choice, not the
+  // source's; the listed nations are the source's exactly.
   //
-  // Brazilian Série A: 22.3% of the 600 registered for 2025 were foreign, 121 of
-  // them South American (Argentina 46, Uruguay 26, Colombia 15), with 2026's
-  // counts (Argentina 53, Uruguay 32, Colombia 28, Paraguay 11, 12 Europeans)
-  // used to shape the tail. The domestic share is the published one.
+  // Brazilian Série A, 666 players: 74.9% Brazilian, then Argentina 44, Uruguay
+  // 26, Colombia 16, Paraguay 13, Ecuador 10, Chile 9, Venezuela 6, Peru 4,
+  // Bolivia 3, Portugal 3, United States 2, Spain 2, Angola 1, Costa Rica 1.
+  // 27 unlisted: a 21-player named tail plus REST.
   Brazil: {
-    Brazil: 777, Argentina: 77, Uruguay: 43, Colombia: 30, Paraguay: 17,
-    Ecuador: 14, Venezuela: 10, Chile: 8, Peru: 6, Bolivia: 3,
-    Portugal: 8, Spain: 3, Netherlands: 2, Italy: 2,
-    [REST]: 5,
-  },
-  // Argentine Liga Profesional: 121 foreigners across 30 clubs in 2025
-  // (Uruguay 46, Paraguay 26, Colombia 20). The domestic share is ESTIMATED at
-  // ~87% from that count against typical squad sizes — no published total was
-  // found — which makes it the most domestic top flight in the game, as the
-  // six-foreigner rule would suggest.
-  Argentina: {
-    Argentina: 866, Uruguay: 51, Paraguay: 29, Colombia: 22, Chile: 8,
-    Venezuela: 6, Ecuador: 5, Peru: 4, Brazil: 4, Bolivia: 2,
+    Brazil: 499, Argentina: 44, Uruguay: 26, Colombia: 16, Paraguay: 13,
+    Ecuador: 10, Chile: 9, Venezuela: 6, Peru: 4, Bolivia: 3,
+    Portugal: 3, "United States": 2, Spain: 2, Angola: 1, "Costa Rica": 1,
+    Italy: 2, France: 2, Netherlands: 2, Mexico: 2,
+    "Cape Verde": 1, Mozambique: 1, "Guinea-Bissau": 1, Honduras: 1, Panama: 1,
+    Japan: 2, Haiti: 1, Nigeria: 2, Germany: 1, Cameroon: 2,
+    Canada: 1, Belgium: 1, Switzerland: 1,
     [REST]: 3,
   },
-  // Liga MX: 310 of 488 players registered for the Apertura 2026 were Mexican
-  // (63.5%); the foreign split is the Clausura 2026 count (Argentina 41,
-  // Colombia 25, Uruguay 18, Brazil 18, Ecuador 11, Spain 9, Chile 6) plus the
-  // smaller nations that make up the rest.
-  Mexico: {
-    Mexico: 635, Argentina: 86, Colombia: 51, Uruguay: 47, Brazil: 37,
-    Ecuador: 23, Spain: 18, Chile: 12, Paraguay: 12, "United States": 10,
-    Venezuela: 8, Peru: 6, Portugal: 5, France: 5, Netherlands: 4,
-    Panama: 4, "Costa Rica": 4, Honduras: 4,
-    [REST]: 30,
+  // Argentine Liga Profesional, 891 players: 83.7% Argentine, then Uruguay 38,
+  // Colombia 24, Paraguay 20, Chile 11, Ecuador 7, Venezuela 5, Peru 4, Brazil 3,
+  // Mexico 2, United States 2, Spain 2, Italy 1, Bolivia 1. 25 unlisted: a
+  // 19-player named tail plus REST.
+  Argentina: {
+    Argentina: 746, Uruguay: 38, Colombia: 24, Paraguay: 20, Chile: 11,
+    Ecuador: 7, Venezuela: 5, Peru: 4, Brazil: 3, Mexico: 2,
+    "United States": 2, Spain: 2, Italy: 1, Bolivia: 1,
+    France: 2, Portugal: 2,
+    Honduras: 1, "Costa Rica": 1, Panama: 1, Canada: 2, Guatemala: 1,
+    "Dominican Republic": 1, Cuba: 1, Haiti: 2, Japan: 1, Israel: 1,
+    Germany: 2, Netherlands: 1, Nicaragua: 1, "El Salvador": 1, Belgium: 1,
+    [REST]: 3,
   },
-  // MLS, 2026: 44% US-born (MLS's own figure), with the foreign 56% split by the
-  // published regional shares (Europe 35%, South America 28%, Africa 12%, North
-  // America 12%, Asia 4%, Mexico/Central America 4%, Caribbean 3%, Oceania 2%)
-  // and the published top counts (Brazil 33, Argentina 32, Colombia 24, UK 20,
-  // Germany 19, with Canada among the top five). The per-nation weights inside
-  // each region are RECONSTRUCTED from those constraints, not copied from a list.
+  // Liga MX, 480 players: 62.9% Mexican, then Argentina 43, Colombia 27, Uruguay
+  // 19, Brazil 19, United States 13, Spain 12, Paraguay 8, Ecuador 6, Chile 4,
+  // Venezuela 3, Panama 3, Morocco 3, Portugal 3, Costa Rica 2, Canada 2, Peru 1,
+  // Nigeria 1, France 1, Jamaica 1. Only 7 unlisted.
+  Mexico: {
+    Mexico: 302, Argentina: 43, Colombia: 27, Uruguay: 19, Brazil: 19,
+    "United States": 13, Spain: 12, Paraguay: 8, Ecuador: 6, Chile: 4,
+    Venezuela: 3, Panama: 3, Morocco: 3, Portugal: 3, "Costa Rica": 2,
+    Canada: 2, Peru: 1, Nigeria: 1, France: 1, Jamaica: 1,
+    Honduras: 2, Netherlands: 1, Italy: 1, Ghana: 1,
+    [REST]: 2,
+  },
+  // MLS, 872 players (US and Canadian clubs): 39.7% American and 6.1% Canadian,
+  // then Brazil 40, Argentina 31, Colombia 26, Germany 17, England 16, Ghana 15,
+  // Spain 14, Mexico 13, France 12, Uruguay 12, Denmark 12, Venezuela 11,
+  // Jamaica 11, Serbia 9, and 8 each for Norway, Chile, Israel, Poland, Ecuador
+  // and Australia. The world only has US clubs, so Canada is an import here.
+  //
+  // The list stops at the 22nd nation and leaves 186 players (21%) unnamed, by
+  // far the broadest tail of the four. It is named at 7 or fewer per nation
+  // (nothing below the list's cut can exceed it) from the regions MLS publishes
+  // its foreign intake from: Scandinavia and central Europe, West Africa,
+  // Central America and the Caribbean, East Asia and Oceania. REST is ~1%, which
+  // still lifts England from its stated 1.8% to ~2.2%.
   "United States": {
-    "United States": 440, Canada: 55, Brazil: 43, Argentina: 42, Colombia: 31,
-    Germany: 25, France: 25, Spain: 22, England: 20, Ghana: 20,
-    Sweden: 13, Norway: 13, Venezuela: 13, Denmark: 12, Nigeria: 12,
-    Netherlands: 10, Uruguay: 10, Cameroon: 10, Senegal: 10, Mexico: 10,
-    Japan: 10, Jamaica: 9, Portugal: 8, Poland: 8, Ecuador: 8,
-    "Ivory Coast": 8, "South Korea": 8, Serbia: 7, Croatia: 6, Italy: 6,
-    Paraguay: 6, Australia: 6, Austria: 5, Switzerland: 5, "New Zealand": 5,
-    Honduras: 4, "Costa Rica": 4, Haiti: 4, "Trinidad and Tobago": 4, Scotland: 3,
-    Chile: 2, Peru: 2, "El Salvador": 2, Panama: 2,
-    [REST]: 20,
+    "United States": 346, Canada: 53, Brazil: 40, Argentina: 31, Colombia: 26,
+    Germany: 17, England: 16, Ghana: 15, Spain: 14, Mexico: 13,
+    France: 12, Uruguay: 12, Denmark: 12, Venezuela: 11, Jamaica: 11,
+    Serbia: 9, Norway: 8, Chile: 8, Israel: 8, Poland: 8,
+    Ecuador: 8, Australia: 8,
+    Sweden: 7, Netherlands: 7, Portugal: 7, Japan: 7, Paraguay: 7,
+    Honduras: 7, "Costa Rica": 7,
+    Nigeria: 6, Cameroon: 6, Senegal: 6, "Ivory Coast": 6, Scotland: 6,
+    Croatia: 6, Peru: 6, Switzerland: 6, Austria: 6,
+    "South Korea": 5, Italy: 5, Haiti: 5, Panama: 5, "Trinidad and Tobago": 5,
+    "New Zealand": 5, Belgium: 5, Wales: 5, "Republic of Ireland": 5,
+    "El Salvador": 4, Guatemala: 4, Iceland: 4, Finland: 4, Slovenia: 4,
+    Guinea: 3, Kenya: 3, Mali: 3, Romania: 3,
+    [REST]: 9,
   },
 };
 
