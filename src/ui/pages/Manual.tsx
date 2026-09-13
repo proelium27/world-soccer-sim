@@ -1501,10 +1501,10 @@ export function Manual() {
             quarter-final, while a confederation with only a handful of real football nations plays
             a single group and sends its top two straight to the final. A confederation that can't
             field even four nations doesn't hold one at all, which is why you'll usually see the
-            Euro, Copa América and AFCON, the Gold Cup only when North America has enough nations
-            with enough players, and never the Asian Cup or the OFC Nations Cup: nearly every
-            player in the world is born into one of the sixteen countries whose leagues you play
-            in, so the rest of the world is thin. Fill it out — with an imported roster, say — and those cups start
+            Euro, Copa América, the Gold Cup, AFCON and usually the Asian Cup, but not the OFC
+            Nations Cup: nearly every player in the world is born into one of the sixteen countries
+            whose leagues you play in, so the rest of the world is thin, and Oceania has only one
+            nation with enough players to field a squad. Fill it out — with an imported roster, say — and those cups start
             being played on their own.
           </p>
           <p>
