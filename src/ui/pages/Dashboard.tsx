@@ -491,7 +491,9 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
           all season would be noise, but this is the last moment a decision
           can still beat them. */}
       {league.phase === "offseason" && (() => {
-        const due = projectAcademyCheckpoints(userTeam, league.players, league.season, league.difficulty);
+        const due = projectAcademyCheckpoints(
+          userTeam, league.players, league.activeLoans, league.season, league.difficulty,
+        );
         if (due.size === 0) return null;
         const leaving = [...due.values()].filter((d) => d.outcome === "release" || d.outcome === "atRisk").length;
         return (

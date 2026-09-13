@@ -20,7 +20,7 @@ import { withSeason, summaryOf, ovrLookup } from "./players/careerSummary.js";
 import { extendPlayerNames } from "./players/playerNames.js";
 import { archiveCup } from "./cup/archive.js";
 import {
-  academyDuePids, resolveAcademyCheckpoints, trimAcademyToCap, enrolAcademyYouth,
+  academyDuePids, academyRanking, resolveAcademyCheckpoints, trimAcademyToCap, enrolAcademyYouth,
 } from "./academyPipeline.js";
 import {
   releaseExpiredContracts, runAIFreeAgency, freeAgencySigningOrder, trimRosterSurplus,
@@ -204,6 +204,15 @@ export function simOffseasonReporting(
 
   const endingSeason = league.season;
   const nextSeason = endingSeason + 1;
+
+  // The order the user's academy cuts run in (steps 5.0 and 5.4), taken now,
+  // before progression re-estimates anyone's potential and before next season's
+  // scouting spend locks in. Either could otherwise reorder two kids the Academy
+  // page had just shown the other way round (see academyPipeline.ts).
+  const userAtStart = league.teams.find((t) => t.tid === league.meta.userTid);
+  const academyOrder = userAtStart
+    ? academyRanking(userAtStart, league.players, endingSeason, league.difficulty)
+    : new Map<number, number>();
 
   // Per-competition final tables. Computed here rather than down at step 3.5
   // where they are spent, because the promotion playoff immediately below needs
@@ -721,7 +730,7 @@ export function simOffseasonReporting(
   //      here developed through the season just ended as the academy player he
   //      was.
   ({ teams, players } = resolveAcademyCheckpoints(
-    teams, players, league.meta.userTid, endingSeason, nextSeason, league.difficulty,
+    teams, players, league.meta.userTid, endingSeason, nextSeason, academyOrder,
   ));
 
   // The user's intake is held back from the loop below and enrolled in his
@@ -884,7 +893,7 @@ export function simOffseasonReporting(
   //      rate lowest go. Before the safety call-up, so a kid kept here can still
   //      be called up to the senior squad at 5.5.
   ({ teams } = trimAcademyToCap(
-    teams, players, league.meta.userTid, endingSeason, nextSeason, league.difficulty,
+    teams, players, league.meta.userTid, nextSeason, academyOrder,
   ));
 
   // 5.5. Emergency call-up for the user's own roster. Anyone taken off the open

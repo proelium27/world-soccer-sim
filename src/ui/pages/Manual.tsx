@@ -2647,8 +2647,11 @@ export function Manual() {
             The Academy page's <strong>Next rollover</strong> column tells you what happens to every
             kid at a cut if you leave it alone: joins the first team, leaves, kept to 18, or cut if
             full, which means he only goes if the new intake fills the academy. Those calls are made
-            on your scouts' estimates, not on how good a kid will really be, so they can be wrong
-            the same way you can. Prospects you sign in from Free Agents are the exception: they're
+            on your scouts' estimates as they stand before the new season, not on how good a kid will
+            really be, so they can be wrong the same way you can. "Joins the first team" and "kept to
+            18" are promises. "Leaves" is the worst case: it counts the players coming back from loan
+            and the ones whose deals are up, but a senior who retires over the summer frees a place
+            it couldn't see coming. Prospects you sign in from Free Agents are the exception: they're
             on ordinary academy deals, with an <strong>Extend</strong> button and an{" "}
             <strong>Extend all</strong> in the banner, like anywhere else.
           </p>

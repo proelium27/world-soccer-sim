@@ -59,8 +59,9 @@ const OUTCOME_BADGE: Record<AcademyDecision["outcome"], { label: string; cls: st
  * core/academyPipeline.ts). Replaces the old Youth Intake trial screen.
  *
  * The "Next rollover" column is `projectAcademyCheckpoints`, the same rules and
- * ranking the offseason applies, so what this page says will happen is what
- * happens unless the user acts first.
+ * ranking the offseason applies. What it can't know it assumes on the cautious
+ * side, so a promotion or a keep it shows is a promise unless the user acts
+ * first, and a release is the worst case (a summer retirement can free a place).
  */
 export function Academy() {
   const {
@@ -80,7 +81,7 @@ export function Academy() {
   const decisions = useMemo(() => {
     const team = league?.teams.find((t) => t.tid === league.meta.userTid);
     return league && team
-      ? projectAcademyCheckpoints(team, league.players, league.season, league.difficulty)
+      ? projectAcademyCheckpoints(team, league.players, league.activeLoans, league.season, league.difficulty)
       : new Map<number, AcademyDecision>();
   }, [league]);
 

@@ -18,21 +18,28 @@
  * **The checkpoint IS the contract expiry.** An academy deal for a kid under the
  * professional cut runs to the season before his next checkpoint
  * (`academyCheckpointExpiry`), so every kid who reaches one is exactly the set
- * whose deal is up. The offseason keeps those kids off `releaseExpiredContracts`
- * and resolves them here instead, which is what stops a deal lapsing silently.
+ * whose deal is up AND was running to a cut. The offseason keeps those kids off
+ * `releaseExpiredContracts` and resolves them here instead, which is what stops a
+ * deal lapsing silently. A prospect signed out of free agency on an ordinary
+ * deal is not at a checkpoint, and his deal lapses like anyone else's.
  *
- * **Ranked on what the user can see.** Default cuts and promotions order kids by
- * the middle of the scouting band as of the season the user is looking at, never
- * by their true potential. Ranking on the truth would make the default quietly
- * perfect and hand the hidden number back through who survived. It is also what
- * lets the Academy page preview the rollover exactly (`projectAcademyCheckpoints`).
+ * **Ranked on what the user could see before the rollover.** Default cuts and
+ * promotions order kids by the middle of the scouting band, never by their true
+ * potential: ranking on the truth would make the default quietly perfect and
+ * hand the hidden number back through who survived. The order is taken ONCE, off
+ * the league as it stood when the offseason began (`academyRanking`), because
+ * the rollover re-estimates every potential (progression, step 2) and locks in
+ * next season's scouting spend (step 3.5) before the cuts run. Ranking after
+ * either could reorder two kids the Academy page had just shown the other way
+ * round.
  *
  * User's club only, pure, and rng-free.
  */
 import type { Player } from "./players/types.js";
 import type { StoredTeam } from "./teams/clubs.js";
+import type { ActiveLoan } from "./loans.js";
 import { potentialFog } from "./scouting/potentialFog.js";
-import { academyContractTerms, contractTerms } from "./contracts.js";
+import { academyCheckpointExpiry, academyContractTerms, contractTerms } from "./contracts.js";
 import { computeOvr } from "./players/ovr.js";
 import { youthRatingsAt } from "./players/progression.js";
 import {
@@ -57,7 +64,16 @@ export interface AcademyDecision {
   outcome: AcademyOutcome;
 }
 
-/** Academy pids whose deal is up at the end of `season`, i.e. who reach a checkpoint. */
+/** A kid's place in the default order, 0 = best. See `academyRanking`. */
+export type AcademyRanking = ReadonlyMap<number, number>;
+
+/**
+ * Academy pids who reach a checkpoint at the end of `season`: a deal that is up
+ * AND was running to a cut. The second half keeps a prospect signed out of free
+ * agency on an ordinary deal out of it, and it is the same test `renewalsDue`
+ * and the Academy page's Extend button use, so the three can't disagree about
+ * who is at a decision and who simply needs re-signing.
+ */
 export function academyDuePids(
   team: StoredTeam | undefined,
   players: Player[],
@@ -67,7 +83,10 @@ export function academyDuePids(
   const inAcademy = new Set(team.academyRoster);
   return new Set(
     players
-      .filter((p) => inAcademy.has(p.pid) && p.contract.expiresSeason <= season)
+      .filter((p) =>
+        inAcademy.has(p.pid)
+        && p.contract.expiresSeason <= season
+        && academyCheckpointExpiry(p.born, season) !== null)
       .map((p) => p.pid),
   );
 }
@@ -83,20 +102,27 @@ function scoutedEstimate(
   return (fog.low + fog.high) / 2;
 }
 
-/** Best first: scouted estimate, then current rating, then pid for a stable order. */
-function bestScoutedFirst(
-  team: StoredTeam, viewSeason: number, difficulty?: Difficulty,
-): (a: Player, b: Player) => number {
-  const est = new Map<number, number>();
-  const estimate = (p: Player) => {
-    let v = est.get(p.pid);
-    if (v === undefined) {
-      v = scoutedEstimate(p, team, viewSeason, difficulty);
-      est.set(p.pid, v);
-    }
-    return v;
-  };
-  return (a, b) => estimate(b) - estimate(a) || b.ovr - a.ovr || a.pid - b.pid;
+/**
+ * Every academy kid's place in the default order, best first: the middle of the
+ * scouting band the user sees in `viewSeason`, then current rating, then pid for
+ * a stable order. The offseason takes this before it changes anything and the
+ * preview takes it off the same league, which is what makes the two agree.
+ */
+export function academyRanking(
+  team: StoredTeam, players: Player[], viewSeason: number, difficulty?: Difficulty,
+): AcademyRanking {
+  const inAcademy = new Set(team.academyRoster);
+  const kids = players
+    .filter((p) => inAcademy.has(p.pid))
+    .map((p) => ({ p, est: scoutedEstimate(p, team, viewSeason, difficulty) }))
+    .sort((a, b) => b.est - a.est || b.p.ovr - a.p.ovr || a.p.pid - b.p.pid);
+  return new Map(kids.map(({ p }, i) => [p.pid, i]));
+}
+
+/** Best first by a ranking; a kid it doesn't know sorts last, by pid. */
+function byRanking(ranking: AcademyRanking): (a: Player, b: Player) => number {
+  const at = (p: Player) => ranking.get(p.pid) ?? Number.MAX_SAFE_INTEGER;
+  return (a, b) => at(a) - at(b) || a.pid - b.pid;
 }
 
 function checkpointOf(p: Player, nextSeason: number): AcademyCheckpoint {
@@ -146,9 +172,9 @@ export interface CheckpointResult {
  * step 5.0, before the new intake arrives).
  *
  * Professional cut: promoted onto senior terms while the roster is under
- * ROSTER_CAP, best-scouted first; the rest leave. Scholarship cut: every one is
+ * ROSTER_CAP, in `ranking` order; the rest leave. Scholarship cut: every one is
  * re-contracted to the professional cut here, and `trimAcademyToCap` takes the
- * lowest-scouted back out once the intake has arrived and the real headcount is
+ * lowest-ranked back out once the intake has arrived and the real headcount is
  * known. Splitting it that way is what makes the cut exact rather than a guess
  * at how many kids the intake will bring.
  */
@@ -158,7 +184,7 @@ export function resolveAcademyCheckpoints(
   userTid: number,
   endingSeason: number,
   nextSeason: number,
-  difficulty?: Difficulty,
+  ranking: AcademyRanking,
 ): CheckpointResult {
   const team = teams.find((t) => t.tid === userTid);
   const due = academyDuePids(team, players, endingSeason);
@@ -168,7 +194,7 @@ export function resolveAcademyCheckpoints(
   const dueKids = [...due].map((pid) => byPid.get(pid)).filter((p): p is Player => p != null);
   const graduating = dueKids
     .filter((p) => checkpointOf(p, nextSeason) === "professional")
-    .sort(bestScoutedFirst(team, endingSeason, difficulty));
+    .sort(byRanking(ranking));
   const staying = dueKids.filter((p) => checkpointOf(p, nextSeason) === "scholarship");
 
   const room = Math.max(0, ROSTER_CAP - team.roster.length);
@@ -207,8 +233,8 @@ export function resolveAcademyCheckpoints(
 
 /**
  * The scholarship cut's default, applied once the intake has arrived (offseason
- * step 5.4): while the academy is over ACADEMY_ROSTER_CAP, release the kid the
- * user's scouts rate lowest among those turning ACADEMY_SCHOLARSHIP_AGE.
+ * step 5.4): while the academy is over ACADEMY_ROSTER_CAP, release the
+ * lowest-ranked kid among those turning ACADEMY_SCHOLARSHIP_AGE.
  *
  * Only that year is ever cut. A kid still on his first deal has not reached a
  * decision, and one past the scholarship cut was kept at it, so releasing either
@@ -220,9 +246,8 @@ export function trimAcademyToCap(
   teams: StoredTeam[],
   players: Player[],
   userTid: number,
-  viewSeason: number,
   nextSeason: number,
-  difficulty?: Difficulty,
+  ranking: AcademyRanking,
 ): { teams: StoredTeam[]; released: number[] } {
   const team = teams.find((t) => t.tid === userTid);
   if (!team || team.academyRoster.length <= ACADEMY_ROSTER_CAP) return { teams, released: [] };
@@ -231,7 +256,7 @@ export function trimAcademyToCap(
   const cuttable = team.academyRoster
     .map((pid) => byPid.get(pid))
     .filter((p): p is Player => p != null && nextSeason - p.born === ACADEMY_SCHOLARSHIP_AGE)
-    .sort(bestScoutedFirst(team, viewSeason, difficulty))
+    .sort(byRanking(ranking))
     .reverse();
   const excess = team.academyRoster.length - ACADEMY_ROSTER_CAP;
   const released = cuttable.slice(0, excess).map((p) => p.pid);
@@ -247,18 +272,51 @@ export function trimAcademyToCap(
 }
 
 /**
+ * How many senior players the user's club carries when the professional cut runs
+ * (offseason step 5.0), replaying the steps before it that change that roster:
+ * loans ending this summer (step 1, a borrowed player goes back and a lent-out one
+ * comes home) and expired contracts (step 1.5, which skips anyone whose loan runs
+ * on). `academyPipeline.test.ts` pins it against the real `processLoanReturns`
+ * and `releaseExpiredContracts`.
+ *
+ * Two things are counted as staying though they might not: a senior who retires
+ * over the summer (step 3 is a roll), and a borrowed player whose deal is up while
+ * his loan runs on (his own club may renew him at step 1). Both can only free
+ * places, so a promotion this counts on is one the rollover makes.
+ */
+function seniorsAtCheckpoint(
+  team: StoredTeam, byPid: ReadonlyMap<number, Player>, activeLoans: readonly ActiveLoan[], season: number,
+): number {
+  const nextSeason = season + 1;
+  const ending = activeLoans.filter((l) => l.returnSeason <= nextSeason);
+  const goingBack = new Set(ending.filter((l) => l.loaneeTid === team.tid).map((l) => l.pid));
+  const kept = team.roster.filter((pid) => !goingBack.has(pid));
+  const keptSet = new Set(kept);
+  const comingHome = ending
+    .filter((l) => l.parentTid === team.tid && !keptSet.has(l.pid))
+    .map((l) => l.pid);
+  const runningOn = new Set(activeLoans.filter((l) => l.returnSeason > nextSeason).map((l) => l.pid));
+  return [...kept, ...comingHome].filter((pid) => {
+    const p = byPid.get(pid);
+    return !p || p.contract.expiresSeason > season || runningOn.has(pid);
+  }).length;
+}
+
+/**
  * What the next rollover will do with every kid in front of a checkpoint, if
  * nobody decides first — the Academy page's preview.
  *
- * Built from the same ranking and the same rules the offseason applies, so the
- * page and the rollover cannot disagree about who is promoted. Two inputs are
- * unknowable in advance and are assumed on the cautious side: the intake is
- * taken at USER_ACADEMY_INTAKE_MAX (hence `atRisk` rather than `release` at the
- * scholarship cut), and senior room counts every expiring senior deal as gone.
+ * Built from the same ranking (taken off the league as it stands, exactly as the
+ * offseason takes it) and the same rules the offseason applies. What it can't
+ * know it assumes on the cautious side, so `promote` and `keep` are promises and
+ * `release` and `atRisk` are worst cases: the intake is taken at
+ * USER_ACADEMY_INTAKE_MAX, and senior retirements over the summer are assumed
+ * not to happen (see `seniorsAtCheckpoint`).
  */
 export function projectAcademyCheckpoints(
   team: StoredTeam,
   players: Player[],
+  activeLoans: readonly ActiveLoan[],
   season: number,
   difficulty?: Difficulty,
 ): Map<number, AcademyDecision> {
@@ -268,22 +326,28 @@ export function projectAcademyCheckpoints(
 
   const nextSeason = season + 1;
   const byPid = new Map(players.map((p) => [p.pid, p]));
-  const order = bestScoutedFirst(team, season, difficulty);
+  const order = byRanking(academyRanking(team, players, season, difficulty));
   const dueKids = [...due].map((pid) => byPid.get(pid)).filter((p): p is Player => p != null);
 
   const graduating = dueKids.filter((p) => checkpointOf(p, nextSeason) === "professional").sort(order);
-  const seniorsStaying = team.roster.filter(
-    (pid) => (byPid.get(pid)?.contract.expiresSeason ?? Infinity) > season,
-  ).length;
-  const room = Math.max(0, ROSTER_CAP - seniorsStaying);
+  const room = Math.max(0, ROSTER_CAP - seniorsAtCheckpoint(team, byPid, activeLoans, season));
   graduating.forEach((p, i) =>
     out.set(p.pid, { pid: p.pid, checkpoint: "professional", outcome: i < room ? "promote" : "release" }),
   );
 
-  const scholarship = dueKids.filter((p) => checkpointOf(p, nextSeason) === "scholarship");
-  const afterRollover =
-    team.academyRoster.length - graduating.length + USER_ACADEMY_INTAKE_MAX;
+  // Everyone who has left the academy by the time the intake arrives: every
+  // graduate, promoted or not, and any prospect whose ordinary deal lapses at
+  // step 1.5.
+  const graduatingPids = new Set(graduating.map((p) => p.pid));
+  const departing = team.academyRoster.filter((pid) => {
+    if (graduatingPids.has(pid)) return true;
+    const p = byPid.get(pid);
+    return p != null && !due.has(pid) && p.contract.expiresSeason <= season;
+  }).length;
+  const afterRollover = team.academyRoster.length - departing + USER_ACADEMY_INTAKE_MAX;
   const excess = Math.max(0, afterRollover - ACADEMY_ROSTER_CAP);
+
+  const scholarship = dueKids.filter((p) => checkpointOf(p, nextSeason) === "scholarship");
   const cuttable = scholarship
     .filter((p) => nextSeason - p.born === ACADEMY_SCHOLARSHIP_AGE)
     .sort(order)
