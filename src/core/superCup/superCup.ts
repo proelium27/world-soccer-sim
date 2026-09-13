@@ -127,10 +127,13 @@ export function buildSuperCups(seed: SuperCupSeed): SuperCupTie[] {
     let opponent = cupWinner;
     let opponentRoute: SuperCupRoute = "cup-winners";
     if (opponent === champion) {
-      // The double. Second in the table steps in; without one (a division of
+      // The double. The best-placed club that ISN'T the champion steps in —
+      // not simply second in the table, because where a title playoff decides
+      // the champion he can have finished anywhere in the top eight, and
+      // second place may be the champion himself. Without one (a division of
       // one club, which no real world has) there is simply no match.
-      const runnerUp = (seed.tablesByCompId.get(d1.id) ?? [])[1];
-      if (runnerUp === undefined || runnerUp.tid === champion) continue;
+      const runnerUp = (seed.tablesByCompId.get(d1.id) ?? []).find((r) => r.tid !== champion);
+      if (runnerUp === undefined) continue;
       opponent = runnerUp.tid;
       opponentRoute = "league-runners-up";
     }

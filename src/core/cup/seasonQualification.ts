@@ -85,6 +85,12 @@ function tablesForPastSeason(league: LeagueStore, season: number): Map<number, S
 function routesFor(league: LeagueStore, season: number, current: boolean): QualificationContext {
   const cup = current ? league.cup : league.cupHistory.find((c) => c.season === season);
   const shield = current ? league.shield : (league.shieldHistory ?? []).find((c) => c.season === season);
+  // Must mirror the offseason's allocation, which hands the Americas Cup holder
+  // a place of his own — leave it out and Standings shades a club the holder
+  // then pushes out at the rollover.
+  const americas = current
+    ? league.americasCup
+    : (league.americasCupHistory ?? []).find((c) => c.season === season);
   const domestic = current
     ? (league.domesticCups ?? [])
     : (league.domesticCupHistory ?? []).filter((c) => c.season === season);
@@ -96,6 +102,7 @@ function routesFor(league: LeagueStore, season: number, current: boolean): Quali
     holders: {
       continental: cup?.championTid ?? undefined,
       shield: shield?.championTid ?? undefined,
+      americas: americas?.championTid ?? undefined,
     },
     slots: coefficientSlots(
       league.competitions,

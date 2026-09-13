@@ -85,6 +85,22 @@ describe("buildSuperCups", () => {
     expect(cups[0].routes).toEqual(["league-champions", "league-runners-up"]);
   });
 
+  it("brings in the best-placed OTHER club when a title playoff crowned someone below first", () => {
+    // Where a title playoff decides the champion, he can have finished second —
+    // and "second in the table" would then be the champion himself, cancelling
+    // the country's super cup outright.
+    const second = buildSuperCups(seedFor({
+      championTid: 11, cupWinnerTid: 11, order: [3, 11, 12],
+    }));
+    expect(second).toHaveLength(1);
+    expect(second[0].teams).toEqual([11, 3]);
+    // And a fifth-placed champion must not skip the club that actually topped it.
+    const fifth = buildSuperCups(seedFor({
+      championTid: 15, cupWinnerTid: 15, order: [3, 11, 12, 14, 15],
+    }));
+    expect(fifth[0].teams).toEqual([15, 3]);
+  });
+
   it("holds no super cup for a country whose domestic cup has no winner yet", () => {
     // Season 1's cups are still being played when the first super cups are
     // seeded, so there is nothing to contest and no match is invented.
