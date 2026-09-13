@@ -116,11 +116,15 @@ function tieRng(lid: number, season: number, compId: number, round: number, tie:
  * Play one tie between two seeds. The better seed is `high`.
  *
  * Single-leg: the better seed hosts, which is what finishing higher buys you in
- * MLS and Argentina. Two-legged: the lower seed hosts the first leg and the
- * better seed the second, as the Liguilla does. Level ties go to extra time and
- * penalties either way — the Liguilla's own rule sends a level tie to the better
- * seed, which is deliberately not modelled so the two formats share one
- * resolver with the cups.
+ * MLS and Argentina, and a level game goes to extra time and penalties.
+ *
+ * Two-legged is the Liguilla, rule for rule: the lower seed hosts the first leg
+ * and the better seed the second, and in the quarter-finals and semi-finals a
+ * tie level on aggregate goes straight to the better-placed club — no extra
+ * time, no penalties, no away goals. Only the final goes to extra time and
+ * penalties, and there table position no longer counts. That is why the regular
+ * season matters so much in Mexico: finishing higher is a real tiebreaker, not
+ * just a home second leg.
  */
 function playTie(
   format: PlayedTitlePlayoffFormat,
@@ -136,7 +140,12 @@ function playTie(
   const rng = tieRng(lid, season, compId, round, index);
   if (format === "two-legged") {
     const leg1 = playFirstLeg(rng, low, high, matchData.get(low)!, matchData.get(high)!, round);
-    return { ...resolveTwoLeggedTie(rng, leg1, matchData.get(low)!, matchData.get(high)!, 0), boxScore: null };
+    // The better seed takes a level tie everywhere but the final.
+    const levelGoesTo = round === TITLE_ROUND_FINAL ? undefined : high;
+    return {
+      ...resolveTwoLeggedTie(rng, leg1, matchData.get(low)!, matchData.get(high)!, 0, levelGoesTo),
+      boxScore: null,
+    };
   }
   return {
     ...resolveCupTie(rng, high, low, matchData.get(high)!, matchData.get(low)!, round, 0),

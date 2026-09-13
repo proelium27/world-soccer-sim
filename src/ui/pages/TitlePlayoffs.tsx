@@ -42,9 +42,11 @@ export function TitlePlayoffs() {
       played, the top eight go into a knockout: first against eighth, fourth against fifth, second
       against seventh and third against sixth. The winner is the champion. Finishing higher still
       matters, because you play a weaker side and you get the home leg. Where the ties are one-off
-      games the better-placed club is at home; where they are two legs, the better-placed club plays
-      the second leg at home. The table still decides prize money, continental places and what your
-      board makes of your season.
+      games the better-placed club is at home. Mexico plays every round over two legs, with the
+      better-placed club at home for the second, and in the quarter-finals and semi-finals a tie
+      that&apos;s level on aggregate goes to the better-placed club with no extra time or penalties.
+      Only the final goes to extra time and penalties. The table still decides prize money,
+      continental places and what your board makes of your season.
     </HelpHint>
   );
 
@@ -115,6 +117,9 @@ export function TitlePlayoffs() {
             {`1st leg ${t.legs[0].homeGoals}-${t.legs[0].awayGoals} · 2nd leg ${t.legs[1].homeGoals}-${t.legs[1].awayGoals} away`}
           </div>
         )}
+        {t.decidedByTablePosition && (
+          <div className="cup-tie-note">Level on aggregate, so the higher-placed club goes through</div>
+        )}
         {(t.wentToExtraTime || t.wentToPens) && (
           <div className="cup-tie-note">
             {t.wentToPens ? `${t.homePens}-${t.awayPens} on pens` : "after extra time"}
@@ -155,7 +160,9 @@ export function TitlePlayoffs() {
       <div className="mb-2">
         <strong>{comp.name}</strong>{" "}
         <span className="text-muted small">
-          {playoff.format === "two-legged" ? "every round over two legs" : "one-off ties, better-placed club at home"}
+          {playoff.format === "two-legged"
+            ? "two legs a round; a level tie goes to the higher-placed club, except in the final"
+            : "one-off ties, better-placed club at home"}
         </span>
       </div>
 

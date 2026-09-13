@@ -1385,8 +1385,12 @@ export function Manual() {
             Once the last matchday is played, the <strong>top eight</strong> go into a bracket:
             1st v 8th, 4th v 5th, 2nd v 7th and 3rd v 6th, then semi-finals and a final. In
             Argentina and the US every tie is a one-off game at the better-placed club&apos;s ground.
-            In Mexico every round, final included, is two legs, with the better-placed club at home
-            for the second. A level tie goes to extra time and penalties. The winner is the champion:
+            A level game there goes to extra time and penalties. In Mexico every round, final
+            included, is two legs, with the better-placed club at home for the second, and it uses
+            the Liguilla&apos;s real tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s
+            level on aggregate goes to the club that finished higher, with no extra time, no
+            penalties and no away goals. Only the final goes to extra time and penalties, and there
+            where you finished no longer helps. The winner is the champion:
             it&apos;s their name in the history books, on the trophy case and on the players&apos;
             profiles, and they play in the champions cup.
           </p>

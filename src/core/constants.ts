@@ -322,8 +322,11 @@ export const DEFAULT_CONTINENTAL_REGION: ContinentalRegion = "europe";
  *  - `single` — the top `TITLE_PLAYOFF_TEAMS` contest a single-leg knockout
  *    (higher seed at home, 1v8 / 4v5 / 2v7 / 3v6), the way MLS Cup and
  *    Argentina's knockout phase work.
- *  - `two-legged` — the same bracket, every round over two legs with the higher
- *    seed hosting the second, the way Mexico's Liguilla works.
+ *  - `two-legged` — Mexico's Liguilla: the same bracket, every round over two
+ *    legs with the higher seed hosting the second. In the quarter-finals and
+ *    semi-finals a tie level on aggregate goes to the higher seed outright (no
+ *    extra time, no penalties, no away goals); only the final goes to extra
+ *    time and penalties.
  *
  * Only the TITLE moves. Prize money, hype, continental places and the board's
  * verdict still read the regular-season table, which is also what real leagues
