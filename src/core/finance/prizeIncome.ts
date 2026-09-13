@@ -139,7 +139,9 @@ function knockoutLabel(round: number, finalRound: number): string {
 }
 
 function cupName(cup: CupState): string {
-  return cup.competition === "shield" ? "Continental Shield" : "Continental Cup";
+  if (cup.competition === "shield") return "Continental Shield";
+  if (cup.competition === "americas") return "Americas Cup";
+  return "Continental Cup";
 }
 
 /**
@@ -216,6 +218,7 @@ export function seasonPrizeIncome(league: LeagueStore, tid: number): PrizeIncome
   const sources = [
     continentalPrizeIncome(league.cup, tid),
     continentalPrizeIncome(league.shield, tid),
+    continentalPrizeIncome(league.americasCup ?? null, tid),
     domesticCupPrizeIncome(
       domestic, league.competitions, tid, team.compId,
       league.meta.userTid, league.difficulty, tierOf,

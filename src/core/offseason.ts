@@ -66,7 +66,7 @@ import { reviewNationalCampaign } from "./nationalManager/index.js";
 import { carryIntlInjuries } from "./injuries.js";
 import { hashInts, mulberry32 } from "../engine/rng.js";
 import {
-  NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, difficultyProfile,
+  NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, AMERICAS_CUP_FORMAT, difficultyProfile,
   YOUTH_TRIAL_GROUP_MIN, YOUTH_TRIAL_GROUP_MAX, YOUTH_TRIAL_STREAM, MOP_UP_FA_STREAM, MOP_UP_MIN_OVR,
 } from "./constants.js";
 
@@ -132,7 +132,7 @@ export interface OffseasonInputs {
    * off the league", which is right for every direct caller (tests, scripts,
    * and `jump`, which is exempt from detaching).
    */
-  cupChampions?: Pick<HonourSources, "cup" | "shield" | "domestic">;
+  cupChampions?: Pick<HonourSources, "cup" | "shield" | "domestic" | "americas">;
 }
 
 /** What the offseason did that the caller cannot work out from the league alone. */
@@ -552,6 +552,7 @@ export function simOffseasonReporting(
       // directly rather than coming through the precomputed past.
       cup: [...pastChampions.cup, ...champion(league.cup)],
       shield: [...pastChampions.shield, ...champion(league.shield)],
+      americas: [...(pastChampions.americas ?? []), ...champion(league.americasCup)],
       domestic: [
         ...pastChampions.domestic,
         ...(league.domesticCups ?? []).map((c) => ({ season: c.season, championTid: c.championTid })),
@@ -1060,6 +1061,7 @@ export function simOffseasonReporting(
     holders: {
       continental: league.cup?.championTid ?? undefined,
       shield: league.shield?.championTid ?? undefined,
+      americas: league.americasCup?.championTid ?? undefined,
     },
     // How many places each country gets, off its rolling continental record.
     // The season that just ended counts, so its competitions are passed in
@@ -1188,6 +1190,9 @@ export function simOffseasonReporting(
     // buildCupState returns null if that format's field can't be filled.
     cup: buildCupState(league.competitions, tablesByCompId, nextSeason, CONTINENTAL_CUP_FORMAT, cupRoutes),
     shield: buildCupState(league.competitions, tablesByCompId, nextSeason, SHIELD_FORMAT, cupRoutes),
+    // The Americas Cup draws from the other continent's leagues through the
+    // same one-pass allocation, so it can never share a club with the two above.
+    americasCup: buildCupState(league.competitions, tablesByCompId, nextSeason, AMERICAS_CUP_FORMAT, cupRoutes),
     // International football already played out (in stages) before this advance;
     // carry its state forward, resetting the per-offseason stage marker (and the
     // just-consumed injury carry-over list) so the new season starts clean.
@@ -1201,6 +1206,9 @@ export function simOffseasonReporting(
     shieldHistory: league.shield
       ? [...league.shieldHistory, archiveCup(league.shield)]
       : league.shieldHistory,
+    americasCupHistory: league.americasCup
+      ? [...(league.americasCupHistory ?? []), archiveCup(league.americasCup)]
+      : (league.americasCupHistory ?? []),
     // Domestic cups roll over the same way. Note `teams` here is the post-
     // promotion/relegation roster of clubs, so a promoted club enters next
     // season's cup as a top-flight one, while the ranking that decides who has
@@ -1219,6 +1227,7 @@ export function simOffseasonReporting(
       domesticCups: league.domesticCups ?? [],
       cup: league.cup,
       shield: league.shield,
+      americasCup: league.americasCup ?? null,
       season: nextSeason,
     }),
     domesticCupHistory: [

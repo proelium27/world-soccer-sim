@@ -17,6 +17,8 @@ export interface ClubRecordRow {
   secondTierTitles: number;
   cupTitles: number;
   shieldTitles: number;
+  /** Americas Cup wins. */
+  americasTitles: number;
   /** Domestic cup wins. Counted separately from the Continental Cup — a treble needs both. */
   domesticCupTitles: number;
   played: number;
@@ -97,7 +99,7 @@ export function computeClubTrivia(league: LeagueStore, limit = CLUB_LIST_LIMIT):
     if (!r) {
       r = {
         tid, seasons: 0, topFlightSeasons: 0, leagueTitles: 0, secondTierTitles: 0, cupTitles: 0,
-        shieldTitles: 0, domesticCupTitles: 0, totalTrophies: 0, trebles: 0,
+        shieldTitles: 0, americasTitles: 0, domesticCupTitles: 0, totalTrophies: 0, trebles: 0,
         played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0, ppg: 0,
         lastTitleSeason: null, titleDrought: 0,
       };
@@ -125,6 +127,9 @@ export function computeClubTrivia(league: LeagueStore, limit = CLUB_LIST_LIMIT):
       const sorted = [...table].sort(
         (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.tid - b.tid,
       );
+      // The recorded champion wins a top flight, not the table leader, because a
+      // title playoff can crown a club that finished lower.
+      const recordedChampion = tier === 1 ? h.championTidByCompId?.[compId] : undefined;
       sorted.forEach((row, i) => {
         const r = rowFor(row.tid);
         r.seasons += 1;
@@ -136,7 +141,8 @@ export function computeClubTrivia(league: LeagueStore, limit = CLUB_LIST_LIMIT):
         r.gf += row.gf;
         r.ga += row.ga;
         r.points += row.points;
-        if (i === 0) {
+        const wonIt = recordedChampion !== undefined ? recordedChampion === row.tid : i === 0;
+        if (wonIt) {
           if (tier === 1) {
             r.leagueTitles += 1;
             r.lastTitleSeason = Math.max(r.lastTitleSeason ?? 0, h.season);
@@ -154,6 +160,9 @@ export function computeClubTrivia(league: LeagueStore, limit = CLUB_LIST_LIMIT):
   for (const shield of league.shieldHistory ?? []) {
     if (shield.championTid != null) rowFor(shield.championTid).shieldTitles += 1;
   }
+  for (const cup of league.americasCupHistory ?? []) {
+    if (cup.championTid != null) rowFor(cup.championTid).americasTitles += 1;
+  }
 
   for (const cup of league.domesticCupHistory ?? []) {
     if (cup.championTid != null) rowFor(cup.championTid).domesticCupTitles += 1;
@@ -162,7 +171,7 @@ export function computeClubTrivia(league: LeagueStore, limit = CLUB_LIST_LIMIT):
   for (const r of rows.values()) {
     // Every trophy the cabinet counts. Trebles are deliberately absent: a
     // treble is not a fourth trophy, it's the three already counted here.
-    r.totalTrophies = r.leagueTitles + r.cupTitles + r.shieldTitles
+    r.totalTrophies = r.leagueTitles + r.cupTitles + r.shieldTitles + r.americasTitles
       + r.domesticCupTitles + r.secondTierTitles;
     r.trebles = treblesByTid.get(r.tid) ?? 0;
     r.ppg = r.played > 0 ? r.points / r.played : 0;

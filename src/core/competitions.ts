@@ -43,6 +43,8 @@ import {
   SHIELD_STRONG_LEAGUE_SLOTS, SHIELD_WEAK_LEAGUE_SLOTS, largestValidCupField,
   NUM_TEAMS, NUM_TEAMS_D2, NUM_TEAMS_D3, PROMOTION_RELEGATION_COUNT,
   COUNTRY_PLAYOFF_FORMAT, DEFAULT_PLAYOFF_FORMAT, type PlayoffFormat,
+  COUNTRY_REGION, DEFAULT_CONTINENTAL_REGION, type ContinentalRegion,
+  COUNTRY_TITLE_PLAYOFF, type TitlePlayoffFormat,
 } from "./constants.js";
 import {
   LEAGUE_NATIONALITY_WEIGHTS, sanitizeNationalityWeights, type NationalityWeights,
@@ -168,6 +170,19 @@ export interface Competition {
    * disagree with itself.
    */
   nationalities?: NationalityWeights;
+  /**
+   * The continent whose club competitions this league plays in. Absent → the
+   * shipped `COUNTRY_REGION` entry, else Europe. Resolve through
+   * `competitionRegion`, never the field.
+   */
+  region?: ContinentalRegion;
+  /**
+   * How this country's top flight decides its champion. Absent → the shipped
+   * `COUNTRY_TITLE_PLAYOFF` entry, else a straight table. Written to every one
+   * of a country's divisions like `playoffFormat`, but only the top flight's is
+   * ever read. Resolve through `competitionTitlePlayoff`, never the field.
+   */
+  titlePlayoff?: TitlePlayoffFormat;
 }
 
 /* ── Per-league tuning accessors ─────────────────────────────────────────────
@@ -296,6 +311,21 @@ export function effectivePromotionSpots(
     competitionPromotionSpots(d1, d2), d1TableLength, d2TableLength,
     swapLimitOf(competitions, d1), swapLimitOf(competitions, d2),
   );
+}
+
+/** The continent this league plays its club competitions in. See Competition.region. */
+export function competitionRegion(comp: Competition): ContinentalRegion {
+  return comp.region ?? COUNTRY_REGION[comp.country] ?? DEFAULT_CONTINENTAL_REGION;
+}
+
+/**
+ * How this league decides its champion. Only a top flight holds a title
+ * playoff — a lower division's title is a promotion race, and that already has
+ * its own playoff (see PlayoffFormat) — so every other tier answers `none`.
+ */
+export function competitionTitlePlayoff(comp: Competition): TitlePlayoffFormat {
+  if (comp.tier !== 1) return "none";
+  return comp.titlePlayoff ?? COUNTRY_TITLE_PLAYOFF[comp.country] ?? "none";
 }
 
 /** This league's money multiplier, before the tier scale. See Competition.budgetScale. */
@@ -459,6 +489,10 @@ export interface LeagueSpec {
    * divisions get the same one.
    */
   nationalities?: NationalityWeights;
+  /** The continent it plays its club competitions in. Absent → the shipped table, else Europe. */
+  region?: ContinentalRegion;
+  /** How its top flight decides the champion. Absent → the shipped table, else a straight table. */
+  titlePlayoff?: TitlePlayoffFormat;
 }
 
 /**
@@ -492,6 +526,8 @@ export function buildCompetitions(specs: LeagueSpec[]): Competition[] {
       promotionSpots: spec.promotionSpots,
       playoffFormat: spec.playoffFormat,
       nationalities: spec.nationalities,
+      region: spec.region,
+      titlePlayoff: spec.titlePlayoff,
       continentalSlots: Object.keys(slots).length > 0 ? slots : undefined,
     });
     // One competition per tier the country asked for, top flight first — which

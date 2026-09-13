@@ -241,6 +241,18 @@ export interface LeagueStore {
   /** Every completed Continental Shield, oldest first (archived at offseason rollover). */
   shieldHistory: CupState[];
   /**
+   * The Americas Cup being played during the current season — the continental
+   * competition for the Americas' top flights. Null in season 1 and in any
+   * world with too few American leagues to field one.
+   *
+   * Optional, unlike the two European competitions, so a test fixture or a
+   * hand-built league written before the Americas existed still typechecks and
+   * simply has none; migrate backfills it for real saves.
+   */
+  americasCup?: CupState | null;
+  /** Every completed Americas Cup, oldest first (archived at offseason rollover). */
+  americasCupHistory?: CupState[];
+  /**
    * This season's domestic cups, one per country — a straight knockout across
    * both of a country's divisions, drawn open round by round. Unlike the
    * Continental Cup these run from season 1 (nothing has to qualify), so the
@@ -512,6 +524,9 @@ export function createLeagueState(
     // Same for the Shield — both are seeded together at the first offseason.
     shield: null,
     shieldHistory: [],
+    // And the Americas Cup, seeded the same way from the same tables.
+    americasCup: null,
+    americasCupHistory: [],
     // Domestic cups need no qualification, so unlike the Continental Cup they
     // run from season 1. Drawn with no tables to rank on, which the field
     // builder handles by falling back to tid order.

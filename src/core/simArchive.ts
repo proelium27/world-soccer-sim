@@ -257,6 +257,7 @@ export interface LeagueNews {
   newsEvents: LeagueStore["newsEvents"];
   cupHistory: LeagueStore["cupHistory"];
   shieldHistory: LeagueStore["shieldHistory"];
+  americasCupHistory: NonNullable<LeagueStore["americasCupHistory"]>;
   domesticCupHistory: LeagueStore["domesticCupHistory"];
 }
 
@@ -291,6 +292,7 @@ export function detachNews(league: LeagueStore): {
     newsEvents: league.newsEvents ?? [],
     cupHistory: league.cupHistory ?? [],
     shieldHistory: league.shieldHistory ?? [],
+    americasCupHistory: league.americasCupHistory ?? [],
     domesticCupHistory: league.domesticCupHistory ?? [],
   };
   return {
@@ -299,6 +301,7 @@ export function detachNews(league: LeagueStore): {
       newsEvents: [],
       cupHistory: [],
       shieldHistory: [],
+      americasCupHistory: [],
       domesticCupHistory: [],
     },
     news,
@@ -325,6 +328,7 @@ export function reattachNews(
     newsEvents: [...kept.newsEvents, ...(result.newsEvents ?? [])],
     cupHistory: [...kept.cupHistory, ...(result.cupHistory ?? [])],
     shieldHistory: [...kept.shieldHistory, ...(result.shieldHistory ?? [])],
+    americasCupHistory: [...kept.americasCupHistory, ...(result.americasCupHistory ?? [])],
     domesticCupHistory: [...kept.domesticCupHistory, ...(result.domesticCupHistory ?? [])],
   };
 }

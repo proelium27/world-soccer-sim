@@ -236,6 +236,9 @@ export function simThrough(
   // disjoint field (see CUP_FORMATS), so it is advanced through the very same
   // path — just with its own state, baseline and rng streams.
   let shield: CupState | null = league.shield;
+  // The Americas Cup, likewise: its field is drawn from a different continent's
+  // leagues, so it shares the calendar with both European competitions safely.
+  let americasCup: CupState | null = league.americasCup ?? null;
   // This season's domestic cups (one per country), advanced round by round on
   // their own matchdays exactly like the Continental Cup above.
   let domesticCups: DomesticCupState[] = league.domesticCups ?? [];
@@ -283,7 +286,7 @@ export function simThrough(
       cupFinalists(c).includes(league.meta.userTid);
     if (
       matchday > currentMatchday &&
-      (userFinalDue(cup) || userFinalDue(shield))
+      (userFinalDue(cup) || userFinalDue(shield) || userFinalDue(americasCup))
     ) {
       stoppedBeforeMatchday = matchday;
       break;
@@ -459,7 +462,9 @@ export function simThrough(
     cup = cupAdvance.cup;
     const shieldAdvance = advanceCompetition(shield);
     shield = shieldAdvance.cup;
-    const mdCupTies: CupTie[] = [...cupAdvance.ties, ...shieldAdvance.ties];
+    const americasAdvance = advanceCompetition(americasCup);
+    americasCup = americasAdvance.cup;
+    const mdCupTies: CupTie[] = [...cupAdvance.ties, ...shieldAdvance.ties, ...americasAdvance.ties];
 
     // Domestic cups: each country's cup plays its due round here, on its own
     // seeded stream. The composites baseline pools the WHOLE country — both
@@ -667,6 +672,7 @@ export function simThrough(
       played: allPlayed,
       cup,
       shield,
+      americasCup,
       domesticCups,
       promotionPlayoffs,
     }).manager
@@ -689,6 +695,7 @@ export function simThrough(
     powerRankingHistory: [...league.powerRankingHistory, ...newSnapshots],
     cup,
     shield,
+    americasCup,
     domesticCups,
     promotionPlayoffs,
     superCups,

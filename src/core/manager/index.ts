@@ -61,6 +61,8 @@ export interface ReviewInput {
   played: PlayedMatch[];
   cup: CupState | null;
   shield: CupState | null;
+  /** The Americas Cup. Optional so callers from before it existed still typecheck. */
+  americasCup?: CupState | null;
   domesticCups: DomesticCupState[];
   /**
    * This season's promotion playoffs, already played.
@@ -151,6 +153,7 @@ export function reviewSeason(input: ReviewInput): ManagerReview {
   let trophies = 0;
   if (input.cup && cupRunSummary(input.cup, userTid)?.isChampion) trophies++;
   if (input.shield && cupRunSummary(input.shield, userTid)?.isChampion) trophies++;
+  if (input.americasCup && cupRunSummary(input.americasCup, userTid)?.isChampion) trophies++;
   if (input.domesticCups.some((c) => c.championTid === userTid)) trophies++;
 
   const titles = finish === 1 ? 1 : 0;

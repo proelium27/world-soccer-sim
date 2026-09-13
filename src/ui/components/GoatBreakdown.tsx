@@ -43,6 +43,7 @@ const TERM_LABELS: Record<string, string> = {
   worldCups: "World Cup",
   cupTitles: "Continental Cup",
   shieldTitles: "Continental Shield",
+  americasTitles: "Americas Cup",
   domesticCupTitles: "domestic cup",
   leagueTitles: "league title",
   goals: "goals",

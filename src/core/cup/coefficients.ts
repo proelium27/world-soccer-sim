@@ -7,6 +7,22 @@ import {
   COEFFICIENT_MIN_CUP_SLOTS, COEFFICIENT_MIN_SEASONS, CONTINENTAL_CUP_FORMAT,
 } from "../constants.js";
 import { cupSlotsForCompetition } from "./qualification.js";
+import { competitionRegion } from "../competitions.js";
+
+/**
+ * The top flights the coefficient ranks: the Continental Cup's region only.
+ *
+ * The coefficient is a European mechanic — it redistributes the Continental
+ * Cup's places — and a league outside that region holds none of them. Counting
+ * one would put a zero on the ladder, and a zero anywhere switches off the
+ * one-place floor for every league (see reallocateCupSlots), so it has to be
+ * filtered out rather than merely scored last.
+ */
+function coefficientLeagues(competitions: Competition[]): Competition[] {
+  return competitions.filter(
+    (c) => c.tier === 1 && competitionRegion(c) === CONTINENTAL_CUP_FORMAT.region,
+  );
+}
 
 /* ── Country coefficients ────────────────────────────────────────────────────
  *
@@ -143,7 +159,7 @@ export function countryCoefficients(
     seasonsSeen.add(cup.season);
   }
 
-  const countries = [...new Set(competitions.filter((c) => c.tier === 1).map((c) => c.country))];
+  const countries = [...new Set(coefficientLeagues(competitions).map((c) => c.country))];
   return countries
     .map((country) => {
       const p = points.get(country) ?? 0;
@@ -181,7 +197,7 @@ export function reallocateCupSlots(
   // places for reasons nobody can see.
   if ((coefficients[0]?.seasons ?? 0) < COEFFICIENT_MIN_SEASONS) return null;
 
-  const tier1 = competitions.filter((c) => c.tier === 1);
+  const tier1 = coefficientLeagues(competitions);
   // The ladder IS the world's current multiset of slot counts, so the total
   // cannot move. See this file's header on why that is a correctness
   // requirement and not just tidiness.

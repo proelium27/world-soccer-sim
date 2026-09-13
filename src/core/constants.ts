@@ -284,6 +284,63 @@ export const COUNTRY_PLAYOFF_FORMAT: Record<string, PlayoffFormat> = {
 export const DEFAULT_PLAYOFF_FORMAT: PlayoffFormat = "english";
 
 /**
+ * Which continent's club competitions a league plays in.
+ *
+ * Every continental competition belongs to exactly one region (`CupFormat.region`)
+ * and only draws its field from that region's top flights, so a Brazilian club
+ * can never take a Continental Cup place and an English one can never take an
+ * Americas Cup place. Before the Americas were added nothing in the game knew
+ * about continents at all, and every tier-1 league fed every competition.
+ */
+export type ContinentalRegion = "europe" | "americas";
+
+/**
+ * The region each shipped country plays its continental football in. Anything
+ * not listed — every European country and every league a player invents — is
+ * `DEFAULT_CONTINENTAL_REGION`, which is what keeps the European world reading
+ * exactly as it did before regions existed.
+ */
+export const COUNTRY_REGION: Readonly<Record<string, ContinentalRegion>> = {
+  Brazil: "americas",
+  Argentina: "americas",
+  Mexico: "americas",
+  "United States": "americas",
+};
+
+export const DEFAULT_CONTINENTAL_REGION: ContinentalRegion = "europe";
+
+/**
+ * How a top flight decides its CHAMPION, as opposed to its promotion places.
+ *
+ *  - `none` — whoever tops the table is champion. What every European league
+ *    does and what every league did before title playoffs existed.
+ *  - `single` — the top `TITLE_PLAYOFF_TEAMS` contest a single-leg knockout
+ *    (higher seed at home, 1v8 / 4v5 / 2v7 / 3v6), the way MLS Cup and
+ *    Argentina's knockout phase work.
+ *  - `two-legged` — the same bracket, every round over two legs with the higher
+ *    seed hosting the second, the way Mexico's Liguilla works.
+ *
+ * Only the TITLE moves. Prize money, hype, continental places and the board's
+ * verdict still read the regular-season table, which is also what real leagues
+ * with playoffs do (MLS qualifies for the Champions Cup partly on the table).
+ */
+export type TitlePlayoffFormat = "none" | "single" | "two-legged";
+
+/** How many clubs a title playoff seats. Eight: quarter-finals, semi-finals, final. */
+export const TITLE_PLAYOFF_TEAMS = 8;
+
+/**
+ * The shipped countries that settle their title in a playoff. Brazil is
+ * deliberately absent — the Brasileirão is a straight 38-round table — and so
+ * is every European country.
+ */
+export const COUNTRY_TITLE_PLAYOFF: Readonly<Record<string, TitlePlayoffFormat>> = {
+  Argentina: "single",
+  Mexico: "two-legged",
+  "United States": "single",
+};
+
+/**
  * The most clubs an added league can be set to promote and relegate. Held below
  * half that league's own division size as well (see WorldSetup), so the ceiling
  * that actually applies is often lower — this is the point past which the number
@@ -4043,7 +4100,7 @@ export const CUP_KO_PRIZE_WIN_BY_ROUND = [
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** Which continental competition a cup is. Saves from before the split have none → "continental". */
-export type CupCompetitionId = "continental" | "shield";
+export type CupCompetitionId = "continental" | "shield" | "americas";
 
 /** Prize money for one competition, in £, credited as each stage is played. */
 export interface CupPrizes {
@@ -4069,6 +4126,13 @@ export interface CupFormat {
   id: CupCompetitionId;
   /** Display name, stored on each CupState as it is built. */
   name: string;
+  /**
+   * The continent whose top flights feed this competition. A league from any
+   * other region earns no places in it whatever its own `continentalSlots` say
+   * (see cupSlotsForCompetition), which is what keeps the European and American
+   * fields from ever sharing a club.
+   */
+  region: ContinentalRegion;
   /** Places a strong (big-four, countryStrengthOffset 0) league earns. */
   strongSlots: number;
   /** Places a weak (offset > 0) league earns. */
@@ -4155,10 +4219,42 @@ export const SHIELD_KO_PRIZE_WIN_BY_ROUND = [
   SHIELD_PRIZE_WIN_QF, SHIELD_PRIZE_WIN_SF, SHIELD_PRIZE_WIN_FINAL,
 ] as const;
 
+/* ── Americas Cup (the continental competition of the Americas) ──────────────
+ * The Libertadores / CONCACAF Champions Cup of this world: the one club
+ * competition Brazil, Argentina, Mexico and the United States play in. It is
+ * structurally the Continental Cup with its own region, so it reuses the whole
+ * Swiss league phase, knockout and calendar, and plays on the same matchdays as
+ * the European competitions — safe for the same reason the Shield sharing them
+ * is, since no club can be in two fields.
+ *
+ * Every league sends four, so the field is 16 on the shipped world: two pots of
+ * eight, three games per pot, and cupKnockoutPlan sends eight straight to the
+ * quarter-finals with no playoff round. Places are the same for every country
+ * rather than weighted to Brazil and Argentina the way CONMEBOL weights them,
+ * because four countries cannot share a 16-club field any other way that the
+ * draw can pair. There is deliberately no second Americas competition: four
+ * leagues cannot fill two fields of the twelve-club minimum.
+ *
+ * No coefficient moves these places — the rolling coefficient is a European
+ * mechanic (see cup/coefficients.ts) and four fixed countries have nothing to
+ * rank. Prize money matches the Shield's, which is a real competition's worth
+ * of money without handing four poorer leagues the Continental Cup's pot. */
+export const AMERICAS_CUP_NAME = "Americas Cup";
+export const AMERICAS_CUP_LEAGUE_SLOTS = 4;
+/** Field size on the shipped world: 4 American leagues × 4 = 16. See CupFormat.fieldSize. */
+export const AMERICAS_CUP_LEAGUE_PHASE_SIZE = 16;
+export const AMERICAS_PRIZE_PARTICIPATION = SHIELD_PRIZE_PARTICIPATION;
+export const AMERICAS_PRIZE_LP_WIN = SHIELD_PRIZE_LP_WIN;
+export const AMERICAS_PRIZE_LP_DRAW = SHIELD_PRIZE_LP_DRAW;
+export const AMERICAS_PRIZE_WIN_PLAYOFF = SHIELD_PRIZE_WIN_PLAYOFF;
+export const AMERICAS_PRIZE_RUNNER_UP = SHIELD_PRIZE_RUNNER_UP;
+export const AMERICAS_KO_PRIZE_WIN_BY_ROUND = SHIELD_KO_PRIZE_WIN_BY_ROUND;
+
 export const CUP_FORMATS: Record<CupCompetitionId, CupFormat> = {
   continental: {
     id: "continental",
     name: CUP_NAME,
+    region: "europe",
     strongSlots: CUP_STRONG_LEAGUE_SLOTS,
     weakSlots: CUP_WEAK_LEAGUE_SLOTS,
     fieldSize: CUP_LEAGUE_PHASE_SIZE,
@@ -4178,6 +4274,7 @@ export const CUP_FORMATS: Record<CupCompetitionId, CupFormat> = {
   shield: {
     id: "shield",
     name: SHIELD_NAME,
+    region: "europe",
     strongSlots: SHIELD_STRONG_LEAGUE_SLOTS,
     weakSlots: SHIELD_WEAK_LEAGUE_SLOTS,
     fieldSize: SHIELD_LEAGUE_PHASE_SIZE,
@@ -4199,6 +4296,28 @@ export const CUP_FORMATS: Record<CupCompetitionId, CupFormat> = {
       legacyKoByRound: SHIELD_KO_PRIZE_WIN_BY_ROUND,
     },
   },
+  americas: {
+    id: "americas",
+    name: AMERICAS_CUP_NAME,
+    region: "americas",
+    strongSlots: AMERICAS_CUP_LEAGUE_SLOTS,
+    weakSlots: AMERICAS_CUP_LEAGUE_SLOTS,
+    fieldSize: AMERICAS_CUP_LEAGUE_PHASE_SIZE,
+    // Its own tag and seed, for the reason the Shield has its own: all three
+    // competitions play the same matchdays in the same season.
+    streamTag: 110,
+    drawSeed: 0x414d_4552, // "AMER"
+    prizes: {
+      participation: AMERICAS_PRIZE_PARTICIPATION,
+      leaguePhaseWin: AMERICAS_PRIZE_LP_WIN,
+      leaguePhaseDraw: AMERICAS_PRIZE_LP_DRAW,
+      playoffWin: AMERICAS_PRIZE_WIN_PLAYOFF,
+      runnerUp: AMERICAS_PRIZE_RUNNER_UP,
+      koByRound: AMERICAS_KO_PRIZE_WIN_BY_ROUND,
+      playInWin: AMERICAS_PRIZE_WIN_PLAYOFF,
+      legacyKoByRound: AMERICAS_KO_PRIZE_WIN_BY_ROUND,
+    },
+  },
 };
 
 /**
@@ -4215,7 +4334,7 @@ export const CUP_FORMATS: Record<CupCompetitionId, CupFormat> = {
  * allocation differed from the shipped default. Insert a new competition here
  * and everything below it shifts down on its own.
  */
-export const CONTINENTAL_ORDER: readonly CupCompetitionId[] = ["continental", "shield"];
+export const CONTINENTAL_ORDER: readonly CupCompetitionId[] = ["continental", "shield", "americas"];
 
 /* ── Country coefficients ────────────────────────────────────────────────────
  * How many clubs a country sends to the Continental Cup is earned, not fixed:
@@ -4288,6 +4407,8 @@ export const COEFFICIENT_MIN_CUP_SLOTS = 1;
 export const CONTINENTAL_CUP_FORMAT = CUP_FORMATS.continental;
 /** The Continental Shield's format. */
 export const SHIELD_FORMAT = CUP_FORMATS.shield;
+/** The Americas Cup's format. */
+export const AMERICAS_CUP_FORMAT = CUP_FORMATS.americas;
 
 /**
  * Extra time: a level tie after 90' plays this many shot-chances per side
@@ -4489,6 +4610,10 @@ export const COUNTRY_CUP_ADJECTIVE: Readonly<Record<string, string>> = {
   Greece: "Greek",
   Scotland: "Scottish",
   Serbia: "Serbian",
+  Brazil: "Brazilian",
+  Argentina: "Argentine",
+  Mexico: "Mexican",
+  "United States": "US",
 };
 
 /**
@@ -4832,6 +4957,12 @@ export const GOAT_CUP_TITLE_WEIGHT = 25;
  */
 export const GOAT_SHIELD_TITLE_WEIGHT = 8;
 /**
+ * An Americas Cup title: the top club trophy a player in the Americas can win,
+ * so worth well over a Shield — but under a Continental Cup, whose field is
+ * drawn from deeper and stronger leagues.
+ */
+export const GOAT_AMERICAS_TITLE_WEIGHT = 15;
+/**
  * A domestic cup, deliberately the cheapest trophy on the board: it's a knockout
  * a club can win in six games without being any good over a season, which is
  * exactly what makes it fun and exactly why it shouldn't build a GOAT case.
@@ -4863,6 +4994,8 @@ export const GOAT_TEAM_CUP_TITLE_WEIGHT = 150;
  * it only entered by missing out on the better one.
  */
 export const GOAT_TEAM_SHIELD_TITLE_WEIGHT = 40;
+/** Same reasoning as the player weight: between a Shield and a Continental Cup. */
+export const GOAT_TEAM_AMERICAS_TITLE_WEIGHT = 80;
 /** Same reasoning as the player weight: a fine trophy, a weak argument. */
 export const GOAT_TEAM_DOMESTIC_CUP_TITLE_WEIGHT = 40;
 /**

@@ -1,7 +1,7 @@
 import type { CupTie } from "../cup/types.js";
 
 /** Which super cup a tie belongs to. */
-export type SuperCupCompetitionId = "domestic" | "continental";
+export type SuperCupCompetitionId = "domestic" | "continental" | "intercontinental";
 
 /**
  * Why a club is in a super cup. Kept on the record rather than re-derived,
@@ -15,7 +15,8 @@ export type SuperCupRoute =
   | "cup-winners"
   | "league-runners-up"
   | "continental-cup"
-  | "continental-shield";
+  | "continental-shield"
+  | "americas-cup";
 
 /**
  * One super cup: a single match between the previous season's two headline
@@ -27,6 +28,9 @@ export type SuperCupRoute =
  *    in, which is what the FA Community Shield does; see `buildSuperCups`.
  *  - **continental** — exactly one in the world, the Continental Cup winner
  *    against the Continental Shield winner.
+ *  - **intercontinental** — exactly one in the world, the Continental Cup
+ *    winner against the Americas Cup winner: the FIFA Intercontinental Cup's
+ *    "Derby of the Americas" and final rolled into a single match.
  *
  * **Played at a neutral venue and worth no money.** The neutrality is real
  * football (Wembley, Istanbul) and happens to be free here — `resolveCupTie`

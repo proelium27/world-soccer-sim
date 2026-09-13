@@ -82,6 +82,9 @@ export function referencedPids(league: LeagueStore): Set<number> {
   for (const cup of league.shieldHistory ?? []) {
     for (const l of cup.statLines ?? []) pids.add(l.pid);
   }
+  for (const cup of league.americasCupHistory ?? []) {
+    for (const l of cup.statLines ?? []) pids.add(l.pid);
+  }
   for (const cup of league.domesticCupHistory ?? []) {
     for (const l of cup.statLines ?? []) pids.add(l.pid);
   }

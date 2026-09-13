@@ -12,6 +12,7 @@ import type { DomesticCupState } from "./domesticCup/types.js";
 export interface HonorCups {
   cupHistory?: CupState[];
   shieldHistory?: CupState[];
+  americasCupHistory?: CupState[];
   domesticCupHistory?: DomesticCupState[];
 }
 
@@ -32,6 +33,8 @@ export interface PlayerHonors {
   continentalCups: number[];
   /** Seasons his club won the Continental Shield while he was in the squad. */
   shields: number[];
+  /** Seasons his club won the Americas Cup while he was in the squad. */
+  americasCups: number[];
   /** Seasons his club won its domestic cup while he was in the squad. */
   domesticCups: number[];
   hasAny: boolean;
@@ -119,6 +122,7 @@ function honorsOf(
   const leagueTitles: number[] = [];
   const continentalCups: number[] = [];
   const shields: number[] = [];
+  const americasCups: number[] = [];
   const domesticCups: number[] = [];
 
   // Cup wins are team honours attributed exactly like a league title: the club
@@ -133,6 +137,11 @@ function honorsOf(
   for (const cup of cups.shieldHistory ?? []) {
     if (cup.championTid != null && squadTid(cup.season) === cup.championTid) {
       shields.push(cup.season);
+    }
+  }
+  for (const cup of cups.americasCupHistory ?? []) {
+    if (cup.championTid != null && squadTid(cup.season) === cup.championTid) {
+      americasCups.push(cup.season);
     }
   }
   for (const cup of cups.domesticCupHistory ?? []) {
@@ -175,6 +184,7 @@ function honorsOf(
     leagueTitles,
     continentalCups,
     shields,
+    americasCups,
     domesticCups,
     hasAny:
       ballonDOr.length > 0 ||
@@ -187,6 +197,7 @@ function honorsOf(
       leagueTitles.length > 0 ||
       continentalCups.length > 0 ||
       shields.length > 0 ||
+      americasCups.length > 0 ||
       domesticCups.length > 0,
   };
 }

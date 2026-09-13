@@ -80,6 +80,7 @@ export interface ClubSeason {
   relegated: boolean;
   cupRun: ClubRun;
   shieldRun: ClubRun;
+  americasRun: ClubRun;
   domesticCupRun: ClubRun;
   treble: boolean;
   /** Individual honours won by this club's players that season; empty for a live season, which has none yet. */
@@ -253,6 +254,7 @@ function fromRecord(
     relegated: record.relegated,
     cupRun: record.cupRun,
     shieldRun: record.shieldRun,
+    americasRun: record.americasRun,
     domesticCupRun: record.domesticCupRun,
     treble: record.treble,
     awaitingRollover: false,
@@ -303,6 +305,7 @@ function currentSeason(league: LeagueStore, tid: number): ClubSeason | null {
     relegated: false,
     cupRun: league.cup ? cupRunSummary(league.cup, tid) : null,
     shieldRun: league.shield ? cupRunSummary(league.shield, tid) : null,
+    americasRun: league.americasCup ? cupRunSummary(league.americasCup, tid) : null,
     domesticCupRun: liveDomesticRun(league, tid),
     treble: false,
     playerOfSeasonPid: null,

@@ -218,6 +218,8 @@ export function cullFreeAgentPoolReporting(
     // culled player is far more likely to have featured there than in the Cup.
     shieldHistory: (league.shieldHistory ?? []).map((cup) => scrubCupLines(cup, cull)),
     shield: league.shield ? scrubCupLines(league.shield, cull) : league.shield,
+    americasCupHistory: (league.americasCupHistory ?? []).map((cup) => scrubCupLines(cup, cull)),
+    americasCup: league.americasCup ? scrubCupLines(league.americasCup, cull) : league.americasCup,
     domesticCups: (league.domesticCups ?? []).map((c) => scrubDomesticCupLines(c, cull)),
     domesticCupHistory: (league.domesticCupHistory ?? []).map((c) => scrubDomesticCupLines(c, cull)),
     international: scrubInternational(league.international, cull),
@@ -237,6 +239,7 @@ export function scrubHistoryForCull(
     newsEvents: LeagueStore["newsEvents"];
     cupHistory: LeagueStore["cupHistory"];
     shieldHistory: LeagueStore["shieldHistory"];
+    americasCupHistory: NonNullable<LeagueStore["americasCupHistory"]>;
     domesticCupHistory: LeagueStore["domesticCupHistory"];
   },
   cull: Set<number>,
@@ -248,6 +251,7 @@ export function scrubHistoryForCull(
     ),
     cupHistory: (history.cupHistory ?? []).map((cup) => scrubCupLines(cup, cull)),
     shieldHistory: (history.shieldHistory ?? []).map((cup) => scrubCupLines(cup, cull)),
+    americasCupHistory: (history.americasCupHistory ?? []).map((cup) => scrubCupLines(cup, cull)),
     domesticCupHistory: (history.domesticCupHistory ?? []).map((c) => scrubDomesticCupLines(c, cull)),
   };
 }

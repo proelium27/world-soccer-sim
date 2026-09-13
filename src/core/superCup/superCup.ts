@@ -41,6 +41,16 @@ export const CONTINENTAL_SUPER_CUP_COMP_ID = -1;
 /** Display name for the one worldwide super cup. */
 export const CONTINENTAL_SUPER_CUP_NAME = "Continental Champions Cup";
 
+/**
+ * The compId the intercontinental super cup is filed under — its own sentinel,
+ * distinct from the continental one's, because it also seeds this match's rng
+ * stream and two matches sharing a stream would replay each other's draws.
+ */
+export const INTERCONTINENTAL_SUPER_CUP_COMP_ID = -2;
+
+/** Display name for the Europe-v-Americas champions match. */
+export const INTERCONTINENTAL_SUPER_CUP_NAME = "Intercontinental Cup";
+
 /** Display name for a country's super cup: "England" -> "English Champions Cup". */
 export function superCupName(country: string): string {
   const adj = COUNTRY_CUP_ADJECTIVE[country];
@@ -55,6 +65,7 @@ export function superCupRouteLabel(route: SuperCupRoute): string {
     case "league-runners-up": return "League runners-up";
     case "continental-cup": return "Continental Cup winners";
     case "continental-shield": return "Continental Shield winners";
+    case "americas-cup": return "Americas Cup winners";
   }
 }
 
@@ -70,6 +81,8 @@ export interface SuperCupSeed {
   /** That season's Continental Cup and Shield, still carrying their champions. */
   cup: CupState | null;
   shield: CupState | null;
+  /** That season's Americas Cup. Optional so callers from before it existed still typecheck. */
+  americasCup?: CupState | null;
   /** The season the super cups will open — i.e. the new one. */
   season: number;
 }
@@ -145,6 +158,20 @@ export function buildSuperCups(seed: SuperCupSeed): SuperCupTie[] {
       name: CONTINENTAL_SUPER_CUP_NAME,
       teams: [cupWinner, shieldWinner],
       routes: ["continental-cup", "continental-shield"],
+      tie: null,
+    });
+  }
+
+  // Europe's champions against the Americas'. The two fields come from
+  // different continents' leagues, so these can never be the same club either.
+  const americasWinner = seed.americasCup?.championTid ?? null;
+  if (cupWinner !== null && americasWinner !== null && cupWinner !== americasWinner) {
+    out.push({
+      competition: "intercontinental",
+      season: seed.season,
+      name: INTERCONTINENTAL_SUPER_CUP_NAME,
+      teams: [cupWinner, americasWinner],
+      routes: ["continental-cup", "americas-cup"],
       tie: null,
     });
   }
@@ -247,9 +274,13 @@ export function playSuperCups(
 
   return superCups.map((sc) => {
     if (sc.tie !== null) return sc;
-    const pool = sc.competition === "continental"
-      ? poolFor(tier1)
-      : poolFor(compsByCountry.get(sc.country ?? "") ?? new Set());
+    // Both worldwide matches pool every top flight in the world: the continental
+    // one's two clubs are European, the intercontinental one's come from two
+    // continents, and the world's top flights are the only shared baseline for
+    // either.
+    const pool = sc.competition === "domestic"
+      ? poolFor(compsByCountry.get(sc.country ?? "") ?? new Set())
+      : poolFor(tier1);
 
     const [homeTid, awayTid] = sc.teams;
     const hd = pool.get(homeTid);
@@ -259,7 +290,9 @@ export function playSuperCups(
     // is skipped rather than half-played, leaving the trophy unawarded.
     if (!hd || !ad) return sc;
 
-    const compId = sc.compId ?? CONTINENTAL_SUPER_CUP_COMP_ID;
+    const compId = sc.compId ?? (sc.competition === "intercontinental"
+      ? INTERCONTINENTAL_SUPER_CUP_COMP_ID
+      : CONTINENTAL_SUPER_CUP_COMP_ID);
     const tie = resolveCupTie(
       matchRng(lid, sc.season, compId),
       homeTid,

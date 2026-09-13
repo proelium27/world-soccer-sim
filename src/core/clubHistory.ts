@@ -43,6 +43,8 @@ export interface ClubSeasonRecord {
   cupRun: { note: string; isChampion: boolean; isRunnerUp: boolean } | null;
   /** The same, for the Continental Shield. A club plays one competition or the other, never both. */
   shieldRun: { note: string; isChampion: boolean; isRunnerUp: boolean } | null;
+  /** The same, for the Americas Cup. Only ever non-null for a club in an American league. */
+  americasRun: { note: string; isChampion: boolean; isRunnerUp: boolean } | null;
   /**
    * The club's domestic cup run this season — same shape as `cupRun`, and null
    * for a season played before the save had domestic cups.
@@ -85,6 +87,10 @@ export interface ClubHistory {
   shieldTitles: number[];
   /** Seasons the club reached the Continental Shield final but lost it, newest first. */
   shieldFinals: number[];
+  /** Seasons the club won the Americas Cup, newest first. */
+  americasTitles: number[];
+  /** Seasons the club reached the Americas Cup final but lost it, newest first. */
+  americasFinals: number[];
   /**
    * Seasons the club won a super cup, newest first — its country's, the
    * continental one, or both.
@@ -173,6 +179,7 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
   // and worlds that field no cup — both leave this empty.
   const cupBySeason = new Map((league.cupHistory ?? []).map((c) => [c.season, c]));
   const shieldBySeason = new Map((league.shieldHistory ?? []).map((c) => [c.season, c]));
+  const americasBySeason = new Map((league.americasCupHistory ?? []).map((c) => [c.season, c]));
   // A club only ever plays its own country's domestic cup, so one entry per
   // season is enough here even though eight cups run at once.
   const domesticBySeason = new Map(
@@ -239,6 +246,8 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
     const cupRun = cup ? cupRunSummary(cup, tid) : null;
     const shield = shieldBySeason.get(entry.season);
     const shieldRun = shield ? cupRunSummary(shield, tid) : null;
+    const americas = americasBySeason.get(entry.season);
+    const americasRun = americas ? cupRunSummary(americas, tid) : null;
 
     const domesticCup = domesticBySeason.get(entry.season);
     const domesticRound = domesticCup ? clubDomesticRun(domesticCup, tid) : null;
@@ -253,6 +262,13 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
         }
       : null;
 
+    // A top flight's champion is whoever the season recorded, which is the table
+    // leader everywhere except a league with a title playoff. Falls back to the
+    // table for a lower division (its title is not recorded) and for any season
+    // entry without the record.
+    const recordedChampion = tier === 1 ? entry.championTidByCompId?.[compId] : undefined;
+    const champion = recordedChampion !== undefined ? recordedChampion === tid : position === 1;
+
     return {
       season: entry.season,
       compId,
@@ -260,7 +276,7 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
       position,
       teamsInComp: compRows.length,
       row,
-      champion: position === 1,
+      champion,
       promoted,
       relegated,
       playerOfSeasonPid,
@@ -272,9 +288,12 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
       worldTeamOfYearPids,
       cupRun,
       shieldRun,
+      americasRun,
       domesticCupRun,
-      treble: position === 1 && tier === 1
-        && cupRun?.isChampion === true
+      // The continental leg is whichever top competition the club's continent
+      // plays: the Continental Cup in Europe, the Americas Cup in the Americas.
+      treble: champion && tier === 1
+        && (cupRun?.isChampion === true || americasRun?.isChampion === true)
         && domesticCupRun?.isChampion === true,
     };
   });
@@ -335,6 +354,12 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
       .map((r) => r.season),
     shieldFinals: newest
       .filter((r) => r.shieldRun?.isRunnerUp)
+      .map((r) => r.season),
+    americasTitles: newest
+      .filter((r) => r.americasRun?.isChampion)
+      .map((r) => r.season),
+    americasFinals: newest
+      .filter((r) => r.americasRun?.isRunnerUp)
       .map((r) => r.season),
     superCupTitles,
     domesticCupTitles: newest
