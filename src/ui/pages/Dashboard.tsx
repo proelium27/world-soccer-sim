@@ -279,6 +279,8 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
       cupHistory: league.cupHistory,
       shield: league.shield,
       shieldHistory: league.shieldHistory,
+      americasCup: league.americasCup ?? null,
+      americasCupHistory: league.americasCupHistory ?? [],
       // Only the live ones: the panel shows the season in progress, and this
       // preseason's super cups are exactly that. Archived ones belong to
       // seasons the panel has already stopped reporting.
@@ -324,6 +326,7 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
     league.transfers, league.newsEvents, league.season, league.played,
     league.meta.userTid, league.teams, league.seasonHistory,
     league.cup, league.cupHistory, league.shield, league.shieldHistory, league.international,
+    league.americasCup, league.americasCupHistory,
     league.promotionPlayoffs,
     league.superCups,
     league.debtSanctions,
@@ -502,7 +505,9 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
 
       {/* A continental final: the season sim halts before it, so flag why. The
           user's club can only be in one of the two competitions. */}
-      {([["cup", league.cup], ["shield", league.shield]] as const).map(([kind, comp]) =>
+      {([
+        ["cup", league.cup], ["shield", league.shield], ["americas-cup", league.americasCup ?? null],
+      ] as const).map(([kind, comp]) =>
         comp && !isCupComplete(comp) && cupFinalists(comp).includes(league.meta.userTid) ? (
           <div key={kind} className="alert alert-warning d-flex justify-content-between align-items-center mb-3">
             <span>
@@ -988,6 +993,11 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
         <div className="col-lg-4">
           <CupBracketPanel cup={league.shield} title="Continental Shield" href="/shield" />
         </div>
+        {(league.americasCup ?? null) !== null && (
+          <div className="col-lg-4">
+            <CupBracketPanel cup={league.americasCup ?? null} title="Americas Cup" href="/americas-cup" />
+          </div>
+        )}
       </div>
 
     </div>

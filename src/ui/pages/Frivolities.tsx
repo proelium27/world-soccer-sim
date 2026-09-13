@@ -134,7 +134,7 @@ function GoatTab() {
           <RankTable
             rows={clubs}
             headers={[
-              "Club", "Titles", "Cups", "Shields", "Dom. cups", "Trebles",
+              "Club", "Titles", "Cups", "Shields", "Americas", "Dom. cups", "Trebles",
               "Top 4", "Seasons", "PPG", "Score",
             ]}
             render={(r: TeamGoatRow) => [
@@ -142,6 +142,7 @@ function GoatTab() {
               r.leagueTitles,
               r.cupTitles,
               r.shieldTitles,
+              r.americasTitles,
               r.domesticCupTitles,
               r.trebles,
               r.topFinishes,
@@ -1240,13 +1241,13 @@ function ClubsTab() {
         <Col wide>
           <Panel
             title="Trophy cabinet"
-            note="A treble is the top flight, the Continental Cup and the domestic cup in one season. Those three wins are already in the total, so a treble doesn't add to it."
+            note="A treble is the top flight, the club's continental cup (the Continental Cup, or the Americas Cup in the Americas) and the domestic cup in one season. Those three wins are already in the total, so a treble doesn't add to it."
           >
             <RankTable
               rows={trivia.records}
               headers={[
                 "Club", "Total Trophies", "D1 Championships", "Continental Cups",
-                "Continental Shields", "Domestic Cups", "Trebles",
+                "Continental Shields", "Americas Cups", "Domestic Cups", "Trebles",
                 "D2 Championships", "Seasons", "Top flight",
               ]}
               render={(r: ClubRecordRow) => [
@@ -1255,6 +1256,7 @@ function ClubsTab() {
                 r.leagueTitles,
                 r.cupTitles,
                 r.shieldTitles,
+                r.americasTitles,
                 r.domesticCupTitles,
                 r.trebles,
                 r.secondTierTitles,

@@ -402,6 +402,18 @@ export const COUNTRY_STRENGTH_OFFSET: Record<string, number> = {
   Greece: 13,
   Scotland: 14,
   Serbia: 15,
+  // The Americas, placed on the one ladder the whole world shares — every
+  // league's players are generated off the same base, so a Brazilian and a
+  // Portuguese side are directly comparable. Real league-strength rankings put
+  // Brazil and Argentina around Portugal (Brazil a step above), and MLS and Liga
+  // MX in the band with Belgium, the Netherlands and Turkey. Mexico is placed a
+  // point above the United States, which is where every ranking consulted puts
+  // them. These are generation-time positions and, like the rest of the ladder,
+  // the bottom rungs are expected to converge over a dynasty.
+  Brazil: 6,
+  Argentina: 9,
+  Mexico: 11,
+  "United States": 12,
 };
 export function countryStrengthOffset(country: string): number {
   return COUNTRY_STRENGTH_OFFSET[country] ?? 0;
@@ -453,6 +465,15 @@ export const COUNTRY_BUDGET_SCALE: Record<string, number> = {
   Greece: 0.39,
   Scotland: 0.37,
   Serbia: 0.35,
+  // Strictly monotonic with the offsets above, which means MLS is modelled as
+  // POORER than Argentina although its real squad value is higher. That is the
+  // same deliberate call Turkey's entry makes: a weaker-but-richer league climbs
+  // the ladder over a dynasty, so "rich but weak" is the one shape the engine
+  // cannot hold. Each sits on the value of the European league at its offset.
+  Brazil: 0.65,
+  Argentina: 0.55,
+  Mexico: 0.45,
+  "United States": 0.4,
 };
 export function countryBudgetScale(country: string): number {
   return COUNTRY_BUDGET_SCALE[country] ?? 1;

@@ -423,6 +423,32 @@ export function worldCompetitions(): Competition[] {
     { id: 33, country: "Serbia", tier: 1, name: "Serbian Division 1", teamCount: 16, promotionSpots: 2 },
     { id: 34, country: "Serbia", tier: 2, name: "Serbian Division 2", teamCount: 16, promotionSpots: 2 },
     { id: 35, country: "Serbia", tier: 3, name: "Serbian Division 3", teamCount: 16, promotionSpots: 2 },
+    // ── The Americas ────────────────────────────────────────────────────────
+    // Appended, so every European country's tids and generated players are
+    // untouched. Each plays its continental football in the Americas Cup rather
+    // than Europe's competitions (COUNTRY_REGION) and all four run three
+    // divisions, for the symmetry reason given at the top of this table.
+    //
+    // Brazil: the Brasileirão's real shape, 20/20/20 with four up and down.
+    { id: 36, country: "Brazil", tier: 1, name: "Brazilian Division 1", promotionSpots: 4 },
+    { id: 37, country: "Brazil", tier: 2, name: "Brazilian Division 2", promotionSpots: 4 },
+    { id: 38, country: "Brazil", tier: 3, name: "Brazilian Division 3", promotionSpots: 4 },
+    // Argentina: capped at 20 (the real Liga Profesional is 30, which the
+    // 38-matchday calendar cannot seat), two up and down, and the title decided
+    // by a knockout the way each of its tournaments ends (COUNTRY_TITLE_PLAYOFF).
+    { id: 39, country: "Argentina", tier: 1, name: "Argentine Division 1", promotionSpots: 2 },
+    { id: 40, country: "Argentina", tier: 2, name: "Argentine Division 2", promotionSpots: 2 },
+    { id: 41, country: "Argentina", tier: 3, name: "Argentine Division 3", promotionSpots: 2 },
+    // Mexico: CLOSED — Liga MX abolished promotion and relegation in 2026 — with
+    // its real 18-club top flight and the Liguilla deciding the title.
+    { id: 42, country: "Mexico", tier: 1, name: "Mexican Division 1", teamCount: 18, promotionSpots: 0 },
+    { id: 43, country: "Mexico", tier: 2, name: "Mexican Division 2", teamCount: 16, promotionSpots: 0 },
+    { id: 44, country: "Mexico", tier: 3, name: "Mexican Division 3", teamCount: 16, promotionSpots: 0 },
+    // United States: CLOSED like MLS, whose real 30 clubs are capped at 20, with
+    // a playoff for the title. The divisions below stand in for the USL.
+    { id: 45, country: "United States", tier: 1, name: "US Division 1", promotionSpots: 0 },
+    { id: 46, country: "United States", tier: 2, name: "US Division 2", promotionSpots: 0 },
+    { id: 47, country: "United States", tier: 3, name: "US Division 3", teamCount: 16, promotionSpots: 0 },
   ];
 }
 

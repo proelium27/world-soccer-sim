@@ -5,12 +5,12 @@ import { computeStandings, type StandingsRow } from "../../core/standings.js";
 import { pointsDeductionMap } from "../../core/finance/debt.js";
 import { computeTeamRating } from "../../core/teams/teamRating.js";
 import { teamSlots } from "../../core/lineup/formations.js";
-import { tierOf } from "../../core/competitions.js";
+import { tierOf, competitionRegion } from "../../core/competitions.js";
 import { worldHasCup, cupSlotsForCompetition, cupSlotRange } from "../../core/cup/cup.js";
 import { seasonQualification } from "../../core/cup/seasonQualification.js";
 import type { QualificationRoute } from "../../core/cup/qualification.js";
 import type { CupCompetitionId } from "../../core/constants.js";
-import { SHIELD_FORMAT } from "../../core/constants.js";
+import { SHIELD_FORMAT, AMERICAS_CUP_FORMAT } from "../../core/constants.js";
 import { CompetitionSelect } from "../components/CompetitionSelect.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { TrophyIcon } from "../components/TrophyIcon.js";
@@ -37,14 +37,22 @@ type StandingsSortKey =
  */
 function qualBarClass(place: QualifiedPlace | undefined): string | null {
   if (!place) return null;
-  return place.competition === "continental"
-    ? "qual-bar qual-bar-cup"
-    : "qual-bar qual-bar-shield";
+  // The Americas Cup is the Americas' top competition, so it wears the top
+  // competition's colour; no table ever shows it beside the Continental Cup.
+  return place.competition === "shield"
+    ? "qual-bar qual-bar-shield"
+    : "qual-bar qual-bar-cup";
 }
+
+const COMPETITION_LABEL: Record<CupCompetitionId, string> = {
+  continental: "Continental Cup",
+  shield: "Continental Shield",
+  americas: "Americas Cup",
+};
 
 function qualTitle(place: QualifiedPlace | undefined): string | undefined {
   if (!place) return undefined;
-  const name = place.competition === "continental" ? "Continental Cup" : "Continental Shield";
+  const name = COMPETITION_LABEL[place.competition];
   if (place.route === "domestic-cup") return `${name} place, as domestic cup winners`;
   if (place.route === "holder") return `${name} place, as holders`;
   return `${name} place`;
@@ -96,13 +104,22 @@ export function Standings() {
   // strong league, two for a weak one. Only mark the zone in worlds that field a
   // cup.
   const comp = league.competitions.find((c) => c.id === compId);
-  const showCupZone = isTier1 && !!comp && worldHasCup(league.competitions);
+  // A league only ever shows its own continent's competitions: a Brazilian table
+  // has no Continental Cup zone, and a European one has no Americas Cup zone.
+  const inEurope = !!comp && competitionRegion(comp) === "europe";
+  const showCupZone = isTier1 && inEurope && worldHasCup(league.competitions);
   const cupSlots = comp ? cupSlotsForCompetition(comp) : 0;
   // Directly below it, the Continental Shield's places. A world can field a Cup
   // and not a Shield (it needs more top-flight leagues), so this is asked
   // separately rather than assumed to come along with the Cup zone.
-  const showShieldZone = isTier1 && !!comp && worldHasCup(league.competitions, SHIELD_FORMAT);
+  const showShieldZone = isTier1 && inEurope && worldHasCup(league.competitions, SHIELD_FORMAT);
   const [shieldFrom, shieldTo] = comp ? cupSlotRange(comp, SHIELD_FORMAT) : [0, -1];
+  const showAmericasZone = isTier1 && !!comp && !inEurope
+    && worldHasCup(league.competitions, AMERICAS_CUP_FORMAT);
+  const americasSlots = comp ? cupSlotsForCompetition(comp, AMERICAS_CUP_FORMAT) : 0;
+  const zoneShown: Record<CupCompetitionId, boolean> = {
+    continental: showCupZone, shield: showShieldZone, americas: showAmericasZone,
+  };
 
   const seasonOptions = [...league.seasonHistory.map((h) => h.season)].sort((a, b) => b - a);
 
@@ -127,7 +144,13 @@ export function Standings() {
     // labelled champion. `phase === "offseason"` is the same "the football is
     // over, the table is final" test core/clubSeason.ts uses for its
     // `awaitingRollover` flag.
-    championTid = league.phase === "offseason" ? (standings[0]?.tid ?? -1) : -1;
+    // Where a title playoff has already been played for this league, its winner
+    // is the champion rather than whoever topped the table.
+    const playoffWinner = (league.titlePlayoffs ?? [])
+      .find((p) => p.compId === compId && p.season === league.season)?.winnerTid;
+    championTid = league.phase === "offseason"
+      ? (playoffWinner ?? standings[0]?.tid ?? -1)
+      : -1;
   } else {
     const entry = league.seasonHistory.find((h) => h.season === season)!;
     const compTids = new Set(
@@ -180,7 +203,10 @@ export function Standings() {
     <div className="container-fluid p-3">
       <h4>
         Standings
-        <HelpHint>The top clubs of each top-flight league qualify for the Continental Cup.</HelpHint>
+        <HelpHint>
+          The top clubs of each top-flight league qualify for their continent&apos;s cup: the
+          Continental Cup in Europe, the Americas Cup in the Americas.
+        </HelpHint>
       </h4>
       <div className="mb-3">
         <select
@@ -227,10 +253,7 @@ export function Standings() {
               const isUser = row.tid === league.meta.userTid;
               const isChampion = row.tid === championTid;
               const place = qualification.byTid.get(row.tid);
-              const shown = place
-                && (place.competition === "continental" ? showCupZone : showShieldZone)
-                ? place
-                : undefined;
+              const shown = place && zoneShown[place.competition] ? place : undefined;
               const rowClass = [
                 isUser && "team-highlight",
                 isChampion && "champion-highlight",
@@ -301,6 +324,18 @@ export function Standings() {
             })}
           </tbody>
         </table>
+        {showAmericasZone && (
+          <p className="qual-key text-muted small mt-2 mb-0">
+            <span className="qual-key-item">
+              <span className="qual-bar qual-bar-cup qual-key-swatch" /> Top {americasSlots} to the Americas Cup
+            </span>
+            <span className="qual-key-item">
+              {qualification.settled
+                ? "Your domestic cup winner takes one of those places, and the holders keep theirs."
+                : "Once the cup finals are played, your domestic cup winner takes one of those places and the holders keep theirs."}
+            </span>
+          </p>
+        )}
         {(showCupZone || showShieldZone) && (
           <p className="qual-key text-muted small mt-2 mb-0">
             {showCupZone && (

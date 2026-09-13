@@ -307,6 +307,12 @@ export const NATIONALITIES: Record<string, NationalityDef> = {
       "Martin", "Mauro", "Pablo", "Patricio", "Ricardo", "Sebastian", "Sergio", "Victor",
       "Adrian", "Alan", "Axel", "Braian", "Damian", "Dante", "Dario", "Enzo",
       "Gaston", "Ivan", "Jonathan", "Kevin", "Milton", "Nazareno", "Thiago", "Uriel",
+      // Deepened when Argentina became a home league (see LEAGUE_NATIONALITY_WEIGHTS),
+      // which generates ~1,500 Argentines a world rather than the handful an import
+      // tail supplies.
+      "Rafael", "Emanuel", "Cristobal", "Lisandro", "Walter", "Hugo", "Raul", "Oscar",
+      "Claudio", "Marcelo", "Eduardo", "Fernando", "Jorge", "Mariano", "Gustavo", "Leonel",
+      "Bautista", "Benjamin",
     ],
     last: [
       "Gonzalez", "Rodriguez", "Gomez", "Fernandez", "Lopez", "Diaz", "Martinez", "Perez",
@@ -317,6 +323,9 @@ export const NATIONALITIES: Record<string, NationalityDef> = {
       "Torres", "Vargas", "Vega", "Vera", "Villalba", "Zapata", "Silva", "Mendoza",
       "Arce", "Barrios", "Bustos", "Cabrera", "Cardozo", "Carrizo", "Coria", "Escobar",
       "Figueroa", "Godoy", "Guzman", "Juarez", "Leiva", "Maidana", "Ojeda", "Sandoval",
+      "Paz", "Quiroga", "Benavidez", "Olivera", "Ponce", "Galvan", "Moreno", "Cano",
+      "Acuna", "Villegas", "Aranda", "Montenegro", "Palacios", "Salinas", "Cejas", "Quintana",
+      "Brizuela", "Chavez",
     ],
   },
   Scotland: {
@@ -1053,6 +1062,10 @@ export const NATIONALITIES: Record<string, NationalityDef> = {
       "Rojas", "Salazar", "Vega", "Cortes", "Estrada", "Fuentes", "Herrera", "Ibarra",
       "Lara", "Medina", "Navarro", "Ochoa", "Padilla", "Quintero", "Rangel", "Sandoval",
       "Trejo", "Urbina", "Valdez", "Zamora", "Carrillo", "Dominguez", "Escobedo", "Figueroa",
+      // Deepened when Mexico became a home league.
+      "Arellano", "Barragan", "Cervantes", "Duran", "Escalante", "Galindo", "Hinojosa", "Lozano",
+      "Montes", "Nunez", "Olvera", "Pacheco", "Robles", "Solis", "Tapia", "Villanueva",
+      "Zavala", "Beltran",
     ],
   },
   Canada: {
@@ -3216,6 +3229,61 @@ export const LEAGUE_NATIONALITY_WEIGHTS: Record<string, Record<string, number>> 
     Hungary: 4, Ukraine: 4, Gambia: 4, "Burkina Faso": 3, "DR Congo": 3,
     Portugal: 3, Belgium: 3, Italy: 3, Slovakia: 3,
     [REST]: 16,
+  },
+  // ── The Americas ──────────────────────────────────────────────────────────
+  // Built from published breakdowns where they exist and reconstructed where
+  // they do not; each table says which. Per 1000 players. REST is kept small on
+  // all four for the reason Serbia's comment gives — the rest-of-world bucket is
+  // ~40% English, and none of these leagues imports English players to speak of.
+  //
+  // Brazilian Série A: 22.3% of the 600 registered for 2025 were foreign, 121 of
+  // them South American (Argentina 46, Uruguay 26, Colombia 15), with 2026's
+  // counts (Argentina 53, Uruguay 32, Colombia 28, Paraguay 11, 12 Europeans)
+  // used to shape the tail. The domestic share is the published one.
+  Brazil: {
+    Brazil: 777, Argentina: 77, Uruguay: 43, Colombia: 30, Paraguay: 17,
+    Ecuador: 14, Venezuela: 10, Chile: 8, Peru: 6, Bolivia: 3,
+    Portugal: 8, Spain: 3, Netherlands: 2, Italy: 2,
+    [REST]: 5,
+  },
+  // Argentine Liga Profesional: 121 foreigners across 30 clubs in 2025
+  // (Uruguay 46, Paraguay 26, Colombia 20). The domestic share is ESTIMATED at
+  // ~87% from that count against typical squad sizes — no published total was
+  // found — which makes it the most domestic top flight in the game, as the
+  // six-foreigner rule would suggest.
+  Argentina: {
+    Argentina: 866, Uruguay: 51, Paraguay: 29, Colombia: 22, Chile: 8,
+    Venezuela: 6, Ecuador: 5, Peru: 4, Brazil: 4, Bolivia: 2,
+    [REST]: 3,
+  },
+  // Liga MX: 310 of 488 players registered for the Apertura 2026 were Mexican
+  // (63.5%); the foreign split is the Clausura 2026 count (Argentina 41,
+  // Colombia 25, Uruguay 18, Brazil 18, Ecuador 11, Spain 9, Chile 6) plus the
+  // smaller nations that make up the rest.
+  Mexico: {
+    Mexico: 635, Argentina: 86, Colombia: 51, Uruguay: 47, Brazil: 37,
+    Ecuador: 23, Spain: 18, Chile: 12, Paraguay: 12, "United States": 10,
+    Venezuela: 8, Peru: 6, Portugal: 5, France: 5, Netherlands: 4,
+    Panama: 4, "Costa Rica": 4, Honduras: 4,
+    [REST]: 30,
+  },
+  // MLS, 2026: 44% US-born (MLS's own figure), with the foreign 56% split by the
+  // published regional shares (Europe 35%, South America 28%, Africa 12%, North
+  // America 12%, Asia 4%, Mexico/Central America 4%, Caribbean 3%, Oceania 2%)
+  // and the published top counts (Brazil 33, Argentina 32, Colombia 24, UK 20,
+  // Germany 19, with Canada among the top five). The per-nation weights inside
+  // each region are RECONSTRUCTED from those constraints, not copied from a list.
+  "United States": {
+    "United States": 440, Canada: 55, Brazil: 43, Argentina: 42, Colombia: 31,
+    Germany: 25, France: 25, Spain: 22, England: 20, Ghana: 20,
+    Sweden: 13, Norway: 13, Venezuela: 13, Denmark: 12, Nigeria: 12,
+    Netherlands: 10, Uruguay: 10, Cameroon: 10, Senegal: 10, Mexico: 10,
+    Japan: 10, Jamaica: 9, Portugal: 8, Poland: 8, Ecuador: 8,
+    "Ivory Coast": 8, "South Korea": 8, Serbia: 7, Croatia: 6, Italy: 6,
+    Paraguay: 6, Australia: 6, Austria: 5, Switzerland: 5, "New Zealand": 5,
+    Honduras: 4, "Costa Rica": 4, Haiti: 4, "Trinidad and Tobago": 4, Scotland: 3,
+    Chile: 2, Peru: 2, "El Salvador": 2, Panama: 2,
+    [REST]: 20,
   },
 };
 

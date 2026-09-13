@@ -11,9 +11,10 @@ import { Leagues } from "./pages/Leagues.js";
 import { NewLeague } from "./pages/NewLeague.js";
 import { Dashboard } from "./pages/Dashboard.js";
 import { Standings } from "./pages/Standings.js";
-import { Cup, Shield } from "./pages/Cup.js";
+import { Cup, Shield, AmericasCup } from "./pages/Cup.js";
 import { DomesticCup } from "./pages/DomesticCup.js";
 import { PromotionPlayoffs } from "./pages/PromotionPlayoffs.js";
+import { TitlePlayoffs } from "./pages/TitlePlayoffs.js";
 import { ChampionsCups } from "./pages/ChampionsCups.js";
 import { NTWorldCup } from "./pages/nationalTeams/WorldCup.js";
 import { NTMySquad } from "./pages/nationalTeams/MySquad.js";
@@ -136,8 +137,10 @@ export function App() {
             <Route path="/standings" element={<Standings />} />
             <Route path="/cup" element={<Cup />} />
             <Route path="/shield" element={<Shield />} />
+            <Route path="/americas-cup" element={<AmericasCup />} />
             <Route path="/domestic-cup" element={<DomesticCup />} />
             <Route path="/promotion-playoffs" element={<PromotionPlayoffs />} />
+            <Route path="/title-playoffs" element={<TitlePlayoffs />} />
             <Route path="/champions-cups" element={<ChampionsCups />} />
             <Route path="/national-teams/my-squad" element={<NTMySquad />} />
             <Route path="/national-teams/player-pool" element={<NTPlayerPool />} />

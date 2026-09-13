@@ -134,6 +134,7 @@ export function PlayerProfile() {
   const honors = computePlayerHonors(player, league.seasonHistory, {
     cupHistory: league.cupHistory,
     shieldHistory: league.shieldHistory,
+    americasCupHistory: league.americasCupHistory,
     domesticCupHistory: league.domesticCupHistory,
   });
 
@@ -148,6 +149,8 @@ export function PlayerProfile() {
       .map((line) => ({ line, competition: "Cup" })),
     ...cupStatsBySeasonForPlayer(league.shield, league.shieldHistory ?? [], player.pid)
       .map((line) => ({ line, competition: "Shield" })),
+    ...cupStatsBySeasonForPlayer(league.americasCup ?? null, league.americasCupHistory ?? [], player.pid)
+      .map((line) => ({ line, competition: "Americas" })),
   ].sort((a, b) => b.line.season - a.line.season || a.competition.localeCompare(b.competition));
   const showCupTab = worldHasCup(league.competitions);
   // Labelled the same way, so the two tabs share one row shape and one render.
@@ -385,6 +388,7 @@ export function PlayerProfile() {
                   <AwardPill label="League Champion" seasons={honors.leagueTitles} icon={<TrophyIcon />} />
                   <AwardPill label="Continental Cup" seasons={honors.continentalCups} />
                   <AwardPill label="Continental Shield" seasons={honors.shields} />
+                  <AwardPill label="Americas Cup" seasons={honors.americasCups} />
                   <AwardPill label="Domestic Cup" seasons={honors.domesticCups} />
                 </div>
               )}

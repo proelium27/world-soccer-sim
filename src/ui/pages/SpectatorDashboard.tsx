@@ -277,6 +277,11 @@ export function SpectatorDashboard({ league }: { league: LeagueStore }) {
         <div className="col-lg-4">
           <CupBracketPanel cup={league.shield} title="Continental Shield" href="/shield" />
         </div>
+        {(league.americasCup ?? null) !== null && (
+          <div className="col-lg-4">
+            <CupBracketPanel cup={league.americasCup ?? null} title="Americas Cup" href="/americas-cup" />
+          </div>
+        )}
       </div>
     </div>
   );
