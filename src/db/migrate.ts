@@ -56,7 +56,7 @@ type StoredTeamAnyVersion =
   {
     division?: 0 | 1;
     /**
-     * The youth trial group (2026-08-31 to 2026-09-12), gone since the academy
+     * The youth trial group (2026-08-31 to 2026-09-13), gone since the academy
      * started filling itself. Stripped on load rather than converted: a
      * trialist was never signed, so dropping the pid is exactly what the next
      * rollover would have done to anyone left undecided — he is a free agent.

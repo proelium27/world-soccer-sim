@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-12",
+  date: "2026-09-13",
   title: "Your academy fills itself",
   items: [
     "I've taken out the **Youth Intake** screen. You used to pick five kids out of a trial group every summer; now 6 to 8 kids join your academy by themselves at **14**, and there's nothing to sign. They're just there when the new season starts.",
