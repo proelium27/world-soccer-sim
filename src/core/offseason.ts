@@ -48,7 +48,8 @@ import {
   playPromotionPlayoffs, playoffOutcomes, playoffsForSeason,
 } from "./promotionPlayoff.js";
 import { playTitlePlayoffs, titlePlayoffsForSeason, titleChampions } from "./titlePlayoff.js";
-import { generateSchedule } from "./schedule.js";
+import { buildCompetitionSchedule } from "./schedule.js";
+import { assignConferences } from "./conferences.js";
 import { updateHype } from "./finance/hype.js";
 import {
   settleSeasonEnd, chargeSeasonStart, wageBill, financeScaleFor, clampBudget,
@@ -669,6 +670,9 @@ export function simOffseasonReporting(
     league.competitions, tablesByCompId, playoffOutcomes(promotionPlayoffs),
   );
   teams = applyCompetitionSwaps(teams, swaps);
+  // A promoted club takes the conference a relegated one left, and a relegated
+  // one carries nothing into a single table (see core/conferences.ts).
+  teams = assignConferences(teams, league.competitions);
   teams = stepAcademyBaseConvergence(teams, league.competitions);
 
   // 3.7. Guaranteed ceiling on Division 2 quality, first pass: any
@@ -1049,9 +1053,12 @@ export function simOffseasonReporting(
   teams = assignAIFormations(teams, players, league.meta.userTid);
 
   // 7. New per-competition schedules, new season, back to regular play.
-  const schedule = league.competitions.flatMap((comp) =>
-    generateSchedule(teams.filter((t) => t.compId === comp.id).map((t) => t.tid)),
-  );
+  //
+  // Through the same builder world creation uses. This used to call the raw
+  // round-robin generator, which left a division smaller than 20 UNSPREAD from
+  // season 2 on — a 16-club league played its 30 rounds on matchdays 1-30 and
+  // sat out the last eight, contradicting the season 1 it was created with.
+  const schedule = buildCompetitionSchedule(teams, league.competitions);
 
   // Drop any listing for a player no longer on the user's senior roster
   // (sold, released, retired, or just loaned out this offseason) — a stale

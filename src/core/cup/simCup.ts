@@ -187,6 +187,12 @@ export function resolveCupTie(
    * are already venue-neutral here, so a neutral tie is neutral end to end.
    */
   neutral = false,
+  /**
+   * Whether a level game gets extra time before penalties. False sends it
+   * straight to the shootout — MLS's wild card and first round and Argentina's
+   * knockout rounds. Every cup caller omits it and is bit-identical to before.
+   */
+  extraTime = true,
 ): CupTie {
   const result = simMatchDetailed(rng, hd.composites, ad.composites, hd.xi, ad.xi, hd.bench, ad.bench, {
     recompute: { home: hd.recompute, away: ad.recompute },
@@ -201,10 +207,12 @@ export function resolveCupTie(
   let awayPens = 0;
 
   if (homeGoals === awayGoals) {
-    wentToExtraTime = true;
-    const et = playExtraTime(rng, hd.composites, ad.composites, hd.xi, ad.xi, box);
-    homeGoals += et.homeGoals;
-    awayGoals += et.awayGoals;
+    if (extraTime) {
+      wentToExtraTime = true;
+      const et = playExtraTime(rng, hd.composites, ad.composites, hd.xi, ad.xi, box);
+      homeGoals += et.homeGoals;
+      awayGoals += et.awayGoals;
+    }
     if (homeGoals === awayGoals) {
       wentToPens = true;
       ({ homePens, awayPens } = playShootout(rng, hd.composites, ad.composites));

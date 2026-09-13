@@ -328,14 +328,35 @@ export const DEFAULT_CONTINENTAL_REGION: ContinentalRegion = "europe";
  *    extra time, no penalties, no away goals); only the final goes to extra
  *    time and penalties.
  *
+ *  - `conference` — MLS. The top `CONFERENCE_PLAYOFF_TEAMS` of EACH conference:
+ *    a one-off wild card (8th v 9th), a best-of-three first round, then one-off
+ *    conference semi-finals and finals, and a final between the two conference
+ *    champions at the ground of whichever finished higher in the overall table.
+ *    The wild card and every first-round game go straight to penalties if level;
+ *    from the conference semi-finals on, extra time comes first.
+ *  - `zones` — Argentina. The top `ZONE_PLAYOFF_TEAMS` of each zone meet in a
+ *    cross-zone round of 16 (1st in one zone v 8th in the other), then fixed
+ *    quarter-finals and semi-finals, all one-off at the better-placed club's
+ *    ground and straight to penalties if level, and a final at a neutral ground
+ *    that goes to extra time first.
+ *
+ * `conference` and `zones` need a division split in two (see ConferenceFormat);
+ * a league set to either without one plays `single` instead.
+ *
  * Only the TITLE moves. Prize money, hype, continental places and the board's
  * verdict still read the regular-season table, which is also what real leagues
  * with playoffs do (MLS qualifies for the Champions Cup partly on the table).
  */
-export type TitlePlayoffFormat = "none" | "single" | "two-legged";
+export type TitlePlayoffFormat = "none" | "single" | "two-legged" | "conference" | "zones";
 
 /** How many clubs a title playoff seats. Eight: quarter-finals, semi-finals, final. */
 export const TITLE_PLAYOFF_TEAMS = 8;
+
+/** Clubs per conference in a `conference` title playoff: MLS's real nine. */
+export const CONFERENCE_PLAYOFF_TEAMS = 9;
+
+/** Clubs per zone in a `zones` title playoff: Argentina's real eight. */
+export const ZONE_PLAYOFF_TEAMS = 8;
 
 /**
  * The shipped countries that settle their title in a playoff. Brazil is
@@ -343,9 +364,45 @@ export const TITLE_PLAYOFF_TEAMS = 8;
  * is every European country.
  */
 export const COUNTRY_TITLE_PLAYOFF: Readonly<Record<string, TitlePlayoffFormat>> = {
-  Argentina: "single",
+  Argentina: "zones",
   Mexico: "two-legged",
-  "United States": "single",
+  "United States": "conference",
+};
+
+/**
+ * A top flight split into two halves that each play their own schedule — MLS's
+ * Eastern and Western Conferences, Argentina's two zones.
+ *
+ * Each club plays every club in its own half twice. When a half has an odd
+ * number of clubs (MLS and Argentina both run 15), the club left over each round
+ * plays its opposite number in the other half instead, which hands every club a
+ * home-and-away rival across the divide at no cost to the calendar.
+ * `crossRounds` adds that many more full rounds of cross-divide games on top,
+ * each against a different opponent.
+ *
+ * Only the SCHEDULE and the title playoff read this. The division is still one
+ * competition with one table: prize money, continental places, relegation and
+ * the board all read the overall standings, which is exactly what MLS's
+ * Supporters' Shield and Argentina's annual table are.
+ */
+export interface ConferenceFormat {
+  names: readonly [string, string];
+  crossRounds: number;
+}
+
+/**
+ * The shipped top flights split into conferences. A division of 30 needs one:
+ * a double round robin of 30 would take 58 matchdays against a 38-matchday
+ * calendar, while two halves of 15 take 30.
+ *
+ * MLS: own conference twice (28) + a cross-conference rival home and away (2) +
+ * four more cross-conference games = 34, its real count. Argentina: own zone
+ * twice (28) + the inter-zone derby home and away (2) = 30, the Liga
+ * Profesional's two tournaments added together.
+ */
+export const COUNTRY_CONFERENCES: Readonly<Record<string, ConferenceFormat>> = {
+  Argentina: { names: ["Zone A", "Zone B"], crossRounds: 0 },
+  "United States": { names: ["Eastern Conference", "Western Conference"], crossRounds: 4 },
 };
 
 /**
@@ -4474,7 +4531,11 @@ export const CUP_PEN_BASE_CONVERSION = 0.75;
  * matchday, and clear of TRANSFER_DEADLINE_MATCHDAY and the season finale (38).
  * The final sits on 36, a matchday before the Continental Cup final on 37.
  */
-export const DOMESTIC_CUP_MATCHDAYS = [5, 9, 13, 21, 26, 36] as const;
+export const DOMESTIC_CUP_MATCHDAYS = [1, 5, 9, 13, 21, 26, 36] as const;
+// Matchday 1 is PREPENDED, and only a field past 64 clubs reaches it (Argentina's
+// 70 and the US's 66 since their top flights went to 30). A smaller cup takes
+// the LAST n entries, so every country that already fitted in six rounds keeps
+// exactly the matchdays it had.
 
 /**
  * Prize for winning a tie, indexed by how many rounds remain INCLUDING the one
@@ -4548,7 +4609,8 @@ export const DOMESTIC_CUP_PRIZE_BY_ROUNDS_FROM_FINAL: readonly number[] = [
   500_000, // win a quarter-final
   300_000, // win a round-of-16 tie
   175_000, // win a round-of-32 tie
-  90_000, // win a preliminary tie
+  90_000, // win a round-of-64 or preliminary tie
+  50_000, // win a preliminary tie in a seven-round cup (a field past 64 clubs)
 ];
 
 /**

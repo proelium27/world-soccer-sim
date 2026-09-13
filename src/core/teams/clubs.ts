@@ -807,6 +807,16 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Formosa Yerbateros", abbrev: "FOM", colors: ["#6e2c00", "#f8c471"] },
   { name: "La Rioja Carpinchos", abbrev: "LAR", colors: ["#1f618d", "#e74c3c"] },
   { name: "Catamarca Ombues", abbrev: "CTA", colors: ["#239b56", "#f7dc6f"] },
+  { name: "Rafaela Hacheros", abbrev: "RAF", colors: ["#c0392b", "#ffffff"] },
+  { name: "San Rafael Condores", abbrev: "SRA", colors: ["#1b4f72", "#f4d03f"] },
+  { name: "Villa Carlos Paz Algarrobos", abbrev: "VCP", colors: ["#145a32", "#ecf0f1"] },
+  { name: "Chilecito Arrieros", abbrev: "CHL", colors: ["#8e44ad", "#f1c40f"] },
+  { name: "Rio Grande Payadores", abbrev: "RGR", colors: ["#2980b9", "#ffffff"] },
+  { name: "Cipolletti Chajaes", abbrev: "CIP", colors: ["#e67e22", "#2c3e50"] },
+  { name: "Alta Gracia Esquiladores", abbrev: "ALG", colors: ["#16a085", "#ecf0f1"] },
+  { name: "Zapala Canoeros", abbrev: "ZAP", colors: ["#7f8c8d", "#e67e22"] },
+  { name: "Concepcion del Uruguay Guanacos", abbrev: "CDU", colors: ["#d35400", "#1a1a1a"] },
+  { name: "Saenz Pena Molineros", abbrev: "SPE", colors: ["#2c3e50", "#f39c12"] },
   // Argentine division 2 clubs, same styling as the block above.
   { name: "San Luis Hacheros", abbrev: "SLU", colors: ["#c0392b", "#ffffff"] },
   { name: "Rio Cuarto Condores", abbrev: "RCU", colors: ["#1b4f72", "#f4d03f"] },
@@ -905,26 +915,43 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Monclova Cocuyos", abbrev: "MOC", colors: ["#2c3e50", "#f39c12"] },
   // US clubs: real towns and cities with invented club nicknames, ASCII
   // only, following the same no-real-clubs rule as the rest of this table.
-  { name: "Omaha Coopers", abbrev: "OMA", colors: ["#154360", "#abebc6"] },
-  { name: "Tulsa Keelboats", abbrev: "TUL", colors: ["#1a1a1a", "#f4d03f"] },
-  { name: "Boise Bargemen", abbrev: "BOI", colors: ["#b03a2e", "#1b2631"] },
-  { name: "Albuquerque Riveters", abbrev: "ALU", colors: ["#117864", "#f5b041"] },
-  { name: "Spokane Ropemakers", abbrev: "SPO", colors: ["#5b2c6f", "#ffffff"] },
-  { name: "Fresno Wheelwrights", abbrev: "FRS", colors: ["#ffffff", "#1b4f72"] },
-  { name: "Wichita Farriers", abbrev: "WIC", colors: ["#f1c40f", "#145a32"] },
-  { name: "Des Moines Cordwainers", abbrev: "DMO", colors: ["#6e2c00", "#f8c471"] },
-  { name: "Little Rock Drovers", abbrev: "LIT", colors: ["#1f618d", "#e74c3c"] },
-  { name: "Knoxville Tanners", abbrev: "KNO", colors: ["#239b56", "#f7dc6f"] },
-  { name: "Savannah Tinsmiths", abbrev: "SAH", colors: ["#c0392b", "#ffffff"] },
-  { name: "Richmond Millwrights", abbrev: "RIC", colors: ["#1b4f72", "#f4d03f"] },
-  { name: "Norfolk Ironmasters", abbrev: "NOF", colors: ["#145a32", "#ecf0f1"] },
+  //
+  // The top flight's 30 are ORDERED BY GEOGRAPHY: the first fifteen are the
+  // Eastern Conference and the last fifteen the Western, because a club's
+  // conference is seeded from its slot order (see core/conferences.ts). Keep new
+  // entries on the right side of that line.
+  // Eastern Conference
   { name: "Providence Flatboatmen", abbrev: "PRO", colors: ["#8e44ad", "#f1c40f"] },
   { name: "Hartford Canalmen", abbrev: "HAF", colors: ["#2980b9", "#ffffff"] },
+  { name: "Worcester Hatters", abbrev: "WOR", colors: ["#922b21", "#f7dc6f"] },
   { name: "Buffalo Glassblowers", abbrev: "BUF", colors: ["#e67e22", "#2c3e50"] },
   { name: "Rochester Surveyors", abbrev: "ROC", colors: ["#16a085", "#ecf0f1"] },
   { name: "Syracuse Lamplighters", abbrev: "SYA", colors: ["#7f8c8d", "#e67e22"] },
+  { name: "Harrisburg Brickmakers", abbrev: "HBG", colors: ["#4a235a", "#d7bde2"] },
+  { name: "Richmond Millwrights", abbrev: "RIC", colors: ["#1b4f72", "#f4d03f"] },
+  { name: "Norfolk Ironmasters", abbrev: "NOF", colors: ["#145a32", "#ecf0f1"] },
+  { name: "Greensboro Weavers", abbrev: "GRB", colors: ["#0e6251", "#f9e79f"] },
+  { name: "Savannah Tinsmiths", abbrev: "SAH", colors: ["#c0392b", "#ffffff"] },
+  { name: "Knoxville Tanners", abbrev: "KNO", colors: ["#239b56", "#f7dc6f"] },
+  { name: "Chattanooga Smelters", abbrev: "CHT", colors: ["#873600", "#fdebd0"] },
   { name: "Akron Sawyers", abbrev: "AKR", colors: ["#d35400", "#1a1a1a"] },
   { name: "Dayton Chandlers", abbrev: "DAY", colors: ["#2c3e50", "#f39c12"] },
+  // Western Conference
+  { name: "Des Moines Cordwainers", abbrev: "DMO", colors: ["#6e2c00", "#f8c471"] },
+  { name: "Omaha Coopers", abbrev: "OMA", colors: ["#154360", "#abebc6"] },
+  { name: "Wichita Farriers", abbrev: "WIC", colors: ["#f1c40f", "#145a32"] },
+  { name: "Tulsa Keelboats", abbrev: "TUL", colors: ["#1a1a1a", "#f4d03f"] },
+  { name: "Little Rock Drovers", abbrev: "LIT", colors: ["#1f618d", "#e74c3c"] },
+  { name: "Albuquerque Riveters", abbrev: "ALU", colors: ["#117864", "#f5b041"] },
+  { name: "Colorado Springs Wagoners", abbrev: "CSP", colors: ["#b03a2e", "#1b2631"] },
+  { name: "Ogden Lumbermen", abbrev: "OGD", colors: ["#117864", "#f5b041"] },
+  { name: "Provo Tollkeepers", abbrev: "PRV", colors: ["#5b2c6f", "#ffffff"] },
+  { name: "Boise Bargemen", abbrev: "BOI", colors: ["#b03a2e", "#1b2631"] },
+  { name: "Spokane Ropemakers", abbrev: "SPO", colors: ["#5b2c6f", "#ffffff"] },
+  { name: "Tacoma Loggers", abbrev: "TAC", colors: ["#154360", "#abebc6"] },
+  { name: "Sacramento Assayers", abbrev: "SAR", colors: ["#f1c40f", "#145a32"] },
+  { name: "Modesto Blacksmiths", abbrev: "MDS", colors: ["#1a1a1a", "#f4d03f"] },
+  { name: "Fresno Wheelwrights", abbrev: "FRS", colors: ["#ffffff", "#1b4f72"] },
   // US division 2 clubs, same styling as the block above.
   { name: "Toledo Quarrymen", abbrev: "TOD", colors: ["#27ae60", "#ffffff"] },
   { name: "Grand Rapids Homesteaders", abbrev: "GRD", colors: ["#922b21", "#f7dc6f"] },
@@ -980,6 +1007,14 @@ export interface StoredTeam {
    * stays empty for every AI team.
    */
   academyRoster: number[];
+  /**
+   * Which half of a split top flight this club plays its schedule in — 0 or 1,
+   * MLS's Eastern/Western Conference or Argentina's Zone A/B (see
+   * ConferenceFormat). Absent in a single table. Optional, and never required:
+   * `conferenceMembers` seats a club without one wherever there is room, which
+   * is what makes it sticky across promotion without being a migration.
+   */
+  conference?: number;
   /**
    * This year's youth trial group, awaiting the user's decision on the Youth
    * Intake screen — pids only, no contracts, no wages, nobody signed.

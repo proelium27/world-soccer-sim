@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { makeLeague } from "../helpers/league.js";
-import { worldCompetitions, competitionTeamCount } from "../../src/core/competitions.js";
+import {
+  worldCompetitions, competitionTeamCount, competitionConferences,
+} from "../../src/core/competitions.js";
 
 describe("createLeagueState", () => {
   const state = makeLeague(3, 42);
@@ -17,9 +19,9 @@ describe("createLeagueState", () => {
     expect(state).toHaveProperty("competitions");
   });
 
-  it("has 48 competitions (sixteen countries, three divisions each) and 852 teams, each division its own size", () => {
+  it("has 48 competitions (sixteen countries, three divisions each) and 872 teams, each division its own size", () => {
     expect(state.competitions).toHaveLength(48);
-    expect(state.teams).toHaveLength(852);
+    expect(state.teams).toHaveLength(872);
     const validCompIds = new Set(state.competitions.map((c) => c.id));
     for (const t of state.teams) {
       expect(typeof t.name).toBe("string");
@@ -38,20 +40,26 @@ describe("createLeagueState", () => {
     }
   });
 
-  it("has 21300 players (852 teams x 25 players)", () => {
-    expect(state.players).toHaveLength(21300);
+  it("has 21800 players (872 teams x 25 players)", () => {
+    expect(state.players).toHaveLength(21800);
   });
 
   it("schedules n(n-1) games per competition, each within one competition", () => {
     // Divisions are no longer all 20 clubs, so the total is the sum of each
     // competition's own double round robin rather than 380 x 24.
+    // A split top flight (MLS, Argentina) plays its own half twice plus games
+    // across, rather than everyone twice.
     expect(state.schedule).toHaveLength(
       worldCompetitions().reduce((n, c) => {
         const size = competitionTeamCount(c);
-        return n + size * (size - 1);
+        const split = competitionConferences(c);
+        if (!split) return n + size * (size - 1);
+        const half = size / 2;
+        const perClub = (half % 2 === 1 ? 2 * half : 2 * (half - 1)) + split.crossRounds;
+        return n + (size * perClub) / 2;
       }, 0),
     );
-    expect(state.schedule).toHaveLength(14604);
+    expect(state.schedule).toHaveLength(14804);
     const compByTid = new Map(state.teams.map((t) => [t.tid, t.compId]));
     for (const g of state.schedule) {
       expect(g).toHaveProperty("matchday");

@@ -6,13 +6,13 @@ import { CLUBS, assignIdentities } from "../../src/core/teams/clubs.js";
 import { englandCompetitions } from "../../src/core/competitions.js";
 
 describe("CLUBS", () => {
-  it("has exactly 852 entries", () => {
-    expect(CLUBS).toHaveLength(852);
+  it("has exactly 872 entries", () => {
+    expect(CLUBS).toHaveLength(872);
   });
 
   it("has all unique abbreviations that are exactly 3 characters", () => {
     const abbrevs = CLUBS.map((c) => c.abbrev);
-    expect(new Set(abbrevs).size).toBe(852);
+    expect(new Set(abbrevs).size).toBe(872);
     for (const a of abbrevs) {
       expect(a).toHaveLength(3);
     }
@@ -20,7 +20,7 @@ describe("CLUBS", () => {
 
   it("has all unique names", () => {
     const names = CLUBS.map((c) => c.name);
-    expect(new Set(names).size).toBe(852);
+    expect(new Set(names).size).toBe(872);
   });
 
   it("has exactly one entry per tid generateWorld() actually produces (regression guard against CLUBS/tid-layout drift)", () => {

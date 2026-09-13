@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState.js";
 import { seasonYear, ordinal } from "../format.js";
 import type { CupTie } from "../../core/cup/types.js";
 import type { TitlePlayoff } from "../../core/titlePlayoff.js";
-import { TITLE_ROUND_QF, TITLE_ROUND_SF, TITLE_ROUND_FINAL } from "../../core/titlePlayoff.js";
+import { titlePlayoffRoundNames } from "../../core/titlePlayoff.js";
 import { competitionOf, competitionTitlePlayoff } from "../../core/competitions.js";
 
 /**
@@ -23,11 +23,19 @@ function allTitlePlayoffs(
     .sort((a, b) => b.season - a.season);
 }
 
-const ROUND_NAMES: Record<number, string> = {
-  [TITLE_ROUND_QF]: "Quarter-finals",
-  [TITLE_ROUND_SF]: "Semi-finals",
-  [TITLE_ROUND_FINAL]: "Final",
-};
+/** One line under the league name saying how its playoff works. */
+function formatSummary(format: TitlePlayoff["format"]): string {
+  switch (format) {
+    case "two-legged":
+      return "two legs a round; a level tie goes to the higher-placed club, except in the final";
+    case "conference":
+      return "top nine in each conference: a wild card, a best-of-three first round, then one-off games to the final";
+    case "zones":
+      return "top eight in each zone, first against eighth across the zones, one-off games and a neutral final";
+    default:
+      return "one-off ties, better-placed club at home";
+  }
+}
 
 export function TitlePlayoffs() {
   const { league } = useLeague();
@@ -39,14 +47,13 @@ export function TitlePlayoffs() {
   const intro = (
     <HelpHint>
       Some leagues don&apos;t give the title to whoever tops the table. Once the last matchday is
-      played, the top eight go into a knockout: first against eighth, fourth against fifth, second
-      against seventh and third against sixth. The winner is the champion. Finishing higher still
-      matters, because you play a weaker side and you get the home leg. Where the ties are one-off
-      games the better-placed club is at home. Mexico plays every round over two legs, with the
-      better-placed club at home for the second, and in the quarter-finals and semi-finals a tie
-      that&apos;s level on aggregate goes to the better-placed club with no extra time or penalties.
-      Only the final goes to extra time and penalties. The table still decides prize money,
-      continental places and what your board makes of your season.
+      played, their best clubs go into a knockout and the winner is the champion. Mexico takes the
+      top eight over two legs a round, and a quarter-final or semi-final that&apos;s level on
+      aggregate goes to the better-placed club. The US takes the top nine in each conference:
+      eighth plays ninth for a wild card, the first round is best of three, and the two conference
+      champions meet in the final. Argentina takes the top eight in each zone and pairs first in one
+      zone with eighth in the other. The table still decides prize money, continental places and
+      what your board makes of your season.
     </HelpHint>
   );
 
@@ -84,10 +91,21 @@ export function TitlePlayoffs() {
   const season = seasons.find((s) => s === seasonSel) ?? seasons[0];
   const playoff = forCountry.find((p) => p.season === season)!;
   const comp = competitionOf(league.competitions, playoff.compId);
+  const roundNames = titlePlayoffRoundNames(playoff.format);
+  const finalRound = roundNames.length - 1;
 
   const teamColors = (tid: number): [string, string] =>
     league.teams.find((t) => t.tid === tid)?.colors ?? ["#888888", "#888888"];
-  const seedOf = (tid: number) => playoff.teams.indexOf(tid) + 1;
+  /** Which half a club played in, or -1 for an unsplit league. */
+  const halfOf = (tid: number): number =>
+    playoff.conferences ? playoff.conferences.findIndex((h) => h.includes(tid)) : -1;
+  /** "3rd" in a table, or "3rd, Eastern Conference" in a split one. */
+  const placeOf = (tid: number): string => {
+    const half = halfOf(tid);
+    if (half < 0 || !playoff.conferences) return ordinal(playoff.teams.indexOf(tid) + 1);
+    const name = playoff.conferenceNames?.[half] ?? "";
+    return `${ordinal(playoff.conferences[half].indexOf(tid) + 1)}, ${name}`;
+  };
 
   const teamCell = (tid: number, won: boolean) => (
     <span className={`cup-team${won ? " cup-team-winner" : ""}${tid === userTid ? " cup-team-user" : ""}`}>
@@ -95,9 +113,16 @@ export function TitlePlayoffs() {
       <span className="cup-team-name">
         <ClubLink tid={tid} season={playoff.season} />
       </span>
-      <span className="text-muted small ms-1">({ordinal(seedOf(tid))})</span>
+      <span className="text-muted small ms-1">({placeOf(tid)})</span>
     </span>
   );
+
+  const seriesNote = (t: CupTie): string =>
+    (t.series ?? []).map((g, i) => {
+      const pens = g.homePens !== undefined ? ` (${g.homePens}-${g.awayPens} pens)` : "";
+      const where = g.at === t.home ? "" : " away";
+      return `Game ${i + 1} ${g.homeGoals}-${g.awayGoals}${pens}${where}`;
+    }).join(" · ");
 
   const renderTie = (t: CupTie) => {
     const rowClass = (tid: number) =>
@@ -112,6 +137,9 @@ export function TitlePlayoffs() {
           {teamCell(t.away, t.winner === t.away)}
           <span className="cup-tie-score">{t.awayGoals}</span>
         </div>
+        {t.series && (
+          <div className="cup-tie-note">{`Series ${t.homeGoals}-${t.awayGoals} · ${seriesNote(t)}`}</div>
+        )}
         {t.legs && t.legs.length === 2 && (
           <div className="cup-tie-note">
             {`1st leg ${t.legs[0].homeGoals}-${t.legs[0].awayGoals} · 2nd leg ${t.legs[1].homeGoals}-${t.legs[1].awayGoals} away`}
@@ -120,18 +148,20 @@ export function TitlePlayoffs() {
         {t.decidedByTablePosition && (
           <div className="cup-tie-note">Level on aggregate, so the higher-placed club goes through</div>
         )}
-        {(t.wentToExtraTime || t.wentToPens) && (
+        {!t.series && (t.wentToExtraTime || t.wentToPens) && (
           <div className="cup-tie-note">
-            {t.wentToPens ? `${t.homePens}-${t.awayPens} on pens` : "after extra time"}
+            {t.wentToPens
+              ? `${t.homePens}-${t.awayPens} on pens${t.wentToExtraTime ? " after extra time" : ""}`
+              : "after extra time"}
           </div>
         )}
       </>
     );
   };
 
-  const rounds = [TITLE_ROUND_QF, TITLE_ROUND_SF, TITLE_ROUND_FINAL]
-    .map((round) => ({ round, ties: playoff.ties.filter((t) => t.round === round) }))
-    .filter((r) => r.ties.length > 0);
+  const rounds = [...new Set(playoff.ties.map((t) => t.round))]
+    .sort((a, b) => a - b)
+    .map((round) => ({ round, ties: playoff.ties.filter((t) => t.round === round) }));
   const userEntered = playoff.teams.includes(userTid);
 
   return (
@@ -159,11 +189,7 @@ export function TitlePlayoffs() {
 
       <div className="mb-2">
         <strong>{comp.name}</strong>{" "}
-        <span className="text-muted small">
-          {playoff.format === "two-legged"
-            ? "two legs a round; a level tie goes to the higher-placed club, except in the final"
-            : "one-off ties, better-placed club at home"}
-        </span>
+        <span className="text-muted small">{formatSummary(playoff.format)}</span>
       </div>
 
       {playoff.winnerTid !== null && (
@@ -171,7 +197,7 @@ export function TitlePlayoffs() {
           <span className="cup-champion-label">Champions</span>{" "}
           <ClubCrest tid={playoff.winnerTid} colors={teamColors(playoff.winnerTid)} size={22} />{" "}
           <strong><ClubLink tid={playoff.winnerTid} season={playoff.season} /></strong>{" "}
-          <span className="text-muted small">from {ordinal(seedOf(playoff.winnerTid))} in the table</span>
+          <span className="text-muted small">from {placeOf(playoff.winnerTid)}</span>
         </div>
       )}
 
@@ -187,12 +213,12 @@ export function TitlePlayoffs() {
         {rounds.map(({ round, ties }) => (
           <div className="cup-round" key={round}>
             <div className="cup-round-title">
-              <span>{ROUND_NAMES[round]}</span>
+              <span>{roundNames[round] ?? `Round ${round + 1}`}</span>
               <span className="cup-round-count">{ties.length}</span>
             </div>
             <div className="cup-round-body">
               {ties.map((t, i) => (
-                <div className={`cup-tie${round === TITLE_ROUND_FINAL ? " cup-tie--final" : ""}`} key={i}>
+                <div className={`cup-tie${round === finalRound ? " cup-tie--final" : ""}`} key={i}>
                   {renderTie(t)}
                 </div>
               ))}

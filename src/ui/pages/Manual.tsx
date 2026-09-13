@@ -695,7 +695,7 @@ export function Manual() {
             <strong>Greece</strong>, <strong>Scotland</strong> and <strong>Serbia</strong>) and
             four are in the Americas (<strong>Brazil</strong>, <strong>Argentina</strong>,{" "}
             <strong>Mexico</strong> and the <strong>United States</strong>). Each has its own league
-            pyramid, for 48 leagues and 852 clubs total. You pick any club in any country and
+            pyramid, for 48 leagues and 872 clubs total. You pick any club in any country and
             division when you start.
           </p>
           <p>
@@ -708,7 +708,14 @@ export function Manual() {
             relegated, so a club starts and stays in its division, however well or badly it does.
             Argentina, Mexico and the US also give their title to the winner of a{" "}
             <a href="#title-playoffs">title playoff</a> rather than to whoever tops the table.
-            Argentina and the US are capped at 20 clubs because the season only has 38 matchdays.
+            <strong>Argentina and the US field their real 30 clubs, split in two.</strong> The US
+            plays in an Eastern and a Western Conference, with clubs placed by where they are, and
+            each club plays its own conference twice, one rival from the other conference home and
+            away, and four more games across: 34 in all. Argentina plays in two zones of 15, each club
+            meeting its own zone twice plus a derby with its rival from the other zone, for 30. When
+            a club goes up or down in Argentina, the promoted club takes the relegated club&apos;s
+            zone. Each half gets its own table on the Standings page, but the overall table is the
+            one that counts for prize money, continental places and relegation.
           </p>
           <p>
             <strong>Every country runs three divisions.</strong> Sizes vary — England, Spain and
@@ -1382,17 +1389,33 @@ export function Manual() {
             way the Liguilla and MLS Cup work in real life.
           </p>
           <p>
-            Once the last matchday is played, the <strong>top eight</strong> go into a bracket:
-            1st v 8th, 4th v 5th, 2nd v 7th and 3rd v 6th, then semi-finals and a final. In
-            Argentina and the US every tie is a one-off game at the better-placed club&apos;s ground.
-            A level game there goes to extra time and penalties. In Mexico every round, final
-            included, is two legs, with the better-placed club at home for the second, and it uses
-            the Liguilla&apos;s real tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s
-            level on aggregate goes to the club that finished higher, with no extra time, no
-            penalties and no away goals. Only the final goes to extra time and penalties, and there
-            where you finished no longer helps. The winner is the champion:
-            it&apos;s their name in the history books, on the trophy case and on the players&apos;
-            profiles, and they play in the champions cup.
+            <strong>Mexico</strong> takes the <strong>top eight</strong>: 1st v 8th, 4th v 5th, 2nd v
+            7th and 3rd v 6th, then semi-finals and a final. Every round, final included, is two legs,
+            with the better-placed club at home for the second, and it uses the Liguilla&apos;s real
+            tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s level on aggregate goes
+            to the club that finished higher, with no extra time, no penalties and no away goals. Only
+            the final goes to extra time and penalties, and there where you finished no longer helps.
+          </p>
+          <p>
+            The <strong>US</strong> takes the <strong>top nine in each conference</strong>. Eighth
+            hosts ninth in a one-off wild card. The first round is <strong>best of three</strong>:
+            first plays the wild card winner, second plays seventh, third plays sixth and fourth plays
+            fifth, with games one and three at the better-placed club. A level game in the wild card
+            or the first round goes straight to penalties. Then come one-off conference semi-finals and
+            conference finals, and the two conference champions meet in the final, at the ground of
+            whichever finished higher in the overall table. From the conference semi-finals on, a level
+            game gets extra time before penalties.
+          </p>
+          <p>
+            <strong>Argentina</strong> takes the <strong>top eight in each zone</strong>. The round of
+            16 pairs 1st in one zone with 8th in the other, 2nd with 7th and so on, so the two zone
+            winners can only meet in the final. Every game is one-off at the better-placed club&apos;s
+            ground and a level game goes straight to penalties, except the final, which is at a neutral
+            ground and gets extra time first.
+          </p>
+          <p>
+            The winner is the champion: it&apos;s their name in the history books, on the trophy case
+            and on the players&apos; profiles, and they play in the champions cup.
           </p>
           <p>
             <strong>The table still counts for everything else.</strong> Prize money, hype,

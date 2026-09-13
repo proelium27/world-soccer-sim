@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { worldCompetitions, competitionRegion, competitionTitlePlayoff } from "../../src/core/competitions.js";
+import {
+  worldCompetitions, competitionRegion, competitionTitlePlayoff, competitionTeamCount,
+} from "../../src/core/competitions.js";
 import type { Competition } from "../../src/core/competitions.js";
 import type { StandingsRow } from "../../src/core/standings.js";
 import {
@@ -127,11 +129,13 @@ describe("title playoffs", () => {
   });
 
   it("seats the table's top eight, best first", () => {
-    const fields = titlePlayoffFields(comps, tablesFor(comps));
+    // Real division sizes: MLS needs nine per conference out of its thirty.
+    const tables = new Map(comps.map((c, i) => [c.id, table(i * 100, competitionTeamCount(c))]));
+    const fields = titlePlayoffFields(comps, tables);
     expect(fields.map((f) => f.country)).toEqual(["Argentina", "Mexico", "United States"]);
     const mexico = comps.find((c) => c.country === "Mexico" && c.tier === 1)!;
     const field = fields.find((f) => f.country === "Mexico")!;
-    expect(field.teams).toEqual(tablesFor(comps).get(mexico.id)!.slice(0, 8).map((r) => r.tid));
+    expect(field.teams).toEqual(tables.get(mexico.id)!.slice(0, 8).map((r) => r.tid));
   });
 
   it("pairs 1v8, 4v5, 2v7 and 3v6 so the top two seeds meet only in the final", () => {

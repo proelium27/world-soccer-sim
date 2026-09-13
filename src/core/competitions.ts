@@ -45,6 +45,7 @@ import {
   COUNTRY_PLAYOFF_FORMAT, DEFAULT_PLAYOFF_FORMAT, type PlayoffFormat,
   COUNTRY_REGION, DEFAULT_CONTINENTAL_REGION, type ContinentalRegion,
   COUNTRY_TITLE_PLAYOFF, type TitlePlayoffFormat, AMERICAS_CUP_LEAGUE_SLOTS,
+  COUNTRY_CONFERENCES, type ConferenceFormat,
 } from "./constants.js";
 import {
   LEAGUE_NATIONALITY_WEIGHTS, sanitizeNationalityWeights, type NationalityWeights,
@@ -118,9 +119,16 @@ export interface Competition {
    * the circle method and an odd field leaves a club unpaired every round. It is
    * also capped: a division of n clubs plays 2(n-1) matchdays and the season
    * calendar is a fixed grid (see MAX_DIVISION_TEAMS), so a bigger division has
-   * nowhere to put its fixtures.
+   * nowhere to put its fixtures — UNLESS it is split into conferences (see
+   * `conferences`), which is how MLS and Argentina seat 30.
    */
   teamCount?: number;
+  /**
+   * The two halves this top flight plays its schedule in. Absent →
+   * `COUNTRY_CONFERENCES`, else one table. Resolve through
+   * `competitionConferences`, never the field.
+   */
+  conferences?: ConferenceFormat;
   /**
    * How many clubs swap with the division below (or above) at the end of each
    * season. Absent → PROMOTION_RELEGATION_COUNT, which is what every shipped
@@ -325,7 +333,24 @@ export function competitionRegion(comp: Competition): ContinentalRegion {
  */
 export function competitionTitlePlayoff(comp: Competition): TitlePlayoffFormat {
   if (comp.tier !== 1) return "none";
-  return comp.titlePlayoff ?? COUNTRY_TITLE_PLAYOFF[comp.country] ?? "none";
+  const format = comp.titlePlayoff ?? COUNTRY_TITLE_PLAYOFF[comp.country] ?? "none";
+  // Both split formats seed per half, so a division that isn't split plays a
+  // plain bracket instead of one with nothing to seed from.
+  if ((format === "conference" || format === "zones") && !competitionConferences(comp)) return "single";
+  return format;
+}
+
+/**
+ * The two halves this division plays its schedule in, or null for a single
+ * table. Top flights only (the shipped splits are all top flights, and a lower
+ * division's promotion race wants one table), and only for a division big enough
+ * to have two halves of at least two clubs.
+ */
+export function competitionConferences(comp: Competition): ConferenceFormat | null {
+  if (comp.tier !== 1) return null;
+  const format = comp.conferences ?? COUNTRY_CONFERENCES[comp.country] ?? null;
+  if (!format || competitionTeamCount(comp) < 4) return null;
+  return format;
 }
 
 /** This league's money multiplier, before the tier scale. See Competition.budgetScale. */
@@ -433,10 +458,11 @@ export function worldCompetitions(): Competition[] {
     { id: 36, country: "Brazil", tier: 1, name: "Brazilian Division 1", promotionSpots: 4 },
     { id: 37, country: "Brazil", tier: 2, name: "Brazilian Division 2", promotionSpots: 4 },
     { id: 38, country: "Brazil", tier: 3, name: "Brazilian Division 3", promotionSpots: 4 },
-    // Argentina: capped at 20 (the real Liga Profesional is 30, which the
-    // 38-matchday calendar cannot seat), two up and down, and the title decided
-    // by a knockout the way each of its tournaments ends (COUNTRY_TITLE_PLAYOFF).
-    { id: 39, country: "Argentina", tier: 1, name: "Argentine Division 1", promotionSpots: 2 },
+    // Argentina: the Liga Profesional's real 30, split into two zones of 15
+    // (COUNTRY_CONFERENCES) so the season fits the 38-matchday calendar, two up
+    // and down on the overall table, and the title decided by a cross-zone
+    // knockout the way each of its tournaments ends (COUNTRY_TITLE_PLAYOFF).
+    { id: 39, country: "Argentina", tier: 1, name: "Argentine Division 1", teamCount: 30, promotionSpots: 2 },
     { id: 40, country: "Argentina", tier: 2, name: "Argentine Division 2", promotionSpots: 2 },
     { id: 41, country: "Argentina", tier: 3, name: "Argentine Division 3", promotionSpots: 2 },
     // Mexico: CLOSED — Liga MX abolished promotion and relegation in 2026 — with
@@ -444,9 +470,11 @@ export function worldCompetitions(): Competition[] {
     { id: 42, country: "Mexico", tier: 1, name: "Mexican Division 1", teamCount: 18, promotionSpots: 0 },
     { id: 43, country: "Mexico", tier: 2, name: "Mexican Division 2", teamCount: 16, promotionSpots: 0 },
     { id: 44, country: "Mexico", tier: 3, name: "Mexican Division 3", teamCount: 16, promotionSpots: 0 },
-    // United States: CLOSED like MLS, whose real 30 clubs are capped at 20, with
-    // a playoff for the title. The divisions below stand in for the USL.
-    { id: 45, country: "United States", tier: 1, name: "US Division 1", promotionSpots: 0 },
+    // United States: CLOSED like MLS, with its real 30 clubs in Eastern and
+    // Western Conferences of 15 (COUNTRY_CONFERENCES, clubs placed by geography)
+    // and a per-conference playoff for the title. The divisions below stand in
+    // for the USL.
+    { id: 45, country: "United States", tier: 1, name: "US Division 1", teamCount: 30, promotionSpots: 0 },
     { id: 46, country: "United States", tier: 2, name: "US Division 2", promotionSpots: 0 },
     { id: 47, country: "United States", tier: 3, name: "US Division 3", teamCount: 16, promotionSpots: 0 },
   ];

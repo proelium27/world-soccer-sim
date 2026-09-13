@@ -757,10 +757,13 @@ export function LeagueSettings({
               // data one. The unused ones are harmless on a shallower pyramid:
               // buildCompetitions only reads as many as `divisions` asks for.
               const n = Number(e.target.value);
-              onSpec({ d1Teams: n, d2Teams: n, d3Teams: n });
+              // Past the single-table ceiling only a top flight split into
+              // conferences fits (MLS's and Argentina's 30), so that size
+              // applies to the top flight alone.
+              onSpec(n > MAX_DIVISION_TEAMS ? { d1Teams: n } : { d1Teams: n, d2Teams: n, d3Teams: n });
             }}
           >
-            {DIVISION_SIZES.map((n) => (
+            {(resolved.d1Teams > MAX_DIVISION_TEAMS ? [...DIVISION_SIZES, resolved.d1Teams] : DIVISION_SIZES).map((n) => (
               <option key={n} value={n}>{n}</option>
             ))}
           </select>

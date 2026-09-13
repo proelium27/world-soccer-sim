@@ -157,9 +157,10 @@ describe("countryClubRanges", () => {
       { country: "Serbia", start: 578, end: 626 },
       // The Americas are appended, so every European block above is unchanged.
       { country: "Brazil", start: 626, end: 686 },
-      { country: "Argentina", start: 686, end: 746 },
-      { country: "Mexico", start: 746, end: 796 },
-      { country: "United States", start: 796, end: 852 },
+      // Argentina and the US field 30 in their top flights, split in two.
+      { country: "Argentina", start: 686, end: 756 },
+      { country: "Mexico", start: 756, end: 806 },
+      { country: "United States", start: 806, end: 872 },
     ]);
   });
 });

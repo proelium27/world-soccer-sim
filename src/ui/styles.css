@@ -523,6 +523,12 @@ a:hover {
 .champion-highlight > td {
   box-shadow: inset 0 0 0 9999px var(--sg-warn-wash);
 }
+/* A split league's conference table: a rule under the last club that makes the
+   title playoff. A border rather than a wash, because the row background already
+   carries your club and the champion. */
+.playoff-cut > td {
+  border-bottom: 2px dashed var(--bs-border-color);
+}
 .row-win > td {
   box-shadow: inset 0 0 0 9999px var(--sg-win-wash);
 }

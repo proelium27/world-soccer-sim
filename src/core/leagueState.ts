@@ -26,8 +26,8 @@ import type { NationalManagerState } from "./nationalManager/types.js";
 import { emptyNationalManagerState } from "./nationalManager/types.js";
 import { generateWorld } from "./league/generate.js";
 import { assignIdentities, assignAIFormations } from "./teams/clubs.js";
-import { generateSchedule } from "./schedule.js";
-import { SEASON_MATCHDAYS } from "./calendar.js";
+import { buildCompetitionSchedule } from "./schedule.js";
+import { assignConferences } from "./conferences.js";
 import { worldCompetitions } from "./competitions.js";
 import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
 import {
@@ -39,45 +39,8 @@ import { isSpectatorTid } from "./spectator.js";
 export type { StoredTeam } from "./teams/clubs.js";
 export type { ScheduleGame } from "./schedule.js";
 
-/** One competition's worth of fixtures per competition, concatenated — shared by createLeagueState and any test/tooling code that assembles a LeagueStore from a League + competitions table by hand. */
-export function buildCompetitionSchedule(
-  teams: Pick<StoredTeam, "tid" | "compId">[],
-  competitions: Competition[],
-): ScheduleGame[] {
-  return competitions.flatMap((comp) => {
-    const fixtures = generateSchedule(
-      teams.filter((t) => t.compId === comp.id).map((t) => t.tid),
-    );
-    return spreadOverSeason(fixtures);
-  });
-}
-
-/**
- * Stretch a competition's rounds across the fixed SEASON_MATCHDAYS grid, so a
- * division of any size still starts near matchday 1 and finishes on the last
- * one, taking blank matchdays in between.
- *
- * A 20-club division plays 38 rounds and maps one-to-one, so **the shipped world
- * is untouched** — round r keeps matchday r. A 16-club division plays 30 rounds
- * and sits them at 1, 3, 4, 5, 6, 8 … 38.
- *
- * Spreading rather than letting a short season simply end early is what keeps
- * the rest of the calendar meaningful for it: the winter window still opens
- * mid-season, deadline day still falls with games left to play, and its run-in
- * still lines up with the continental finals. Blank matchdays are also why
- * injuries and bans have to tick per club that actually played (see
- * simThrough), not once per matchday for everyone.
- */
-function spreadOverSeason(fixtures: ScheduleGame[]): ScheduleGame[] {
-  const rounds = fixtures.length === 0
-    ? 0
-    : Math.max(...fixtures.map((g) => g.matchday));
-  if (rounds === 0 || rounds === SEASON_MATCHDAYS) return fixtures;
-  return fixtures.map((g) => ({
-    ...g,
-    matchday: Math.round((g.matchday * SEASON_MATCHDAYS) / rounds),
-  }));
-}
+/** Every competition's season, concatenated. Lives in schedule.ts; re-exported for the callers that always imported it from here. */
+export { buildCompetitionSchedule } from "./schedule.js";
 
 export interface LeagueStore {
   lid: number;
@@ -482,9 +445,11 @@ export function createLeagueState(
   const league = generateWorld(rng, seed, competitions, progressionModel);
   // Each AI club lines up in the formation that fields its strongest XI; the
   // user's club keeps the neutral 4-3-3 default and picks its own on the Roster page.
-  const teams = assignAIFormations(
+  // Each club in a split top flight is given its conference here, so it keeps
+  // it from season to season (see core/conferences.ts).
+  const teams = assignConferences(assignAIFormations(
     assignIdentities(league, competitions, userTid, difficulty), league.players, userTid,
-  );
+  ), competitions);
   const schedule = buildCompetitionSchedule(teams, competitions);
 
   // Fog-of-war: stamp the user's initial senior roster as first-observed in
