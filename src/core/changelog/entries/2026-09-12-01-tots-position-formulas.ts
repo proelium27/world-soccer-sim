@@ -9,7 +9,8 @@ const entry: ChangelogEntry = {
     "Defenders and midfielders also get credit for tackles and interceptions, counted **per game** instead of added up over the season. A defence that spent all year under siege doesn't get extra credit just for being busy. It counts most for centre-backs, then full-backs and holding midfielders, and a little for central midfielders.",
     "Keepers are judged on save percentage, meaning how many of the shots on target they faced they kept out. Goals conceded mostly measures the defence in front of a keeper, and making lots of saves usually just means facing lots of shots.",
     "I tested it over ten seasons, and a league's Player of the Season made its Team of the Season 99% of the time, up from 93%. There's still only one striker spot, though, so when a league has two brilliant strikers one of them misses out.",
-    "The World Team of the Year and the Goalkeeper and Defender of the Year use the same formulas, so they change too. Seasons you've already played keep the awards they had.",
+    "The World Team of the Year and the Goalkeeper and Defender of the Year use the same formulas, so they change too. Trophies also count the same in those three as they do in the Ballon d'Or now, instead of three times as much. Tripling them was handing Goalkeeper of the Year to whoever played for the club that won things, rather than to one of the best keepers in the world.",
+    "Seasons you've already played keep the awards they had.",
   ],
 };
 

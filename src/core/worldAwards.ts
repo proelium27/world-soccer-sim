@@ -415,11 +415,10 @@ function worldTotsParts(e: Entry, s: Scoring): WorldAwardEntry {
   const base = worldAwardParts(
     e, s, totsScore(e.player, e.stats, s.season), POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
   );
-  // Everything beyond his own league season counts for more here than it does
-  // in the Ballon d'Or, because this base is inflated by season-long counting
-  // stats that drown every other term. See WORLD_TOTS_TROPHY_MULTIPLIER — and
-  // note it is applied HERE, at the shared base, precisely so all three awards
-  // built on it stay in agreement about the same player.
+  // Everything beyond his own league season is scaled by
+  // WORLD_TOTS_TROPHY_MULTIPLIER (now 1, i.e. the Ballon d'Or's own weighting;
+  // see its history note). It is applied HERE, at the shared base, precisely so
+  // all three awards built on it stay in agreement about the same player.
   const m = WORLD_TOTS_TROPHY_MULTIPLIER;
   const cup = base.cup * m;
   const intl = base.intl * m;

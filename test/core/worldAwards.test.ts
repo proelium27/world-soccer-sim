@@ -696,10 +696,10 @@ describe("position awards", () => {
     expect(worldTeamOfYear[0]).toBe(goalkeeperOfYear![0].pid);
     // The Ballon d'Or takes the league-strength scale on its trophies like
     // everything else — that scale belongs to the trophy, not to one award —
-    // but NOT the tots trophy multiplier, so it stays strictly the smaller.
+    // and the position awards take the trophy multiplier on top of it.
     const ballonTitle = ballonDOr.find((e) => e.pid === 1)!.title;
     expect(ballonTitle).toBeGreaterThan(0);
-    expect(goalkeeperOfYear![0].title).toBeGreaterThan(ballonTitle);
+    expect(goalkeeperOfYear![0].title).toBeCloseTo(ballonTitle * WORLD_TOTS_TROPHY_MULTIPLIER, 6);
   });
 
   it("applies the multiplier to the World XI as well, not just the two awards", () => {
@@ -775,10 +775,12 @@ describe("position awards", () => {
     const gap = noTrophies.goalkeeperOfYear!.find((e) => e.pid === 1)!.league
       - noTrophies.goalkeeperOfYear!.find((e) => e.pid === 2)!.league;
 
-    // The gap is wider than an unmultiplied title, so at Ballon d'Or weight the
-    // trophy would NOT have been enough. That is the whole reason the
-    // multiplier exists, and pinning it is what stops the fixture drifting into
-    // a gap so small the test would pass without any multiplier at all.
+    // The gap is wider than the bare title bonus, so the title only overturns
+    // it because a title won in a strong league is scaled up
+    // (WORLD_AWARD_TROPHY_STRENGTH_WEIGHT; both keepers play in the stronger
+    // competition here). Pinning the gap stops the fixture drifting into one so
+    // small that any title would overturn it. The trophy multiplier is 1, so it
+    // plays no part.
     expect(gap).toBeGreaterThan(WORLD_AWARD_LEAGUE_TITLE_BONUS);
 
     const champion = computeWorldAwards(players, SEASON, ctx({ championTidByCompId: { 0: 1 } }));

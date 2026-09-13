@@ -3344,7 +3344,20 @@ export const WORLD_POSITION_AWARD_SHORTLIST = 5;
  * same page. **A correction that belongs to a shared base has to be applied at
  * the base, or the things built on it quietly stop agreeing.**
  */
-export const WORLD_TOTS_TROPHY_MULTIPLIER = 3;
+/*
+ * **Now 1 (2026-09-13, user call), i.e. the Ballon d'Or's own weighting; the
+ * note above is the record of why it was 3.** The dilution it corrected came
+ * from counting tackles and interceptions as season totals, and the Team of the
+ * Season formula now counts them per game (TOTS_POSITION_WORK), so the base is no
+ * longer inflated. At 3 on the new base the trophies started deciding the award:
+ * measured over 4 seeds × 5 seasons (scripts/totsWeightProbe.ts), on identical
+ * worlds since this constant feeds no sim state, the Goalkeeper of the Year
+ * winner's ovr rank among the world's keepers read median 10 / mean 15.2 / worst
+ * 57 at 3, against 6 / 9.6 / 43 at 1; Defender of the Year 9 / 23.1 / 100 against
+ * 7 / 15.2 / 68. Every winner of both awards still came from the big four at 1
+ * (16/16), so the weak-league drift it was introduced to stop does not return.
+ */
+export const WORLD_TOTS_TROPHY_MULTIPLIER = 1;
 
 /**
  * How much a league title and a domestic cup are scaled by how strong the

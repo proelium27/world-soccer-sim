@@ -1919,27 +1919,26 @@ export function Manual() {
             your country, your league title, your domestic cup.
           </p>
           <p>
-            Those extras count for three times as much here as they do in the Ballon d'Or. That was
-            set back when defending was still added up over a whole season, and a defender's raw
-            totals were big enough to drown out everything else. Defending is counted per game now,
-            so the totals no longer swamp the score, but trophies still weigh more in these two
-            awards than they do in the Ballon d'Or.
+            Those extras count exactly as much here as they do in the Ballon d'Or. They used to count
+            three times as much, back when defending was added up over a whole season and a
+            defender's raw totals were big enough to drown out everything else. Defending is counted
+            per game now, so that stopped being needed, and tripling trophies had started handing the
+            award to whichever keeper played for the club that won things rather than the best keeper.
           </p>
           <p>
-            It has a second effect that's worth knowing about, because it's the reason the defender
-            award stopped drifting to weak leagues. Two of those extras &mdash; the Continental Cup
-            and your summer with your country &mdash; are the only parts of the whole calculation
-            that put players from different leagues against each other directly, and a club from a
-            weak league rarely goes deep in the cup. Turning them up pulls the award towards the
-            stronger leagues on its own. Your league title and your domestic cup don't help with
-            that at all, since every league crowns a champion regardless of how good it is.
+            Two of those extras &mdash; the Continental Cup and your summer with your country
+            &mdash; are the only parts of the whole calculation that put players from different
+            leagues against each other directly, and a club from a weak league rarely goes deep in
+            the cup. That, plus the league-strength correction, is what stops these two awards
+            drifting to weak leagues. Your league title and your domestic cup don't help with that
+            at all, since every league crowns a champion regardless of how good it is.
           </p>
           <p>
-            The World Team of the Year is scored the same way, trophies and all, because it's built
-            on the same numbers and had the same problem. So the three agree with each other: the
-            Goalkeeper of the Year is the keeper in that XI, and the Defender of the Year is in its
-            back four. The Ballon d'Or is the one that stands apart, since it's scored on goals and
-            assists rather than on defending, and it keeps its own trophy weighting.
+            The World Team of the Year is scored the same way, trophies and all. So the three agree
+            with each other: the Goalkeeper of the Year is the keeper in that XI, and the Defender
+            of the Year is in its back four. The Ballon d'Or is the one that stands apart, since
+            it's scored on goals and assists rather than on defending, but a trophy is worth the
+            same in all four.
           </p>
           <p>
             One thing worth knowing about how the defender's award reads. Tackles and interceptions
