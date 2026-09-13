@@ -353,6 +353,26 @@ export function competitionConferences(comp: Competition): ConferenceFormat | nu
   return format;
 }
 
+/**
+ * League games each club in this division plays in a season. A double round
+ * robin, 2(n-1), for a single table; for a split one, its own half twice plus
+ * the rival (an odd half) and the extra cross rounds — MLS's 34, Argentina's 30.
+ *
+ * Must agree with `conferenceSchedule`, which is what actually builds the games;
+ * `conferences.test.ts` pins the two together. Anything that prices a season by
+ * its length (a transfer's appearance bonus, say) reads this rather than
+ * assuming a double round robin, which reads a 30-club split league as 58.
+ */
+export function competitionSeasonGames(comp: Competition): number {
+  const n = competitionTeamCount(comp);
+  const split = competitionConferences(comp);
+  if (!split) return 2 * (n - 1);
+  const half = Math.floor(n / 2);
+  const odd = half % 2 === 1;
+  const own = odd ? 2 * half : 2 * (half - 1);
+  return own + Math.min(split.crossRounds, half - (odd ? 1 : 0));
+}
+
 /** This league's money multiplier, before the tier scale. See Competition.budgetScale. */
 export function competitionBudgetScale(comp: Competition): number {
   return comp.budgetScale ?? COUNTRY_BUDGET_SCALE[comp.country] ?? 1;

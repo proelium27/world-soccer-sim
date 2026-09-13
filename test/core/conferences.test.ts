@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   worldCompetitions, competitionConferences, competitionTeamCount, competitionTitlePlayoff,
-  type Competition,
+  competitionSeasonGames, type Competition,
 } from "../../src/core/competitions.js";
 import { buildCompetitionSchedule, conferenceSchedule, type ScheduleGame } from "../../src/core/schedule.js";
 import { conferenceMembers, assignConferences, type ConferenceTeam } from "../../src/core/conferences.js";
@@ -134,6 +134,17 @@ describe("buildCompetitionSchedule on the shipped world", () => {
   const comps = worldCompetitions();
   const teams = worldTeams(comps);
   const schedule = buildCompetitionSchedule(teams, comps);
+
+  it("plays exactly the season length competitionSeasonGames reports, in every division", () => {
+    for (const c of comps) {
+      const games = schedule.filter((g) => teams.find((t) => t.tid === g.home)!.compId === c.id);
+      expect(games.length * 2, c.name).toBe(competitionTeamCount(c) * competitionSeasonGames(c));
+    }
+    const us = comps.find((c) => c.country === "United States" && c.tier === 1)!;
+    const arg = comps.find((c) => c.country === "Argentina" && c.tier === 1)!;
+    expect(competitionSeasonGames(us)).toBe(34);
+    expect(competitionSeasonGames(arg)).toBe(30);
+  });
 
   it("fits every division inside the calendar, finishing on the last matchday", () => {
     for (const c of comps) {
