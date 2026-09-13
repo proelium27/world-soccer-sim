@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-12",
+  date: "2026-09-13",
   title: "Tell the game which jobs you want",
   items: [
     "Up to now the only way into a job was to wait for someone to offer it. If you wanted the biggest club in the world, you had to hope they called. If you'd won everything and wanted to go back to the little third-division club you started at, you couldn't, because nobody offers you a step down while you're in a job.",
