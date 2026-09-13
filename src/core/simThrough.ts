@@ -38,6 +38,7 @@ import { clampBudget, financeScaleFor, domesticCupScaleFor } from "./finance/bud
 import { initInternationalCampaign } from "./international/index.js";
 import { reviewSeason, tablesByCompetition } from "./manager/index.js";
 import { playPromotionPlayoffs } from "./promotionPlayoff.js";
+import { playTitlePlayoffs } from "./titlePlayoff.js";
 import { POWER_SNAPSHOT_INTERVAL, INTL_FIELD_SIZE } from "./constants.js";
 import { pointsDeductionMap } from "./finance/debt.js";
 
@@ -649,16 +650,26 @@ export function simThrough(
   // a league that never came through here, which is how headless callers get
   // the same world the game does.
   const allPlayed = [...league.played, ...newResults];
-  const promotionPlayoffs = enteringOffseason
+  const finalTables = enteringOffseason
+    ? tablesByCompetition(
+      currentTeams, league.competitions, allPlayed,
+      pointsDeductionMap(league.debtSanctions, league.season),
+    )
+    : null;
+  const promotionPlayoffs = finalTables
     ? playPromotionPlayoffs(
-      league.competitions, currentTeams, currentPlayers,
-      tablesByCompetition(
-        currentTeams, league.competitions, allPlayed,
-        pointsDeductionMap(league.debtSanctions, league.season),
-      ),
+      league.competitions, currentTeams, currentPlayers, finalTables,
       league.lid, league.season,
     )
     : league.promotionPlayoffs;
+  // And the title playoffs, at the same moment and for the same reasons — the
+  // board should know who won the league before it judges the season.
+  const titlePlayoffs = finalTables
+    ? playTitlePlayoffs(
+      league.competitions, currentTeams, currentPlayers, finalTables,
+      league.lid, league.season,
+    )
+    : (league.titlePlayoffs ?? []);
 
   // Same boundary, same reasoning: the board reviews the season the moment it
   // ends, so a sacking or a job offer is answered *before* the offseason runs
@@ -675,6 +686,7 @@ export function simThrough(
       americasCup,
       domesticCups,
       promotionPlayoffs,
+      titlePlayoffs,
     }).manager
     : league.manager;
 
@@ -698,6 +710,7 @@ export function simThrough(
     americasCup,
     domesticCups,
     promotionPlayoffs,
+    titlePlayoffs,
     superCups,
   };
 }

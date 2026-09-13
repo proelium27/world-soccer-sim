@@ -47,6 +47,7 @@ import { computeCountrySwaps, applyCompetitionSwaps, stepAcademyBaseConvergence 
 import {
   playPromotionPlayoffs, playoffOutcomes, playoffsForSeason,
 } from "./promotionPlayoff.js";
+import { playTitlePlayoffs, titlePlayoffsForSeason, titleChampions } from "./titlePlayoff.js";
 import { generateSchedule } from "./schedule.js";
 import { updateHype } from "./finance/hype.js";
 import {
@@ -236,6 +237,17 @@ export function simOffseasonReporting(
   const promotionPlayoffs = playedPlayoffs.length > 0
     ? playedPlayoffs
     : playPromotionPlayoffs(
+      league.competitions, league.teams, league.players, tablesByCompId,
+      league.lid, endingSeason,
+    );
+
+  // Title playoffs, on exactly the same terms: normally already played at the
+  // season boundary, replayed here for a caller that skipped it. Their winners
+  // become the season's champions at step 3.5.
+  const playedTitles = titlePlayoffsForSeason(league.titlePlayoffs, endingSeason);
+  const titlePlayoffs = playedTitles.length > 0
+    ? playedTitles
+    : playTitlePlayoffs(
       league.competitions, league.teams, league.players, tablesByCompId,
       league.lid, endingSeason,
     );
@@ -464,8 +476,14 @@ export function simOffseasonReporting(
   const standings = league.competitions.flatMap((comp) => tablesByCompId.get(comp.id)!);
   const teamStats =
     precomputedTeamStats ?? computeTeamSeasonStats(teams.map((t) => t.tid), league.played);
+  // A top flight's champion is its title playoff's winner where it holds one,
+  // else whoever topped the table. This is the one fact a title playoff moves;
+  // everything above and below this line still reads the table.
+  const titleWinners = titleChampions(titlePlayoffs);
   const championTidByCompId: Record<number, number> = Object.fromEntries(
-    league.competitions.filter((c) => c.tier === 1).map((c) => [c.id, tablesByCompId.get(c.id)![0].tid]),
+    league.competitions.filter((c) => c.tier === 1).map((c) => [
+      c.id, titleWinners.get(c.id) ?? tablesByCompId.get(c.id)![0].tid,
+    ]),
   );
 
   // 3.6. Worldwide honors — the Ballon d'Or ranking and the World Team of the
@@ -525,6 +543,7 @@ export function simOffseasonReporting(
     // world holds none, so a save that never plays one carries no empty arrays
     // through its whole history.
     promotionPlayoffs: promotionPlayoffs.length > 0 ? promotionPlayoffs : undefined,
+    titlePlayoffs: titlePlayoffs.length > 0 ? titlePlayoffs : undefined,
     // The super cups that *opened* this season, moved off the live field now
     // that it is about to be reseeded for the next one. Unlike every other
     // record on this entry these describe the season's first day rather than
@@ -1239,6 +1258,7 @@ export function simOffseasonReporting(
     // Holding both would keep a second copy of every scoreline for a whole
     // season and mean two places the page could read a different answer from.
     promotionPlayoffs: [],
+    titlePlayoffs: [],
     nextPid,
     retiredPlayers,
     // Assembled at step 3.66, where the farewell list is also scored against

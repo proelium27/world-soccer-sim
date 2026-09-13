@@ -15,6 +15,7 @@ import type { Competition } from "./competitions.js";
 import type { CupState } from "./cup/types.js";
 import type { DomesticCupState } from "./domesticCup/types.js";
 import type { PromotionPlayoff } from "./promotionPlayoff.js";
+import type { TitlePlayoff } from "./titlePlayoff.js";
 import type { SuperCupTie } from "./superCup/types.js";
 import { buildDomesticCups } from "./domesticCup/cup.js";
 import type { InternationalState } from "./international/types.js";
@@ -278,6 +279,14 @@ export interface LeagueStore {
    */
   promotionPlayoffs: PromotionPlayoff[];
   /**
+   * The title playoffs decided by the season that just ended — transient in
+   * exactly the way `promotionPlayoffs` is, and for the same reason: filled at
+   * the season boundary, copied onto that season's history entry and emptied by
+   * the offseason. Optional so a fixture written before them still typechecks.
+   * See core/titlePlayoff.ts.
+   */
+  titlePlayoffs?: TitlePlayoff[];
+  /**
    * This preseason's super cups — one per country between its league champions
    * and its domestic cup winners, plus the one worldwide match between the
    * Continental Cup and Shield winners.
@@ -533,6 +542,7 @@ export function createLeagueState(
     domesticCups: buildDomesticCups(competitions, teams, new Map(), 1),
     domesticCupHistory: [],
     promotionPlayoffs: [],
+    titlePlayoffs: [],
     // Season 1 has no super cups: nothing has been won yet to contest one.
     superCups: [],
     debtSanctions: [],

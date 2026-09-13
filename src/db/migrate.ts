@@ -764,6 +764,9 @@ function migrateFields(league: LeagueStore): LeagueStore {
     // them would be inventing results. A save mid-season picks its first
     // playoff up when that season ends. See core/promotionPlayoff.ts.
     promotionPlayoffs: anyVersion.promotionPlayoffs ?? [],
+    // Title playoffs, on the same terms: empty outside the one offseason window
+    // that holds them, and never invented for a season already decided.
+    titlePlayoffs: anyVersion.titlePlayoffs ?? [],
     // Same one-way reasoning as the playoffs above: a season that opened before
     // super cups existed did not play one, so an old save picks its first up at
     // its next rollover rather than having one invented for a preseason that is
