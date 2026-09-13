@@ -16,6 +16,8 @@ import {
   MANAGER_OFFER_FORM_WEIGHT,
   MANAGER_OFFER_MAX_CHANCE,
   MANAGER_SACKED_PRESTIGE_PENALTY,
+  MANAGER_INTEREST_CHANCE,
+  MANAGER_INTEREST_MAX_CHANCE,
   MANAGER_REP_BASE,
   MANAGER_REP_TITLE_WEIGHT,
   MANAGER_REP_TROPHY_WEIGHT,
@@ -28,6 +30,51 @@ import type { ClubExpectation } from "./expectation.js";
 import type { JobOffer, ManagerStint } from "./types.js";
 
 const MANAGER_OFFER_STREAM = 970;
+/**
+ * Rolls for the clubs the user has asked about. Its own stream, and keyed per
+ * club, so an interest list neither shifts the ordinary offer draws (a save with
+ * no interests gets exactly the list it always did) nor depends on the order the
+ * clubs were picked in.
+ */
+const MANAGER_INTEREST_STREAM = 972;
+
+/**
+ * How realistic a job you've asked about is, [0,1].
+ *
+ * A job at or below your level is 1: a club is always glad of a manager better
+ * than it could normally get, which is the whole point for someone who wants to
+ * drop down to a small club they care about. Above your level it fades to 0 at
+ * the top of the ordinary offer band, so asking can never reach a job the band
+ * itself would call out of reach — interest raises the odds, it doesn't open
+ * doors your record hasn't earned.
+ */
+export function interestReach(prestige: number, target: number, band: number): number {
+  if (prestige <= target) return 1;
+  // Snap float dust at the band edge to 0 — `0.7 - 0.5` is not `0.2`, and a
+  // job exactly on the edge must read "out of reach", not a 1e-16 long shot.
+  const reach = 1 - (prestige - target) / band;
+  return reach < 1e-9 ? 0 : reach;
+}
+
+/**
+ * The prestige a manager is matched against: the bigger of reputation and the
+ * current job, a rung lower after a sacking. Exported so the Manager page can
+ * say how realistic an interest is using the same number offers are drawn with.
+ */
+export function clubOfferTarget(
+  reputation: number,
+  currentPrestige: number,
+  sacked: boolean,
+): number {
+  return Math.min(
+    1,
+    Math.max(
+      0,
+      Math.max(reputation / 100, currentPrestige)
+      - (sacked ? MANAGER_SACKED_PRESTIGE_PENALTY : 0),
+    ),
+  );
+}
 
 /**
  * A manager's standing in the game, 0-100 — derived from the stint record, never
@@ -104,6 +151,42 @@ export interface OfferInputs {
   lastOverperformance: number;
   /** Promotion/relegation about to be applied, so an offer names the right division. */
   moves?: OfferMoves;
+  /** Clubs the user has asked about (`ManagerState.interests`). */
+  interests?: number[];
+}
+
+/**
+ * The clubs the user asked about that come calling this offseason. Each rolls
+ * once at `MANAGER_INTEREST_CHANCE` scaled by `interestReach`, which ignores the
+ * step-up filter entirely — asking for a smaller job is exactly the case the
+ * ordinary list can never produce.
+ *
+ * A bad season doesn't make the ask worthless (it's already paid for in the
+ * reputation behind `target`), so only a good one moves the chance, upward.
+ */
+function interestedClubs(input: OfferInputs, target: number): ClubExpectation[] {
+  const chance = Math.min(
+    MANAGER_INTEREST_MAX_CHANCE,
+    MANAGER_INTEREST_CHANCE + Math.max(0, input.lastOverperformance) * MANAGER_OFFER_FORM_WEIGHT,
+  );
+  const out: ClubExpectation[] = [];
+  for (const tid of new Set(input.interests ?? [])) {
+    if (tid === input.currentTid) continue;
+    const club = input.expectations.get(tid);
+    if (!club) continue;
+    const reach = interestReach(club.prestige, target, MANAGER_OFFER_BAND);
+    if (reach <= 0) continue;
+    const roll = mulberry32(hashInts(input.lid, input.season, MANAGER_INTEREST_STREAM, tid))();
+    if (roll < chance * reach) out.push(club);
+  }
+  return out;
+}
+
+/** Clubs that answered an interest first, then the ordinary list, capped. */
+function withInterests(interested: ClubExpectation[], ordinary: ClubExpectation[]): ClubExpectation[] {
+  const taken = new Set(interested.map((e) => e.tid));
+  return [...interested, ...ordinary.filter((e) => !taken.has(e.tid))]
+    .slice(0, Math.max(MANAGER_MAX_OFFERS, interested.length));
 }
 
 /**
@@ -142,14 +225,8 @@ export function generateJobOffers(input: OfferInputs): JobOffer[] {
   // A sacking is "a rung down" from where you were, so the penalty applies to
   // the centred target rather than to reputation in isolation — measuring the
   // drop against reputation is the same category error the band had.
-  const target = Math.min(
-    1,
-    Math.max(
-      0,
-      Math.max(input.reputation / 100, currentPrestige)
-      - (sacked ? MANAGER_SACKED_PRESTIGE_PENALTY : 0),
-    ),
-  );
+  const target = clubOfferTarget(input.reputation, currentPrestige, sacked);
+  const interested = interestedClubs(input, target);
 
   const others = [...expectations.values()].filter((e) => e.tid !== currentTid);
   const byCloseness = (a: ClubExpectation, b: ClubExpectation): number =>
@@ -173,8 +250,9 @@ export function generateJobOffers(input: OfferInputs): JobOffer[] {
     // fall back to whichever clubs sit closest to the target if the band and
     // the step-down filter between them left nothing.
     if (pool.length === 0) pool = [...others].sort(byCloseness);
-    return shuffled(pool.slice(0, MANAGER_MAX_OFFERS * 3), rng)
-      .slice(0, MANAGER_MAX_OFFERS)
+    const ordinary = shuffled(pool.slice(0, MANAGER_MAX_OFFERS * 3), rng)
+      .slice(0, MANAGER_MAX_OFFERS);
+    return withInterests(interested, ordinary)
       .sort((a, b) => b.prestige - a.prestige)
       .map((e) => toOffer(e, moves));
   }
@@ -189,5 +267,7 @@ export function generateJobOffers(input: OfferInputs): JobOffer[] {
     if (offers.length >= MANAGER_MAX_OFFERS) break;
     if (rng() < chance) offers.push(club);
   }
-  return offers.sort((a, b) => b.prestige - a.prestige).map((e) => toOffer(e, moves));
+  return withInterests(interested, offers)
+    .sort((a, b) => b.prestige - a.prestige)
+    .map((e) => toOffer(e, moves));
 }

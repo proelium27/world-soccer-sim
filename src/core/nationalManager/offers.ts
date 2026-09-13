@@ -19,6 +19,8 @@ import {
   NATIONAL_OFFER_FORM_WEIGHT,
   NATIONAL_OFFER_MAX_CHANCE,
   NATIONAL_SACKED_PRESTIGE_PENALTY,
+  NATIONAL_INTEREST_CHANCE,
+  NATIONAL_INTEREST_MAX_CHANCE,
   NATIONAL_REP_BASE,
   NATIONAL_REP_TITLE_WEIGHT,
   NATIONAL_REP_CONTINENTAL_WEIGHT,
@@ -28,11 +30,49 @@ import {
   NATIONAL_REP_CAMPAIGN_CAP,
   NATIONAL_REP_SACKING_PENALTY,
 } from "../constants.js";
+import { interestReach } from "../manager/jobOffers.js";
 import type { NationExpectation } from "./expectation.js";
 import type { NationOffer, NationalStint } from "./types.js";
 
 /** Distinct from MANAGER_OFFER_STREAM (970), so the two offer lists can't correlate. */
 const NATIONAL_OFFER_STREAM = 971;
+/** Rolls for countries the user asked about; the club side's 972 reasoning, one stream along. */
+const NATIONAL_INTEREST_STREAM = 973;
+
+/** A stable integer for a nation name, so its interest roll is keyed by nation rather than list order. */
+function nationKey(nation: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < nation.length; i++) {
+    h = Math.imul(h ^ nation.charCodeAt(i), 16777619) >>> 0;
+  }
+  return h;
+}
+
+/**
+ * The prestige a manager is matched against by federations: the biggest of
+ * international reputation, the discounted club reputation and the current
+ * nation, a rung lower after a dismissal. Exported so the UI can quote how
+ * realistic an interest is off the same number.
+ */
+export function nationOfferTarget(
+  reputation: number,
+  clubReputation: number,
+  currentPrestige: number,
+  sacked: boolean,
+): number {
+  return Math.min(
+    1,
+    Math.max(
+      0,
+      Math.max(
+        reputation / 100,
+        (clubReputation / 100) * NATIONAL_OFFER_CLUB_REP_WEIGHT,
+        currentPrestige,
+      )
+      - (sacked ? NATIONAL_SACKED_PRESTIGE_PENALTY : 0),
+    ),
+  );
+}
 
 /**
  * A manager's standing in the international game, 0-100 — derived from the
@@ -96,6 +136,8 @@ export interface NationOfferInputs {
   clubReputation: number;
   /** Last campaign's placement-versus-expectation — a good tournament gets you noticed. */
   lastOverperformance: number;
+  /** Countries the user has asked about (`NationalManagerState.interests`). */
+  interests?: string[];
 }
 
 /**
@@ -136,18 +178,29 @@ export function generateNationOffers(input: NationOfferInputs): NationOffer[] {
   const currentPrestige = current?.prestige ?? 0;
   const employed = currentNation !== null;
 
-  const target = Math.min(
-    1,
-    Math.max(
-      0,
-      Math.max(
-        input.reputation / 100,
-        (input.clubReputation / 100) * NATIONAL_OFFER_CLUB_REP_WEIGHT,
-        currentPrestige,
-      )
-      - (sacked ? NATIONAL_SACKED_PRESTIGE_PENALTY : 0),
-    ),
+  const target = nationOfferTarget(
+    input.reputation, input.clubReputation, currentPrestige, sacked,
   );
+
+  // Countries the user asked about roll first, on their own stream, and ignore
+  // the step-up filter: wanting a smaller country is exactly the ask the
+  // ordinary list can never answer. See the club side's `interestedClubs`.
+  const interestChance = Math.min(
+    NATIONAL_INTEREST_MAX_CHANCE,
+    NATIONAL_INTEREST_CHANCE + Math.max(0, input.lastOverperformance) * NATIONAL_OFFER_FORM_WEIGHT,
+  );
+  const interested: NationExpectation[] = [];
+  for (const name of new Set(input.interests ?? [])) {
+    if (name === currentNation) continue;
+    const e = expectations.get(name);
+    if (!e) continue;
+    const reach = interestReach(e.prestige, target, NATIONAL_OFFER_BAND);
+    if (reach <= 0) continue;
+    const roll = mulberry32(
+      hashInts(input.lid, input.season, NATIONAL_INTEREST_STREAM, nationKey(name)),
+    )();
+    if (roll < interestChance * reach) interested.push(e);
+  }
 
   const others = [...expectations.values()].filter((e) => e.nation !== currentNation);
   const byCloseness = (a: NationExpectation, b: NationExpectation): number =>
@@ -176,5 +229,9 @@ export function generateNationOffers(input: NationOfferInputs): NationOffer[] {
     if (offers.length >= NATIONAL_MAX_OFFERS) break;
     if (rng() < chance) offers.push(nation);
   }
-  return offers.sort((a, b) => a.rank - b.rank).map(toOffer);
+  const taken = new Set(interested.map((e) => e.nation));
+  return [...interested, ...offers.filter((e) => !taken.has(e.nation))]
+    .slice(0, Math.max(NATIONAL_MAX_OFFERS, interested.length))
+    .sort((a, b) => a.rank - b.rank)
+    .map(toOffer);
 }

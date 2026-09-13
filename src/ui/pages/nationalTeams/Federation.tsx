@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useLeague } from "../../context/LeagueContext.js";
 import { seasonYear, ordinal } from "../../format.js";
 import { confidenceMood, confidenceLabel } from "../../../core/manager/confidence.js";
@@ -123,7 +123,12 @@ export function NTFederation() {
     <div className="card mb-2" key={offer.nation}>
       <div className="card-body d-flex align-items-center gap-3">
         <div className="flex-grow-1">
-          <div className="fw-semibold"><NationName nation={offer.nation} /></div>
+          <div className="fw-semibold">
+            <NationName nation={offer.nation} />
+            {state.interests?.includes(offer.nation) && (
+              <span className="badge bg-primary ms-2">You asked about them</span>
+            )}
+          </div>
           <div className="text-muted small">{offer.confederation || "Unaffiliated"}</div>
           <div className="text-muted small">
             {ordinal(offer.rank)} of {offer.nations} nations by the players available to them
@@ -259,6 +264,10 @@ export function NTFederation() {
       {state.lastVerdict && <LastCampaignPanel verdict={state.lastVerdict} />}
 
       <h5>{nation ? "Countries who want you" : "Countries willing to take you on"}</h5>
+      <p className="text-muted small">
+        Got a country in mind? Pick it under Jobs you'd like on the{" "}
+        <Link to="/manager">Manager</Link> page and it gets its own chance to call each summer.
+      </p>
       {state.offers.length === 0 ? (
         <p className="text-muted">
           Nobody's been in touch. Federations look around each summer, and a good club
