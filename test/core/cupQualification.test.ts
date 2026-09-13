@@ -219,7 +219,9 @@ describe("qualificationByTid", () => {
     expect(byTid.get(7)).toEqual({ competition: "continental", route: "holder" });
     expect(byTid.get(8)).toEqual({ competition: "shield", route: "domestic-cup" });
     expect(byTid.has(11)).toBe(false); // 12th qualifies for nothing
-    expect(byTid.size).toBe(CUP_LEAGUE_PHASE_SIZE + SHIELD_LEAGUE_PHASE_SIZE);
+    // Plus the Americas Cup's 16, which the same one-pass allocation fills from
+    // the American top flights alongside the two European competitions.
+    expect(byTid.size).toBe(CUP_LEAGUE_PHASE_SIZE + SHIELD_LEAGUE_PHASE_SIZE + 16);
   });
 });
 
