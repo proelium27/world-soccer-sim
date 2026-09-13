@@ -151,12 +151,18 @@ describe("Team of the Season: a formula per position", () => {
     expect(work(cm)).toBeGreaterThan(0);
   });
 
-  it("judges a keeper on goals conceded per game, not on saves", () => {
-    // A keeper facing a barrage makes more saves and concedes more; that is a
-    // busier keeper, not a better one.
-    const calm = withStats(player({ pid: 1, pos: "GK" }), { goalsAgainst: 30, saves: 60 });
-    const busy = withStats(player({ pid: 2, pos: "GK" }), { goalsAgainst: 50, saves: 140 });
-    expect(totsScore(calm, calm.stats[0], SEASON)).toBeGreaterThan(totsScore(busy, busy.stats[0], SEASON));
-    expect(computeSeasonAwards([calm, busy], SEASON).teamOfSeason[0]).toBe(1);
+  it("judges a keeper on save percentage, not on saves or goals conceded", () => {
+    // Behind a good defence: faces little, concedes little, but only stops 60%.
+    const sheltered = withStats(player({ pid: 1, pos: "GK" }), { goalsAgainst: 20, saves: 30 });
+    // Behind a bad one: concedes more and makes more saves, but stops 75%.
+    const shotStopper = withStats(player({ pid: 2, pos: "GK" }), { goalsAgainst: 40, saves: 120 });
+    expect(totsScore(shotStopper, shotStopper.stats[0], SEASON))
+      .toBeGreaterThan(totsScore(sheltered, sheltered.stats[0], SEASON));
+    expect(computeSeasonAwards([sheltered, shotStopper], SEASON).teamOfSeason[0]).toBe(2);
+  });
+
+  it("reads a keeper who faced no shots as average rather than docking him", () => {
+    const idle = withStats(player({ pid: 1, pos: "GK" }), { goalsAgainst: 0, saves: 0 });
+    expect(totsScore(idle, idle.stats[0], SEASON)).toBeCloseTo(potyScore(idle, idle.stats[0], SEASON), 10);
   });
 });

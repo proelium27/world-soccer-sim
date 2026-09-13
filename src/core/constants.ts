@@ -3173,8 +3173,8 @@ export const POTY_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = 
  * position does and the scoreline can't show (`totsScore` in core/awards.ts):
  *
  *  - `defendingPerGame` × (tackles + interceptions) per appearance.
- *  - `concededPerGame` × goals conceded per appearance, subtracted. Keepers
- *    only, because goalsAgainst is only recorded for keepers.
+ *  - `savePct` × (his save percentage − TOTS_KEEPER_SAVE_PCT_BASELINE). Keepers
+ *    only.
  *
  * **Per appearance, never season totals (2026-09-12).** The old formula paid
  * 0.01-0.03 per tackle and interception on season totals, which rewarded a
@@ -3185,9 +3185,14 @@ export const POTY_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = 
  * rate DOES track quality (correlation with ovr: CB 0.41, DM 0.35, CM 0.36,
  * FB 0.31), so it measures the right thing once volume is taken out.
  *
- * **Keepers are judged on goals conceded per game, not saves.** Correlation with
- * ovr: goals conceded -0.56, saves -0.27 (a busier keeper is usually a worse
- * one), goals prevented against xG only 0.10.
+ * **Keepers are judged on save percentage, the one keeper stat that tracks the
+ * keeper rather than the defence in front of him.** Measured over 5,720
+ * qualified keeper-seasons, correlation with his own ovr / with his club's
+ * outfield ovr: save % 0.27 / 0.07, goals conceded per game -0.27 / -0.22,
+ * saves per game 0.01 / -0.25, goals prevented against xG -0.01 / 0.01 (noise).
+ * Goals conceded per game shipped first and was replaced: it rewarded the
+ * keeper behind a good defence, and the Goalkeeper of the Year winner's median
+ * ovr rank among the world's keepers fell from 5 to 15.
  *
  * **Attackers (AM, W, ST) add nothing**, so their Team of the Season score IS
  * the Player of the Season score. That is what makes a forward who wins his
@@ -3195,17 +3200,26 @@ export const POTY_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = 
  */
 export const TOTS_POSITION_WORK: Record<
   "GK" | "CB" | "FB" | "DM" | "CM" | "AM" | "W" | "ST",
-  { defendingPerGame: number; concededPerGame: number }
+  { defendingPerGame: number; savePct: number }
 > = {
-  GK: { defendingPerGame: 0, concededPerGame: 1.2 },
-  CB: { defendingPerGame: 0.3, concededPerGame: 0 },
-  FB: { defendingPerGame: 0.24, concededPerGame: 0 },
-  DM: { defendingPerGame: 0.24, concededPerGame: 0 },
-  CM: { defendingPerGame: 0.06, concededPerGame: 0 },
-  AM: { defendingPerGame: 0, concededPerGame: 0 },
-  W: { defendingPerGame: 0, concededPerGame: 0 },
-  ST: { defendingPerGame: 0, concededPerGame: 0 },
+  GK: { defendingPerGame: 0, savePct: 4 },
+  CB: { defendingPerGame: 0.3, savePct: 0 },
+  FB: { defendingPerGame: 0.24, savePct: 0 },
+  DM: { defendingPerGame: 0.24, savePct: 0 },
+  CM: { defendingPerGame: 0.06, savePct: 0 },
+  AM: { defendingPerGame: 0, savePct: 0 },
+  W: { defendingPerGame: 0, savePct: 0 },
+  ST: { defendingPerGame: 0, savePct: 0 },
 };
+
+/**
+ * The save percentage an average qualified keeper posts (measured 0.668, sd
+ * 0.048, p10 0.608, p90 0.727), so `TOTS_POSITION_WORK.GK.savePct` credits a
+ * keeper only for how far he sits above or below it. Only keepers are ever
+ * compared with each other on this term, so the baseline moves no ranking; it
+ * keeps an ordinary keeper's score where the Player of the Season score puts it.
+ */
+export const TOTS_KEEPER_SAVE_PCT_BASELINE = 0.67;
 
 /* ────────────────────────────────────────────────────────────────────────
  * Worldwide awards — Ballon d'Or and World Team of the Year (core/worldAwards.ts)

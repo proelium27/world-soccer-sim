@@ -39,7 +39,7 @@ import { simThrough } from "../src/core/simThrough.js";
 import { simOffseason } from "../src/core/offseason.js";
 import { competitionOf } from "../src/core/competitions.js";
 import { positionGroup, ovrDuringSeason, statsFor } from "../src/core/awards.js";
-import { TOTS_POSITION_WORK } from "../src/core/constants.js";
+import { TOTS_POSITION_WORK, TOTS_KEEPER_SAVE_PCT_BASELINE } from "../src/core/constants.js";
 import type { Position } from "../src/core/players/types.js";
 
 const SEASONS = Number(process.env.SEASONS ?? 8);
@@ -143,10 +143,11 @@ for (const seed of SEEDS) {
       lastKeeper = w.pid;
       const p = byPid.get(w.pid);
       const st = p ? statsFor(p, entry.season) : undefined;
-      // The per-game conceded term's share of his score (absolute: it's a penalty).
-      if (st && w.score > 0 && st.appearances > 0) {
+      // The save-percentage term's share of his score (absolute: it can be negative).
+      if (st && w.score > 0 && st.saves + st.goalsAgainst > 0) {
+        const savePct = st.saves / (st.saves + st.goalsAgainst);
         keeperVolumeShare.push(
-          Math.abs((st.goalsAgainst / st.appearances) * TOTS_POSITION_WORK.GK.concededPerGame) / w.score,
+          Math.abs((savePct - TOTS_KEEPER_SAVE_PCT_BASELINE) * TOTS_POSITION_WORK.GK.savePct) / w.score,
         );
       }
       if (w.score > 0) keeperTrophyShare.push((w.score - w.league) / w.score);

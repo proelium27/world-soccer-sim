@@ -1821,8 +1821,10 @@ export function Manual() {
             tackles and interceptions <em>per game</em> rather than over the whole season, so a
             defence that spent all year under siege isn't rewarded just for being busy. It counts
             most for centre-backs, then full-backs and holding midfielders, and only a little for
-            central midfielders. Keepers are judged on goals conceded per game rather than saves,
-            because a keeper making loads of saves is usually one facing loads of shots. Every
+            central midfielders. Keepers are judged on save percentage: how many of the shots on
+            target he faced he actually kept out. Goals conceded mostly measures the defence in
+            front of him, and a keeper making loads of saves is usually one facing loads of shots,
+            so neither says as much about the keeper himself. Every
             slot takes a player who actually plays that position, so a great season at a position
             the shape has only one of (striker, say) can still miss out. Both Player of
             the Season and Team of the Season also factor in overall quality, not just the stat
@@ -1910,8 +1912,8 @@ export function Manual() {
           </p>
           <p>
             So these two are judged on the things the Ballon d'Or ignores, using the same formulas
-            as the Team of the Season. The keeper's award holds goals conceded per game against
-            him; the defender's counts tackles and interceptions per game, and is open to
+            as the Team of the Season. The keeper's award counts his save percentage; the
+            defender's counts tackles and interceptions per game, and is open to
             centre-backs and full-backs. On top of that come the same worldwide extras the Ballon
             d'Or uses: the league-strength correction, your Continental Cup run, your summer with
             your country, your league title, your domestic cup.

@@ -248,7 +248,7 @@ writeFileSync(out, JSON.stringify(summary, null, 2));
 console.log(`\n=== ${RUN}: ${SEEDS.length} seed(s) x ${SEASONS} seasons ===`);
 console.log(
   `  weights: CB defending/game ${TOTS_POSITION_WORK.CB.defendingPerGame},` +
-  ` GK conceded/game ${TOTS_POSITION_WORK.GK.concededPerGame}, trophy x${WORLD_TOTS_TROPHY_MULTIPLIER}`,
+  ` GK save% ${TOTS_POSITION_WORK.GK.savePct}, trophy x${WORLD_TOTS_TROPHY_MULTIPLIER}`,
 );
 console.log(`  protected stars per season:      ${summary.protectedTotal.toFixed(1)}`);
 console.log(`    ...clearing the ovr bar alone: ${summary.protectedByOvr.toFixed(1)}`);

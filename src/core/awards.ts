@@ -1,7 +1,7 @@
 import type { Player, Position, SeasonStats } from "./players/types.js";
 import {
   AWARD_MIN_APPEARANCES, AWARD_OVR_BASELINE, AWARD_OVR_WEIGHT,
-  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT, TOTS_POSITION_WORK,
+  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT, TOTS_POSITION_WORK, TOTS_KEEPER_SAVE_PCT_BASELINE,
 } from "./constants.js";
 
 export type PositionGroup = "GK" | "DEF" | "MID" | "FWD";
@@ -158,9 +158,13 @@ export function potyScore(p: Player, s: SeasonStats, season: number): number {
 export function totsScore(p: Player, s: SeasonStats, season: number): number {
   const work = TOTS_POSITION_WORK[p.pos];
   const games = Math.max(1, s.appearances);
+  // A keeper who faced no shots has no save percentage; he reads as average
+  // rather than being docked for it.
+  const shotsFaced = s.saves + s.goalsAgainst;
+  const savePct = shotsFaced > 0 ? s.saves / shotsFaced : TOTS_KEEPER_SAVE_PCT_BASELINE;
   return potyScore(p, s, season)
     + ((s.tackles + s.interceptions) / games) * work.defendingPerGame
-    - (s.goalsAgainst / games) * work.concededPerGame;
+    + (savePct - TOTS_KEEPER_SAVE_PCT_BASELINE) * work.savePct;
 }
 
 function pickPlayerOfSeason(
