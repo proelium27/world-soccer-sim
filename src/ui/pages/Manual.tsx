@@ -167,10 +167,13 @@ export function Manual() {
             is the other way in — see just below.
           </p>
           <p>
-            Every club in it carries a real name, but not every one carries a real squad, because
-            the source data doesn't reach that far down. Serbia, the second tiers of Portugal,
-            Belgium, Turkey, the Netherlands, Scotland and Greece, and most of the Greek top flight
-            get real names with generated players. Everywhere else has both. The file is rebuilt
+            Third divisions stay fictional. Above them, every club carries a real name, but not every
+            one carries a real squad, because the source data doesn't reach that far down. Serbia,
+            Mexico, the second tiers of Portugal, Belgium, Turkey, the Netherlands, Scotland, Greece,
+            Brazil, Argentina and the United States, most of the Greek top flight, and seven Brazilian
+            and two Argentine top-flight clubs get real names with generated players. Everywhere else
+            has both. Brazil's squads come from the previous year's ratings, since the newest ones
+            don't include Brazilian clubs. The file is rebuilt
             when the ratings are, and the link never changes, so downloading it again is how you
             get a newer one.
           </p>
