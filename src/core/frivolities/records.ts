@@ -2,6 +2,8 @@ import type { LeagueStore } from "../leagueState.js";
 import type { StandingsRow } from "../standings.js";
 import { isFreeAgentTid } from "../transfers/negotiation.js";
 import { allCareers, topBy, type CareerRow } from "./careers.js";
+import type { ContinentalRegion } from "../constants.js";
+import { americasTids, careerRegion, inRegion } from "../americasClubs.js";
 
 /** How many rows each record list shows. Long enough to browse, short enough to read. */
 export const RECORD_LIST_LIMIT = 25;
@@ -71,15 +73,26 @@ export interface RecordBook {
  * division's size between seasons, so raw points would quietly rank the biggest
  * league's clubs above better seasons played in smaller ones.
  */
-export function computeRecordBook(league: LeagueStore, limit = RECORD_LIST_LIMIT): RecordBook {
-  const careers = allCareers(league);
+export function computeRecordBook(
+  league: LeagueStore,
+  limit = RECORD_LIST_LIMIT,
+  /**
+   * One continent's records: its clubs' seasons, careers spent mostly there,
+   * and fees its clubs paid. Absent means the world.
+   */
+  region?: ContinentalRegion,
+): RecordBook {
+  const americas = new Set(americasTids(league.teams, league.competitions));
+  const clubShown = (tid: number) => region === undefined || inRegion(tid, region, americas);
+  const careers = allCareers(league)
+    .filter((c) => region === undefined || careerRegion(c.seasons, americas) === region);
 
   // --- Team seasons -------------------------------------------------------
   const tierByCompId = new Map(league.competitions.map((c) => [c.id, c.tier]));
   const teamSeasons: TeamSeasonRecord[] = [];
   for (const h of league.seasonHistory) {
     for (const row of h.table) {
-      if (row.played <= 0) continue;
+      if (row.played <= 0 || !clubShown(row.tid)) continue;
       // The season's own compsByTid snapshot, not the club's current
       // competition: promotion and relegation move clubs between tiers, so a
       // live lookup would file a title-winning D2 season under D1.
@@ -103,7 +116,9 @@ export function computeRecordBook(league: LeagueStore, limit = RECORD_LIST_LIMIT
   const careerByPid = new Map(careers.map((c) => [c.pid, c]));
   const biggestTransfers: TransferRecord[] = league.transfers
     .filter((t) => t.fee > 0 && !t.loanSeasons && !t.loanReturn
-      && !isFreeAgentTid(t.fromTid) && !isFreeAgentTid(t.toTid))
+      && !isFreeAgentTid(t.fromTid) && !isFreeAgentTid(t.toTid)
+      // Filed under the continent of the club that paid.
+      && clubShown(t.toTid))
     .map((t) => ({
       pid: t.pid,
       // A player sold years ago may have since retired out of the archive; the

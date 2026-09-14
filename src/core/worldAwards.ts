@@ -1,5 +1,6 @@
 import type { Player, SeasonStats } from "./players/types.js";
-import type { Competition } from "./competitions.js";
+import { competitionRegion, type Competition } from "./competitions.js";
+import type { ContinentalRegion } from "./constants.js";
 import type { CupState } from "./cup/types.js";
 import type { CupStatLine } from "./cup/cupStats.js";
 import { cupStatsByPid, cupAvgRating } from "./cup/cupStats.js";
@@ -23,6 +24,7 @@ import {
   WORLD_AWARD_INTL_CAP_WEIGHT, WORLD_AWARD_INTL_TOURNAMENT_MULTIPLIER, WORLD_AWARD_WORLD_CUP_BONUS,
   WORLD_AWARD_DOMESTIC_CUP_BONUS, WORLD_AWARD_DOMESTIC_CUP_FULL_INVOLVEMENT,
   WORLD_AWARD_INTL_CONFEDERATION_CUP_MULTIPLIER, WORLD_AWARD_CONFEDERATION_CUP_BONUS,
+  AMERICAS_ACCOMPLISHMENT_SCALE,
 } from "./constants.js";
 
 /**
@@ -49,7 +51,11 @@ export interface WorldAwardEntry {
    * difference between them.
    */
   league: number;
-  /** Continental Cup: his own end product and rating there, plus how far his club went. */
+  /**
+   * His continental competition — the Continental Cup, or the Americas Cup for
+   * a club in the Americas: his own end product and rating there, plus how far
+   * his club went.
+   */
   cup: number;
   /** The offseason's international campaign, plus a World Cup winner's bonus. */
   intl: number;
@@ -65,8 +71,13 @@ export interface WorldAwardEntry {
   domesticCup?: number;
 }
 
-/** One completed season's worldwide honors, stored on SeasonHistoryEntry alongside the per-competition ones. */
-export interface WorldAwards {
+/**
+ * One set of end-of-season honours judged across several leagues at once: the
+ * world's, or the Americas' own. `ballonDOr` is that set's player of the year
+ * and `worldTeamOfYear` its team of the year. The names are the world set's,
+ * kept rather than renamed because every WorldAwards already persisted uses them.
+ */
+export interface ContinentalAwards {
   /** The ranking, best first, up to BALLON_DOR_SHORTLIST. `[0]` is the winner; empty if nobody was eligible. */
   ballonDOr: WorldAwardEntry[];
   /** 11 pids (or null where no eligible player existed), index-aligned with TOTS_SLOTS. */
@@ -87,6 +98,21 @@ export interface WorldAwards {
   goalkeeperOfYear?: WorldAwardEntry[];
   /** The best defender in the world (CB and FB), same shape and same caveats as `goalkeeperOfYear`. */
   defenderOfYear?: WorldAwardEntry[];
+}
+
+/** One completed season's worldwide honors, stored on SeasonHistoryEntry alongside the per-competition ones. */
+export interface WorldAwards extends ContinentalAwards {
+  /**
+   * The Americas' own Player, Team, Goalkeeper and Defender of the Year, judged
+   * over the leagues of the Americas alone and on the same formula as the
+   * world's. They exist because the world's awards discount everything done at
+   * a club in the Americas (AMERICAS_ACCOMPLISHMENT_SCALE), which keeps those
+   * players off the worldwide shortlists; these are the honours they can win.
+   *
+   * Optional: absent on a world with no league in the Americas, and on every
+   * season played before these awards existed, which is never rescored.
+   */
+  americas?: ContinentalAwards;
 }
 
 /**
@@ -119,6 +145,17 @@ export interface WorldAwardContext {
    * confederation cup credit rather than failing to compile.
    */
   confederationCupChampions?: ReadonlySet<string>;
+  /**
+   * The Americas Cup played during that season. A club plays in at most one
+   * continental competition, so this feeds the same cup term the Continental
+   * Cup does, for clubs in the Americas. Optional: absent scores none.
+   */
+  americasCup?: CupState | null;
+  /**
+   * Override for AMERICAS_ACCOMPLISHMENT_SCALE, for the probe that sizes it.
+   * Absent means the constant.
+   */
+  americasScale?: number;
 }
 
 interface Entry {
@@ -130,6 +167,8 @@ interface Entry {
   /** The ovr he actually played the season with — see awards.ts's ovrDuringSeason. */
   ovr: number;
   cupLine: CupStatLine | undefined;
+  /** The continent his league is on, which decides the scale the world's awards score him at. */
+  region: ContinentalRegion;
   /** Rating-unit correction for how strong his competition was — see leagueStrengthOffsets. */
   strength: number;
   /**
@@ -346,6 +385,12 @@ interface Scoring {
   domesticChampions: ReadonlySet<number>;
   /** pid -> his domestic cup line, for pro-rating the winner's bonus by ties played. */
   domesticLines: Map<number, CupStatLine>;
+  /**
+   * What a player's whole case is multiplied by: 1, or
+   * AMERICAS_ACCOMPLISHMENT_SCALE for a player at a club in the Americas when
+   * the world's awards are scored. The Americas' own awards score everyone at 1.
+   */
+  scale: (e: Entry) => number;
 }
 
 /**
@@ -370,13 +415,16 @@ function worldAwardParts(
   // The ovr terms fold into `league` rather than becoming a fifth part: the UI
   // already labels that column as including an ovr term, and adding a field
   // would break WorldAwards entries already persisted on old saves.
-  const league = base + e.strength + worldOvrComponent(e);
-  const cup = cupComponent(e, s.roundsFromFinal, goalWeight, assistWeight);
+  // Every part takes the same scale, so the breakdown still adds up to the score
+  // and an Americas case is discounted whole rather than piece by piece.
+  const k = s.scale(e);
+  const league = (base + e.strength + worldOvrComponent(e)) * k;
+  const cup = cupComponent(e, s.roundsFromFinal, goalWeight, assistWeight) * k;
   const intl = intlComponent(
     e.player, s.season, s.ctx.worldCupChampion, s.ctx.confederationCupChampions ?? NO_CHAMPIONS,
-  );
-  const title = titleComponent(e, s.ctx.championTidByCompId);
-  const domesticCup = domesticCupComponent(e, s.domesticChampions, s.domesticLines);
+  ) * k;
+  const title = titleComponent(e, s.ctx.championTidByCompId) * k;
+  const domesticCup = domesticCupComponent(e, s.domesticChampions, s.domesticLines) * k;
   return {
     pid: e.player.pid, tid: e.stats.tid,
     score: league + cup + intl + title + domesticCup,
@@ -519,8 +567,18 @@ export function computeWorldAwards(
   season: number,
   ctx: WorldAwardContext,
 ): WorldAwards {
-  const cupLines = ctx.cup ? cupStatsByPid(ctx.cup) : new Map<number, CupStatLine>();
-  const roundsFromFinal = ctx.cup ? cupRoundsFromFinal(ctx.cup) : new Map<number, number>();
+  // Both continental competitions feed the one cup term: a club enters at most
+  // one of them, so a player's line and his club's run come from whichever his
+  // club played. The Continental Cup is read last, so a player who somehow
+  // appeared in both after a mid-season move keeps its line.
+  const cupLines = new Map<number, CupStatLine>();
+  const roundsFromFinal = new Map<number, number>();
+  for (const cup of [ctx.americasCup ?? null, ctx.cup]) {
+    if (!cup) continue;
+    for (const [pid, line] of cupStatsByPid(cup)) cupLines.set(pid, line);
+    for (const [tid, rounds] of cupRoundsFromFinal(cup)) roundsFromFinal.set(tid, rounds);
+  }
+  const regionByCompId = new Map(ctx.competitions.map((c) => [c.id, competitionRegion(c)]));
   // Domestic cups: who won each country's, and how many ties each player made.
   // Both empty on a save whose past seasons predate domestic cups, which scores
   // exactly as it did before the competition existed.
@@ -546,6 +604,7 @@ export function computeWorldAwards(
       compId,
       ovr: ovrDuringSeason(player, season),
       cupLine: cupLines.get(player.pid),
+      region: regionByCompId.get(compId) ?? "europe",
       strength: 0,
       ovrDelta: 0,
     });
@@ -559,13 +618,39 @@ export function computeWorldAwards(
     };
   }
 
+  const shared = { season, ctx, roundsFromFinal, domesticChampions, domesticLines };
+  const americasScale = ctx.americasScale ?? AMERICAS_ACCOMPLISHMENT_SCALE;
+
+  // The world's awards: every league at once, a case made in the Americas at a
+  // discount.
+  const world = rankHonours(entries, {
+    ...shared,
+    scale: (e) => (e.region === "americas" ? americasScale : 1),
+  });
+
+  // The Americas' own: its leagues alone, measured against each other, so the
+  // league-strength correction is recomputed over that pool and nobody is
+  // discounted. Copies, because ranking writes each entry's strength.
+  const americasPool = entries.filter((e) => e.region === "americas").map((e) => ({ ...e }));
+  if (americasPool.length === 0) return world;
+  return { ...world, americas: rankHonours(americasPool, { ...shared, scale: () => 1 }) };
+}
+
+/**
+ * One set of honours over one pool of players: the player of the year and his
+ * shortlist, the team of the year, and the two position awards.
+ *
+ * The world's awards run it over every player in the world and the Americas'
+ * over that continent's alone. The league-strength correction is computed over
+ * whatever pool it is handed, so each set measures its leagues against its own
+ * average.
+ */
+function rankHonours(entries: Entry[], scoring: Scoring): ContinentalAwards {
   const deltas = leagueStrengthOffsets(entries);
   for (const e of entries) {
     e.ovrDelta = deltas.get(e.compId) ?? 0;
     e.strength = e.ovrDelta * WORLD_AWARD_LEAGUE_STRENGTH_WEIGHT;
   }
-
-  const scoring: Scoring = { season, ctx, roundsFromFinal, domesticChampions, domesticLines };
 
   // Ballon d'Or: a full season's worth of appearances is the bar, but if a world
   // is small or short enough that nobody clears it, everyone who played is

@@ -33,6 +33,8 @@ import { Panel, Empty, ClubCell, PlayerCell, RankTable } from "../components/boa
 import { GoatBreakdown, partLabel } from "../components/GoatBreakdown.js";
 import { currency, seasonYear } from "../format.js";
 import { isSpectator } from "../../core/spectator.js";
+import type { ContinentalRegion } from "../../core/constants.js";
+import { RegionSwitch, defaultRegion, worldHasAmericas } from "../components/RegionSwitch.js";
 import { shortName } from "../playerName.js";
 
 type Tab = "goat" | "awards" | "records" | "leaders" | "international" | "bios" | "clubs";
@@ -59,11 +61,17 @@ function Col({ children, wide = false }: { children: ReactNode; wide?: boolean }
 // --- GOAT ------------------------------------------------------------------
 
 
-function GoatTab() {
+function GoatTab({ region }: { region?: ContinentalRegion }) {
   const { league } = useLeague();
   const [side, setSide] = useState<"players" | "clubs">("players");
-  const players = useMemo(() => (league ? playerGoatRanking(league) : []), [league]);
-  const clubs = useMemo(() => (league ? teamGoatRanking(league) : []), [league]);
+  const players = useMemo(
+    () => (league ? playerGoatRanking(league, undefined, region) : []),
+    [league, region],
+  );
+  const clubs = useMemo(
+    () => (league ? teamGoatRanking(league, undefined, region) : []),
+    [league, region],
+  );
   if (!league) return null;
 
   return (
@@ -71,6 +79,10 @@ function GoatTab() {
       <p className="text-secondary small">
         Ranked by a fixed formula weighing peak rating, years spent near that peak, career length
         and match rating, individual awards, trophies, and goals and assists.
+        {region === "europe" &&
+          " Players are listed where they made most of their appearances. Anything done at a club in the Americas counts for a quarter here."}
+        {region === "americas" &&
+          " Careers spent mostly in the Americas, compared with each other at full weight."}
       </p>
 
       <ul className="nav nav-pills nav-sm mb-3">
@@ -644,9 +656,12 @@ function careerCells(c: CareerRow, value: ReactNode, extra?: ReactNode): ReactNo
   ];
 }
 
-function RecordsTab() {
+function RecordsTab({ region }: { region?: ContinentalRegion }) {
   const { league } = useLeague();
-  const book = useMemo(() => (league ? computeRecordBook(league) : null), [league]);
+  const book = useMemo(
+    () => (league ? computeRecordBook(league, undefined, region) : null),
+    [league, region],
+  );
   if (!league || !book) return null;
 
   const careerHeaders = (last: string, extra?: string) =>
@@ -895,7 +910,7 @@ function LeaderBoard({ stat, scope, rows, userTid, onBack }: {
   );
 }
 
-export function LeadersTab() {
+export function LeadersTab({ region }: { region?: ContinentalRegion } = {}) {
   const { league } = useLeague();
   const [open, setOpen] = useState<AllTimeStatKey | null>(null);
   const [scope, setScope] = useState<LeaderScope>("career");
@@ -905,8 +920,8 @@ export function LeadersTab() {
   // career list fourteen times over. The full board a card opens into is a
   // slice of the same result, so the two can't disagree.
   const boards = useMemo(
-    () => (league ? allTimeLeaderBoards(league, scope) : null),
-    [league, scope],
+    () => (league ? allTimeLeaderBoards(league, scope, undefined, region) : null),
+    [league, scope, region],
   );
   if (!league || !boards) return null;
 
@@ -1217,9 +1232,12 @@ function BiosTab() {
 
 // --- Club trivia -----------------------------------------------------------
 
-function ClubsTab() {
+function ClubsTab({ region }: { region?: ContinentalRegion }) {
   const { league } = useLeague();
-  const trivia = useMemo(() => (league ? computeClubTrivia(league) : null), [league]);
+  const trivia = useMemo(
+    () => (league ? computeClubTrivia(league, undefined, region) : null),
+    [league, region],
+  );
   if (!league || !trivia) return null;
 
   if (trivia.seasonsRecorded === 0) {
@@ -1329,14 +1347,27 @@ function ClubsTab() {
 
 // --- Page ------------------------------------------------------------------
 
+/** The tabs that list clubs or club careers, and so can be split by continent. */
+const REGION_TABS: ReadonlySet<Tab> = new Set<Tab>(["goat", "records", "leaders", "clubs"]);
+
 export function Frivolities() {
   const { league } = useLeague();
   const [tab, setTab] = useState<Tab>("goat");
+  const [regionSel, setRegionSel] = useState<ContinentalRegion | null>(null);
   if (!league) return null;
+
+  // One continent at a time on the club and career lists, in a world with
+  // leagues on both. A world without the Americas passes no region, which is
+  // exactly the world-wide list every tab showed before.
+  const hasAmericas = worldHasAmericas(league);
+  const region = hasAmericas ? (regionSel ?? defaultRegion(league)) : undefined;
 
   return (
     <div>
-      <h1 className="h4 mb-3">Frivolities</h1>
+      <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-3">
+        <h1 className="h4 mb-0">Frivolities</h1>
+        {region && REGION_TABS.has(tab) && <RegionSwitch value={region} onChange={setRegionSel} />}
+      </div>
 
       <ul className="nav nav-tabs mb-3">
         {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
@@ -1351,13 +1382,13 @@ export function Frivolities() {
         ))}
       </ul>
 
-      {tab === "goat" && <GoatTab />}
+      {tab === "goat" && <GoatTab region={region} />}
       {tab === "awards" && <AwardsTab />}
-      {tab === "records" && <RecordsTab />}
-      {tab === "leaders" && <LeadersTab />}
+      {tab === "records" && <RecordsTab region={region} />}
+      {tab === "leaders" && <LeadersTab region={region} />}
       {tab === "international" && <InternationalTab />}
       {tab === "bios" && <BiosTab />}
-      {tab === "clubs" && <ClubsTab />}
+      {tab === "clubs" && <ClubsTab region={region} />}
     </div>
   );
 }

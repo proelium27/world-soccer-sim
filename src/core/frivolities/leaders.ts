@@ -4,6 +4,8 @@ import {
 } from "../constants.js";
 import { allCareers, type CareerRow } from "./careers.js";
 import { ALL_TIME_STAT_KEYS, type AllTimeStatKey } from "./stats.js";
+import type { ContinentalRegion } from "../constants.js";
+import { americasTids, careerRegion } from "../americasClubs.js";
 
 /** How many rows one stat's full board shows. */
 export const ALL_TIME_LEADER_LIMIT = 30;
@@ -84,8 +86,12 @@ export function allTimeLeaderBoards(
   league: LeagueStore,
   scope: LeaderScope,
   limit = ALL_TIME_LEADER_LIMIT,
+  /** Careers spent mostly on one continent (see `careerRegion`). Absent means the world. */
+  region?: ContinentalRegion,
 ): Record<AllTimeStatKey, AllTimeLeaderRow[]> {
-  const careers = allCareers(league);
+  const americas = new Set(americasTids(league.teams, league.competitions));
+  const careers = allCareers(league)
+    .filter((c) => region === undefined || careerRegion(c.seasons, americas) === region);
   return Object.fromEntries(
     ALL_TIME_STAT_KEYS.map((stat) => [stat, rankCareers(careers, stat, scope, limit)]),
   ) as Record<AllTimeStatKey, AllTimeLeaderRow[]>;

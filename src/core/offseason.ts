@@ -134,7 +134,7 @@ export interface OffseasonInputs {
    * off the league", which is right for every direct caller (tests, scripts,
    * and `jump`, which is exempt from detaching).
    */
-  cupChampions?: Pick<HonourSources, "cup" | "shield" | "domestic" | "americas">;
+  cupChampions?: Pick<HonourSources, "cup" | "shield" | "domestic" | "americas" | "americasTids">;
 }
 
 /** What the offseason did that the caller cannot work out from the league alone. */
@@ -500,6 +500,9 @@ export function simOffseasonReporting(
     competitions: league.competitions,
     championTidByCompId,
     cup: league.cup,
+    // The Americas Cup that ran alongside it, credited the same way for clubs
+    // in the Americas (and then discounted with the rest of their case).
+    americasCup: league.americasCup ?? null,
     // The domestic cups that ran during this season, read before the archive a
     // few steps below folds their box scores away. Archiving keeps the champion
     // and the per-player lines this needs, so the order isn't load-bearing, but
@@ -573,6 +576,9 @@ export function simOffseasonReporting(
       cup: [...pastChampions.cup, ...champion(league.cup)],
       shield: [...pastChampions.shield, ...champion(league.shield)],
       americas: [...(pastChampions.americas ?? []), ...champion(league.americasCup)],
+      // Which clubs play in the Americas, so a retiree's time there is scored
+      // at the same discount the GOAT board applies.
+      americasTids: pastChampions.americasTids,
       domestic: [
         ...pastChampions.domestic,
         ...(league.domesticCups ?? []).map((c) => ({ season: c.season, championTid: c.championTid })),

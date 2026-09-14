@@ -1,6 +1,8 @@
 import type { LeagueStore } from "../leagueState.js";
 import { isFreeAgentTid } from "../transfers/negotiation.js";
 import { trebleCountByTid } from "./trebles.js";
+import type { ContinentalRegion } from "../constants.js";
+import { americasTids, inRegion } from "../americasClubs.js";
 
 
 /** How many rows each club list shows. */
@@ -86,7 +88,14 @@ export interface ClubTrivia {
  * retired player as a departure, making the past look permanently more
  * turbulent than the present.
  */
-export function computeClubTrivia(league: LeagueStore, limit = CLUB_LIST_LIMIT): ClubTrivia {
+export function computeClubTrivia(
+  league: LeagueStore,
+  limit = CLUB_LIST_LIMIT,
+  /** One continent's clubs. Absent means the world. */
+  region?: ContinentalRegion,
+): ClubTrivia {
+  const americas = new Set(americasTids(league.teams, league.competitions));
+  const clubShown = (tid: number) => region === undefined || inRegion(tid, region, americas);
   const tierByCompId = new Map(league.competitions.map((c) => [c.id, c.tier]));
   const latestSeason = league.seasonHistory.reduce((max, h) => Math.max(max, h.season), 0);
 
@@ -180,7 +189,7 @@ export function computeClubTrivia(league: LeagueStore, limit = CLUB_LIST_LIMIT):
       ? r.seasons
       : latestSeason - r.lastTitleSeason;
   }
-  const all = [...rows.values()];
+  const all = [...rows.values()].filter((r) => clubShown(r.tid));
 
   // --- Transfer spend -----------------------------------------------------
   const spend = new Map<number, ClubSpendRow>();
@@ -208,7 +217,7 @@ export function computeClubTrivia(league: LeagueStore, limit = CLUB_LIST_LIMIT):
     seller.sales += 1;
   }
   for (const s of spend.values()) s.net = s.received - s.spent;
-  const spendRows = [...spend.values()];
+  const spendRows = [...spend.values()].filter((s) => clubShown(s.tid));
 
   return {
     // Sorted by the column the table leads with. Ranking by league titles while

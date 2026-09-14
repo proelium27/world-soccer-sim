@@ -382,6 +382,10 @@ export function PlayerProfile() {
                   <AwardPill label="World Team of the Year" seasons={honors.worldTeamOfYear} />
                   <AwardPill label="Goalkeeper of the Year" seasons={honors.goalkeeperOfYear} />
                   <AwardPill label="Defender of the Year" seasons={honors.defenderOfYear} />
+                  <AwardPill label="Americas Player of the Year" seasons={honors.americasPlayerOfYear} />
+                  <AwardPill label="Americas Team of the Year" seasons={honors.americasTeamOfYear} />
+                  <AwardPill label="Americas Goalkeeper of the Year" seasons={honors.americasGoalkeeperOfYear} />
+                  <AwardPill label="Americas Defender of the Year" seasons={honors.americasDefenderOfYear} />
                   <AwardPill label="Player of the Season" seasons={honors.playerOfSeason} />
                   <AwardPill label="Golden Boot" seasons={honors.goldenBoot} icon={<GoldenBootIcon />} />
                   <AwardPill label="Team of the Season" seasons={honors.teamOfSeason} />

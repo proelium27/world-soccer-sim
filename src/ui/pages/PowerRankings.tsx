@@ -23,6 +23,11 @@ import { CompetitionSelect } from "../components/CompetitionSelect.js";
 import { DivisionBadge } from "../components/DivisionBadge.js";
 import { sortByPosThenOvr } from "./Roster.js";
 import { shortName } from "../playerName.js";
+import type { ContinentalRegion } from "../../core/constants.js";
+import { competitionRegion } from "../../core/competitions.js";
+import { americasTids, inRegion } from "../../core/americasClubs.js";
+import { RegionSwitch, defaultRegion, worldHasAmericas } from "../components/RegionSwitch.js";
+import { REGION_LABELS } from "../continents.js";
 
 /** The stored snapshot immediately preceding `snapshot` within the same season, for rank-movement arrows. */
 function previousSnapshot(
@@ -42,6 +47,7 @@ export function PowerRankings() {
   const playerByPid = usePlayerMap(league?.players);
   const [expandedTid, setExpandedTid] = useState<number | null>(null);
   const [compId, setCompId] = useState<number | "all">("all");
+  const [regionSel, setRegionSel] = useState<ContinentalRegion | null>(null);
   // -1 = the live "Current" view; otherwise an index into powerRankingHistory.
   const [viewIndex, setViewIndex] = useState(-1);
 
@@ -66,7 +72,19 @@ export function PowerRankings() {
 
   const teamByTid = new Map(league.teams.map((t) => [t.tid, t]));
 
-  const rows = snapshot.rows.filter((r) => compId === "all" || r.compId === compId);
+  // One continent at a time in a world with leagues on both: the two never meet
+  // in a club competition, so one ranking of both reads as a ladder that isn't
+  // there. A world with no league in the Americas shows everyone, as before.
+  const region = worldHasAmericas(league) ? (regionSel ?? defaultRegion(league)) : null;
+  const americas = new Set(americasTids(league.teams, league.competitions));
+  const inShownRegion = (tid: number) => region === null || inRegion(tid, region, americas);
+  const regionCompetitions = region === null
+    ? league.competitions
+    : league.competitions.filter((c) => competitionRegion(c) === region);
+  // A competition picked on the other continent falls back to all of this one.
+  const shownCompId = compId !== "all" && regionCompetitions.some((c) => c.id === compId) ? compId : "all";
+  const regionRows = snapshot.rows.filter((r) => inShownRegion(r.tid));
+  const rows = regionRows.filter((r) => shownCompId === "all" || r.compId === shownCompId);
 
   // Rank movement vs the previous stored snapshot of the same season (the
   // live view compares against the season's latest snapshot). Ranks are
@@ -78,7 +96,7 @@ export function PowerRankings() {
   const prevRankByTid = new Map<number, number>();
   if (prev) {
     prev.rows
-      .filter((r) => compId === "all" || r.compId === compId)
+      .filter((r) => inShownRegion(r.tid) && (shownCompId === "all" || r.compId === shownCompId))
       .forEach((r, i) => prevRankByTid.set(r.tid, i + 1));
   }
 
@@ -94,13 +112,15 @@ export function PowerRankings() {
   // score. snapshot.rows is the full, globally-sorted list (before the
   // competition filter), so its index order is exactly that.
   const worldRankByTid = new Map<number, number>();
-  snapshot.rows.forEach((r, i) => worldRankByTid.set(r.tid, i + 1));
-  const worldTotal = snapshot.rows.length;
+  // With the continent switch, "world" means the continent being shown.
+  regionRows.forEach((r, i) => worldRankByTid.set(r.tid, i + 1));
+  const worldTotal = regionRows.length;
+  const rankScope = region === null ? "World" : REGION_LABELS[region];
 
   // When a single competition is selected, everyone shares a division, so the
   // "Div" badge just mirrors the # column — show each club's world rank there
   // instead, which is genuinely new information in that view.
-  const showWorldRank = compId !== "all";
+  const showWorldRank = shownCompId !== "all";
 
   // Newest first in the dropdown: seasons descending, matchdays descending
   // within a season. Values are indices into powerRankingHistory.
@@ -140,9 +160,10 @@ export function PowerRankings() {
             </optgroup>
           ))}
         </select>
+        {region !== null && <RegionSwitch value={region} onChange={setRegionSel} />}
         <CompetitionSelect
-          competitions={league.competitions}
-          value={compId}
+          competitions={regionCompetitions}
+          value={shownCompId}
           onChange={setCompId}
           allOption
         />
@@ -160,7 +181,7 @@ export function PowerRankings() {
             <th className="text-end">#</th>
             <th style={{ width: "2.5em" }}></th>
             <th>Team</th>
-            <th className="text-end">{showWorldRank ? "World" : "Div"}</th>
+            <th className="text-end">{showWorldRank ? rankScope : "Div"}</th>
             <th className="text-end">Record</th>
             <th className="text-end">GD</th>
             <th className="text-end">OVR</th>
@@ -225,7 +246,7 @@ export function PowerRankings() {
                         return (
                           <span
                             className="text-muted"
-                            title={`World rank ${worldRankByTid.get(r.tid)} of ${worldTotal} by Power score`}
+                            title={`${rankScope} rank ${worldRankByTid.get(r.tid)} of ${worldTotal} by Power score`}
                           >
                             #{worldRankByTid.get(r.tid)}
                           </span>

@@ -5,7 +5,8 @@ import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { usePlayerMap } from "../usePlayerMap.js";
 import { HelpHint } from "../components/HelpHint.js";
-import type { WorldAwardEntry } from "../../core/worldAwards.js";
+import type { ContinentalAwards, WorldAwardEntry } from "../../core/worldAwards.js";
+import { competitionRegion } from "../../core/competitions.js";
 import type { AwardWinner } from "../../core/awardWinners.js";
 import type { Player, Position, SeasonStats } from "../../core/players/types.js";
 import type { LeagueStore } from "../../core/leagueState.js";
@@ -415,11 +416,64 @@ function PositionAward({
   );
 }
 
+/**
+ * The words for one set of cross-league honours. The world's set and the
+ * Americas' own are laid out identically and read off the same stored shape, so
+ * this is all that tells them apart on the page.
+ */
+interface HonoursLabels {
+  playerAward: string;
+  shortlist: string;
+  shortlistHelp: string;
+  cup: string;
+  keeper: string;
+  keeperBlurb: string;
+  defender: string;
+  defenderBlurb: string;
+  team: string;
+  empty: string;
+}
+
+const WORLD_LABELS: HonoursLabels = {
+  playerAward: "Ballon d'Or",
+  shortlist: "Ballon d'Or shortlist",
+  shortlistHelp:
+    "Every league is scored on one scale, so a big season in a weaker league doesn't outrank a big season in a strong one just because its opponents were easier. Cup and international football count too — they're the only places players from different leagues actually meet. Anything done at a club in the Americas counts for a fraction of the same thing in Europe; those players have awards of their own.",
+  cup: "Continental Cup",
+  keeper: "Goalkeeper of the Year",
+  keeperBlurb:
+    "The Ballon d'Or is scored on goals, assists and rating, so no goalkeeper has ever come close to winning one. This is the award that is actually his: same worldwide scale, but judged on the things a keeper does — saves, goals kept out, and how he rated week to week.",
+  defender: "Defender of the Year",
+  defenderBlurb:
+    "Centre-backs and full-backs, judged on the work they actually do: tackles, interceptions, goals kept out and their rating, on the same worldwide scale as the Ballon d'Or.",
+  team: "World Team of the Year",
+  empty:
+    "No worldwide awards for this season. Saves from before they existed can only reconstruct them for seasons whose players are still around.",
+};
+
+const AMERICAS_LABELS: HonoursLabels = {
+  playerAward: "Americas Player of the Year",
+  shortlist: "Americas Player of the Year shortlist",
+  shortlistHelp:
+    "The Ballon d'Or's formula, run over the leagues of the Americas alone: every league there on one scale, with the Americas Cup and international football counting too.",
+  cup: "Americas Cup",
+  keeper: "Americas Goalkeeper of the Year",
+  keeperBlurb:
+    "The best keeper in the Americas, judged on saves, goals kept out and his rating across the Americas' leagues.",
+  defender: "Americas Defender of the Year",
+  defenderBlurb:
+    "Centre-backs and full-backs in the Americas, judged on tackles, interceptions, goals kept out and their rating.",
+  team: "Americas Team of the Year",
+  empty: "No Americas awards for this season. They started with the first season the Americas' leagues finished after they were added.",
+};
+
+const NO_HONOURS: ContinentalAwards = { ballonDOr: [], worldTeamOfYear: [] };
+
 export function Awards() {
   const { league } = useLeague();
   const playersByPid = usePlayerMap(league?.players);
   const [season, setSeason] = useState<number | null>(null);
-  const [scope, setScope] = useState<"world" | "league">("world");
+  const [scope, setScope] = useState<"world" | "americas" | "league">("world");
   const [compIdOverride, setCompIdOverride] = useState<number | null>(null);
 
   if (!league) {
@@ -464,15 +518,23 @@ export function Awards() {
 
   // Falls back to empty rather than throwing on a season-history entry written
   // before worldwide awards existed and not yet migrated.
-  const world = entry.world ?? { ballonDOr: [], worldTeamOfYear: [] };
-  const winner = world.ballonDOr[0];
+  const world = entry.world ?? NO_HONOURS;
+  // The Americas tab is offered wherever the world has a league there. The two
+  // sets share one layout, so the page picks which set and which words to show
+  // and everything below reads `shown`.
+  const hasAmericas = league.competitions.some((c) => competitionRegion(c) === "americas");
+  const shownScope = scope === "americas" && !hasAmericas ? "world" : scope;
+  const shown: ContinentalAwards =
+    shownScope === "americas" ? (entry.world?.americas ?? NO_HONOURS) : world;
+  const labels = shownScope === "americas" ? AMERICAS_LABELS : WORLD_LABELS;
+  const winner = shown.ballonDOr[0];
   const winnerSubject = winner ? subjectOf(winner.pid) : undefined;
   const winnerStats = winnerSubject?.player?.stats.find((s) => s.season === activeSeason);
   // Both empty on a season played before these awards existed, which is every
   // season already on an existing save — they are never backfilled, so those
   // seasons show the Ballon d'Or and the World XI alone (see WorldAwards).
-  const bestKeepers = world.goalkeeperOfYear ?? [];
-  const bestDefenders = world.defenderOfYear ?? [];
+  const bestKeepers = shown.goalkeeperOfYear ?? [];
+  const bestDefenders = shown.defenderOfYear ?? [];
 
   return (
     <div className="container-fluid p-3">
@@ -494,6 +556,15 @@ export function Awards() {
           >
             World
           </button>
+          {hasAmericas && (
+            <button
+              type="button"
+              className={`btn btn-sm ${shownScope === "americas" ? "btn-primary" : "btn-outline-primary"}`}
+              onClick={() => setScope("americas")}
+            >
+              Americas
+            </button>
+          )}
           <button
             type="button"
             className={`btn btn-sm ${scope === "league" ? "btn-primary" : "btn-outline-primary"}`}
@@ -521,18 +592,15 @@ export function Awards() {
         )}
       </div>
 
-      {scope === "world" ? (
-        world.ballonDOr.length === 0 ? (
-          <p className="text-muted">
-            No worldwide awards for this season. Saves from before they existed can only reconstruct
-            them for seasons whose players are still around.
-          </p>
+      {shownScope !== "league" ? (
+        shown.ballonDOr.length === 0 ? (
+          <p className="text-muted">{labels.empty}</p>
         ) : (
           <>
             <div className="row g-3 mb-4">
               <div className="col-md-6">
                 <AwardCard
-                  title="Ballon d'Or"
+                  title={labels.playerAward}
                   subject={winnerSubject}
                   subtitle={
                     <>
@@ -560,7 +628,7 @@ export function Awards() {
                         </div>
                       )}
                       <div className="d-flex justify-content-between">
-                        <span>Continental Cup</span>
+                        <span>{labels.cup}</span>
                         <span className="fw-semibold">{winner.cup.toFixed(2)}</span>
                       </div>
                       <div className="d-flex justify-content-between">
@@ -579,24 +647,19 @@ export function Awards() {
             </div>
 
             <h5>
-              Ballon d'Or shortlist
-              <HelpHint>
-                Every league is scored on one scale, so a big season in a weaker league doesn't
-                outrank a big season in a strong one just because its opponents were easier. Cup and
-                international football count too — they're the only places players from different
-                leagues actually meet.
-              </HelpHint>
+              {labels.shortlist}
+              <HelpHint>{labels.shortlistHelp}</HelpHint>
             </h5>
             <WorldAwardTable
-              entries={world.ballonDOr}
+              entries={shown.ballonDOr}
               subjectOf={subjectOf}
               leagueName={leagueName}
               season={activeSeason}
             />
 
             <PositionAward
-              title="Goalkeeper of the Year"
-              blurb="The Ballon d'Or is scored on goals, assists and rating, so no goalkeeper has ever come close to winning one. This is the award that is actually his: same worldwide scale, but judged on the things a keeper does — saves, goals kept out, and how he rated week to week."
+              title={labels.keeper}
+              blurb={labels.keeperBlurb}
               entries={bestKeepers}
               columns={KEEPER_COLUMNS}
               subjectOf={subjectOf}
@@ -606,8 +669,8 @@ export function Awards() {
             />
 
             <PositionAward
-              title="Defender of the Year"
-              blurb="Centre-backs and full-backs, judged on the work they actually do: tackles, interceptions, goals kept out and their rating, on the same worldwide scale as the Ballon d'Or."
+              title={labels.defender}
+              blurb={labels.defenderBlurb}
               entries={bestDefenders}
               columns={DEFENDER_COLUMNS}
               subjectOf={subjectOf}
@@ -616,9 +679,9 @@ export function Awards() {
               statLine={(st) => `${st.tackles} tackles · ${st.interceptions} interceptions`}
             />
 
-            <h5 className="mt-4">World Team of the Year</h5>
+            <h5 className="mt-4">{labels.team}</h5>
             <TeamOfSeasonField
-              pids={world.worldTeamOfYear}
+              pids={shown.worldTeamOfYear}
               subjectOf={subjectOf}
               userTid={league.meta.userTid}
             />

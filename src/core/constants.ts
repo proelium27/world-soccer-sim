@@ -5071,11 +5071,35 @@ export const GOAT_CUP_TITLE_WEIGHT = 25;
  */
 export const GOAT_SHIELD_TITLE_WEIGHT = 8;
 /**
- * An Americas Cup title: the top club trophy a player in the Americas can win,
- * so worth well over a Shield — but under a Continental Cup, whose field is
- * drawn from deeper and stronger leagues.
+ * What anything done at a club in the Americas counts for, against the same
+ * thing done at a European club (1 would be the same).
+ *
+ * The world is built around Europe, and a career spent in the Americas should
+ * not reach the worldwide honours or the GOAT board however good it was. This
+ * one number is how, applied everywhere those are scored rather than as an
+ * eligibility rule:
+ *
+ * - **World awards** (Ballon d'Or, World XI, Goalkeeper and Defender of the
+ *   Year): a player at a club in the Americas has his whole case multiplied by
+ *   it. The Americas' own awards (`WorldAwards.americas`) compare Americas
+ *   players with each other and take no discount.
+ * - **Player GOAT board**: everything that belongs to a season is scaled by the
+ *   club he was at that season (peak, prime, seasons played, titles, cups,
+ *   league and Americas awards); what a career keeps only as a total (match
+ *   rating, goals, assists, caps, World Cups) is scaled by the share of his
+ *   appearances made in the Americas.
+ * - **Club GOAT board**: every term for a club in the Americas.
+ *
+ * A career spent wholly in Europe scores exactly as it did before.
  */
-export const GOAT_AMERICAS_TITLE_WEIGHT = 15;
+export const AMERICAS_ACCOMPLISHMENT_SCALE = 0.25;
+/**
+ * An Americas Cup title: the Americas' own Continental Cup, and priced as one.
+ * What keeps it below a Continental Cup is AMERICAS_ACCOMPLISHMENT_SCALE, which
+ * applies wherever it is scored, rather than a smaller number here — one
+ * discount for every Americas accomplishment alike.
+ */
+export const GOAT_AMERICAS_TITLE_WEIGHT = GOAT_CUP_TITLE_WEIGHT;
 /**
  * A domestic cup, deliberately the cheapest trophy on the board: it's a knockout
  * a club can win in six games without being any good over a season, which is
@@ -5108,8 +5132,8 @@ export const GOAT_TEAM_CUP_TITLE_WEIGHT = 150;
  * it only entered by missing out on the better one.
  */
 export const GOAT_TEAM_SHIELD_TITLE_WEIGHT = 40;
-/** Same reasoning as the player weight: between a Shield and a Continental Cup. */
-export const GOAT_TEAM_AMERICAS_TITLE_WEIGHT = 80;
+/** Same reasoning as the player weight: a Continental Cup's worth, before AMERICAS_ACCOMPLISHMENT_SCALE. */
+export const GOAT_TEAM_AMERICAS_TITLE_WEIGHT = GOAT_TEAM_CUP_TITLE_WEIGHT;
 /** Same reasoning as the player weight: a fine trophy, a weak argument. */
 export const GOAT_TEAM_DOMESTIC_CUP_TITLE_WEIGHT = 40;
 /**
