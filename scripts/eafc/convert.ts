@@ -25,6 +25,7 @@ import { mapNation } from "./nations.js";
 import { ratingShapeFromEa, applySpread, shiftToOverall } from "./ratings.js";
 import { buildRescaler, type Rescaler } from "./scale.js";
 import { deriveColors, uniquifyAbbrevs, type IdentityOverrides } from "./identity.js";
+import { orderByConference } from "./conferences.js";
 
 import type { Position } from "../../src/core/players/types.js";
 import { POSITIONS } from "../../src/core/players/types.js";
@@ -122,11 +123,18 @@ export interface ConvertReport {
 /**
  * Fraction of a competition's slots the source must fill before its players are
  * rank-matched against that competition's own OVR band rather than the pooled
- * world. See wellCovered — 0.75 clears every league FC26 actually carries
- * (England's second tier is the thinnest at 20 of 24) and catches Greece, which
- * it holds 4 of 14 of.
+ * world. See wellCovered. It catches Greece (4 of 14, the four best clubs in the
+ * country) and nothing a real export carries more of.
+ *
+ * Lowered from 0.75 to 0.6 on 2026-09-14 for Brazil, measured rather than
+ * guessed: the Série A arrives as 13 of 20 clubs (EA licenses those, plus a
+ * relegated Fortaleza that is dropped), and pooled it came out 5 XI points below
+ * the league it replaces (68.2 against a generated 73.5, best club 74.6 against
+ * 83.9) — below Portugal, which is not what the Brasileirão is. Matched on its
+ * own band it lands at 71.8 (best 78.5). Thirteen of twenty is the whole top of
+ * the league, not a fragment, so it is the case the pooled curve was never for.
  */
-export const PARTIAL_LEAGUE_COVERAGE = 0.75;
+export const PARTIAL_LEAGUE_COVERAGE = 0.6;
 
 const clampInt = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(x)));
 
@@ -385,9 +393,11 @@ export function convert(csvText: string, opts: Partial<ConvertOptions> = {}): {
       );
     }
 
+    // Strength decides WHO gets a slot; a split division's real halves then
+    // decide the ORDER, since slots are seated positionally (see conferences.ts).
     chosen.set(
       comp,
-      ranked.slice(0, slots).map((c) => ({
+      orderByConference(comp, ranked.slice(0, slots)).map((c) => ({
         clubName: c.clubName,
         squad: pickSquad(c.roster, o.squadSize),
       })),

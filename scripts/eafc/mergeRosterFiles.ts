@@ -33,6 +33,7 @@ import { parseArgs } from "node:util";
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseRosterFile, type RosterFile, type RosterFileClub } from "../../src/core/teams/rosterFile.js";
 import { uniqueAbbrev } from "./identity.js";
+import { orderByConference } from "./conferences.js";
 
 /**
  * Club-type words, legal-form suffixes and founding years, none of which
@@ -60,6 +61,35 @@ const SPELLING: Record<string, string> = {
   munich: "munchen", cologne: "koln", milan: "milano", turin: "torino",
   seville: "sevilla", lisbon: "lisboa", nuremberg: "nurnberg", brunswick: "braunschweig",
 };
+
+/**
+ * Real, different clubs in the SAME country whose names pass the containment
+ * rule anyway — the residual false positive sameClub's note describes, met on
+ * the Americas names (2026-09-14). Each pair is the two names' tokens after
+ * NOISE removal. Cross-country collisions ("Santos" and "Santos Laguna",
+ * "Birmingham City" and "Birmingham Legion") need no entry: comparisons are
+ * scoped to one country (see mergeRosterFiles).
+ */
+const DISTINCT: [string, string][] = [
+  ["america mineiro", "mineiro"],             // América Mineiro vs Atlético Mineiro
+  ["botafogo sp", "botafogo"],                // Botafogo-SP (Ribeirão Preto) vs Botafogo
+  ["belgrano defensores", "belgrano"],        // Defensores de Belgrano vs Belgrano (Córdoba)
+  ["martin san tucuman", "tucuman"],          // San Martín de Tucumán vs Atlético Tucumán
+  ["cordoba", "central cordoba"],             // Racing de Córdoba vs Central Córdoba
+  ["azul cruz hidalgo", "azul cruz"],         // Cruz Azul Hidalgo vs Cruz Azul
+  ["miami", "inter miami"],                   // Miami FC vs Inter Miami CF
+];
+
+function knownDistinct(ta: string[], tb: string[]): boolean {
+  const a = [...ta].sort().join(" ");
+  const b = [...tb].sort().join(" ");
+  return DISTINCT.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
+}
+
+/** Same club by exact token set — preferred over containment wherever both exist. */
+function exactClub(a: string, b: string): boolean {
+  return tokens(a).sort().join(" ") === tokens(b).sort().join(" ");
+}
 
 /** Lowercase, strip accents and punctuation, drop noise words, unify spellings. */
 function tokens(name: string): string[] {
@@ -91,6 +121,7 @@ function sameClub(a: string, b: string): boolean {
   const ta = tokens(a);
   const tb = tokens(b);
   if (ta.length === 0 || tb.length === 0) return a.trim().toLowerCase() === b.trim().toLowerCase();
+  if (knownDistinct(ta, tb)) return false;
   const [short, long] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
   return short.every((t) => long.includes(t));
 }
@@ -98,7 +129,11 @@ function sameClub(a: string, b: string): boolean {
 /** The club in `pool` that `name` duplicates, preferring an exact-token match. */
 function duplicateOf(pool: string[], name: string): string | undefined {
   const t = tokens(name).sort().join(" ");
-  return pool.find((n) => tokens(n).sort().join(" ") === t) ?? pool.find((n) => sameClub(n, name));
+  // A name made entirely of NOISE words has no tokens, and two empty token sets
+  // are not the same club: Brazil's "Sport" read as a duplicate of "Athletic".
+  // sameClub already falls back to the raw name for exactly that case.
+  const exact = t === "" ? undefined : pool.find((n) => tokens(n).sort().join(" ") === t);
+  return exact ?? pool.find((n) => sameClub(n, name));
 }
 
 /** Country prefix of a competition name ("German Division 1" -> "German"). */
@@ -146,10 +181,14 @@ export function mergeRosterFiles(base: RosterFile, names: RosterFile): MergeResu
     ...names.competitions.map((c) => c.match).filter((m) => !baseByComp.has(m.trim().toLowerCase())),
   ];
 
-  // Claimed names span the WHOLE world, not one competition: the duplicates
-  // this exists to prevent are cross-division ones.
-  const claimed: string[] = [];
-  for (const c of base.competitions) for (const k of c.clubs) claimed.push(k.name);
+  // Claimed names span every division of a COUNTRY, not one competition: the
+  // duplicates this exists to prevent are cross-division ones (Bochum listed in
+  // both Bundesligas). Scoped to the country, because across countries the
+  // containment rule only produces false positives — Mexico's Santos Laguna was
+  // rejected as Brazil's Santos, and a guest club filled its Liga MX slot.
+  const claimed: { name: string; country: string }[] = [];
+  for (const c of base.competitions) for (const k of c.clubs) claimed.push({ name: k.name, country: countryOf(c.match) });
+  const claimedIn = (country: string) => claimed.filter((c) => c.country === country).map((c) => c.name);
 
   const used = new Set<RosterFileClub>();
   const filled: Filled[] = [];
@@ -162,10 +201,16 @@ export function mergeRosterFiles(base: RosterFile, names: RosterFile): MergeResu
   // already in the world must be spent recoloring it rather than left lying
   // around as a candidate to fill some other slot with a second copy.
   const recolor = new Map<RosterFileClub, [string, string]>();
-  const allNamesClubs = names.competitions.flatMap((c) => c.clubs);
   for (const comp of base.competitions) {
+    // Same country only, and an exact name before a contained one: by
+    // containment alone "New York City FC" took the Red Bulls' colors, since
+    // its words all appear in "New York Red Bulls".
+    const pool = names.competitions
+      .filter((c) => countryOf(c.match) === countryOf(comp.match))
+      .flatMap((c) => c.clubs);
     for (const club of comp.clubs) {
-      const match = allNamesClubs.find((n) => !used.has(n) && sameClub(n.name, club.name));
+      const free = pool.filter((n) => !used.has(n));
+      const match = free.find((n) => exactClub(n.name, club.name)) ?? free.find((n) => sameClub(n.name, club.name));
       if (!match) continue;
       used.add(match);
       // Colors only, never the abbreviation: the converter already ran its
@@ -196,7 +241,7 @@ export function mergeRosterFiles(base: RosterFile, names: RosterFile): MergeResu
       for (const cand of pool) {
         if (clubs.length >= slots) return;
         if (used.has(cand)) continue;
-        const dupe = duplicateOf(claimed, cand.name);
+        const dupe = duplicateOf(claimedIn(countryOf(match)), cand.name);
         if (dupe) {
           rejected.push({ candidate: cand.name, duplicateOf: dupe });
           used.add(cand); // a duplicate here is a duplicate everywhere
@@ -206,7 +251,7 @@ export function mergeRosterFiles(base: RosterFile, names: RosterFile): MergeResu
         const abbrev = uniqueAbbrev(cand.name, cand.abbrev, takenAbbrevs);
         takenAbbrevs.add(abbrev);
         clubs.push({ name: cand.name, abbrev, colors: cand.colors });
-        claimed.push(cand.name);
+        claimed.push({ name: cand.name, country: countryOf(match) });
         used.add(cand);
         filled.push({ competition: match, club: cand.name, from: nameComp?.match ?? "" });
       }
@@ -223,7 +268,9 @@ export function mergeRosterFiles(base: RosterFile, names: RosterFile): MergeResu
     }
     if (clubs.length < slots) unfilled.push({ competition: match, slots: slots - clubs.length });
 
-    return { match, clubs };
+    // Filled clubs were appended after the base's, so a split division has to be
+    // put back into its real halves here (see conferences.ts).
+    return { match, clubs: orderByConference(match, clubs, (c) => c.name) };
   });
 
   return {
