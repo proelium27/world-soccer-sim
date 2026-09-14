@@ -45,9 +45,11 @@ import { archiveDomesticCup } from "./domesticCup/archive.js";
 import { buildSuperCups } from "./superCup/superCup.js";
 import { computeCountrySwaps, applyCompetitionSwaps, stepAcademyBaseConvergence } from "./promotion.js";
 import {
-  playPromotionPlayoffs, playoffOutcomes, playoffsForSeason,
+  playPromotionPlayoffs, playoffOutcomes, playoffsForSeason, completePromotionPlayoffs,
 } from "./promotionPlayoff.js";
-import { playTitlePlayoffs, titlePlayoffsForSeason, titleChampions } from "./titlePlayoff.js";
+import {
+  playTitlePlayoffs, titlePlayoffsForSeason, titleChampions, completeTitlePlayoffs,
+} from "./titlePlayoff.js";
 import { buildCompetitionSchedule } from "./schedule.js";
 import { assignConferences } from "./conferences.js";
 import { updateHype } from "./finance/hype.js";
@@ -234,20 +236,23 @@ export function simOffseasonReporting(
   // derived from the league's own content, and both read end-of-season squads,
   // which is why this sits above contract renewals rather than beside the swap
   // it feeds at step 3.6. No shared-`rng` draw, so no league scoreline moves.
+  // A playoff the game drew but a caller left partly played (the game plays
+  // them a round per sim block, see playoffStages.ts) is finished here on the
+  // same streams, so it lands on the same result it would have on the clicks.
   const playedPlayoffs = playoffsForSeason(league.promotionPlayoffs, endingSeason);
   const promotionPlayoffs = playedPlayoffs.length > 0
-    ? playedPlayoffs
+    ? completePromotionPlayoffs(playedPlayoffs, league.teams, league.players, league.lid)
     : playPromotionPlayoffs(
       league.competitions, league.teams, league.players, tablesByCompId,
       league.lid, endingSeason,
     );
 
   // Title playoffs, on exactly the same terms: normally already played at the
-  // season boundary, replayed here for a caller that skipped it. Their winners
-  // become the season's champions at step 3.5.
+  // season boundary, finished or replayed here for a caller that skipped it.
+  // Their winners become the season's champions at step 3.5.
   const playedTitles = titlePlayoffsForSeason(league.titlePlayoffs, endingSeason);
   const titlePlayoffs = playedTitles.length > 0
-    ? playedTitles
+    ? completeTitlePlayoffs(playedTitles, league.teams, league.players, league.lid)
     : playTitlePlayoffs(
       league.competitions, league.teams, league.players, tablesByCompId,
       league.lid, endingSeason,

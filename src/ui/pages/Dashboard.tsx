@@ -14,6 +14,8 @@ import { competitionRegion } from "../../core/competitions.js";
 import { cupFinalists, isCupComplete } from "../../core/cup/cup.js";
 import { domesticFinalists } from "../../core/domesticCup/cup.js";
 import { isIntlStagePending, editableSquad } from "../../core/international/index.js";
+import { playoffsPending } from "../../core/playoffStages.js";
+import { PlayoffStageCard } from "../components/PlayoffStageCard.js";
 import { superCupsPending } from "../../core/superCup/superCup.js";
 import {
   intlStageButton,
@@ -178,7 +180,7 @@ export function Dashboard() {
 // maps, the wage bill, and the stat-leader scans over the whole player pool.
 function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: StoredTeam }) {
   const {
-    simAction, simLiveAction, setScoutingSpendAction, intlStageAction, simming,
+    simAction, simLiveAction, setScoutingSpendAction, intlStageAction, playoffStageAction, simming,
     playSuperCupsAction,
   } = useLeague();
   const navigate = useNavigate();
@@ -553,6 +555,15 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
                     See who'll have you
                   </button>
                 </>
+              ) : playoffsPending(league) ? (
+                // The playoffs come first: they close the club season, and the
+                // board's verdict waits for them.
+                <PlayoffStageCard
+                  league={league}
+                  simming={simming}
+                  onStage={() => playoffStageAction("stage")}
+                  onThrough={() => playoffStageAction("through")}
+                />
               ) : isIntlStagePending(league.international) ? (
                 <>
                   <p className="card-text">

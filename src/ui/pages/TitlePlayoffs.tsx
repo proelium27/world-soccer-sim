@@ -7,7 +7,7 @@ import { EmptyState } from "../components/EmptyState.js";
 import { seasonYear, ordinal } from "../format.js";
 import type { CupTie } from "../../core/cup/types.js";
 import type { TitlePlayoff } from "../../core/titlePlayoff.js";
-import { titlePlayoffRoundNames } from "../../core/titlePlayoff.js";
+import { titlePlayoffRoundNames, titlePlayoffNextRoundName } from "../../core/titlePlayoff.js";
 import { competitionOf, competitionTitlePlayoff } from "../../core/competitions.js";
 
 /**
@@ -85,7 +85,8 @@ export function TitlePlayoffs() {
         ) : (
           <EmptyState headline="No title playoffs have been played yet.">
             <p>
-              They are played the moment the season ends. This world holds them in{" "}
+              They are played a round at a time once the season ends, from the Dashboard. This
+              world holds them in{" "}
               {leaguesWithPlayoffs.map((c) => c.name).join(", ")}.
             </p>
           </EmptyState>
@@ -240,6 +241,7 @@ export function TitlePlayoffs() {
     playoff.ties.filter((t) => t.round === round && (half === undefined || halfOf(t.home) === half));
   const roundName = (round: number) => roundNames[round] ?? `Round ${round + 1}`;
   const userEntered = playoff.teams.includes(userTid);
+  const nextRound = titlePlayoffNextRoundName(playoff);
 
   const splitByConference = playoff.format === "conference" && !!playoff.conferences;
   const zoned = playoff.format === "zones" && !!playoff.conferences;
@@ -282,7 +284,12 @@ export function TitlePlayoffs() {
         </div>
       )}
 
-      {userEntered && (
+      {playoff.winnerTid === null ? (
+        <p className="text-muted small mb-3">
+          Still being played{nextRound ? `, with the ${nextRound.toLowerCase()} up next` : ""}. Each
+          round is its own sim, from the Dashboard.
+        </p>
+      ) : userEntered && (
         <p className="text-muted small mb-3">
           {playoff.winnerTid === userTid
             ? "You won the title through the playoffs."

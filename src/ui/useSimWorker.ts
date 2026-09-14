@@ -4,7 +4,7 @@ import type { LeagueStore } from "../core/leagueState.js";
 import type { PlayedMatch } from "../core/standings.js";
 import type { CupTie } from "../core/cup/types.js";
 import type { DomesticTieResult } from "../core/simThrough.js";
-import type { SimThrough, IntlMode, WorkerResponse } from "../worker/protocol.js";
+import type { SimThrough, IntlMode, PlayoffMode, WorkerResponse } from "../worker/protocol.js";
 import type { LeagueArchive } from "../core/simArchive.js";
 import {
   detachArchive, reattachArchive, detachPlayed, reattachPlayed,
@@ -83,6 +83,7 @@ export function useSimWorker() {
         e.data.type === "simResult" ||
         e.data.type === "offseasonResult" ||
         e.data.type === "intlResult" ||
+        e.data.type === "playoffsResult" ||
         e.data.type === "jumpResult"
       ) {
         setSimming(false);
@@ -130,6 +131,7 @@ export function useSimWorker() {
         | { type: "sim"; through: SimThrough; league: LeagueStore }
         | { type: "offseason"; league: LeagueStore }
         | { type: "intl"; mode: IntlMode; league: LeagueStore }
+        | { type: "playoffs"; mode: PlayoffMode; league: LeagueStore }
         | { type: "jump"; seasons: number; league: LeagueStore },
       handlers: {
         onProgress?: (progress: SimProgress) => void;
@@ -232,6 +234,11 @@ export function useSimWorker() {
     [post],
   );
 
+  const runPlayoffStage = useCallback(
+    (mode: PlayoffMode, league: LeagueStore): Promise<LeagueStore> => post({ type: "playoffs", mode, league }),
+    [post],
+  );
+
   const runJump = useCallback(
     (
       seasons: number,
@@ -241,5 +248,5 @@ export function useSimWorker() {
     [post],
   );
 
-  return { sim, runOffseason, runIntlStage, runJump, simming };
+  return { sim, runOffseason, runIntlStage, runPlayoffStage, runJump, simming };
 }

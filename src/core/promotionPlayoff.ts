@@ -7,9 +7,8 @@ import type { CupTie } from "./cup/types.js";
 import {
   countryDivisions, promotionLinks, effectivePromotionSpots, competitionPlayoffFormat,
 } from "./competitions.js";
-import { leagueMatchData } from "./league/composites.js";
 import { playFirstLeg, resolveTwoLeggedTie, resolveCupTie } from "./cup/simCup.js";
-import { teamSeasonFormDelta, applySeasonForm } from "./teamSeasonForm.js";
+import { playoffMatchData } from "./playoffMatchData.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
 import { PROMOTION_PLAYOFF_SEMI_FINALS } from "./constants.js";
 
@@ -47,11 +46,12 @@ export type PlayedPlayoffFormat = "english" | "german";
  *    incumbent goes down, or neither moves and the country simply promotes and
  *    relegates one fewer.
  *
- * Played inside the offseason, on end-of-season squads, and stored on the
- * season-history entry for the season it decides. Box scores are deliberately
- * **never** kept — the whole world plays these ties every season and a save
- * keeps its history forever, so scorelines are the record (see CLAUDE.md's
- * save-size section for what happens when that rule is relaxed).
+ * Drawn when the season ends and played a round at a time (see
+ * playoffStages.ts), on end-of-season squads, then stored on the season-history
+ * entry for the season it decides. Box scores are deliberately **never** kept —
+ * the whole world plays these ties every season and a save keeps its history
+ * forever, so scorelines are the record (see CLAUDE.md's save-size section for
+ * what happens when that rule is relaxed).
  */
 export interface PromotionPlayoff {
   /** The season just finished — the one whose final tables seeded this. */
@@ -89,7 +89,8 @@ export interface PromotionPlayoff {
   autoRelegated: number;
   /**
    * English: two semi-finals (round `PLAYOFF_ROUND_SEMI`) then the final.
-   * German: the single two-legged tie, at `PLAYOFF_ROUND_FINAL`.
+   * German: the single two-legged tie, at `PLAYOFF_ROUND_FINAL`. Only the
+   * rounds played so far; empty on a playoff drawn but unplayed.
    * `boxScore` is always null — see the interface note.
    */
   ties: CupTie[];
@@ -97,7 +98,7 @@ export interface PromotionPlayoff {
    * Who won the deciding tie. For the English format that is always the club
    * promoted; for the German one it may be the **incumbent from above**, which means
    * nobody moves. Read `playoffOutcomes` rather than this field to find out
-   * what actually happened to the table. Null only while unplayed.
+   * what actually happened to the table. Null while unplayed.
    */
   winnerTid: number | null;
 }
@@ -308,23 +309,9 @@ function tieRng(lid: number, season: number, d2CompId: number, round: number, ti
   return mulberry32(hashInts(lid, season, d2CompId, round, tie, PROMOTION_PLAYOFF_STREAM));
 }
 
-/**
- * Play one country's playoff, dispatched on its format.
- *
- * Every tie runs on its own seeded stream derived from
- * (lid, season, d2 competition, round, tie index) — never the shared league
- * `rng`, and never a stream any cup uses. The whole thing is therefore
- * reproducible from the league's content alone, which is what lets it be played
- * either at the offseason transition or lazily at the top of `simOffseason` and
- * come out the same.
- */
-export function playPromotionPlayoff(
-  field: PlayoffField,
-  matchData: Map<number, TeamMatchData>,
-  lid: number,
-  season: number,
-): PromotionPlayoff {
-  const base: PromotionPlayoff = {
+/** A promotion playoff drawn from its field, with nothing played. */
+export function drawPromotionPlayoff(field: PlayoffField, season: number): PromotionPlayoff {
+  return {
     season,
     country: field.country,
     d1CompId: field.d1CompId,
@@ -338,55 +325,115 @@ export function playPromotionPlayoff(
     ties: [],
     winnerTid: null,
   };
+}
+
+/** Every promotion playoff the season's tables seat, drawn and unplayed. */
+export function drawPromotionPlayoffs(
+  competitions: Competition[],
+  tablesByCompId: Map<number, StandingsRow[]>,
+  season: number,
+): PromotionPlayoff[] {
+  return promotionPlayoffFields(competitions, tablesByCompId).map((f) => drawPromotionPlayoff(f, season));
+}
+
+/** How many rounds a playoff has: semi-finals and a final, or the German tie alone. */
+export function promotionPlayoffRoundCount(playoff: { format: PlayedPlayoffFormat }): number {
+  return playoff.format === "german" ? 1 : 2;
+}
+
+/** Rounds still to play; 0 once decided. */
+export function promotionPlayoffRoundsLeft(playoff: PromotionPlayoff): number {
+  if (playoff.winnerTid !== null) return 0;
+  if (playoff.format === "german") return playoff.ties.length === 0 ? 1 : 0;
+  if (playoff.ties.some((t) => t.round === PLAYOFF_ROUND_FINAL)) return 0;
+  return playoff.ties.length === 0 ? 2 : 1;
+}
+
+/** What the next round is called, or null once decided. */
+export function promotionPlayoffNextRoundName(playoff: PromotionPlayoff): string | null {
+  const left = promotionPlayoffRoundsLeft(playoff);
+  if (left === 0) return null;
+  if (playoff.format === "german") return "Playoff";
+  return left === 2 ? "Semi-finals" : "Final";
+}
+
+/** The clubs that play in the next round: every entrant, then the semi-final winners. */
+export function promotionPlayoffNextEntrants(playoff: PromotionPlayoff): Set<number> {
+  const left = promotionPlayoffRoundsLeft(playoff);
+  if (left === 0) return new Set();
+  if (playoff.format === "german" || left === 2) return new Set(playoff.teams);
+  return new Set(playoff.ties.filter((t) => t.round === PLAYOFF_ROUND_SEMI).map((t) => t.winner));
+}
+
+/**
+ * Play the next round of one country's playoff on prepared match data,
+ * dispatched on its format. A no-op once decided.
+ *
+ * Every tie runs on its own seeded stream derived from
+ * (lid, season, d2 competition, round, tie index) — never the shared league
+ * `rng`, and never a stream any cup uses. So a round played on its own click
+ * is the same round the single-pass `playPromotionPlayoff` plays, and the whole
+ * thing is reproducible from the league's content alone.
+ */
+export function playPromotionPlayoffRound(
+  playoff: PromotionPlayoff,
+  matchData: Map<number, TeamMatchData>,
+  lid: number,
+): PromotionPlayoff {
+  const left = promotionPlayoffRoundsLeft(playoff);
+  if (left === 0) return playoff;
+  const season = playoff.season;
 
   // A club with no match data can't be fielded. Only reachable if a club left
   // its division between the table and here, but the tie must still produce
   // exactly one winner or the swap is left holding an undecided place.
   const canPlay = (tid: number): boolean => matchData.has(tid);
-  if (!field.teams.every(canPlay)) {
+  if (!playoff.teams.every(canPlay)) {
     // The incumbent keeps his place when the tie cannot be played, which for
     // the German format means nobody moves and for the English one hands the
     // place to the best-placed entrant who can field a side.
-    const fallback = field.format === "german"
-      ? field.teams[0]
-      : field.teams.find(canPlay) ?? field.teams[0];
-    return { ...base, winnerTid: fallback };
+    const fallback = playoff.format === "german"
+      ? playoff.teams[0]
+      : playoff.teams.find(canPlay) ?? playoff.teams[0];
+    return { ...playoff, winnerTid: fallback };
   }
 
-  if (field.format === "german") {
+  if (playoff.format === "german") {
     // The challenger from below hosts the first leg and the incumbent from
     // above the second, the same way round the English bracket does it.
     // Cosmetic here for the reason semiFinalPairings sets out, so no result
     // rests on it.
-    const [incumbent, challenger] = field.teams;
-    const rng = tieRng(lid, season, field.d2CompId, PLAYOFF_ROUND_FINAL, 0);
+    const [incumbent, challenger] = playoff.teams;
+    const rng = tieRng(lid, season, playoff.d2CompId, PLAYOFF_ROUND_FINAL, 0);
     const hd = matchData.get(challenger)!;
     const ad = matchData.get(incumbent)!;
     const leg1 = playFirstLeg(rng, challenger, incumbent, hd, ad, PLAYOFF_ROUND_FINAL);
     const tie = resolveTwoLeggedTie(rng, leg1, hd, ad, 0);
-    return { ...base, ties: [{ ...tie, boxScore: null }], winnerTid: tie.winner };
+    return { ...playoff, ties: [{ ...tie, boxScore: null }], winnerTid: tie.winner };
   }
 
-  const ties: CupTie[] = [];
-  const finalists: number[] = [];
-  semiFinalPairings(field.teams.length).forEach(({ home, away }, i) => {
-    const homeTid = field.teams[home];
-    const awayTid = field.teams[away];
-    const rng = tieRng(lid, season, field.d2CompId, PLAYOFF_ROUND_SEMI, i);
-    const hd = matchData.get(homeTid)!;
-    const ad = matchData.get(awayTid)!;
-    const leg1 = playFirstLeg(rng, homeTid, awayTid, hd, ad, PLAYOFF_ROUND_SEMI);
-    const tie = resolveTwoLeggedTie(rng, leg1, hd, ad, 0);
-    ties.push({ ...tie, boxScore: null });
-    finalists.push(tie.winner);
-  });
+  if (left === 2) {
+    const semis: CupTie[] = semiFinalPairings(playoff.teams.length).map(({ home, away }, i) => {
+      const homeTid = playoff.teams[home];
+      const awayTid = playoff.teams[away];
+      const rng = tieRng(lid, season, playoff.d2CompId, PLAYOFF_ROUND_SEMI, i);
+      const hd = matchData.get(homeTid)!;
+      const ad = matchData.get(awayTid)!;
+      const leg1 = playFirstLeg(rng, homeTid, awayTid, hd, ad, PLAYOFF_ROUND_SEMI);
+      return { ...resolveTwoLeggedTie(rng, leg1, hd, ad, 0), boxScore: null };
+    });
+    return { ...playoff, ties: semis };
+  }
 
   // The better league finisher is listed first. `teams` is already in finishing
   // order, so the lower index is the higher finish.
-  finalists.sort((a, b) => field.teams.indexOf(a) - field.teams.indexOf(b));
+  const finalists = playoff.ties
+    .filter((t) => t.round === PLAYOFF_ROUND_SEMI)
+    .map((t) => t.winner)
+    .sort((a, b) => playoff.teams.indexOf(a) - playoff.teams.indexOf(b));
   const [finalHome, finalAway] = finalists;
   const decider = resolveCupTie(
-    tieRng(lid, season, field.d2CompId, PLAYOFF_ROUND_FINAL, 0),
+    tieRng(lid, season, playoff.d2CompId, PLAYOFF_ROUND_FINAL, 0),
     finalHome,
     finalAway,
     matchData.get(finalHome)!,
@@ -398,13 +445,29 @@ export function playPromotionPlayoff(
     // tie is neutral end to end.
     true,
   );
-  ties.push({ ...decider, boxScore: null });
+  return {
+    ...playoff,
+    ties: [...playoff.ties, { ...decider, boxScore: null }],
+    winnerTid: decider.winner,
+  };
+}
 
-  return { ...base, ties, winnerTid: decider.winner };
+/** Play one country's playoff start to finish on prepared match data. */
+export function playPromotionPlayoff(
+  field: PlayoffField,
+  matchData: Map<number, TeamMatchData>,
+  lid: number,
+  season: number,
+): PromotionPlayoff {
+  let playoff = drawPromotionPlayoff(field, season);
+  for (let guard = 0; promotionPlayoffRoundsLeft(playoff) > 0 && guard < 4; guard++) {
+    playoff = playPromotionPlayoffRound(playoff, matchData, lid);
+  }
+  return playoff;
 }
 
 /**
- * Play every country's promotion playoff for the season that just finished.
+ * The match data a promotion playoff is played on.
  *
  * **Which clubs share a normalization baseline depends on the format, and this
  * is the same lesson `cupMatchData` and the domestic cups already carry.**
@@ -417,11 +480,42 @@ export function playPromotionPlayoff(
  *    cross-division. A club measured against its own division reads as an
  *    average side and would meet the division above as an equal, which would
  *    make the incumbent's advantage vanish.
- *
- * Season form is applied, because the playoff is the last act of the season it
- * decides. Suspensions are deliberately not carried in, the same call the cups
- * make: a ban is served in league matchdays and the offseason has no matchday
- * clock to serve one against. Injuries **are** honoured, since
+ */
+export function promotionPlayoffMatchData(
+  playoff: { format: PlayedPlayoffFormat; d1CompId: number; d2CompId: number; season: number },
+  teams: readonly StoredTeam[],
+  players: Player[],
+  lid: number,
+): Map<number, TeamMatchData> {
+  const pool = playoff.format === "german"
+    ? new Set([playoff.d1CompId, playoff.d2CompId])
+    : new Set([playoff.d2CompId]);
+  return playoffMatchData(teams, players, pool, lid, playoff.season);
+}
+
+/** Play every round the given playoffs have left. Decided ones come back untouched. */
+export function completePromotionPlayoffs(
+  playoffs: PromotionPlayoff[],
+  teams: readonly StoredTeam[],
+  players: Player[],
+  lid: number,
+): PromotionPlayoff[] {
+  return playoffs.map((p) => {
+    if (promotionPlayoffRoundsLeft(p) === 0) return p;
+    const matchData = promotionPlayoffMatchData(p, teams, players, lid);
+    let playoff = p;
+    for (let guard = 0; promotionPlayoffRoundsLeft(playoff) > 0 && guard < 4; guard++) {
+      playoff = playPromotionPlayoffRound(playoff, matchData, lid);
+    }
+    return playoff;
+  });
+}
+
+/**
+ * Play every country's promotion playoff for the season that just finished,
+ * start to finish. Suspensions are deliberately not carried in, the same call
+ * the cups make: a ban is served in league matchdays and the offseason has no
+ * matchday clock to serve one against. Injuries **are** honoured, since
  * `leagueMatchData` filters them for every caller.
  */
 export function playPromotionPlayoffs(
@@ -432,40 +526,9 @@ export function playPromotionPlayoffs(
   lid: number,
   season: number,
 ): PromotionPlayoff[] {
-  const fields = promotionPlayoffFields(competitions, tablesByCompId);
-  if (fields.length === 0) return [];
-
-  return fields.map((field) => {
-    const pool = field.format === "german"
-      ? new Set([field.d1CompId, field.d2CompId])
-      : new Set([field.d2CompId]);
-    const poolTeams = teams.filter((t) => pool.has(t.compId));
-    const data = leagueMatchData({
-      teams: poolTeams.map((t) => ({
-        tid: t.tid,
-        name: t.name,
-        roster: t.roster,
-        avgOvr: 0,
-        academyBase: t.academyBase,
-        compId: t.compId,
-        starters: t.starters,
-        formation: t.formation,
-        moreMinutes: t.moreMinutes,
-      })),
-      players,
-    });
-    const matchData = new Map<number, TeamMatchData>();
-    poolTeams.forEach((t, i) => {
-      const delta = teamSeasonFormDelta(lid, season, t.tid);
-      const d = data[i];
-      matchData.set(t.tid, delta === 0 ? d : {
-        ...d,
-        composites: applySeasonForm(d.composites, delta),
-        recompute: (onPitch) => applySeasonForm(d.recompute(onPitch), delta),
-      });
-    });
-    return playPromotionPlayoff(field, matchData, lid, season);
-  });
+  return completePromotionPlayoffs(
+    drawPromotionPlayoffs(competitions, tablesByCompId, season), teams, players, lid,
+  );
 }
 
 /**

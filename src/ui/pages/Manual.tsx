@@ -788,10 +788,15 @@ export function Manual() {
             only the German one is offered.
           </p>
           <p>
-            It's played the moment the season ends, before anyone retires or moves clubs, so a
-            veteran on his way out gets one last game. Suspensions don't carry into it — there are
-            no matchdays left to serve a ban against — but injuries do. Results are on the{" "}
-            <strong>Promotion Playoffs</strong> page, for any country and any past season.
+            It's played after the last matchday, before anyone retires or moves clubs, so a
+            veteran on his way out gets one last game. The brackets are drawn off the final table
+            and then played a round per sim, from the Dashboard or the Sim menu, alongside the{" "}
+            <a href="#title-playoffs">title playoffs</a>: each click plays one round everywhere, and
+            the rounds are lined up so every final is on the last click. "Sim through the playoffs"
+            plays them all, but stops before any round your club is in so you can pick your team.
+            Suspensions don't carry into it — there are no matchdays left to serve a ban against —
+            but injuries do. Results are on the <strong>Promotion Playoffs</strong> page, for any
+            country and any past season.
           </p>
           <p>
             The big four (England, Spain, Italy and Germany) are all built to the same strength and
@@ -1428,9 +1433,14 @@ export function Manual() {
             just not a title-winning one. The board does give you credit for the title if you win it.
           </p>
           <p>
-            It&apos;s played the moment the season ends, before anyone retires or moves clubs, with
+            It&apos;s played after the last matchday, before anyone retires or moves clubs, with
             injuries honoured and suspensions wiped, the same as the{" "}
-            <a href="#world">promotion playoffs</a>. The brackets are on the{" "}
+            <a href="#world">promotion playoffs</a>, and on the same clock: the season ends, the
+            brackets are drawn, and you play them a round at a time from the Dashboard. The deepest
+            bracket (the US, five rounds) starts first and the others join as they come level, so
+            every final lands on the same click. The offseason, and your board&apos;s verdict on the
+            season, wait until the finals are played. If you&apos;re in one, simming through stops
+            before each round you play so you can set your lineup. The brackets are on the{" "}
             <strong>Title Playoffs</strong> page. The number beside each club is where it finished,
             with its zone&apos;s letter in Argentina (A1 is first in Zone A); the US page draws each
             conference as its own bracket, with the final between the two champions underneath.

@@ -50,9 +50,9 @@ export function PromotionPlayoffs() {
       just missed out below plays the lowest club that just survived above, home and away, and the
       winner has the place next season. Lose it from above and you go down; hold on and nobody
       moves at all. Countries with a third division play one at each boundary, so there is a way
-      up whichever tier you are in. Either way it&apos;s played the moment the season ends, before
-      anyone retires or moves on, and you can set which one each country uses when you start a
-      save.
+      up whichever tier you are in. Either way it&apos;s played a round at a time once the season
+      ends, from the Dashboard, before anyone retires or moves on, and you can set which one each
+      country uses when you start a save.
     </HelpHint>
   );
 
@@ -62,8 +62,8 @@ export function PromotionPlayoffs() {
         <h4>Promotion Playoffs{intro}</h4>
         <EmptyState headline="No playoffs have been decided yet.">
           <p>
-            They are played the moment the season ends, before anyone retires or moves on, and
-            they settle the last promotion place at each step of a country&apos;s pyramid.
+            They are played a round at a time once the season ends, before anyone retires or moves
+            on, and they settle the last promotion place at each step of a country&apos;s pyramid.
           </p>
           <p>
             Which shape a country uses is set when you start a save. Most play the English way,
@@ -175,7 +175,11 @@ export function PromotionPlayoffs() {
           </div>
         )}
 
-        {userEntered && (
+        {playoff.winnerTid === null ? (
+          <p className="text-muted small mb-3">
+            Still being played. Each round is its own sim, from the Dashboard.
+          </p>
+        ) : userEntered && (
           <p className="text-muted small mb-3">
             {playoff.winnerTid === userTid
               ? (promotedTid === userTid ? "You went up through the playoffs." : "You held on to your place.")

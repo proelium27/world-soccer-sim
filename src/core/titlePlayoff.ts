@@ -6,9 +6,8 @@ import type { TeamMatchData } from "./league/composites.js";
 import type { CupTie, SeriesGame } from "./cup/types.js";
 import { competitionTitlePlayoff, competitionConferences } from "./competitions.js";
 import { conferenceMembers, type ConferenceTeam } from "./conferences.js";
-import { leagueMatchData } from "./league/composites.js";
 import { playFirstLeg, resolveTwoLeggedTie, resolveCupTie } from "./cup/simCup.js";
-import { teamSeasonFormDelta, applySeasonForm } from "./teamSeasonForm.js";
+import { playoffMatchData } from "./playoffMatchData.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
 import {
   TITLE_PLAYOFF_TEAMS, CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS,
@@ -33,13 +32,15 @@ import {
  * that record, so the title follows it without anything else knowing playoffs
  * exist.
  *
- * Shaped exactly like the promotion playoff, which is the precedent for all of
- * it: played at the season boundary in `simThrough` on end-of-season squads,
- * replayed by `simOffseason` for any caller that never came through there, held
- * on `LeagueStore.titlePlayoffs` only until the offseason copies it onto the
- * season's history, and never storing a box score. Every tie draws its own
- * stream off the league's content, never the shared `rng`, so adding this
- * cannot move a single league scoreline and both paths land on one result.
+ * **Played a round at a time.** A bracket is drawn when the season ends
+ * (`drawTitlePlayoffs`) and each call to `playTitlePlayoffRound` plays its next
+ * round — the game stages those rounds as separate sim blocks (see
+ * playoffStages.ts). Every tie draws its own stream off
+ * (lid, season, competition, round, tie index), never the shared `rng`, so a
+ * round played on its own click is the same round `playTitlePlayoff` plays in a
+ * single pass, and adding this cannot move a single league scoreline. Box scores
+ * are never kept; the offseason copies the finished bracket onto the season's
+ * history.
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** rng-stream tag, clear of every other competition's (see promotionPlayoff.ts for the list). */
@@ -68,12 +69,14 @@ export interface TitlePlayoff {
   conferences?: [number[], number[]];
   conferenceNames?: [string, string];
   /**
-   * Every tie, in round order (see `titlePlayoffRoundNames` for what each round
-   * index is called) and bracket order within a round. Two-legged ties carry
-   * both legs, best-of-three series carry each game. `boxScore` is always null.
+   * Every tie played so far, in round order (see `titlePlayoffRoundNames` for
+   * what each round index is called) and bracket order within a round — a
+   * round's ties pair off two by two into the next. Two-legged ties carry both
+   * legs, best-of-three series carry each game. `boxScore` is always null.
+   * Empty on a bracket drawn but not yet played.
    */
   ties: CupTie[];
-  /** The champion, or null while unplayed. */
+  /** The champion, or null while the final is still to play. */
   winnerTid: number | null;
 }
 
@@ -179,6 +182,72 @@ function tieRng(lid: number, season: number, compId: number, round: number, tie:
   return mulberry32(hashInts(lid, season, compId, round, tie, TITLE_PLAYOFF_STREAM));
 }
 
+/** How many rounds a format's bracket has. */
+export function titlePlayoffRoundCount(format: PlayedTitlePlayoffFormat): number {
+  return titlePlayoffRoundNames(format).length;
+}
+
+/** Rounds played so far. A round's ties are appended together, so this is one past the highest on record. */
+function roundsPlayed(playoff: TitlePlayoff): number {
+  let n = 0;
+  for (const t of playoff.ties) n = Math.max(n, t.round + 1);
+  return n;
+}
+
+/** Rounds still to play; 0 once there is a champion. */
+export function titlePlayoffRoundsLeft(playoff: TitlePlayoff): number {
+  if (playoff.winnerTid !== null) return 0;
+  return Math.max(0, titlePlayoffRoundCount(playoff.format) - roundsPlayed(playoff));
+}
+
+/** What the next round is called, or null once the playoff is decided. */
+export function titlePlayoffNextRoundName(playoff: TitlePlayoff): string | null {
+  if (titlePlayoffRoundsLeft(playoff) === 0) return null;
+  return titlePlayoffRoundNames(playoff.format)[roundsPlayed(playoff)] ?? null;
+}
+
+/**
+ * The clubs that play in the next round. Round one of MLS's playoff is the
+ * seven seeds the wild card skipped plus its two winners; every other round
+ * after the first is whoever won the round before.
+ */
+export function titlePlayoffNextEntrants(playoff: TitlePlayoff): Set<number> {
+  if (titlePlayoffRoundsLeft(playoff) === 0) return new Set();
+  const round = roundsPlayed(playoff);
+  const previousWinners = playoff.ties.filter((t) => t.round === round - 1).map((t) => t.winner);
+  if (playoff.format === "conference" && playoff.conferences) {
+    const halves = playoff.conferences;
+    if (round === 0) return new Set(halves.flatMap((c) => [c[7], c[8]]));
+    if (round === 1) return new Set([...halves.flatMap((c) => c.slice(0, 7)), ...previousWinners]);
+  }
+  return new Set(round === 0 ? playoff.teams : previousWinners);
+}
+
+/** A title playoff drawn from its field, with nothing played. */
+export function drawTitlePlayoff(field: TitlePlayoffField, season: number): TitlePlayoff {
+  return {
+    season,
+    country: field.country,
+    compId: field.compId,
+    format: field.format,
+    teams: field.teams,
+    ...(field.conferences ? { conferences: field.conferences } : {}),
+    ...(field.conferenceNames ? { conferenceNames: field.conferenceNames } : {}),
+    ties: [],
+    winnerTid: null,
+  };
+}
+
+/** Every title playoff the season's tables seat, drawn and unplayed. */
+export function drawTitlePlayoffs(
+  competitions: Competition[],
+  tablesByCompId: ReadonlyMap<number, StandingsRow[]>,
+  teams: readonly ConferenceTeam[],
+  season: number,
+): TitlePlayoff[] {
+  return titlePlayoffFields(competitions, tablesByCompId, teams).map((f) => drawTitlePlayoff(f, season));
+}
+
 /**
  * Play one tie of the eight-club formats. The better seed is `high`.
  *
@@ -220,66 +289,62 @@ function playTie(
   };
 }
 
-/** Play one title playoff on prepared match data. Pure apart from its own seeded streams. */
-export function playTitlePlayoff(
-  field: TitlePlayoffField,
+/**
+ * Play the next round of one title playoff on prepared match data, returning
+ * the playoff with that round's ties appended (and its champion, if the round
+ * was the final). A no-op once there is a champion.
+ *
+ * Tie indices count up within the round in the same order the single-pass
+ * bracket always played them, which is what keeps each tie on the same seeded
+ * stream however the rounds are split up.
+ */
+export function playTitlePlayoffRound(
+  playoff: TitlePlayoff,
   matchData: Map<number, TeamMatchData>,
   lid: number,
-  season: number,
 ): TitlePlayoff {
-  const base: TitlePlayoff = {
-    season,
-    country: field.country,
-    compId: field.compId,
-    format: field.format,
-    teams: field.teams,
-    ...(field.conferences ? { conferences: field.conferences } : {}),
-    ...(field.conferenceNames ? { conferenceNames: field.conferenceNames } : {}),
-    ties: [],
-    winnerTid: null,
-  };
+  if (titlePlayoffRoundsLeft(playoff) === 0) return playoff;
   // A club that cannot be fielded (left the division between the table and
   // here — unreachable in a real save) would leave a tie undecided, so the
   // table's champion keeps the title instead.
-  if (!field.teams.every((tid) => matchData.has(tid))) {
-    return { ...base, winnerTid: field.teams[0] };
+  if (!playoff.teams.every((tid) => matchData.has(tid))) {
+    return { ...playoff, winnerTid: playoff.teams[0] };
   }
 
+  const season = playoff.season;
+  const round = roundsPlayed(playoff);
+  const lastRound = titlePlayoffRoundCount(playoff.format) - 1;
   // Better = higher in the OVERALL table. Within one half that is the same as
   // the half's own seeding, and between the halves it is what decides who hosts
   // MLS's final.
-  const rank = new Map(field.teams.map((tid, i) => [tid, i]));
+  const rank = new Map(playoff.teams.map((tid, i) => [tid, i]));
   const better = (a: number, b: number): [number, number] =>
     (rank.get(a)! <= rank.get(b)! ? [a, b] : [b, a]);
   const md = (tid: number) => matchData.get(tid)!;
+  const previous = playoff.ties.filter((t) => t.round === round - 1).map((t) => t.winner);
+  const pairUp = (winners: number[]): [number, number][] =>
+    Array.from({ length: winners.length / 2 }, (_, i) => [winners[2 * i], winners[2 * i + 1]]);
 
   const ties: CupTie[] = [];
-  const counters = new Map<number, number>();
-  const nextIndex = (round: number) => {
-    const i = counters.get(round) ?? 0;
-    counters.set(round, i + 1);
-    return i;
-  };
+  let index = 0;
 
   /** A one-off game at the better club's ground (or neutral), extra time optional. */
-  const single = (a: number, b: number, round: number, opts: { extraTime: boolean; neutral?: boolean }): number => {
+  const single = (a: number, b: number, opts: { extraTime: boolean; neutral?: boolean }): void => {
     const [high, low] = better(a, b);
-    const rng = tieRng(lid, season, field.compId, round, nextIndex(round));
-    const tie: CupTie = {
+    const rng = tieRng(lid, season, playoff.compId, round, index++);
+    ties.push({
       ...resolveCupTie(rng, high, low, md(high), md(low), round, 0, opts.neutral ?? false, opts.extraTime),
       boxScore: null,
-    };
-    ties.push(tie);
-    return tie.winner;
+    });
   };
 
   /**
    * MLS's best-of-three: game one and a decider at the better club's ground,
    * game two at the other's, every level game straight to penalties.
    */
-  const series = (a: number, b: number, round: number): number => {
+  const series = (a: number, b: number): void => {
     const [high, low] = better(a, b);
-    const rng = tieRng(lid, season, field.compId, round, nextIndex(round));
+    const rng = tieRng(lid, season, playoff.compId, round, index++);
     const games: SeriesGame[] = [];
     let highWins = 0;
     let lowWins = 0;
@@ -302,79 +367,109 @@ export function playTitlePlayoff(
       if (g.winner === high) highWins++;
       else lowWins++;
     }
-    const winner = highWins > lowWins ? high : low;
     ties.push({
       round, matchday: 0, home: high, away: low, homeGoals: highWins, awayGoals: lowWins,
       wentToExtraTime: false, wentToPens: false, homePens: 0, awayPens: 0,
-      winner, boxScore: null, series: games,
+      winner: highWins > lowWins ? high : low, boxScore: null, series: games,
     });
-    return winner;
   };
 
-  const pairUp = (winners: number[]): [number, number][] =>
-    Array.from({ length: winners.length / 2 }, (_, i) => [winners[2 * i], winners[2 * i + 1]]);
-
-  if (field.format === "conference") {
-    const halves = field.conferences!;
-    // Wild card: 8th v 9th in each conference, straight to penalties.
-    const wildCard = halves.map((c) => single(c[7], c[8], 0, { extraTime: false }));
-    // Round one, best of three: 1 v wild card and 4 v 5 in one half of the
-    // bracket, 2 v 7 and 3 v 6 in the other.
-    const roundOne = halves.map((c, ci) => [
-      series(c[0], wildCard[ci], 1),
-      series(c[3], c[4], 1),
-      series(c[1], c[6], 1),
-      series(c[2], c[5], 1),
-    ]);
-    const semis = roundOne.map((w) => pairUp(w).map(([a, b]) => single(a, b, 2, { extraTime: true })));
-    const finals = semis.map(([a, b]) => single(a, b, 3, { extraTime: true }));
-    const champion = single(finals[0], finals[1], 4, { extraTime: true });
-    return { ...base, ties, winnerTid: champion };
-  }
-
-  if (field.format === "zones") {
-    const [zoneA, zoneB] = field.conferences!;
-    const interleaved = zoneA.flatMap((tid, i) => [tid, zoneB[i]]);
-    let winners = ZONE_ROUND_OF_16_PAIRS.map(([x, y]) =>
-      single(interleaved[x], interleaved[y], 0, { extraTime: false }));
-    for (let round = 1; round <= 2; round++) {
-      winners = pairUp(winners).map(([a, b]) => single(a, b, round, { extraTime: false }));
+  if (playoff.format === "conference") {
+    const halves = playoff.conferences!;
+    if (round === 0) {
+      // Wild card: 8th v 9th in each conference, straight to penalties.
+      halves.forEach((c) => single(c[7], c[8], { extraTime: false }));
+    } else if (round === 1) {
+      // Round one, best of three: 1 v wild card and 4 v 5 in one half of the
+      // bracket, 2 v 7 and 3 v 6 in the other.
+      halves.forEach((c, ci) => {
+        series(c[0], previous[ci]);
+        series(c[3], c[4]);
+        series(c[1], c[6]);
+        series(c[2], c[5]);
+      });
+    } else {
+      // Conference semi-finals and finals pair each conference's winners, first
+      // conference first; the final pairs the two conference champions.
+      pairUp(previous).forEach(([a, b]) => single(a, b, { extraTime: true }));
     }
-    const champion = single(winners[0], winners[1], 3, { extraTime: true, neutral: true });
-    return { ...base, ties, winnerTid: champion };
+  } else if (playoff.format === "zones") {
+    if (round === 0) {
+      const [zoneA, zoneB] = playoff.conferences!;
+      const interleaved = zoneA.flatMap((tid, i) => [tid, zoneB[i]]);
+      ZONE_ROUND_OF_16_PAIRS.forEach(([x, y]) =>
+        single(interleaved[x], interleaved[y], { extraTime: false }));
+    } else if (round < lastRound) {
+      pairUp(previous).forEach(([a, b]) => single(a, b, { extraTime: false }));
+    } else {
+      single(previous[0], previous[1], { extraTime: true, neutral: true });
+    }
+  } else {
+    const format = playoff.format;
+    const pairs: [number, number][] = round === 0
+      ? TITLE_PLAYOFF_QF_PAIRS.map(([a, b]) => [playoff.teams[a], playoff.teams[b]])
+      : pairUp(previous);
+    pairs.forEach(([a, b]) => {
+      const [high, low] = better(a, b);
+      ties.push(playTie(format, high, low, matchData, lid, season, playoff.compId, round, index++));
+    });
   }
 
-  const format = field.format;
-  const playRound = (pairs: [number, number][], round: number): number[] =>
-    pairs.map(([a, b], i) => {
-      const [high, low] = better(a, b);
-      const tie = playTie(format, high, low, matchData, lid, season, field.compId, round, i);
-      ties.push(tie);
-      return tie.winner;
-    });
+  return {
+    ...playoff,
+    ties: [...playoff.ties, ...ties],
+    winnerTid: round === lastRound ? ties[ties.length - 1].winner : null,
+  };
+}
 
-  const qfWinners = playRound(
-    TITLE_PLAYOFF_QF_PAIRS.map(([a, b]) => [field.teams[a], field.teams[b]]),
-    TITLE_ROUND_QF,
-  );
-  const sfWinners = playRound(
-    [[qfWinners[0], qfWinners[1]], [qfWinners[2], qfWinners[3]]],
-    TITLE_ROUND_SF,
-  );
-  const [champion] = playRound([[sfWinners[0], sfWinners[1]]], TITLE_ROUND_FINAL);
-  return { ...base, ties, winnerTid: champion };
+/** Play one title playoff start to finish on prepared match data. Pure apart from its own seeded streams. */
+export function playTitlePlayoff(
+  field: TitlePlayoffField,
+  matchData: Map<number, TeamMatchData>,
+  lid: number,
+  season: number,
+): TitlePlayoff {
+  let playoff = drawTitlePlayoff(field, season);
+  for (let guard = 0; titlePlayoffRoundsLeft(playoff) > 0 && guard < 8; guard++) {
+    playoff = playTitlePlayoffRound(playoff, matchData, lid);
+  }
+  return playoff;
 }
 
 /**
- * Play every title playoff for the season that just finished.
- *
- * The pool is the competition's own clubs, which is right for the reason it is
- * right for an English promotion bracket: every entrant comes from that one
- * division, so normalizing against it is measuring them against each other.
- * Season form applies (this is the season's last act); injuries are honoured by
- * `leagueMatchData`; suspensions are not carried in, the same call every cup
- * makes.
+ * The match data a title playoff is played on: its own competition's clubs,
+ * which is right for the reason it is right for an English promotion bracket —
+ * every entrant comes from that one division, so normalizing against it is
+ * measuring them against each other.
  */
+export function titlePlayoffMatchData(
+  playoff: { compId: number; season: number },
+  teams: readonly StoredTeam[],
+  players: Player[],
+  lid: number,
+): Map<number, TeamMatchData> {
+  return playoffMatchData(teams, players, new Set([playoff.compId]), lid, playoff.season);
+}
+
+/** Play every round the given title playoffs have left. Decided ones come back untouched. */
+export function completeTitlePlayoffs(
+  playoffs: TitlePlayoff[],
+  teams: readonly StoredTeam[],
+  players: Player[],
+  lid: number,
+): TitlePlayoff[] {
+  return playoffs.map((p) => {
+    if (titlePlayoffRoundsLeft(p) === 0) return p;
+    const matchData = titlePlayoffMatchData(p, teams, players, lid);
+    let playoff = p;
+    for (let guard = 0; titlePlayoffRoundsLeft(playoff) > 0 && guard < 8; guard++) {
+      playoff = playTitlePlayoffRound(playoff, matchData, lid);
+    }
+    return playoff;
+  });
+}
+
+/** Play every title playoff for the season that just finished, start to finish. */
 export function playTitlePlayoffs(
   competitions: Competition[],
   teams: StoredTeam[],
@@ -383,35 +478,7 @@ export function playTitlePlayoffs(
   lid: number,
   season: number,
 ): TitlePlayoff[] {
-  const fields = titlePlayoffFields(competitions, tablesByCompId, teams);
-  return fields.map((field) => {
-    const poolTeams = teams.filter((t) => t.compId === field.compId);
-    const data = leagueMatchData({
-      teams: poolTeams.map((t) => ({
-        tid: t.tid,
-        name: t.name,
-        roster: t.roster,
-        avgOvr: 0,
-        academyBase: t.academyBase,
-        compId: t.compId,
-        starters: t.starters,
-        formation: t.formation,
-        moreMinutes: t.moreMinutes,
-      })),
-      players,
-    });
-    const matchData = new Map<number, TeamMatchData>();
-    poolTeams.forEach((t, i) => {
-      const delta = teamSeasonFormDelta(lid, season, t.tid);
-      const d = data[i];
-      matchData.set(t.tid, delta === 0 ? d : {
-        ...d,
-        composites: applySeasonForm(d.composites, delta),
-        recompute: (onPitch) => applySeasonForm(d.recompute(onPitch), delta),
-      });
-    });
-    return playTitlePlayoff(field, matchData, lid, season);
-  });
+  return completeTitlePlayoffs(drawTitlePlayoffs(competitions, tablesByCompId, teams, season), teams, players, lid);
 }
 
 /** The title playoffs held for `season`, or [] if none were. */
