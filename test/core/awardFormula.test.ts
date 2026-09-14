@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   DEFAULT_AWARD_FORMULA, resolveAwardFormula, isCustomAwardFormula, type AwardFormula,
+  AWARD_PRESETS, matchingPreset,
 } from "../../src/core/awardFormula.js";
+import { scoreSeasonAwards, lastCompletedSeason } from "../../src/core/awardPreview.js";
+import type { LeagueStore } from "../../src/core/leagueState.js";
 import { computeSeasonAwards, potyScore, totsScore } from "../../src/core/awards.js";
 import { computeWorldAwards, type WorldAwardContext } from "../../src/core/worldAwards.js";
 import {
@@ -163,5 +166,82 @@ describe("an edited formula decides the awards", () => {
     const { ballonDOr } = computeWorldAwards([champion, better], SEASON, ctx, titlesMatter);
     expect(ballonDOr[0].pid).toBe(1);
     expect(ballonDOr[0].title).toBeGreaterThan(10);
+  });
+});
+
+describe("award presets", () => {
+  it("starts with the shipped formula, which a save with nothing stored matches", () => {
+    expect(AWARD_PRESETS[0].id).toBe("shipped");
+    expect(AWARD_PRESETS[0].formula).toBe(DEFAULT_AWARD_FORMULA);
+    expect(matchingPreset(undefined)).toBe("shipped");
+  });
+
+  /**
+   * A preset is saved through resolveAwardFormula like any other edit, so it
+   * must come back out unchanged and still be recognised, or the editor would
+   * reopen a saved style as "custom".
+   */
+  it("gives every preset a distinct formula that survives saving and is recognised again", () => {
+    const seen = new Set<string>();
+    for (const p of AWARD_PRESETS) {
+      const saved = resolveAwardFormula(structuredClone(p.formula));
+      expect(saved).toEqual(p.formula);
+      expect(matchingPreset(saved)).toBe(p.id);
+      expect(isCustomAwardFormula(saved)).toBe(p.id !== "shipped");
+      seen.add(JSON.stringify(p.formula));
+    }
+    expect(seen.size).toBe(AWARD_PRESETS.length);
+  });
+
+  it("calls a hand-tuned formula no preset at all", () => {
+    expect(matchingPreset(edited((f) => { f.world.intlCapWeight = 0.5; }))).toBeNull();
+  });
+
+  it("really does hand awards to scorers under Goals win awards", () => {
+    const rater = player({ pid: 1, pos: "ST", goals: 5, avgRating: 7.6 });
+    const scorer = player({ pid: 2, pos: "ST", goals: 12, avgRating: 6.9 });
+    const goals = AWARD_PRESETS.find((p) => p.id === "goals")!.formula;
+    expect(computeSeasonAwards([rater, scorer], SEASON).playerOfSeasonPid).toBe(1);
+    expect(computeSeasonAwards([rater, scorer], SEASON, goals).playerOfSeasonPid).toBe(2);
+  });
+});
+
+describe("re-scoring a finished season for the preview", () => {
+  const competitions = [{ id: 0, country: "England", tier: 1, name: "English Division 1" }];
+  const champion = player({ pid: 1, pos: "ST", tid: 1, avgRating: 6.5 });
+  const better = player({ pid: 2, pos: "ST", tid: 2, avgRating: 7.5 });
+  const league = {
+    players: [champion, better],
+    competitions,
+    seasonHistory: [{
+      season: SEASON, table: [], teamStats: [], awards: {},
+      world: { ballonDOr: [], worldTeamOfYear: [] },
+      compsByTid: { 1: 0, 2: 0 },
+      championTidByCompId: { 0: 1 },
+    }],
+    cup: null, cupHistory: [], domesticCups: [], domesticCupHistory: [],
+    international: { history: [], confederationCupHistory: [] },
+  } as unknown as LeagueStore;
+
+  it("knows which season finished last, and has nothing to score for any other", () => {
+    expect(lastCompletedSeason(league)).toBe(SEASON);
+    expect(scoreSeasonAwards(league, SEASON + 1, DEFAULT_AWARD_FORMULA)).toBeNull();
+  });
+
+  /** The preview is only honest if it scores the season exactly as the offseason does. */
+  it("scores the season the way the offseason does", () => {
+    const scored = scoreSeasonAwards(league, SEASON, DEFAULT_AWARD_FORMULA)!;
+    expect(scored.awards[0]).toEqual(computeSeasonAwards([champion, better], SEASON));
+    expect(scored.world).toEqual(computeWorldAwards([champion, better], SEASON, {
+      compsByTid: { 1: 0, 2: 0 }, competitions, championTidByCompId: { 0: 1 },
+      cup: null, domesticCups: [], worldCupChampion: null, confederationCupChampions: new Set(),
+    }));
+  });
+
+  it("shows a different winner under a different formula", () => {
+    const now = scoreSeasonAwards(league, SEASON, DEFAULT_AWARD_FORMULA)!;
+    const titlesMatter = scoreSeasonAwards(league, SEASON, edited((f) => { f.world.leagueTitleBonus = 100; }))!;
+    expect(now.world.ballonDOr[0].pid).toBe(2);
+    expect(titlesMatter.world.ballonDOr[0].pid).toBe(1);
   });
 });

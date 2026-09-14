@@ -194,3 +194,84 @@ export function isCustomAwardFormula(stored?: unknown): boolean {
   if (!stored) return false;
   return JSON.stringify(resolveAwardFormula(stored)) !== JSON.stringify(DEFAULT_AWARD_FORMULA);
 }
+
+export type AwardPresetId = "shipped" | "goals" | "defenders" | "trophies" | "form";
+
+/**
+ * A named award style: a whole formula a player can pick with one click
+ * instead of reasoning about forty weights. Each is the shipped formula with
+ * one idea turned up, so picking one and then fine-tuning starts from somewhere
+ * recognisable.
+ */
+export interface AwardPreset {
+  id: AwardPresetId;
+  label: string;
+  description: string;
+  formula: Readonly<AwardFormula>;
+}
+
+/** Two decimal places, so a scaled weight reads 1.65 rather than 1.6500000000000001. */
+const tidy = (v: number) => Math.round(v * 100) / 100;
+
+function derive(edit: (f: AwardFormula) => void): Readonly<AwardFormula> {
+  const f = structuredClone(DEFAULT_AWARD_FORMULA) as AwardFormula;
+  edit(f);
+  return deepFreeze(f);
+}
+
+export const AWARD_PRESETS: readonly AwardPreset[] = [
+  {
+    id: "shipped",
+    label: "As shipped",
+    description: "The formula the game comes with.",
+    formula: DEFAULT_AWARD_FORMULA,
+  },
+  {
+    id: "goals",
+    label: "Goals win awards",
+    description: "Goals and assists count double and match rating half as much, so the big scorers take the awards.",
+    formula: derive((f) => {
+      f.ratingWeight = 0.5;
+      for (const g of AWARD_GROUPS) {
+        f.goalWeight[g] = tidy(f.goalWeight[g] * 2);
+        f.assistWeight[g] = tidy(f.assistWeight[g] * 2);
+      }
+    }),
+  },
+  {
+    id: "defenders",
+    label: "Defenders get their due",
+    description: "Tackles, interceptions and a keeper's save percentage count double for the Team of the Season, the World XI and the Goalkeeper and Defender of the Year. The Ballon d'Or doesn't look at defending, so it's unchanged.",
+    formula: derive((f) => {
+      for (const pos of POSITION_KEYS) f.positionWork[pos].defendingPerGame = tidy(f.positionWork[pos].defendingPerGame * 2);
+      f.positionWork.GK.savePct = tidy(f.positionWork.GK.savePct * 2);
+    }),
+  },
+  {
+    id: "trophies",
+    label: "Trophies decide it",
+    description: "League titles, cup runs and cup wins are worth three times as much and international trophies twice as much, so players at winning clubs and nations take the world awards.",
+    formula: derive((f) => {
+      f.world.leagueTitleBonus = tidy(f.world.leagueTitleBonus * 3);
+      f.world.domesticCupBonus = tidy(f.world.domesticCupBonus * 3);
+      f.world.cupRunBonus = f.world.cupRunBonus.map((v) => tidy(v * 3));
+      f.world.worldCupBonus = tidy(f.world.worldCupBonus * 2);
+      f.world.confederationCupBonus = tidy(f.world.confederationCupBonus * 2);
+    }),
+  },
+  {
+    id: "form",
+    label: "Form only",
+    description: "A player's overall rating counts for nothing, so awards go purely on the season he had rather than on how good he is.",
+    formula: derive((f) => {
+      f.ovrWeight = 0;
+      f.world.ovrWeight = 0;
+    }),
+  },
+];
+
+/** Which preset a formula is exactly, or null for a hand-tuned one. */
+export function matchingPreset(formula: unknown): AwardPresetId | null {
+  const resolved = JSON.stringify(resolveAwardFormula(formula));
+  return AWARD_PRESETS.find((p) => JSON.stringify(p.formula) === resolved)?.id ?? null;
+}

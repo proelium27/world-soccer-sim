@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { makeLeague } from "../helpers/league.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
-import { DEFAULT_AWARD_FORMULA, type AwardFormula } from "../../src/core/awardFormula.js";
+import { AWARD_PRESETS, DEFAULT_AWARD_FORMULA, type AwardFormula } from "../../src/core/awardFormula.js";
 
 /**
  * The award formula editor is only reachable through God Mode, so a tab that
@@ -38,7 +38,7 @@ vi.mock("../../src/ui/sportName.js", () => ({
 }));
 
 const { GodMode } = await import("../../src/ui/pages/GodMode.js");
-const { AwardFormulas } = await import("../../src/ui/pages/GodModeAwards.js");
+const { AwardFormulas, inForwardGoals } = await import("../../src/ui/pages/GodModeAwards.js");
 
 const render = (el: ReturnType<typeof createElement>) =>
   renderToStaticMarkup(createElement(MemoryRouter, null, el));
@@ -49,22 +49,54 @@ describe("the award formula editor is reachable", () => {
     expect(render(createElement(GodMode))).toMatch(/<button[^>]*>Awards<\/button>/);
   });
 
-  it("opens on the shipped formula for a save that never edited it", () => {
+  it("opens on the shipped style, with every preset offered and the numbers folded away", () => {
     leagueRef.current = { ...makeLeague(0, 1), godMode: true };
     const html = render(createElement(AwardFormulas));
+    for (const p of AWARD_PRESETS) expect(html).toContain(`id="award-preset-${p.id}"`);
+    expect(html).toMatch(/id="award-preset-shipped"[^>]*checked=""/);
+    // Fine-tune starts closed when a style describes the save.
+    expect(html).toMatch(/<details class="gm-panel mb-3">/);
+    // The numbers are still in the page, behind the disclosure.
     expect(html).toContain(`id="award-minAppearances"`);
     expect(html).toContain(`value="${DEFAULT_AWARD_FORMULA.minAppearances}"`);
-    expect(html).toContain(`id="award-work-CB"`);
     expect(html).toContain(`id="award-world-leagueTitleBonus"`);
-    expect(html).toContain("shipped award formulas");
+    expect(html).toMatch(/Using the game.{1,6}s own formula/);
   });
 
-  it("loads a stored edit and says the save is custom", () => {
+  it("says a save with no finished season has nothing to preview yet", () => {
+    leagueRef.current = { ...makeLeague(0, 1), godMode: true };
+    expect(render(createElement(AwardFormulas))).toContain("Once a season has finished");
+  });
+
+  it("loads a hand-tuned formula as custom, with the numbers open", () => {
     const awardFormula = structuredClone(DEFAULT_AWARD_FORMULA) as AwardFormula;
     awardFormula.minAppearances = 7;
     leagueRef.current = { ...makeLeague(0, 1), godMode: true, awardFormula };
     const html = render(createElement(AwardFormulas));
     expect(html).toMatch(/id="award-minAppearances"[^>]*value="7"|value="7"[^>]*id="award-minAppearances"/);
-    expect(html).toContain("custom award formulas");
+    expect(html).toMatch(/<details class="gm-panel mb-3" open="">/);
+    expect(html).toContain("Custom: your own numbers");
+    expect(html).toContain("Using your custom formula.");
+  });
+
+  it("recognises a saved preset rather than calling it custom", () => {
+    const goals = AWARD_PRESETS.find((p) => p.id === "goals")!;
+    leagueRef.current = { ...makeLeague(0, 1), godMode: true, awardFormula: structuredClone(goals.formula) as AwardFormula };
+    const html = render(createElement(AwardFormulas));
+    expect(html).toMatch(/id="award-preset-goals"[^>]*checked=""/);
+    expect(html).not.toContain("Custom: your own numbers");
+  });
+});
+
+describe("explaining a weight in forward goals", () => {
+  it("reads a league title against a forward's goal", () => {
+    expect(inForwardGoals(0.8, DEFAULT_AWARD_FORMULA)).toBe("about 10 goals by a forward");
+    expect(inForwardGoals(0.08, DEFAULT_AWARD_FORMULA)).toBe("about 1 goal by a forward");
+  });
+
+  it("falls back to award points when forwards' goals are worth nothing", () => {
+    const f = structuredClone(DEFAULT_AWARD_FORMULA) as AwardFormula;
+    f.goalWeight.FWD = 0;
+    expect(inForwardGoals(0.8, f)).toBe("0.8 award points");
   });
 });
