@@ -6,6 +6,7 @@ import { simOffseason } from "../../src/core/offseason.js";
 import { freeAgentPids, ensureUserRosterSafety } from "../../src/core/freeAgency.js";
 import { academyFacilitiesBonus } from "../../src/core/players/academyFacilities.js";
 import { computeOvr } from "../../src/core/players/ovr.js";
+import { FREE_AGENT_TID } from "../../src/core/transfers/negotiation.js";
 import {
   USER_ACADEMY_INTAKE_MIN, USER_ACADEMY_INTAKE_MAX, USER_ACADEMY_ENTRY_AGE,
   ACADEMY_SCHOLARSHIP_AGE, ACADEMY_GRADUATION_AGE, ACADEMY_ROSTER_CAP,
@@ -174,6 +175,19 @@ describe("the scholarship cut, through a real offseason", () => {
     const academy = new Set(team.academyRoster);
     const roster = new Set(team.roster);
     const byPid = byPidOf(scholarshipWorld);
+    // A kid can also reach the senior squad through the roster safety net, which
+    // runs after the cut and calls up academy kids first. The user's club is
+    // unmanaged here, so how short its squad runs (and so whether every kid is
+    // called up) depends on how the rest of the world played out. Counting only
+    // kids still in the academy made this pass or fail on that luck. A call-up
+    // from the academy is still a kept kid; one re-signed off the open market is
+    // not, since that is exactly how a lapsed deal would come back, and the
+    // safety net logs it as a free-agent arrival.
+    const signedAsFreeAgent = new Set(
+      scholarshipWorld.transfers
+        .filter((t) => t.fromTid === FREE_AGENT_TID && t.toTid === team.tid)
+        .map((t) => t.pid),
+    );
 
     let kept = 0;
     for (const kid of first) {
@@ -182,7 +196,9 @@ describe("the scholarship cut, through a real offseason", () => {
       if (academy.has(kid.pid)) {
         kept++;
         expect(now.contract.expiresSeason).toBe(now.born + ACADEMY_GRADUATION_AGE - 1);
-      } else if (!roster.has(kid.pid)) {
+      } else if (roster.has(kid.pid)) {
+        if (!signedAsFreeAgent.has(kid.pid)) kept++;
+      } else {
         // Released: only ever because the academy was full, which the cut
         // leaves it at.
         expect(team.academyRoster.length).toBeGreaterThanOrEqual(ACADEMY_ROSTER_CAP);
