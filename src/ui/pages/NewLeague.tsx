@@ -44,6 +44,7 @@ import { takePendingRoster } from "../pendingRoster.js";
 import { TeamIdentityEditor, type EditableTeam } from "../components/TeamIdentityEditor.js";
 import { ClubCrest, CrestArtProvider, CustomCrestProvider } from "../components/ClubCrest.js";
 import { CountryFlag } from "../components/CountryFlag.js";
+import { REGION_LABELS, countriesByRegion } from "../continents.js";
 import { HelpHint } from "../components/HelpHint.js";
 import { trackEvent } from "../analytics.js";
 import {
@@ -1046,21 +1047,36 @@ export function NewLeague() {
         )}
       </div>
 
+      {/*
+        Country tabs under a heading per continent, the same grouping World
+        setup uses. Sixteen tabs in one wrapping row read as an unsorted wall.
+      */}
       {!spectate && (
-      <div className="btn-group segmented mb-3" role="group" aria-label="Choose a league">
-        {world.countries.map((c) => (
-          <button
-            key={c}
-            type="button"
-            className={`btn btn-outline-secondary d-inline-flex align-items-center gap-2${
-              c === activeCountry ? " active" : ""
-            }`}
-            aria-pressed={c === activeCountry}
-            onClick={() => selectCountry(c)}
-          >
-            <CountryFlag country={c} fallback={abbrevForCountry(c)} />
-            {c}
-          </button>
+      <div className="mb-3">
+        {countriesByRegion(world.competitions, world.countries).map((group) => (
+          <div key={group.region} className="mb-2">
+            <div className="page-eyebrow">{REGION_LABELS[group.region]}</div>
+            <div
+              className="btn-group segmented"
+              role="group"
+              aria-label={`Choose a league in ${REGION_LABELS[group.region]}`}
+            >
+              {group.items.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={`btn btn-outline-secondary d-inline-flex align-items-center gap-2${
+                    c === activeCountry ? " active" : ""
+                  }`}
+                  aria-pressed={c === activeCountry}
+                  onClick={() => selectCountry(c)}
+                >
+                  <CountryFlag country={c} fallback={abbrevForCountry(c)} />
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
       )}

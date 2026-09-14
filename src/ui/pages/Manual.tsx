@@ -841,7 +841,9 @@ export function Manual() {
           <p>
             <strong>Shaping your own world.</strong> The sixteen countries above are the default, not
             the only option. The <strong>World setup</strong> panel on the New League screen lets you
-            switch any of them off and add leagues of your own. An added league's clubs get
+            switch any of them off and add leagues of your own. Countries are grouped under Europe
+            and the Americas, and the checkbox on each heading switches that whole continent on or
+            off in one click. An added league's clubs get
             generated names and colours, since the game ships no real clubs. The panel is on both
             ways in, whether you started a plain new league or came through Import Custom League.
           </p>

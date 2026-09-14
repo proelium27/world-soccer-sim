@@ -6,7 +6,8 @@ import {
   competitionStrengthOffset, competitionBudgetScale,
   resolveLeagueSpec, type ResolvedLeagueSpec,
 } from "../../core/competitions.js";
-import { MAX_PROMOTION_SPOTS, type PlayoffFormat } from "../../core/constants.js";
+import { MAX_PROMOTION_SPOTS, type PlayoffFormat, type ContinentalRegion } from "../../core/constants.js";
+import { REGION_LABELS, groupByRegion } from "../continents.js";
 
 /** What the code box suggests when left empty — the same rule competitionAbbrev uses. */
 function defaultAbbrev(country: string): string {
@@ -58,6 +59,30 @@ export function defaultWorldEntries(): WorldEntry[] {
 let nextAddedId = 0;
 
 /** The leagues that will actually be built, in order. */
+/**
+ * The continent a world entry's league plays in — the same resolution that
+ * decides its continental competition, so an added league with no region set
+ * sits under Europe, which is where it would play.
+ */
+export function entryRegion(entry: WorldEntry): ContinentalRegion {
+  return resolveLeagueSpec(entry.spec).region;
+}
+
+/**
+ * Switch every league on one continent on or off at once. Entries on other
+ * continents, and entries already in the requested state, come back by
+ * reference.
+ */
+export function setRegionIncluded(
+  entries: WorldEntry[],
+  region: ContinentalRegion,
+  included: boolean,
+): WorldEntry[] {
+  return entries.map((e) =>
+    entryRegion(e) === region && e.included !== included ? { ...e, included } : e,
+  );
+}
+
 export function includedSpecs(entries: WorldEntry[]): LeagueSpec[] {
   return entries.filter((e) => e.included).map((e) => e.spec);
 }
@@ -275,8 +300,39 @@ export function WorldSetup({ entries, onChange, defaultOpen = false }: Props) {
           Pick which countries your world has, or add your own. Fixed once you start.
         </p>
 
-        <ul className="list-unstyled mb-3">
-          {entries.map((entry, i) => (
+        {/*
+          One heading per continent, each with a checkbox that switches that
+          whole continent's leagues on or off. It reads as ticked only when every
+          league under it is on, and as a dash when some are, so it always
+          describes the rows beneath it. Rows keep their index into `entries`,
+          which every per-row control below writes through.
+        */}
+        {groupByRegion(entries.map((entry, i) => ({ entry, i })), ({ entry }) => entryRegion(entry)).map((group) => {
+          const on = group.items.filter(({ entry }) => entry.included).length;
+          const all = on === group.items.length;
+          const label = REGION_LABELS[group.region];
+          return (
+          <div key={group.region} className="mb-3">
+          <div className="d-flex align-items-center gap-2 mb-1">
+            <input
+              type="checkbox"
+              className="form-check-input mt-0"
+              id={`region-on-${group.region}`}
+              checked={all}
+              ref={(el) => {
+                if (el) el.indeterminate = on > 0 && !all;
+              }}
+              onChange={(e) => onChange(setRegionIncluded(entries, group.region, e.target.checked))}
+            />
+            <label htmlFor={`region-on-${group.region}`} className="page-eyebrow mb-0">
+              {label}
+            </label>
+            <span className="text-muted small">
+              {on} of {group.items.length}
+            </span>
+          </div>
+        <ul className="list-unstyled mb-0">
+          {group.items.map(({ entry, i }) => (
             <li key={entry.id} className="border-top py-2">
               <div className="d-flex align-items-center gap-2">
                 <input
@@ -361,6 +417,9 @@ export function WorldSetup({ entries, onChange, defaultOpen = false }: Props) {
             </li>
           ))}
         </ul>
+          </div>
+          );
+        })}
 
         <button
           type="button"
