@@ -34,7 +34,9 @@ import { GoatBreakdown, partLabel } from "../components/GoatBreakdown.js";
 import { currency, seasonYear } from "../format.js";
 import { isSpectator } from "../../core/spectator.js";
 import type { ContinentalRegion } from "../../core/constants.js";
-import { RegionSwitch, defaultRegion, worldHasAmericas } from "../components/RegionSwitch.js";
+import {
+  RegionSwitch, defaultRegion, worldHasAmericas, regionFilter, type RegionView,
+} from "../components/RegionSwitch.js";
 import { shortName } from "../playerName.js";
 
 type Tab = "goat" | "awards" | "records" | "leaders" | "international" | "bios" | "clubs";
@@ -61,7 +63,7 @@ function Col({ children, wide = false }: { children: ReactNode; wide?: boolean }
 // --- GOAT ------------------------------------------------------------------
 
 
-function GoatTab({ region }: { region?: ContinentalRegion }) {
+function GoatTab({ region, both = false }: { region?: ContinentalRegion; both?: boolean }) {
   const { league } = useLeague();
   const [side, setSide] = useState<"players" | "clubs">("players");
   const players = useMemo(
@@ -83,6 +85,8 @@ function GoatTab({ region }: { region?: ContinentalRegion }) {
           " Players are listed where they made most of their appearances. Anything done at a club in the Americas counts for a quarter here."}
         {region === "americas" &&
           " Careers spent mostly in the Americas, compared with each other at full weight."}
+        {both &&
+          " Every career on one list. Anything done at a club in the Americas counts for a quarter here."}
       </p>
 
       <ul className="nav nav-pills nav-sm mb-3">
@@ -1362,20 +1366,24 @@ const REGION_TABS: ReadonlySet<Tab> = new Set<Tab>(["goat", "records", "leaders"
 export function Frivolities() {
   const { league } = useLeague();
   const [tab, setTab] = useState<Tab>("goat");
-  const [regionSel, setRegionSel] = useState<ContinentalRegion | null>(null);
+  const [regionSel, setRegionSel] = useState<RegionView | null>(null);
   if (!league) return null;
 
   // One continent at a time on the club and career lists, in a world with
-  // leagues on both. A world without the Americas passes no region, which is
-  // exactly the world-wide list every tab showed before.
+  // leagues on both, or both together. A world without the Americas, and the
+  // "Both" view, pass no region, which is the world-wide list every tab showed
+  // before the switch existed.
   const hasAmericas = worldHasAmericas(league);
-  const region = hasAmericas ? (regionSel ?? defaultRegion(league)) : undefined;
+  const view: RegionView | undefined = hasAmericas ? (regionSel ?? defaultRegion(league)) : undefined;
+  const region = regionFilter(view);
 
   return (
     <div>
       <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-3">
         <h1 className="h4 mb-0">Frivolities</h1>
-        {region && REGION_TABS.has(tab) && <RegionSwitch value={region} onChange={setRegionSel} />}
+        {view && REGION_TABS.has(tab) && (
+          <RegionSwitch value={view} onChange={setRegionSel} includeBoth />
+        )}
       </div>
 
       <ul className="nav nav-tabs mb-3">
@@ -1391,7 +1399,7 @@ export function Frivolities() {
         ))}
       </ul>
 
-      {tab === "goat" && <GoatTab region={region} />}
+      {tab === "goat" && <GoatTab region={region} both={view === "both"} />}
       {tab === "awards" && <AwardsTab />}
       {tab === "records" && <RecordsTab region={region} />}
       {tab === "leaders" && <LeadersTab region={region} />}

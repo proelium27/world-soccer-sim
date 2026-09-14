@@ -10,6 +10,9 @@ import { REGION_LABELS, REGION_ORDER } from "../continents.js";
  * one ladder when it is really two.
  */
 
+/** A continent, or both of them on one list. */
+export type RegionView = ContinentalRegion | "both";
+
 /** Whether the world has a league in the Americas, i.e. whether a switch means anything. */
 export function worldHasAmericas(league: Pick<LeagueStore, "competitions">): boolean {
   return league.competitions.some((c) => competitionRegion(c) === "americas");
@@ -22,16 +25,25 @@ export function defaultRegion(league: LeagueStore): ContinentalRegion {
   return comp ? competitionRegion(comp) : "europe";
 }
 
-export function RegionSwitch({
+/** The continent filter a view passes to a ranking: none for "both". */
+export function regionFilter(view: RegionView | undefined): ContinentalRegion | undefined {
+  return view === "both" ? undefined : view;
+}
+
+export function RegionSwitch<T extends RegionView>({
   value,
   onChange,
+  includeBoth = false,
 }: {
-  value: ContinentalRegion;
-  onChange: (region: ContinentalRegion) => void;
+  value: T;
+  onChange: (region: T) => void;
+  /** Offer a third button listing both continents together. */
+  includeBoth?: boolean;
 }) {
+  const options = (includeBoth ? [...REGION_ORDER, "both"] : REGION_ORDER) as readonly T[];
   return (
     <div className="btn-group segmented" role="group" aria-label="Choose a continent">
-      {REGION_ORDER.map((r) => (
+      {options.map((r) => (
         <button
           key={r}
           type="button"
@@ -39,7 +51,7 @@ export function RegionSwitch({
           aria-pressed={r === value}
           onClick={() => onChange(r)}
         >
-          {REGION_LABELS[r]}
+          {r === "both" ? "Both" : REGION_LABELS[r as ContinentalRegion]}
         </button>
       ))}
     </div>
