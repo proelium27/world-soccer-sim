@@ -182,6 +182,10 @@ const AWARD_LABELS: Record<AwardKey, string> = {
   worldXI: "World XI",
   goalkeeperOfYear: "Goalkeeper of the Year",
   defenderOfYear: "Defender of the Year",
+  americasPlayerOfYear: "Americas Player of the Year",
+  americasTeamOfYear: "Americas Team of the Year",
+  americasGoalkeeperOfYear: "Americas Goalkeeper of the Year",
+  americasDefenderOfYear: "Americas Defender of the Year",
   playerOfSeason: "Player of the Season",
   goldenBoot: "Golden Boot",
   teamOfSeason: "Team of the Season",
@@ -194,6 +198,10 @@ const AWARD_SHORT: Record<AwardKey, string> = {
   worldXI: "World XI",
   goalkeeperOfYear: "Keeper",
   defenderOfYear: "Defender",
+  americasPlayerOfYear: "Am POTY",
+  americasTeamOfYear: "Am XI",
+  americasGoalkeeperOfYear: "Am Keeper",
+  americasDefenderOfYear: "Am Defender",
   playerOfSeason: "POTS",
   goldenBoot: "Boot",
   teamOfSeason: "TOTS",
@@ -208,6 +216,7 @@ const AWARD_SHORT: Record<AwardKey, string> = {
  */
 const TALLY_COLUMNS: AwardKey[] = [
   "ballonDOr", "worldXI", "goalkeeperOfYear", "defenderOfYear",
+  "americasPlayerOfYear", "americasTeamOfYear", "americasGoalkeeperOfYear", "americasDefenderOfYear",
   "playerOfSeason", "goldenBoot", "teamOfSeason", "total",
 ];
 

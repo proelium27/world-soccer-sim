@@ -9,7 +9,7 @@ import type { PromotionNews } from "../core/promotionNews.js";
 import type { ContinentalNews } from "../core/continentalNews.js";
 import type { DebtSanction } from "../core/finance/debt.js";
 import { WINTER_WINDOW_OPEN_MATCHDAY } from "../core/calendar.js";
-import { NEWS_WORLD_TRANSFER_FEE } from "../core/constants.js";
+import { NEWS_WORLD_TRANSFER_FEE, type ContinentalRegion } from "../core/constants.js";
 
 export type FeedItem =
   | { kind: "transfer"; order: number; data: CompletedTransfer }
@@ -53,6 +53,12 @@ export interface NewsAudience {
   userCompId: number | undefined;
   /** The competition a club played in that season, or undefined if unknown. */
   compOf: (tid: number) => number | undefined;
+  /**
+   * The continent the user's league is on, which decides whether the Americas'
+   * own honours are news to him. Optional: absent shows them only to their
+   * winners' own clubs and leagues.
+   */
+  userRegion?: ContinentalRegion;
 }
 
 /**
@@ -96,7 +102,7 @@ export function buildSeasonTimeline(
   promotions: PromotionNews[] = [],
   sanctions: DebtSanction[] = [],
 ): FeedItem[] {
-  const { userTid, userCompId, compOf } = audience;
+  const { userTid, userCompId, compOf, userRegion } = audience;
 
   // An unresolved competition is nobody's league rather than everybody's, so a
   // missing snapshot degrades to showing only world-tier news, never to
@@ -127,7 +133,8 @@ export function buildSeasonTimeline(
     const home = a.compId !== undefined
       ? userCompId !== undefined && a.compId === userCompId
       : a.tid !== undefined && inUserComp(a.tid);
-    return home || awardNewsScope(a) === "world";
+    const scope = awardNewsScope(a);
+    return home || scope === "world" || (scope === "americas" && userRegion === "americas");
   });
 
   const items: FeedItem[] = [

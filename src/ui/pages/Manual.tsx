@@ -2095,8 +2095,10 @@ export function Manual() {
             shortlist, a <strong>Goalkeeper</strong> and a <strong>Defender of the Year</strong>, and
             a <strong>Team of the Year</strong>. They're worked out exactly like the world awards,
             but only over the leagues of the Americas and with no cut, and the Americas Cup counts
-            where the Continental Cup does in Europe. They show up on player profiles and count
-            towards the GOAT ranking, at the same discount as everything else done there.
+            where the Continental Cup does in Europe. They show up on player profiles, in a club&apos;s
+            history, on the Frivolities award boards and in the News Feed if your league is in the
+            Americas, and they count towards the GOAT ranking at the same discount as everything else
+            done there.
           </p>
           <p>
             <strong>xG (expected goals).</strong> Every shot's chance of going in before you know

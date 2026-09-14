@@ -103,6 +103,14 @@ export function newsHeadlineNode(item: FeedItem, ctx: NewsHeadlineContext): Reac
         return <>{who} is Goalkeeper of the Year</>;
       case "defenderOfYear":
         return <>{who} is Defender of the Year</>;
+      case "americasPlayerOfYear":
+        return <>{who} is Americas Player of the Year</>;
+      case "americasTeamOfYear":
+        return <>{who} makes the Americas Team of the Year</>;
+      case "americasGoalkeeperOfYear":
+        return <>{who} is Americas Goalkeeper of the Year</>;
+      case "americasDefenderOfYear":
+        return <>{who} is Americas Defender of the Year</>;
       case "playerOfSeason":
         return <>{who} is {comp ?? "his league"} Player of the Season</>;
       case "goldenBoot":

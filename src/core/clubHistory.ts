@@ -35,6 +35,14 @@ export interface ClubSeasonRecord {
   defenderOfYearPid: number | null;
   /** This club's players selected in the season's World Team of the Year. */
   worldTeamOfYearPids: number[];
+  /** This club's Americas Player of the Year that season, if any (`WorldAwards.americas`). */
+  americasPlayerOfYearPid: number | null;
+  /** This club's Americas Goalkeeper of the Year that season, if any. */
+  americasGoalkeeperOfYearPid: number | null;
+  /** This club's Americas Defender of the Year that season, if any. */
+  americasDefenderOfYearPid: number | null;
+  /** This club's players selected in the season's Americas Team of the Year. */
+  americasTeamOfYearPids: number[];
   /**
    * The club's Continental Cup run this season: a short stage label plus
    * champion / runner-up flags (format-aware for Swiss and legacy cups). Null if
@@ -117,6 +125,14 @@ export interface ClubHistory {
   defenderOfYearWinners: ClubIndividualHonour[];
   /** World Team of the Year places won by the club's players, newest first. */
   worldTeamOfYearSelections: ClubIndividualHonour[];
+  /** Seasons one of the club's players was the Americas Player of the Year, newest first. */
+  americasPlayerOfYearWinners: ClubIndividualHonour[];
+  /** Seasons one of the club's players was the Americas Goalkeeper of the Year, newest first. */
+  americasGoalkeeperOfYearWinners: ClubIndividualHonour[];
+  /** Seasons one of the club's players was the Americas Defender of the Year, newest first. */
+  americasDefenderOfYearWinners: ClubIndividualHonour[];
+  /** Americas Team of the Year places won by the club's players, newest first. */
+  americasTeamOfYearSelections: ClubIndividualHonour[];
   /** All-time aggregate record across every completed season. */
   totals: { played: number; won: number; drawn: number; lost: number; gf: number; ga: number };
   /** Best (lowest-numbered) finishing position ever, preferring a tier-1 finish; null if no seasons. */
@@ -241,6 +257,17 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
     const worldTeamOfYearPids = world
       ? world.worldTeamOfYear.filter((pid): pid is number => belongs(pid))
       : [];
+    // The Americas' own set, filtered to this club the same way. Optional twice
+    // over: absent on a season before it existed and on a world without the Americas.
+    const americasHonours = world?.americas;
+    const winnerHere = (pid: number | null | undefined): number | null =>
+      pid != null && belongs(pid) ? pid : null;
+    const americasPlayerOfYearPid = winnerHere(americasHonours?.ballonDOr[0]?.pid);
+    const americasGoalkeeperOfYearPid = winnerHere(americasHonours?.goalkeeperOfYear?.[0]?.pid);
+    const americasDefenderOfYearPid = winnerHere(americasHonours?.defenderOfYear?.[0]?.pid);
+    const americasTeamOfYearPids = americasHonours
+      ? americasHonours.worldTeamOfYear.filter((pid): pid is number => belongs(pid))
+      : [];
 
     const cup = cupBySeason.get(entry.season);
     const cupRun = cup ? cupRunSummary(cup, tid) : null;
@@ -286,6 +313,10 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
       goalkeeperOfYearPid,
       defenderOfYearPid,
       worldTeamOfYearPids,
+      americasPlayerOfYearPid,
+      americasGoalkeeperOfYearPid,
+      americasDefenderOfYearPid,
+      americasTeamOfYearPids,
       cupRun,
       shieldRun,
       americasRun,
@@ -383,6 +414,18 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
       .map((r) => ({ season: r.season, compId: r.compId, pid: r.defenderOfYearPid! })),
     worldTeamOfYearSelections: newest.flatMap((r) =>
       r.worldTeamOfYearPids.map((pid) => ({ season: r.season, compId: r.compId, pid })),
+    ),
+    americasPlayerOfYearWinners: newest
+      .filter((r) => r.americasPlayerOfYearPid !== null)
+      .map((r) => ({ season: r.season, compId: r.compId, pid: r.americasPlayerOfYearPid! })),
+    americasGoalkeeperOfYearWinners: newest
+      .filter((r) => r.americasGoalkeeperOfYearPid !== null)
+      .map((r) => ({ season: r.season, compId: r.compId, pid: r.americasGoalkeeperOfYearPid! })),
+    americasDefenderOfYearWinners: newest
+      .filter((r) => r.americasDefenderOfYearPid !== null)
+      .map((r) => ({ season: r.season, compId: r.compId, pid: r.americasDefenderOfYearPid! })),
+    americasTeamOfYearSelections: newest.flatMap((r) =>
+      r.americasTeamOfYearPids.map((pid) => ({ season: r.season, compId: r.compId, pid })),
     ),
     teamOfSeasonSelections: newest.flatMap((r) =>
       r.teamOfSeasonPids.map((pid) => ({ season: r.season, compId: r.compId, pid })),

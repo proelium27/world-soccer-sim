@@ -10,6 +10,7 @@ import { nextMatchday, transferWindowState } from "../../core/transfers/window.j
 import { SimTargetForm } from "../components/SimTargetForm.js";
 import { SCOUTING_SPEND_MAX, RATING_LEADER_QUALIFY_FRACTION } from "../../core/constants.js";
 import { wageBill } from "../../core/finance/budget.js";
+import { competitionRegion } from "../../core/competitions.js";
 import { cupFinalists, isCupComplete } from "../../core/cup/cup.js";
 import { domesticFinalists } from "../../core/domesticCup/cup.js";
 import { isIntlStagePending, editableSquad } from "../../core/international/index.js";
@@ -316,10 +317,12 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
     // warning lives in the Finances card below, which does not age out.
     const shownSanctions = debtNewsBySeason(league.debtSanctions).get(league.season) ?? [];
 
+    const userComp = league.competitions.find((c) => c.id === comps[userTid]);
     const newsTimeline = buildSeasonTimeline(currentSeasonTransfers, currentSeasonEvents, {
       userTid,
       userCompId: comps[userTid],
       compOf: (tid) => comps[tid],
+      userRegion: userComp ? competitionRegion(userComp) : undefined,
     }, lastSeasonHonours, shownTrophies, [], shownPromotions, shownSanctions);
     return [...newsTimeline].slice(-NEWS_TOP_N).reverse();
   }, [

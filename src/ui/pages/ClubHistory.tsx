@@ -408,6 +408,41 @@ export function ClubHistory() {
                 playersByPid={playersByPid}
               />
             </div>
+            {/* The Americas' own honours, only for a club that has won one: four
+                empty cards on every European club would read as a promise. */}
+            {history.americasPlayerOfYearWinners.length + history.americasTeamOfYearSelections.length
+              + history.americasGoalkeeperOfYearWinners.length + history.americasDefenderOfYearWinners.length > 0 && (
+              <>
+                <div className="col-md-4">
+                  <HonourList
+                    title="Americas Player of the Year"
+                    honours={history.americasPlayerOfYearWinners}
+                    playersByPid={playersByPid}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <HonourList
+                    title="Americas Team of the Year"
+                    honours={history.americasTeamOfYearSelections}
+                    playersByPid={playersByPid}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <HonourList
+                    title="Americas Goalkeeper of the Year"
+                    honours={history.americasGoalkeeperOfYearWinners}
+                    playersByPid={playersByPid}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <HonourList
+                    title="Americas Defender of the Year"
+                    honours={history.americasDefenderOfYearWinners}
+                    playersByPid={playersByPid}
+                  />
+                </div>
+              </>
+            )}
             <div className="col-md-4">
               <HonourList title="Player of the Season" honours={history.playerOfSeason} playersByPid={playersByPid} />
             </div>

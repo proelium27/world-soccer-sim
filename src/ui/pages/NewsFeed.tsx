@@ -16,6 +16,7 @@ import { Flag } from "../components/Flag.js";
 import { PlayerRefLink, usePlayerRefs } from "../components/PlayerRefLink.js";
 import { NationName } from "./nationalTeams/shared.js";
 import { debtNewsBySeason } from "../../core/debtNews.js";
+import { competitionRegion } from "../../core/competitions.js";
 
 type ClubFilter = "all" | "user";
 
@@ -34,6 +35,10 @@ const AWARD_LABEL: Record<AwardNews["kind"], string> = {
   worldTeamOfYear: "World Team of the Year",
   goalkeeperOfYear: "Goalkeeper of the Year",
   defenderOfYear: "Defender of the Year",
+  americasPlayerOfYear: "Americas Player of the Year",
+  americasTeamOfYear: "Americas Team of the Year",
+  americasGoalkeeperOfYear: "Americas Goalkeeper of the Year",
+  americasDefenderOfYear: "Americas Defender of the Year",
   playerOfSeason: "Player of the Season",
   goldenBoot: "Golden Boot",
   teamOfSeason: "Team of the Season",
@@ -202,6 +207,14 @@ export function NewsFeed() {
     // there is nothing to merge in.
     const sanctionsBySeason = debtNewsBySeason(league?.debtSanctions);
 
+    // Which continent a competition is on, so the Americas' own honours reach
+    // readers whose league is there. A club never changes continent, so the
+    // live table answers for every past season.
+    const regionOfComp = (compId: number | undefined) => {
+      const comp = compId === undefined ? undefined : league?.competitions.find((c) => c.id === compId);
+      return comp ? competitionRegion(comp) : undefined;
+    };
+
     const out = new Map<number, FeedItem[]>();
     const seasons = new Set([
       ...transfersBySeason.keys(),
@@ -217,7 +230,12 @@ export function NewsFeed() {
       out.set(season, buildSeasonTimeline(
         transfersBySeason.get(season) ?? [],
         eventsBySeason.get(season) ?? [],
-        { userTid, userCompId: comps[userTid], compOf: (tid) => comps[tid] },
+        {
+          userTid,
+          userCompId: comps[userTid],
+          compOf: (tid) => comps[tid],
+          userRegion: regionOfComp(comps[userTid]),
+        },
         awardsBySeason.get(season) ?? [],
         trophiesBySeason.get(season) ?? [],
         continentalBySeason.get(season) ?? [],
