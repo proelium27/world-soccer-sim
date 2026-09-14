@@ -12,6 +12,7 @@ import { exportLeagueJSON, importLeagueJSON } from "../../db/exportImport.js";
 import {
   signFreeAgent, releasePlayer, signToAcademy, promoteFromAcademy, releaseAcademyPlayer,
 } from "../../core/freeAgency.js";
+import { setAcademyDecision, type AcademyChoice } from "../../core/academyPipeline.js";
 import { scoutDirectionsOf, type ScoutDirections } from "../../core/scouting/scoutDirections.js";
 import { clampScoutingSpend } from "../../core/finance/scouting.js";
 import type { ProposedClause } from "../../core/transfers/clauses.js";
@@ -109,6 +110,11 @@ interface LeagueContextValue {
   setScoutDirectionsAction: (next: Partial<ScoutDirections>) => Promise<void>;
   promoteFromAcademyAction: (pid: number) => Promise<void>;
   releaseAcademyPlayerAction: (pid: number) => Promise<void>;
+  /**
+   * Make (or, with `null`, withdraw) the user's call on an academy kid at the
+   * next rollover. A call that doesn't fit is ignored; see setAcademyDecision.
+   */
+  setAcademyDecisionAction: (pid: number, choice: AcademyChoice | null) => Promise<void>;
   extendAcademyContractAction: (pid: number) => Promise<void>;
   setScoutingSpendAction: (spend: number) => Promise<void>;
   makeOfferAction: (pid: number, amount: number, clauses?: ProposedClause[]) => Promise<void>;
@@ -789,6 +795,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     return { ...l, teams };
   }), [mutate]);
 
+  const setAcademyDecisionAction = useCallback((pid: number, choice: AcademyChoice | null) => mutate((l) => {
+    const team = l.teams.find((t) => t.tid === l.meta.userTid);
+    if (!team) return null;
+    const next = setAcademyDecision(team, l.players, l.activeLoans, l.season, pid, choice, l.difficulty);
+    if (next === team) return null;
+    return { ...l, teams: l.teams.map((t) => (t === team ? next : t)) };
+  }), [mutate]);
+
   const extendAcademyContractAction = useCallback((pid: number) => mutate(
     (l) => ({ ...l, players: extendAcademyContract(l.players, pid, l.season) }),
   ), [mutate]);
@@ -1235,6 +1249,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     setScoutDirectionsAction,
     promoteFromAcademyAction,
     releaseAcademyPlayerAction,
+    setAcademyDecisionAction,
     extendAcademyContractAction,
     setScoutingSpendAction,
     makeOfferAction,
@@ -1285,7 +1300,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     releasePlayerAction, signToAcademyAction,
     setScoutDirectionsAction,
     promoteFromAcademyAction,
-    releaseAcademyPlayerAction, extendAcademyContractAction, setScoutingSpendAction,
+    releaseAcademyPlayerAction, setAcademyDecisionAction, extendAcademyContractAction, setScoutingSpendAction,
     makeOfferAction, acceptCounterAction, acceptInboundOfferAction,
     rejectInboundOfferAction, counterInboundOfferAction, extendContractAction,
     extendAllContractsAction,
