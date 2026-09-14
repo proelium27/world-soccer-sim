@@ -80,7 +80,9 @@ describe("Academy page", () => {
       };
     }));
     expect(html).toContain("reaches a cut at the next");
-    expect(html).toContain("Joins the first team");
+    // The column is a dropdown sitting on the scouts' call until the user changes it.
+    expect(html).toContain('aria-label="What happens to him at the next rollover"');
+    expect(html).toContain("Promote (default)");
   });
 });
 
