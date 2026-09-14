@@ -178,4 +178,16 @@ export interface Player {
    * so there is nothing for `migrate.ts` to backfill.
    */
   ratingsLocked?: boolean;
+  /**
+   * The ratings an academy kid who joined below YOUTH_BASE_REFERENCE_AGE was
+   * rolled with, i.e. exactly what he will be at that age. Until then he shows
+   * `youthRatingsAt` of these and grows toward them each offseason; the season
+   * he reaches the reference age `progressPlayer` sets him to them and drops the
+   * field. Landing on a number rolled up front is what keeps the sixteen-year-old
+   * average (and spread) identical to a kid generated at sixteen.
+   *
+   * Absent for everyone else, including academy kids enrolled before this
+   * existed, who simply hold still until sixteen — so nothing to backfill.
+   */
+  youthTarget?: PlayerRatings;
 }

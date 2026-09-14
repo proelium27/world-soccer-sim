@@ -4,9 +4,9 @@
  *
  *   SEEDS=1,2,3 TID=0 SEASONS=10 npx tsx scripts/academyOnlyProbe.ts
  *
- * Plays the save with the policy a player would actually use — sign the best
- * trialists on estimated potential each summer, extend the academy deals before
- * they lapse, extend the senior squad, promote at 18 — and reports what the
+ * Plays the save the way the academy runs if the player never overrides it —
+ * every intake joins automatically, the checkpoints at 16 and 18 take their
+ * defaults, the senior squad is re-signed each summer — and reports what the
  * graduates became. `TID` picks the club: 0 is England's top flight (the
  * strongest academies in the world), 578 Serbia's (the weakest top flight), 40
  * an English third division.
@@ -40,10 +40,9 @@ import { mulberry32 } from "../src/engine/rng.js";
 import { createLeagueState, type LeagueStore } from "../src/core/leagueState.js";
 import { simThrough } from "../src/core/simThrough.js";
 import { simOffseason } from "../src/core/offseason.js";
-import { signTrialist, promoteFromAcademy } from "../src/core/freeAgency.js";
-import { extendAcademyContracts, extendContracts } from "../src/core/contracts.js";
+import { extendContracts } from "../src/core/contracts.js";
 import { competitionOf } from "../src/core/competitions.js";
-import { ACADEMY_ROSTER_CAP, ROSTER_CAP, YOUTH_TRIAL_SIGN_LIMIT } from "../src/core/constants.js";
+import { USER_ACADEMY_ENTRY_AGE } from "../src/core/constants.js";
 
 const TID = Number(process.env.TID ?? 0);
 const SEASONS = Number(process.env.SEASONS ?? 10);
@@ -85,47 +84,25 @@ function runSeed(seed: number): { grads: Graduate[]; label: string; intruders: n
     league = simOffseason(playSeason(league, rng), rng);
     const season = league.season;
 
-    // Sign the best trialists on estimated potential, which is all the player
-    // has to go on. Bounded by the academy cap, not by the sign limit alone.
+    // This summer's intake joined the academy by itself; record each kid once,
+    // with the potential the page showed when he arrived.
     {
       const team = league.teams.find((t) => t.tid === TID)!;
       const byPid = new Map(league.players.map((p) => [p.pid, p]));
-      const room = Math.max(0, ACADEMY_ROSTER_CAP - team.academyRoster.length);
-      const pick = (team.youthTrialists ?? [])
-        .map((pid) => byPid.get(pid))
-        .filter((p): p is NonNullable<typeof p> => p != null)
-        .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr)
-        .slice(0, Math.min(YOUTH_TRIAL_SIGN_LIMIT, room));
-      for (const p of pick) {
-        const before = league.teams.find((t) => t.tid === TID)!.academyRoster.length;
-        const out = signTrialist(league.teams, league.players, TID, p.pid, season);
-        league = { ...league, teams: out.teams, players: out.players };
-        if (league.teams.find((t) => t.tid === TID)!.academyRoster.length > before) {
-          signed.set(p.pid, { potAtSigning: p.potential, signedSeason: season });
+      for (const pid of team.academyRoster) {
+        const p = byPid.get(pid);
+        if (p && !signed.has(pid) && season - p.born === USER_ACADEMY_ENTRY_AGE) {
+          signed.set(pid, { potAtSigning: p.potential, signedSeason: season });
         }
       }
     }
 
-    // (a) above: both lists, every summer, or the graduates leak away.
+    // (a) above: the senior squad, every summer, or the graduates leak away.
+    // The academy needs nothing: its deals run to the checkpoints, and the
+    // rollover promotes graduates while there is senior room.
     {
       const team = league.teams.find((t) => t.tid === TID)!;
-      let players = extendAcademyContracts(league.players, team.academyRoster, season);
-      players = extendContracts(players, team.roster, season);
-      league = { ...league, players };
-    }
-
-    // Promote at 18 so he gets senior minutes rather than backing the cap up.
-    {
-      const byPid = new Map(league.players.map((p) => [p.pid, p]));
-      const ready = league.teams.find((t) => t.tid === TID)!.academyRoster
-        .map((pid) => byPid.get(pid))
-        .filter((p): p is NonNullable<typeof p> => p != null && season - p.born >= 18)
-        .sort((a, b) => b.ovr - a.ovr);
-      for (const p of ready) {
-        if (league.teams.find((t) => t.tid === TID)!.roster.length >= ROSTER_CAP) break;
-        const out = promoteFromAcademy(league.teams, league.players, TID, p.pid, season, "offseason");
-        league = { ...league, teams: out.teams, players: out.players };
-      }
+      league = { ...league, players: extendContracts(league.players, team.roster, season) };
     }
   }
 
@@ -198,8 +175,8 @@ console.log(`mean peak: ${(pooled.reduce((a, g) => a + g.peak, 0) / pooled.lengt
 
 /**
  * The headline. POT is a scout's ESTIMATE and the design says so, but this puts
- * a number on how little it tells you: if this is near zero, picking the top
- * few off the Youth Intake page is barely better than picking at random, and
+ * a number on how little it tells you: if this is near zero, keeping the kids
+ * rated highest at the scholarship cut is barely better than keeping at random, and
  * the lever that matters is how many you can hold rather than which you take.
  * Computed over EVERY graduate, not a top-N slice — sorting by peak and then
  * truncating attenuates the correlation toward zero on its own.

@@ -63,7 +63,6 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           <NavLink to="/incoming-offers" className="nav-link" onClick={onNavigate}>Incoming Offers</NavLink>
           <NavLink to="/loans" className="nav-link" onClick={onNavigate}>Loans</NavLink>
           <NavLink to="/finance" className="nav-link" onClick={onNavigate}>Finance</NavLink>
-          <NavLink to="/youth-intake" className="nav-link" onClick={onNavigate}>Youth Intake</NavLink>
           <NavLink to="/free-agents" className="nav-link" onClick={onNavigate}>Free Agents</NavLink>
           <NavLink to="/academy" className="nav-link" onClick={onNavigate}>Academy</NavLink>
         </>

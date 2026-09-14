@@ -1,6 +1,8 @@
 import type { Player } from "../players/types.js";
-import type { IntlGroup, IntlQualifyingCampaign, NationSquad } from "./types.js";
+import type { TeamMatchData } from "../league/composites.js";
+import type { IntlGroup, IntlQualifyingCampaign, IntlQualifyingPlayoff, NationSquad } from "./types.js";
 import type { CareerDelta } from "./simIntl.js";
+import { playQualifyingPlayoff } from "./qualifyingPlayoff.js";
 import { buildSquads, nationMatchData } from "./squads.js";
 import { groupByConfederation, allocateSlots, allocateByQuota } from "./confederations.js";
 import { buildGroup, serpentineGroups, groupTable, rankAcrossGroups, type GroupRow } from "./groups.js";
@@ -22,28 +24,52 @@ function groupCountFor(nations: number, slots: number): number {
 }
 
 /**
- * Fill a confederation's places from its completed groups: every group winner
- * first, then the best runners-up, then the best third-placed nations, and so
- * on until the places are gone.
+ * Split a confederation's places over its completed groups: every finishing
+ * position that takes every group's place is through outright (group winners,
+ * then runners-up, and so on), and the one position that takes only some of
+ * them goes to a playoff between all of its nations (see qualifyingPlayoff.ts).
  *
  * Working down by finishing position (rather than one flat merged table) is
  * both how real qualifying behaves and what makes the allocation total: however
  * lopsided the group sizes are, there is always another position to draw from,
- * so a confederation can never come up short of the places it was given.
- * Nations from different groups are compared on per-game rates — see
- * rankAcrossGroups.
+ * so a confederation can never come up short of the places it was given. The
+ * playoff entrants are seeded on per-game rates (see rankAcrossGroups), which
+ * decides who hosts and who meets whom, never who goes through.
  */
-function fillPlaces(groups: IntlGroup[], slots: number): number[] {
+function splitPlaces(
+  groups: IntlGroup[],
+  slots: number,
+): { direct: number[]; playoff: { position: number; places: number; entrants: number[] } | null } {
   const tables = groups.map((g) => groupTable(g));
-  const qualified: number[] = [];
+  const direct: number[] = [];
+  let playoff: { position: number; places: number; entrants: number[] } | null = null;
 
   placesByPosition(tables.map((t) => t.length), slots).forEach((take, position) => {
     const atPosition: GroupRow[] = tables
       .map((table) => table[position])
       .filter((row): row is GroupRow => row !== undefined);
-    for (const row of rankAcrossGroups(atPosition).slice(0, take)) qualified.push(row.nid);
+    const seeded = rankAcrossGroups(atPosition).map((row) => row.nid);
+    if (take >= seeded.length) direct.push(...seeded);
+    else playoff = { position, places: take, entrants: seeded };
   });
-  return qualified;
+  return { direct, playoff };
+}
+
+/**
+ * The playoff a confederation's draw sets up, if any: the finishing position
+ * whose places run out part-way through it, how many nations finish there, and
+ * how many of them go through. Settled by the draw alone, like placesByPosition.
+ */
+export function playoffShape(
+  groupSizes: number[],
+  slots: number,
+): { position: number; entrants: number; places: number } | null {
+  const byPosition = placesByPosition(groupSizes, slots);
+  const position = byPosition.length - 1;
+  if (position < 0) return null;
+  const entrants = groupSizes.filter((size) => size > position).length;
+  const places = byPosition[position];
+  return places < entrants ? { position, entrants, places } : null;
 }
 
 /**
@@ -133,6 +159,12 @@ export interface ConfederationQualifyingPlan {
    * whose nations are all through by entering.
    */
   byPosition: number[];
+  /**
+   * The playoff for the last places, when the quota runs out part-way through
+   * a finishing position (see playoffShape). Null when every position it
+   * reaches is through outright, or it plays no qualifying at all.
+   */
+  playoff: { position: number; entrants: number; places: number } | null;
 }
 
 /**
@@ -167,6 +199,7 @@ export function qualifyingPlan(campaign: IntlQualifyingCampaign): ConfederationQ
       nations: (byConfederation.get(confederation) ?? []).length,
       groups: groupSizes.length,
       byPosition: placesByPosition(groupSizes, slots),
+      playoff: playoffShape(groupSizes, slots),
     };
   });
 }
@@ -214,13 +247,21 @@ export function initQualifying(
 }
 
 /**
- * The qualifiers, computed once the whole campaign is played: each
- * confederation's places filled by finishing position across its groups, plus
- * the direct qualifiers whose confederation had no more nations than places.
- * Strongest first (by nid) so the tournament draw's pots seed correctly. The
- * allocation is the one recorded at the draw (see planQualifying).
+ * The qualifiers, decided once the whole campaign is played: each
+ * confederation's outright places by finishing position across its groups, its
+ * playoff played for the rest, plus the direct qualifiers whose confederation
+ * had no more nations than places. Strongest first (by nid) so the tournament
+ * draw's pots seed correctly. The allocation is the one recorded at the draw
+ * (see planQualifying).
  */
-export function computeQualified(played: IntlGroup[], campaign: QualifyingSource): string[] {
+export function decideQualifiers(
+  played: IntlGroup[],
+  campaign: QualifyingSource & Pick<IntlQualifyingCampaign, "season">,
+  matchData: Map<number, TeamMatchData>,
+  lid: number,
+  delta: CareerDelta,
+  injured: Set<number>,
+): { qualified: string[]; playoffs: IntlQualifyingPlayoff[] } {
   const { nations } = campaign;
   const { nidOf, fieldSize, byConfederation, slotsByConfederation } = planQualifying(campaign);
 
@@ -235,20 +276,30 @@ export function computeQualified(played: IntlGroup[], campaign: QualifyingSource
   });
 
   const qualifiedNids: number[] = [];
-  for (const [confederation, slots] of slotsByConfederation) {
+  const playoffs: IntlQualifyingPlayoff[] = [];
+  [...slotsByConfederation].forEach(([confederation, slots], confederationIndex) => {
     const members = (byConfederation.get(confederation) ?? []).map((n) => nidOf.get(n)!);
     if (members.length <= slots) {
       qualifiedNids.push(...members); // direct qualifiers, played no matches
-      continue;
+      return;
     }
     const indices = groupsOfConfederation.get(confederation) ?? [];
-    qualifiedNids.push(...fillPlaces(indices.map((i) => played[i]), slots));
-  }
+    const { direct, playoff } = splitPlaces(indices.map((i) => played[i]), slots);
+    qualifiedNids.push(...direct);
+    if (!playoff) return;
+    const result = playQualifyingPlayoff(
+      confederation, confederationIndex, playoff.position, playoff.entrants, playoff.places,
+      matchData, lid, campaign.season, delta, injured,
+    );
+    playoffs.push(result);
+    qualifiedNids.push(...result.qualified);
+  });
 
-  return [...new Set(qualifiedNids)]
+  const qualified = [...new Set(qualifiedNids)]
     .sort((a, b) => a - b)
     .slice(0, fieldSize)
     .map((nid) => nations[nid]);
+  return { qualified, playoffs };
 }
 
 /**
@@ -269,32 +320,47 @@ export function playQualifyingRound(
   const delta = emptyCareerDelta();
   const injured = new Set<number>();
 
+  // Drop squad members who have since retired out of the world so match data
+  // never dereferences a missing pid.
+  const liveMatchData = (): Map<number, TeamMatchData> => {
+    const alive = new Set(players.map((p) => p.pid));
+    const liveSquads = campaign.squads.map((s) => ({ ...s, pids: s.pids.filter((pid) => alive.has(pid)) }));
+    return nationMatchData(liveSquads, players);
+  };
+
   // The next leg to play is the lowest leg with any fixture still unplayed.
   const pendingLegs = campaign.groups.flatMap((g) =>
     g.matches.filter((m) => m.homeGoals < 0).map((m) => m.leg ?? 0),
   );
   if (pendingLegs.length === 0) {
     // Nothing left to play (or a world where every confederation qualified
-    // directly): make sure the qualifiers are computed.
-    const qualified = campaign.qualified.length > 0
-      ? campaign.qualified
-      : computeQualified(campaign.groups, campaign);
-    return { campaign: { ...campaign, qualified }, delta, injured: [] };
+    // directly): make sure the qualifiers are decided.
+    if (campaign.qualified.length > 0) return { campaign, delta, injured: [] };
+    const decided = decideQualifiers(campaign.groups, campaign, liveMatchData(), lid, delta, injured);
+    return {
+      campaign: { ...campaign, qualified: decided.qualified, playoffs: decided.playoffs },
+      delta,
+      injured: [...injured],
+    };
   }
   const leg = Math.min(...pendingLegs);
-
-  // Drop squad members who have since retired out of the world so match data
-  // never dereferences a missing pid.
-  const alive = new Set(players.map((p) => p.pid));
-  const liveSquads = campaign.squads.map((s) => ({ ...s, pids: s.pids.filter((pid) => alive.has(pid)) }));
-  const matchData = nationMatchData(liveSquads, players);
+  const matchData = liveMatchData();
 
   const seed = hashInts(lid, campaign.season, QUALIFYING_GROUP_STREAM, leg);
   const played = playGroups(campaign.groups, matchData, seed, false, delta, injured, leg);
 
   const complete = played.every((g) => g.matches.every((m) => m.homeGoals >= 0));
-  const qualified = complete ? computeQualified(played, campaign) : campaign.qualified;
-  return { campaign: { ...campaign, groups: played, qualified }, delta, injured: [...injured] };
+  if (!complete) {
+    return { campaign: { ...campaign, groups: played }, delta, injured: [...injured] };
+  }
+  // The last leg is in: play each confederation's playoff straight after it,
+  // on the same squads, and lock in the field.
+  const decided = decideQualifiers(played, campaign, matchData, lid, delta, injured);
+  return {
+    campaign: { ...campaign, groups: played, qualified: decided.qualified, playoffs: decided.playoffs },
+    delta,
+    injured: [...injured],
+  };
 }
 
 /**

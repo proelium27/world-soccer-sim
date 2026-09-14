@@ -11,7 +11,6 @@ import { setSeasonStartYear } from "../format.js";
 import { exportLeagueJSON, importLeagueJSON } from "../../db/exportImport.js";
 import {
   signFreeAgent, releasePlayer, signToAcademy, promoteFromAcademy, releaseAcademyPlayer,
-  signTrialist,
 } from "../../core/freeAgency.js";
 import { scoutDirectionsOf, type ScoutDirections } from "../../core/scouting/scoutDirections.js";
 import { clampScoutingSpend } from "../../core/finance/scouting.js";
@@ -37,7 +36,8 @@ import {
   type PlayerEdit, type NewPlayerSpec,
 } from "../../core/godMode.js";
 import { switchClub } from "../../core/manager/switchClub.js";
-import { takeNationalJob, leaveNationalJob } from "../../core/nationalManager/index.js";
+import { takeNationalJob, leaveNationalJob, setNationInterest } from "../../core/nationalManager/index.js";
+import { setClubInterest } from "../../core/manager/interests.js";
 import {
   editableSquad, writeSquad, isValidNationSquad, squadRating, isEligibleNation,
 } from "../../core/international/index.js";
@@ -102,8 +102,6 @@ interface LeagueContextValue {
   signFreeAgentAction: (pid: number) => Promise<void>;
   releasePlayerAction: (pid: number) => Promise<void>;
   signToAcademyAction: (pid: number) => Promise<void>;
-  /** Sign one of this year's youth trialists into the academy. */
-  signTrialistAction: (pid: number) => Promise<void>;
   /**
    * Set what the youth scouts have been told — countries and positions — as a
    * partial, so a panel can change one without restating the other. See
@@ -143,6 +141,10 @@ interface LeagueContextValue {
   declineJobOffersAction: () => Promise<void>;
   /** Save-level switch for whether the board can sack you at all. */
   setSackingEnabledAction: (on: boolean) => Promise<void>;
+  /** Add or remove a club from the jobs you'd like. */
+  setClubInterestAction: (tid: number, on: boolean) => Promise<void>;
+  /** Add or remove a country from the national jobs you'd like. */
+  setNationInterestAction: (nation: string, on: boolean) => Promise<void>;
   /** Take charge of a national team, leaving whichever one you had. */
   takeNationalJobAction: (nation: string) => Promise<void>;
   /** Step down from the national job, going back to club football only. */
@@ -753,28 +755,6 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     };
   }), [mutate]);
 
-  const signTrialistAction = useCallback((pid: number) => mutate((l) => {
-    const { teams, players } = signTrialist(
-      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, userSpendPolicy(l),
-    );
-    if (teams === l.teams && players === l.players) return null;
-    // Reuses the academy event rather than adding one: the analytics set is
-    // deliberately "a handful of meaningful moments, not one event per click"
-    // (see analytics.ts), and this is an academy signing by another route.
-    trackEvent("player_signed_to_academy");
-    // Same fee-0 sentinel record an academy signing gets: he arrives at the
-    // club from nowhere, and without it his club-by-season history would name
-    // whichever club last had a record for him (none, for a youth product).
-    const { season, window } = freeAgentSigningWindow(l);
-    return {
-      ...l, teams, players,
-      transfers: [
-        ...l.transfers,
-        { pid, fromTid: FREE_AGENT_TID, toTid: l.meta.userTid, fee: 0, season, window },
-      ],
-    };
-  }), [mutate]);
-
   const setScoutDirectionsAction = useCallback((next: Partial<ScoutDirections>) => mutate((l) => {
     const team = l.teams.find((t) => t.tid === l.meta.userTid);
     if (!team) return null;
@@ -958,6 +938,18 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const setSackingEnabledAction = useCallback(
     (on: boolean) => mutate((l) => ({ ...l, manager: { ...l.manager, sackingEnabled: on } })),
+    [mutate],
+  );
+
+  // Interests only ever change which offers get drawn at the next review, so
+  // they're safe at any point in the season and need no phase gate.
+  const setClubInterestAction = useCallback(
+    (tid: number, on: boolean) => mutate((l) => setClubInterest(l, tid, on)),
+    [mutate],
+  );
+
+  const setNationInterestAction = useCallback(
+    (nation: string, on: boolean) => mutate((l) => setNationInterest(l, nation, on)),
     [mutate],
   );
 
@@ -1257,7 +1249,6 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     signFreeAgentAction,
     releasePlayerAction,
     signToAcademyAction,
-    signTrialistAction,
     setScoutDirectionsAction,
     promoteFromAcademyAction,
     releaseAcademyPlayerAction,
@@ -1284,6 +1275,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     playSuperCupsAction,
     setGodModeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
+    setClubInterestAction, setNationInterestAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,
     setNationalFormationAction, autoPickNationalXIAction,
@@ -1308,7 +1300,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     customizeTeamsAction, simAction, simLiveAction, liveMatch, chooseLiveMatch,
     finishLiveMatch, jumpSeasonsAction, offseasonAction,
     intlStageAction, signFreeAgentAction,
-    releasePlayerAction, signToAcademyAction, signTrialistAction,
+    releasePlayerAction, signToAcademyAction,
     setScoutDirectionsAction,
     promoteFromAcademyAction,
     releaseAcademyPlayerAction, extendAcademyContractAction, setScoutingSpendAction,
@@ -1326,6 +1318,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSetProgressionModelAction,
     setWorldCupSizeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
+    setClubInterestAction, setNationInterestAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,
     setNationalFormationAction, autoPickNationalXIAction,

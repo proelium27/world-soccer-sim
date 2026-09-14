@@ -310,5 +310,29 @@ export function summarizeQualifying(campaign: IntlQualifyingCampaign): IntlQuali
     entered: campaign.nations.length,
     groups: campaign.groups.map((g) => groupTableSummary(g, campaign.nations)),
     qualified: campaign.qualified,
+    ...(campaign.playoffs
+      ? {
+        playoffs: campaign.playoffs.map((p) => ({
+          confederation: p.confederation,
+          position: p.position,
+          places: p.places,
+          entrants: p.entrants.map((nid) => campaign.nations[nid]),
+          rounds: p.rounds.map((r) => ({
+            qualifies: r.qualifies,
+            results: r.ties.map((t) => ({
+              round: t.round,
+              home: campaign.nations[t.home],
+              away: campaign.nations[t.away],
+              homeGoals: t.homeGoals,
+              awayGoals: t.awayGoals,
+              winner: campaign.nations[t.winner],
+              pens: t.wentToPens ? { home: t.homePens, away: t.awayPens } : null,
+              extraTime: t.wentToExtraTime,
+            })),
+          })),
+          qualified: p.qualified.map((nid) => campaign.nations[nid]),
+        })),
+      }
+      : {}),
   };
 }

@@ -5,7 +5,7 @@ import type { ActiveLoan } from "./loans.js";
 import { isBorrowed } from "./loanOwnership.js";
 import {
   ROSTER_COMPOSITION, ROSTER_CAP, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
-  ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, PROSPECT_AGE_MAX, YOUTH_TRIAL_SIGN_LIMIT,
+  ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, PROSPECT_AGE_MAX,
   AI_PROSPECT_SLOTS, AI_PROSPECT_MAX_AGE, AI_PROSPECT_MIN_POT,
   potentialBar, type ProgressionModel,
 } from "./constants.js";
@@ -43,13 +43,7 @@ export function freeAgentPids(
   players: Player[],
   activeLoans: ActiveLoan[] = [],
 ): Set<number> {
-  // Trialists count as rostered: a youth trial group awaiting the user's
-  // decision must not be signable by an AI club, nor culled out from under it.
-  // Read off the team rather than taken as a parameter so every caller gets it
-  // without a signature change (see StoredTeam.youthTrialists).
-  const rostered = new Set(
-    teams.flatMap((t) => [...t.roster, ...t.academyRoster, ...(t.youthTrialists ?? [])]),
-  );
+  const rostered = new Set(teams.flatMap((t) => [...t.roster, ...t.academyRoster]));
   const onLoan = new Set(activeLoans.map((l) => l.pid));
   return new Set(
     players.map((p) => p.pid).filter((pid) => !rostered.has(pid) && !onLoan.has(pid)),
@@ -701,7 +695,6 @@ export function ensureUserRosterSafety(
   const playerMap = new Map(players.map((p) => [p.pid, p]));
   const roster = [...team.roster];
   let academy = [...team.academyRoster];
-  let trialists = [...(team.youthTrialists ?? [])];
   const promoted = new Map<number, Player>();
 
   // Who came from the open market rather than from inside the club. The caller
@@ -709,14 +702,14 @@ export function ensureUserRosterSafety(
   // reconstructed from `league.transfers` alone (teamForSeason, the OVR chart's
   // club colours), so an unrecorded free arrival is attributed to whichever club
   // last had a record for him — the exact bug that sentinel record exists to
-  // prevent. A promotion from the academy or the trial list needs no record: it
-  // is the same club, so the owner the record would establish is already right.
+  // prevent. A promotion from the academy needs no record: it is the same club,
+  // so the owner the record would establish is already right.
   const marketSignings: number[] = [];
 
   function promote(pid: number): void {
     const p = playerMap.get(pid)!;
     const terms = contractTerms(p, season);
-    const fromMarket = !academy.includes(pid) && !trialists.includes(pid);
+    const fromMarket = !academy.includes(pid);
     promoted.set(pid, {
       ...p,
       contract: { salary: terms.salary, expiresSeason: terms.expiresSeason },
@@ -728,18 +721,15 @@ export function ensureUserRosterSafety(
     if (fromMarket) marketSignings.push(pid);
     roster.push(pid);
     academy = academy.filter((q) => q !== pid);
-    trialists = trialists.filter((q) => q !== pid);
   }
 
   /**
-   * Everyone the club could call up, best first: its own academy, then this
-   * year's trial group, then the open market.
+   * Everyone the club could call up, best first: its own academy, then the open
+   * market.
    *
-   * **The trial group is here because the academy stopped being guaranteed to
-   * hold anyone.** Youth intake used to sign itself straight into the academy,
-   * so there was always somebody to promote; now the user chooses, and a user
-   * who ignores the Youth Intake screen has an empty academy forever. Left
-   * unfixed that is fatal rather than cosmetic: the roster starves, `selectXI`
+   * The academy fills itself every offseason, but it can still be empty — a
+   * user who released every kid, or one who only just took over a club — and an
+   * empty pool is fatal rather than cosmetic: the roster starves, `selectXI`
    * silently leaves slots empty, and `pickInterceptor` then dereferences an
    * undefined tackler and takes the whole sim down. Found by the dynasty audit,
    * which never signs anybody.
@@ -753,7 +743,7 @@ export function ensureUserRosterSafety(
    * unfieldable, and only ever for the user's club.
    */
   function callUpPool(): Player[] {
-    const own = [...academy, ...trialists];
+    const own = [...academy];
     // `freeAgentPids` reads the CALLER's teams, which this function does not
     // update as it promotes — so anyone already called up still looks unsigned
     // here. Excluding them is a correctness requirement, not a tidy-up: without
@@ -770,10 +760,10 @@ export function ensureUserRosterSafety(
         .filter((p): p is Player => p != null)
         .sort((a, b) => b.ovr - a.ovr);
     // TIERED, not one sorted list. A single ovr sort collapses the tiers: free
-    // agents are grown men and a trialist is 16, so the market would always win
-    // and the club would sign strangers while its own kids sat on the trial
-    // list. A call-up promotes from within first; the market is the last resort
-    // it always was.
+    // agents are grown men and an academy kid can be 14, so the market would
+    // always win and the club would sign strangers while its own kids sat in the
+    // academy. A call-up promotes from within first; the market is the last
+    // resort it always was.
     return [...rank(own), ...rank(market)];
   }
 
@@ -795,94 +785,11 @@ export function ensureUserRosterSafety(
   return {
     teams: teams.map((t) =>
       t.tid === userTid
-        ? { ...t, roster, academyRoster: academy, youthTrialists: trialists }
+        ? { ...t, roster, academyRoster: academy }
         : t,
     ),
     players: players.map((p) => promoted.get(p.pid) ?? p),
     marketSignings,
-  };
-}
-
-/**
- * How many of this year's trial group can still be signed.
- *
- * Both bounds are real and the tighter one wins: YOUTH_TRIAL_SIGN_LIMIT is the
- * decision the intake is meant to be, and ACADEMY_ROSTER_CAP is the pool's hard
- * ceiling — a club arriving with a full academy signs nobody however good the
- * group is. The per-intake count is a counter on the team, reset when the
- * offseason lays out the new group, rather than something derived from ages or
- * contract dates: those are ambiguous the moment a 16-year-old can reach the
- * academy by any other route.
- */
-export function trialSigningsLeft(team: StoredTeam, _players?: Player[]): number {
-  return Math.max(
-    0,
-    Math.min(
-      YOUTH_TRIAL_SIGN_LIMIT - (team.youthTrialSignings ?? 0),
-      ACADEMY_ROSTER_CAP - team.academyRoster.length,
-    ),
-  );
-}
-
-/**
- * Sign one of this year's trialists into the academy.
- *
- * The trialist leaves `youthTrialists` and joins `academyRoster` on ordinary
- * academy stipend terms. **The academy stamp on his ratings history happens
- * here, not at generation**, because a trialist who is never signed was never
- * an academy player and his OVR chart should not claim he was.
- *
- * No budget check and no mid-season charge, unlike `signToAcademy`: the intake
- * is resolved in the offseason, where the season-start charge has not yet run
- * and will pick up his stipend along with everyone else's.
- */
-export function signTrialist(
-  teams: StoredTeam[],
-  players: Player[],
-  tid: number,
-  pid: number,
-  season: number,
-  phase: "regular" | "offseason" = "offseason",
-  spend?: SpendPolicy,
-): { teams: StoredTeam[]; players: Player[] } {
-  const team = teams.find((t) => t.tid === tid);
-  if (!team || !(team.youthTrialists ?? []).includes(pid)) return { teams, players };
-  if (trialSigningsLeft(team) <= 0) return { teams, players };
-
-  const terms = academyContractTerms(season);
-  // Wages are charged up front at season start, so a signing made mid-season
-  // has to pay this season's stipend on the spot — exactly as signToAcademy
-  // does for the same player by the other route. The group is normally
-  // resolved in the offseason, where the season-start charge is still to come
-  // and picks him up with everyone else, but nothing stops the page being
-  // opened in March: the trial list survives until the next rollover.
-  const wageCharge = phase === "regular" ? terms.salary : 0;
-  // Overdraft yes, embargo no — see signToAcademy.
-  if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
-
-  return {
-    teams: teams.map((t) =>
-      t.tid === tid
-        ? {
-            ...t,
-            youthTrialists: (t.youthTrialists ?? []).filter((x) => x !== pid),
-            academyRoster: [...t.academyRoster, pid],
-            youthTrialSignings: (t.youthTrialSignings ?? 0) + 1,
-            budget: t.budget - wageCharge,
-          }
-        : t,
-    ),
-    players: players.map((p) =>
-      p.pid === pid
-        ? {
-            ...p,
-            contract: { salary: terms.salary, expiresSeason: terms.expiresSeason },
-            // Start his OVR history in the academy (blue) rather than with a
-            // stray senior point before his first real academy season.
-            hist: p.hist.map((h) => ({ ...h, academy: true })),
-          }
-        : p,
-    ),
   };
 }
 

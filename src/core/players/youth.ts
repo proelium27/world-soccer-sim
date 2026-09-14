@@ -111,29 +111,38 @@ export function generateYouthIntake(
   homeCountry?: string,
   nationalities?: NationalityWeights | null,
   /**
-   * Exact number to generate, for the user's youth trial group (see
-   * YOUTH_TRIAL_GROUP_MIN). Omitted, the count is drawn from `rng` as always —
-   * so passing it also SKIPS that draw, which is why the trial top-up must run
-   * on its own stream rather than the shared one.
+   * Exact number to generate, for the user academy's yearly intake (see
+   * USER_ACADEMY_INTAKE_MIN). Omitted, the count is drawn from `rng` as always —
+   * so passing it also SKIPS that draw, which is why the academy's top-up must
+   * run on its own stream rather than the shared one.
    */
   countOverride?: number,
   /**
    * The positions the user's scouts were told to look for, and ONLY ever for
-   * his trial group's scouted extras. It does not change the rng draw COUNT — a
-   * position is still one draw off a cumulative table — but it changes which
+   * his academy intake's scouted extras. It does not change the rng draw COUNT —
+   * a position is still one draw off a cumulative table — but it changes which
    * player comes out, because the position decides which tier row his ratings
    * are rolled from, and those draw counts differ. So passing this anywhere
    * that runs on the shared stream re-rolls the world.
    */
   directions?: { positions?: readonly Position[] },
   /**
-   * The save's development model. Matters more here than anywhere else it is
-   * threaded: a trialist's listed potential is the *only* thing the Youth
-   * Intake screen gives the user to choose five of twelve on, and he is not
-   * re-estimated until the end of his first offseason — i.e. long after the
-   * decision. Scaling a draw, never the count, so this cannot re-roll a world.
+   * The save's development model. It shapes the listed potential the academy's
+   * scholarship and professional cuts are ranked on. Scaling a draw, never the
+   * count, so this cannot re-roll a world.
    */
   model: ProgressionModel = "random",
+  /**
+   * The age the intake arrives at: YOUTH_AGE for every AI club, and
+   * USER_ACADEMY_ENTRY_AGE for the user's academy.
+   *
+   * **Draw-neutral, and that is what lets the user's ordinary intake stay inside
+   * the world loop on the shared rng.** Ratings are rolled with no age term, and
+   * `estimatePotential` forecasts from YOUTH_BASE_REFERENCE_AGE for anyone below
+   * it, so a 14-year-old spends exactly the draws a 16-year-old does. Only his
+   * birth year differs, and `progressPlayer` holds him until the reference age.
+   */
+  age: number = YOUTH_AGE,
 ): { players: Player[]; nextPid: number } {
   const count = countOverride ?? YOUTH_INTAKE_MIN
     + Math.floor(rng() * (YOUTH_INTAKE_MAX - YOUTH_INTAKE_MIN + 1));
@@ -145,7 +154,7 @@ export function generateYouthIntake(
   for (let i = 0; i < count; i++) {
     const pos = weightedPosition(rng(), cdf);
     const p = generatePlayer(
-      rng, pos, base, pid++, YOUTH_AGE, season, genSeed, homeCountry, nationalities, model,
+      rng, pos, base, pid++, age, season, genSeed, homeCountry, nationalities, model,
     );
     p.contract.expiresSeason = season + YOUTH_CONTRACT_LENGTH;
     players.push(p);

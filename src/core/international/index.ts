@@ -2,7 +2,7 @@ import type { InternationalState } from "./types.js";
 
 export type {
   InternationalState, IntlStage, IntlCareer, IntlSeasonLine, IntlTournament, IntlTournamentSummary,
-  IntlQualifyingCampaign, IntlQualifyingSummary, IntlGroup, IntlGroupMatch, IntlGroupTable,
+  IntlQualifyingCampaign, IntlQualifyingSummary, IntlQualifyingPlayoff, IntlQualifyingPlayoffSummary, IntlGroup, IntlGroupMatch, IntlGroupTable,
   IntlKnockoutResult, IntlPowerSnapshot, NationSquad, IntlConfederationCup,
 } from "./types.js";
 export { emptyIntlCareer } from "./types.js";
@@ -19,7 +19,8 @@ export { formatFor, knockoutRounds, type TournamentFormat } from "./format.js";
 export {
   nationForm, noNationForm, INTL_FORM_WINDOW, type NationFormStats,
 } from "./nationForm.js";
-export { qualifyingPlan, placesByPosition, type ConfederationQualifyingPlan } from "./qualifying.js";
+export { qualifyingPlan, placesByPosition, playoffShape, type ConfederationQualifyingPlan } from "./qualifying.js";
+export { runPlayoff } from "./qualifyingPlayoff.js";
 export {
   buildSquads, selectSquad, isEligibleNation, manageableNations, nationPools,
   buildPowerSnapshot, squadRating, nationMatchData,

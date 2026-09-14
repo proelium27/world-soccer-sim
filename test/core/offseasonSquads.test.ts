@@ -21,7 +21,7 @@ import { simOffseason } from "../../src/core/offseason.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 import { playFullSeason } from "../helpers/offseasonLeague.js";
 import {
-  NUM_TEAMS,
+  NUM_TEAMS, USER_ACADEMY_ENTRY_AGE, USER_ACADEMY_INTAKE_MIN,
 } from "../../src/core/constants.js";
 
 describe("simOffseason — youth intake and free agency", () => {
@@ -54,25 +54,17 @@ describe("simOffseason — youth intake and free agency", () => {
     expect(sixteenYearOlds.length).toBeGreaterThanOrEqual(NUM_TEAMS * 3);
   });
 
-  it("routes the user's youth intake to the trial list, signing nobody for him", () => {
-    // Used to assert the intake landed in academyRoster. It now arrives
-    // unsigned on youthTrialists and the user chooses (see YOUTH_TRIAL_*):
-    // the assertion moves with the contract rather than being dropped.
+  it("enrols the user's youth intake straight into his academy at the entry age", () => {
     const next = youthIntakeOffseason();
 
     const userTeam = next.teams.find((t) => t.tid === next.meta.userTid)!;
-    const trialists = userTeam.youthTrialists ?? [];
-    expect(trialists.length).toBeGreaterThan(0);
-    for (const pid of trialists) {
-      const p = next.players.find((q) => q.pid === pid)!;
-      expect(next.season - p.born).toBe(16);
-    }
-    // Nobody is signed on his behalf, and no trialist leaks onto either squad.
-    expect(userTeam.youthTrialSignings).toBe(0);
-    for (const pid of trialists) {
-      expect(userTeam.academyRoster).not.toContain(pid);
-      expect(userTeam.roster).not.toContain(pid);
-    }
+    const byPid = new Map(next.players.map((p) => [p.pid, p]));
+    const intake = userTeam.academyRoster.filter(
+      (pid) => next.season - byPid.get(pid)!.born === USER_ACADEMY_ENTRY_AGE,
+    );
+    expect(intake.length).toBeGreaterThanOrEqual(USER_ACADEMY_INTAKE_MIN);
+    // In the academy, never straight onto the senior squad.
+    for (const pid of intake) expect(userTeam.roster).not.toContain(pid);
   });
 
   it("still lands AI clubs' youth intake straight on the senior roster", () => {

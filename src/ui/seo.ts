@@ -88,7 +88,6 @@ const APP_TITLES: Record<string, string> = {
   "/set-scouting": "Scouting",
   "/roster": "Roster",
   "/leaders": "Stat leaders",
-  "/youth-intake": "Youth intake",
   "/free-agents": "Free agents",
   "/academy": "Academy",
   "/transfers": "Transfers",
