@@ -9,7 +9,7 @@ import {
 } from "../../core/contracts.js";
 import { renewalsDue } from "../../core/contractRenewal.js";
 import {
-  projectAcademyCheckpoints, type AcademyChoice, type AcademyDecision,
+  projectAcademyCheckpoints, type AcademyDecision,
 } from "../../core/academyPipeline.js";
 import {
   academyFacilitiesBonus, ACADEMY_FACILITIES_MAX,
@@ -29,84 +29,29 @@ import { EmptyState } from "../components/EmptyState.js";
 
 type AcademySortKey = "name" | "pos" | "ovr" | "pot" | "age" | "wage" | "next";
 
-type Outcome = AcademyDecision["outcome"];
-
-/** How each outcome reads in the Next rollover dropdown, and what it means. */
-const OUTCOME: Record<Outcome, { label: string; tone: string; title: string }> = {
+/** How the next rollover's default reads in the table, and how loudly. */
+const OUTCOME_BADGE: Record<AcademyDecision["outcome"], { label: string; cls: string; title: string }> = {
   promote: {
-    label: "Promote",
-    tone: "text-success",
-    title: "He joins your senior squad at the next rollover.",
+    label: "Joins the first team",
+    cls: "bg-success",
+    title: "He's at the professional cut. Unless you release him, he's promoted to your senior squad at the next rollover.",
   },
   release: {
-    label: "Release",
-    tone: "text-danger",
-    title: "He leaves at the next rollover.",
+    label: "Leaves",
+    cls: "bg-danger",
+    title: "He's at the professional cut and your senior squad has no room for him. Promote him now, or make room, or he leaves at the next rollover.",
   },
   keep: {
-    label: `Keep to ${ACADEMY_GRADUATION_AGE}`,
-    tone: "",
-    title: `He stays in the academy on a deal to ${ACADEMY_GRADUATION_AGE}.`,
+    label: `Kept to ${ACADEMY_GRADUATION_AGE}`,
+    cls: "bg-secondary",
+    title: "He's at the scholarship cut and there's room, so he stays on unless you release him.",
   },
   atRisk: {
     label: "Cut if full",
-    tone: "text-warning",
-    title: "Your scouts rate him among the lowest at this cut. If the academy is full once the new intake arrives, he's the one who goes.",
+    cls: "bg-warning text-dark",
+    title: "He's at the scholarship cut and your scouts rate him among the lowest. If the academy is full after the new intake arrives, he's the one who goes.",
   },
 };
-
-const CHOICE_LABEL: Record<AcademyChoice, string> = {
-  promote: "Promote",
-  keep: "Keep",
-  release: "Release",
-};
-
-/**
- * One kid's call at the next rollover. It sits on the scouts' default until the
- * user picks something else; a pick that no longer fits is greyed out rather
- * than offered and quietly broken at the rollover.
- */
-function RolloverChoice({
-  decision, disabled, onChange,
-}: {
-  decision: AcademyDecision;
-  disabled: boolean;
-  onChange: (choice: AcademyChoice | null) => void;
-}) {
-  const choices: AcademyChoice[] =
-    decision.checkpoint === "professional" ? ["promote", "release"] : ["keep", "release"];
-  const outcome = OUTCOME[decision.outcome];
-  // Possible only if the senior squad filled up after he was marked (signing
-  // someone, say): the pick stands, but there is no place left to honour it.
-  const noPlace = decision.chosen === "promote" && decision.outcome === "release";
-  return (
-    <div>
-      <select
-        className={`form-select form-select-sm w-auto ${outcome.tone}`}
-        aria-label="What happens to him at the next rollover"
-        title={outcome.title}
-        value={decision.chosen ?? "default"}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value === "default" ? null : (e.target.value as AcademyChoice))}
-      >
-        <option value="default">
-          {decision.chosen ? "Scouts' call" : `${outcome.label} (default)`}
-        </option>
-        {choices.map((c) => {
-          const fits = decision.options[c] === true;
-          return (
-            <option key={c} value={c} disabled={!fits}>
-              {CHOICE_LABEL[c]}{decision.chosen === c ? " (you)" : fits ? "" : " (no room)"}
-            </option>
-          );
-        })}
-      </select>
-      {noPlace && (
-        <div className="small text-danger">No senior place left, so he leaves</div>
-      )}
-    </div>
-  );
-}
 
 /**
  * The user's academy: kids join automatically every offseason, and the
@@ -114,15 +59,14 @@ function RolloverChoice({
  * core/academyPipeline.ts). Replaces the old Youth Intake trial screen.
  *
  * The "Next rollover" column is `projectAcademyCheckpoints`, the same rules and
- * ranking the offseason applies, with the user's calls folded in. Each kid at a
- * cut gets a dropdown that starts on the scouts' default; what the column can't
- * know it assumes on the cautious side, so a promotion or a keep it shows is a
- * promise and a release is the worst case (a summer retirement can free a place).
+ * ranking the offseason applies. What it can't know it assumes on the cautious
+ * side, so a promotion or a keep it shows is a promise unless the user acts
+ * first, and a release is the worst case (a summer retirement can free a place).
  */
 export function Academy() {
   const {
     league, promoteFromAcademyAction, extendAcademyContractAction, extendAllContractsAction,
-    releaseAcademyPlayerAction, setAcademyDecisionAction,
+    releaseAcademyPlayerAction,
     simming,
   } = useLeague();
   const { sort, toggle } = useTableSort<AcademySortKey>("age", "desc");
@@ -150,7 +94,7 @@ export function Academy() {
   const academyRoster = (userTeam?.academyRoster ?? [])
     .map((pid) => byPid.get(pid))
     .filter((p): p is NonNullable<typeof p> => p != null);
-  const outcomeRank: Record<Outcome, number> = {
+  const outcomeRank: Record<AcademyDecision["outcome"], number> = {
     release: 0, atRisk: 1, promote: 2, keep: 3,
   };
   const academyPlayers = sortRows(academyRoster, sort, {
@@ -174,7 +118,7 @@ export function Academy() {
   const midSeason = league.phase === "regular";
   const bonus = userTeam ? academyFacilitiesBonus(userTeam) : 0;
 
-  const count = (o: Outcome) =>
+  const count = (o: AcademyDecision["outcome"]) =>
     [...decisions.values()].filter((d) => d.outcome === o).length;
   // Older prospects signed out of free agency are on ordinary academy deals,
   // not checkpoints, so they can still quietly run out — same warning as Roster.
@@ -188,9 +132,9 @@ export function Academy() {
         Academy
         <HelpHint>
           Your youth academy. Kids join at {USER_ACADEMY_ENTRY_AGE} every summer and draw a cheap
-          flat stipend without counting against your senior roster. The calls come at{" "}
-          {ACADEMY_SCHOLARSHIP_AGE} and {ACADEMY_GRADUATION_AGE}: your scouts make them unless you
-          change them. Only your club has an academy.
+          flat stipend without counting against your senior roster. You decide who stays at{" "}
+          {ACADEMY_SCHOLARSHIP_AGE} and who turns pro at {ACADEMY_GRADUATION_AGE}. Only your club
+          has an academy.
         </HelpHint>
       </h4>
       <p className="text-muted" style={{ maxWidth: "48rem" }}>
@@ -199,9 +143,7 @@ export function Academy() {
         so their first two years are for watching them come along. At {ACADEMY_SCHOLARSHIP_AGE} their first deal is up: they're
         kept on while there's room (up to {ACADEMY_ROSTER_CAP} in the academy), and when there isn't,
         the ones your scouts rate lowest go. At {ACADEMY_GRADUATION_AGE} they join your first team
-        if there's space, or leave. Those are your scouts' calls, and you can change any of them in
-        the Next rollover column, as long as there's room for what you pick. Release anyone early,
-        or promote them early, whenever you like.
+        if there's space, or leave. Release anyone early, or promote them early, whenever you like.
       </p>
       <p className="text-muted" style={{ maxWidth: "48rem" }}>
         How good each intake is comes down to your academy's standing, how the club's been
@@ -224,9 +166,9 @@ export function Academy() {
             {decisions.size} {decisions.size === 1 ? "kid reaches" : "kids reach"} a cut at the next
             rollover.
           </strong>{" "}
-          As things stand: {count("promote")} join the first team, {count("release")} leave,{" "}
-          {count("keep")} stay on and {count("atRisk")} could be cut if the academy is full. Change
-          any of them in the Next rollover column.
+          If you leave it: {count("promote")} join the first team, {count("release")} leave,{" "}
+          {count("keep")} stay on and {count("atRisk")} could be cut if the academy is full. The
+          Next rollover column says who.
         </div>
       )}
       {expiring.length > 0 && (
@@ -271,9 +213,9 @@ export function Academy() {
               through more of them than you could keep in the first team.
             </li>
             <li>
-              The calls come at {ACADEMY_SCHOLARSHIP_AGE} and {ACADEMY_GRADUATION_AGE}. Your scouts
-              make each one for you, keeping the kids there&apos;s room for and promoting the ones the
-              first team can take, and you can overrule any of them.
+              The calls come at {ACADEMY_SCHOLARSHIP_AGE} and {ACADEMY_GRADUATION_AGE}, and doing
+              nothing is a real choice: the game keeps the kids it can and promotes the ones there&apos;s
+              room for.
             </li>
           </ul>
         </EmptyState>
@@ -295,6 +237,7 @@ export function Academy() {
           <tbody>
             {academyPlayers.map((p) => {
               const decision = decisions.get(p.pid);
+              const badge = decision ? OUTCOME_BADGE[decision.outcome] : null;
               // A kid short of the professional cut has no deal to extend: his
               // runs to his next checkpoint, which only the rollover resolves.
               const extendable =
@@ -315,12 +258,8 @@ export function Academy() {
                   <td className="text-end">{age}</td>
                   <td className="text-end">{formatWeeklyWage(p.contract.salary)}</td>
                   <td>
-                    {decision ? (
-                      <RolloverChoice
-                        decision={decision}
-                        disabled={simming}
-                        onChange={(choice) => { void setAcademyDecisionAction(p.pid, choice); }}
-                      />
+                    {badge ? (
+                      <span className={`badge ${badge.cls}`} title={badge.title}>{badge.label}</span>
                     ) : age < ACADEMY_GRADUATION_AGE ? (
                       <span className="text-muted small">
                         Decision at {age < ACADEMY_SCHOLARSHIP_AGE ? ACADEMY_SCHOLARSHIP_AGE : ACADEMY_GRADUATION_AGE}

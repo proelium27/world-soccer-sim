@@ -723,13 +723,6 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Trstenik Vocari",                   abbrev: "TRV", colors: ["#154360", "#abebc6"] },
 ];
 
-/**
- * A call the user can make on an academy kid at the next rollover: keep or
- * release at the scholarship cut, promote or release at the professional cut.
- * See `StoredTeam.academyDecisions` and core/academyPipeline.ts.
- */
-export type AcademyChoice = "keep" | "release" | "promote";
-
 export interface StoredTeam {
   tid: number;
   name: string;
@@ -745,17 +738,6 @@ export interface StoredTeam {
    * stays empty for every AI team.
    */
   academyRoster: number[];
-  /**
-   * The user's own calls on academy kids at the next rollover, by pid. A kid
-   * with no entry gets the scouts' default (see core/academyPipeline.ts): keep
-   * or release at the scholarship cut, promote or release at the professional
-   * cut. Only choices that fit are accepted (`setAcademyDecision`), the rollover
-   * applies them and then clears the whole map, and a club switch drops it.
-   *
-   * **User's club only.** Optional, absent = every kid on his default, so there
-   * is nothing to migrate.
-   */
-  academyDecisions?: Record<number, AcademyChoice>;
   /**
    * Countries the user has sent his youth scouts to, capped at
    * SCOUTING_REGION_MAX. They supply SCOUTING_REGION_SHARE of his academy's

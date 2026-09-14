@@ -51,13 +51,7 @@ function dissolveAcademy(
   });
 
   return {
-    // The academy is gone, so any calls the departing manager made on it go too.
-    team: {
-      ...team,
-      roster: [...team.roster, ...team.academyRoster],
-      academyRoster: [],
-      academyDecisions: undefined,
-    },
+    team: { ...team, roster: [...team.roster, ...team.academyRoster], academyRoster: [] },
     players: updated,
   };
 }

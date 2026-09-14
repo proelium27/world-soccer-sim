@@ -3,7 +3,7 @@ import { mulberry32 } from "../../src/engine/rng.js";
 import { generatePlayer } from "../../src/core/players/generate.js";
 import {
   resolveAcademyCheckpoints, trimAcademyToCap, projectAcademyCheckpoints, academyDuePids,
-  academyRanking, setAcademyDecision, clearAcademyDecisions, type AcademyChoice,
+  academyRanking,
 } from "../../src/core/academyPipeline.js";
 import {
   academyCheckpointExpiry, academyContractTerms, contractTerms,
@@ -268,124 +268,5 @@ describe("projectAcademyCheckpoints", () => {
     const intake = Array.from({ length: USER_ACADEMY_INTAKE_MAX }, (_, i) => 50_000 + i);
     const withIntake = lapsed.map((x) => ({ ...x, academyRoster: [...x.academyRoster, ...intake] }));
     expect(trimAcademyToCap(withIntake, players, TID, NEXT, rank(t, players)).released).toEqual([]);
-  });
-});
-
-describe("the user's calls at the rollover", () => {
-  const withCalls = (t: StoredTeam, calls: Record<number, AcademyChoice>): StoredTeam =>
-    ({ ...t, academyDecisions: calls });
-
-  it("puts a kid marked promote ahead of a better-ranked one the scouts would have picked", () => {
-    const best = kid(1, ACADEMY_GRADUATION_AGE - 1, 90);
-    const pick = kid(2, ACADEMY_GRADUATION_AGE - 1, 35);
-    const players = [best, pick];
-    const t = withCalls(team(players, ROSTER_CAP - 1), { [pick.pid]: "promote" });
-
-    const out = resolveAcademyCheckpoints([t], players, TID, SEASON, NEXT, rank(t, players));
-    expect(out.promoted).toEqual([pick.pid]);
-    expect(out.released).toEqual([best.pid]);
-
-    const preview = projectAcademyCheckpoints(t, players, [], SEASON);
-    expect(preview.get(pick.pid)).toMatchObject({ outcome: "promote", chosen: "promote" });
-    expect(preview.get(best.pid)).toMatchObject({ outcome: "release", chosen: null });
-  });
-
-  it("hands the place a kid marked release would have had to the next one down", () => {
-    const best = kid(1, ACADEMY_GRADUATION_AGE - 1, 90);
-    const next = kid(2, ACADEMY_GRADUATION_AGE - 1, 35);
-    const players = [best, next];
-    const t = withCalls(team(players, ROSTER_CAP - 1), { [best.pid]: "release" });
-
-    const out = resolveAcademyCheckpoints([t], players, TID, SEASON, NEXT, rank(t, players));
-    expect(out.promoted).toEqual([next.pid]);
-    expect(out.released).toEqual([best.pid]);
-  });
-
-  it("lets a kid at the scholarship cut go when he's marked release", () => {
-    const scholar = kid(3, ACADEMY_SCHOLARSHIP_AGE - 1, 90);
-    const t = withCalls(team([scholar]), { [scholar.pid]: "release" });
-
-    const out = resolveAcademyCheckpoints([t], [scholar], TID, SEASON, NEXT, rank(t, [scholar]));
-    expect(out.released).toEqual([scholar.pid]);
-    expect(out.teams[0].academyRoster).not.toContain(scholar.pid);
-    expect(projectAcademyCheckpoints(t, [scholar], [], SEASON).get(scholar.pid)!.outcome).toBe("release");
-  });
-
-  it("only cuts kids the user hasn't marked keep", () => {
-    const low = kid(1, ACADEMY_SCHOLARSHIP_AGE - 1, 30);
-    const mid = kid(2, ACADEMY_SCHOLARSHIP_AGE - 1, 50);
-    const high = kid(3, ACADEMY_SCHOLARSHIP_AGE - 1, 80);
-    const top = kid(4, ACADEMY_SCHOLARSHIP_AGE - 1, 95);
-    const others = Array.from({ length: ACADEMY_ROSTER_CAP - 2 }, (_, i) =>
-      kid(100 + i, USER_ACADEMY_ENTRY_AGE, 99, NEXT + 1));
-    const players = [low, mid, high, top, ...others];
-    const t = withCalls(team(players), { [low.pid]: "keep" });
-
-    // Two over the cap: the two lowest kids the user didn't protect.
-    const { teams, released } = trimAcademyToCap([t], players, TID, NEXT, rank(t, players));
-    expect(new Set(released)).toEqual(new Set([mid.pid, high.pid]));
-    expect(teams[0].academyRoster).toContain(low.pid);
-  });
-
-  it("greys out promote once the user's picks fill the senior places", () => {
-    const players = [
-      kid(1, ACADEMY_GRADUATION_AGE - 1, 90),
-      kid(2, ACADEMY_GRADUATION_AGE - 1, 60),
-      kid(3, ACADEMY_GRADUATION_AGE - 1, 35),
-    ];
-    const t = withCalls(team(players, ROSTER_CAP - 1), { 3: "promote" });
-    const preview = projectAcademyCheckpoints(t, players, [], SEASON);
-
-    expect(preview.get(3)!.options.promote).toBe(true);
-    expect(preview.get(1)!.options.promote).toBe(false);
-    expect(preview.get(1)!.options.release).toBe(true);
-    // And the backstop: a stale page can't store the pick anyway.
-    expect(setAcademyDecision(t, players, [], SEASON, 1, "promote")).toBe(t);
-  });
-
-  it("greys out keep once the kids kept would leave no room for the new intake", () => {
-    const a = kid(1, ACADEMY_SCHOLARSHIP_AGE - 1, 30);
-    const b = kid(2, ACADEMY_SCHOLARSHIP_AGE - 1, 95);
-    // Full enough that a maximum intake pushes the academy one over the cap,
-    // so one of the two sixteen-year-olds has to be cuttable.
-    const others = Array.from(
-      { length: ACADEMY_ROSTER_CAP - USER_ACADEMY_INTAKE_MAX - 1 },
-      (_, i) => kid(100 + i, USER_ACADEMY_ENTRY_AGE, 60, NEXT + 1),
-    );
-    const players = [a, b, ...others];
-    const t = withCalls(team(players), { [a.pid]: "keep" });
-    const preview = projectAcademyCheckpoints(t, players, [], SEASON);
-
-    expect(preview.get(a.pid)).toMatchObject({ outcome: "keep", chosen: "keep" });
-    // Keeping the weaker kid puts the stronger one at risk, and he can't be kept too.
-    expect(preview.get(b.pid)).toMatchObject({ outcome: "atRisk", chosen: null });
-    expect(preview.get(b.pid)!.options.keep).toBe(false);
-    expect(setAcademyDecision(t, players, [], SEASON, b.pid, "keep")).toBe(t);
-  });
-
-  it("refuses a call for the other checkpoint, and withdraws one on null", () => {
-    const scholar = kid(3, ACADEMY_SCHOLARSHIP_AGE - 1, 60);
-    const graduate = kid(4, ACADEMY_GRADUATION_AGE - 1, 60);
-    const young = kid(5, USER_ACADEMY_ENTRY_AGE, 60, NEXT + 1);
-    const players = [scholar, graduate, young];
-    const t = team(players);
-
-    expect(setAcademyDecision(t, players, [], SEASON, scholar.pid, "promote")).toBe(t);
-    expect(setAcademyDecision(t, players, [], SEASON, graduate.pid, "keep")).toBe(t);
-    // Nobody is deciding anything about a kid who isn't at a cut yet.
-    expect(setAcademyDecision(t, players, [], SEASON, young.pid, "release")).toBe(t);
-
-    const marked = setAcademyDecision(t, players, [], SEASON, scholar.pid, "release");
-    expect(marked.academyDecisions).toEqual({ [scholar.pid]: "release" });
-    const withdrawn = setAcademyDecision(marked, players, [], SEASON, scholar.pid, null);
-    expect(withdrawn.academyDecisions).toEqual({});
-  });
-
-  it("clears every call once the rollover has used them, and touches no other club", () => {
-    const own = withCalls(team([]), { 7: "release" });
-    const other = { ...team([]), tid: TID + 1 } as StoredTeam;
-    const [clearedOwn, clearedOther] = clearAcademyDecisions([own, other], TID);
-    expect("academyDecisions" in clearedOwn).toBe(false);
-    expect(clearedOther).toBe(other);
   });
 });
