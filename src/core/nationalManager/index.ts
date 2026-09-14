@@ -32,6 +32,7 @@ export * from "./expectation.js";
 export * from "./confidence.js";
 export * from "./outcome.js";
 export * from "./offers.js";
+export * from "./interests.js";
 export { takeNationalJob, leaveNationalJob, mapNationSquads } from "./switchNation.js";
 
 /**
@@ -166,6 +167,7 @@ export function reviewNationalCampaign(league: LeagueStore): LeagueStore {
     // strictly on the national record.
     clubReputation: managerReputation(league.manager.stints),
     lastOverperformance: after.lastVerdict?.overperformance ?? 0,
+    interests: after.interests,
   });
 
   return { ...out, nationalManager: { ...after, offers } };

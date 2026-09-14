@@ -3189,23 +3189,59 @@ export const POTY_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = 
   FWD: 0.05, MID: 0.07, DEF: 0.09, GK: 0.16,
 };
 
-/** Team of the Season: avgRating plus every position-relevant season stat, not just goals/assists. */
-export const TOTS_GOAL_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.06, MID: 0.08, DEF: 0.11, GK: 0.3,
+/**
+ * Team of the Season: each position has its own formula, built as the Player of
+ * the Season score (match rating, goals, assists, ovr) plus the work that
+ * position does and the scoreline can't show (`totsScore` in core/awards.ts):
+ *
+ *  - `defendingPerGame` × (tackles + interceptions) per appearance.
+ *  - `savePct` × (his save percentage − TOTS_KEEPER_SAVE_PCT_BASELINE). Keepers
+ *    only.
+ *
+ * **Per appearance, never season totals (2026-09-13).** The old formula paid
+ * 0.01-0.03 per tackle and interception on season totals, which rewarded a
+ * defence for how much it had to defend rather than how well: a centre-back's
+ * ~160 a season was worth ~5 points against a rating spread of ~1, and a
+ * forward's 0.01 was enough for a busy striker to take the one ST slot off a
+ * Ballon d'Or winner. Measured over 10 simmed seasons of tier-1 players, the per-game
+ * rate DOES track quality (correlation with ovr: CB 0.41, DM 0.35, CM 0.36,
+ * FB 0.31), so it measures the right thing once volume is taken out.
+ *
+ * **Keepers are judged on save percentage, the one keeper stat that tracks the
+ * keeper rather than the defence in front of him.** Measured over 5,720
+ * qualified keeper-seasons, correlation with his own ovr / with his club's
+ * outfield ovr: save % 0.27 / 0.07, goals conceded per game -0.27 / -0.22,
+ * saves per game 0.01 / -0.25, goals prevented against xG -0.01 / 0.01 (noise).
+ * Goals conceded per game shipped first and was replaced: it rewarded the
+ * keeper behind a good defence, and the Goalkeeper of the Year winner's median
+ * ovr rank among the world's keepers fell from 5 to 15.
+ *
+ * **Attackers (AM, W, ST) add nothing**, so their Team of the Season score IS
+ * the Player of the Season score. That is what makes a forward who wins his
+ * league's Player of the Season the best at his position by construction.
+ */
+export const TOTS_POSITION_WORK: Record<
+  "GK" | "CB" | "FB" | "DM" | "CM" | "AM" | "W" | "ST",
+  { defendingPerGame: number; savePct: number }
+> = {
+  GK: { defendingPerGame: 0, savePct: 4 },
+  CB: { defendingPerGame: 0.3, savePct: 0 },
+  FB: { defendingPerGame: 0.24, savePct: 0 },
+  DM: { defendingPerGame: 0.24, savePct: 0 },
+  CM: { defendingPerGame: 0.06, savePct: 0 },
+  AM: { defendingPerGame: 0, savePct: 0 },
+  W: { defendingPerGame: 0, savePct: 0 },
+  ST: { defendingPerGame: 0, savePct: 0 },
 };
-export const TOTS_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.04, MID: 0.055, DEF: 0.07, GK: 0.2,
-};
-export const TOTS_TACKLE_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.01, MID: 0.02, DEF: 0.03, GK: 0,
-};
-export const TOTS_INTERCEPTION_WEIGHT = TOTS_TACKLE_WEIGHT;
-/** Goalkeepers only. */
-export const TOTS_SAVE_WEIGHT = 0.035;
-/** Penalty per goal conceded across the season, heaviest for GK/DEF. */
-export const TOTS_GOALS_AGAINST_PENALTY: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0, MID: 0.006, DEF: 0.02, GK: 0.03,
-};
+
+/**
+ * The save percentage an average qualified keeper posts (measured 0.668, sd
+ * 0.048, p10 0.608, p90 0.727), so `TOTS_POSITION_WORK.GK.savePct` credits a
+ * keeper only for how far he sits above or below it. Only keepers are ever
+ * compared with each other on this term, so the baseline moves no ranking; it
+ * keeps an ordinary keeper's score where the Player of the Season score puts it.
+ */
+export const TOTS_KEEPER_SAVE_PCT_BASELINE = 0.67;
 
 /* ────────────────────────────────────────────────────────────────────────
  * Worldwide awards — Ballon d'Or and World Team of the Year (core/worldAwards.ts)
@@ -3330,7 +3366,20 @@ export const WORLD_POSITION_AWARD_SHORTLIST = 5;
  * same page. **A correction that belongs to a shared base has to be applied at
  * the base, or the things built on it quietly stop agreeing.**
  */
-export const WORLD_TOTS_TROPHY_MULTIPLIER = 3;
+/*
+ * **Now 1 (2026-09-13, user call), i.e. the Ballon d'Or's own weighting; the
+ * note above is the record of why it was 3.** The dilution it corrected came
+ * from counting tackles and interceptions as season totals, and the Team of the
+ * Season formula now counts them per game (TOTS_POSITION_WORK), so the base is no
+ * longer inflated. At 3 on the new base the trophies started deciding the award:
+ * measured over 4 seeds × 5 seasons (scripts/totsWeightProbe.ts), on identical
+ * worlds since this constant feeds no sim state, the Goalkeeper of the Year
+ * winner's ovr rank among the world's keepers read median 10 / mean 15.2 / worst
+ * 57 at 3, against 6 / 9.6 / 43 at 1; Defender of the Year 9 / 23.1 / 100 against
+ * 7 / 15.2 / 68. Every winner of both awards still came from the big four at 1
+ * (16/16), so the weak-league drift it was introduced to stop does not return.
+ */
+export const WORLD_TOTS_TROPHY_MULTIPLIER = 1;
 
 /**
  * How much a league title and a domestic cup are scaled by how strong the
@@ -5091,6 +5140,23 @@ export const MANAGER_OFFER_MAX_CHANCE = 0.8;
  */
 export const MANAGER_SACKED_PRESTIGE_PENALTY = 0.18;
 
+/**
+ * Clubs you can say you'd like to manage at once. Small on purpose: "I want
+ * these three jobs" is a statement of intent, and a list of thirty would just be
+ * a second, worse offer generator.
+ */
+export const MANAGER_MAX_INTERESTS = 3;
+/**
+ * Per-offseason chance a club you've asked about comes calling, when you're
+ * comfortably good enough for it. Scaled down by how far the club sits above your
+ * level (see `interestReach`), so it never reaches a job the ordinary band would
+ * call out of reach. More than double `MANAGER_OFFER_BASE_CHANCE`, since telling a
+ * club you want it is supposed to matter, and well short of certain, since a
+ * club still picks its manager rather than the other way round.
+ */
+export const MANAGER_INTEREST_CHANCE = 0.5;
+export const MANAGER_INTEREST_MAX_CHANCE = 0.85;
+
 /** Reputation a manager starts a career on, before any results, 0-100. */
 export const MANAGER_REP_BASE = 30;
 export const MANAGER_REP_TITLE_WEIGHT = 13;
@@ -5226,6 +5292,16 @@ export const NATIONAL_OFFER_FORM_WEIGHT = 0.7;
 export const NATIONAL_OFFER_MAX_CHANCE = 0.85;
 /** Losing a job drops the calibre of nation that will take you next. */
 export const NATIONAL_SACKED_PRESTIGE_PENALTY = 0.2;
+
+/** Countries you can say you'd like to manage at once. The club side's reasoning. */
+export const NATIONAL_MAX_INTERESTS = 3;
+/**
+ * Per-offseason chance a country you've asked about gets in touch, when you're
+ * good enough for it — scaled by `interestReach` against `NATIONAL_OFFER_BAND`
+ * exactly as the club version is.
+ */
+export const NATIONAL_INTEREST_CHANCE = 0.5;
+export const NATIONAL_INTEREST_MAX_CHANCE = 0.85;
 
 /** Reputation as an international manager, 0-100, derived from the stint record. */
 export const NATIONAL_REP_BASE = 30;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  computeSeasonAwards, positionGroup, potyScore, TOTS_SLOTS,
+  computeSeasonAwards, positionGroup, potyScore, totsScore, TOTS_SLOTS,
 } from "../../src/core/awards.js";
 import { emptySeasonStats, type Player, type Position } from "../../src/core/players/types.js";
 
@@ -98,5 +98,71 @@ describe("Team of the Season slots", () => {
   it("actually picks an attacking midfielder into the XI", () => {
     const am = player({ pid: 1, pos: "AM", goals: 15, assists: 12 });
     expect(computeSeasonAwards([am], SEASON).teamOfSeason).toContain(1);
+  });
+});
+
+/** Same player with a season's defensive work, keeper numbers, or a different appearance count. */
+function withStats(p: Player, extra: Partial<Player["stats"][number]>): Player {
+  return { ...p, stats: [{ ...p.stats[0], ...extra }] };
+}
+
+describe("Team of the Season: a formula per position", () => {
+  it("scores an attacker on exactly his Player of the Season score", () => {
+    // Defensive work adds nothing up front, which is what makes a forward who
+    // wins Player of the Season the best at his position by construction.
+    for (const pos of ["AM", "W", "ST"] as Position[]) {
+      const p = withStats(player({ pid: 1, pos, goals: 14, assists: 6 }), { tackles: 40, interceptions: 30 });
+      expect(totsScore(p, p.stats[0], SEASON)).toBeCloseTo(potyScore(p, p.stats[0], SEASON), 10);
+    }
+  });
+
+  it("no longer lets a busier striker take the spot off a better one", () => {
+    // The reported shape: the old formula paid a forward 0.01 per tackle and
+    // interception on season totals, so 120 of them outweighed a goal and a
+    // point of rating.
+    const better = player({ pid: 1, pos: "ST", ovr: 90, goals: 22, assists: 6, avgRating: 7.1 });
+    const busier = withStats(
+      player({ pid: 2, pos: "ST", ovr: 88, goals: 21, assists: 6, avgRating: 7.0 }),
+      { tackles: 60, interceptions: 60 },
+    );
+    const awards = computeSeasonAwards([better, busier], SEASON);
+    expect(awards.playerOfSeasonPid).toBe(1);
+    expect(awards.teamOfSeason).toContain(1);
+    expect(awards.teamOfSeason).not.toContain(2);
+  });
+
+  it("counts defending per game, not over the season", () => {
+    // Same rate over more games is the same defender, not a better one.
+    const base = player({ pid: 1, pos: "CB", avgRating: 6.6 });
+    const regular = withStats(base, { appearances: 34, tackles: 68, interceptions: 68 });
+    const longer = withStats(base, { appearances: 38, tackles: 76, interceptions: 76 });
+    expect(totsScore(regular, regular.stats[0], SEASON))
+      .toBeCloseTo(totsScore(longer, longer.stats[0], SEASON), 10);
+    // A higher rate is.
+    const busier = withStats(base, { appearances: 34, tackles: 102, interceptions: 102 });
+    expect(totsScore(busier, busier.stats[0], SEASON)).toBeGreaterThan(totsScore(regular, regular.stats[0], SEASON));
+  });
+
+  it("gives a centre-back more for his defending than a central midfielder", () => {
+    const cb = withStats(player({ pid: 1, pos: "CB" }), { tackles: 60, interceptions: 60 });
+    const cm = withStats(player({ pid: 2, pos: "CM" }), { tackles: 60, interceptions: 60 });
+    const work = (p: Player) => totsScore(p, p.stats[0], SEASON) - potyScore(p, p.stats[0], SEASON);
+    expect(work(cb)).toBeGreaterThan(work(cm));
+    expect(work(cm)).toBeGreaterThan(0);
+  });
+
+  it("judges a keeper on save percentage, not on saves or goals conceded", () => {
+    // Behind a good defence: faces little, concedes little, but only stops 60%.
+    const sheltered = withStats(player({ pid: 1, pos: "GK" }), { goalsAgainst: 20, saves: 30 });
+    // Behind a bad one: concedes more and makes more saves, but stops 75%.
+    const shotStopper = withStats(player({ pid: 2, pos: "GK" }), { goalsAgainst: 40, saves: 120 });
+    expect(totsScore(shotStopper, shotStopper.stats[0], SEASON))
+      .toBeGreaterThan(totsScore(sheltered, sheltered.stats[0], SEASON));
+    expect(computeSeasonAwards([sheltered, shotStopper], SEASON).teamOfSeason[0]).toBe(2);
+  });
+
+  it("reads a keeper who faced no shots as average rather than docking him", () => {
+    const idle = withStats(player({ pid: 1, pos: "GK" }), { goalsAgainst: 0, saves: 0 });
+    expect(totsScore(idle, idle.stats[0], SEASON)).toBeCloseTo(potyScore(idle, idle.stats[0], SEASON), 10);
   });
 });

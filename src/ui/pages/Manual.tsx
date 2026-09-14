@@ -450,6 +450,17 @@ export function Manual() {
             your peers &mdash; fewer of them, and all from clubs in the same bracket as yours.
           </p>
           <p>
+            <strong>You can also say which jobs you'd like.</strong> Under Jobs you'd like on the
+            Manager page, pick up to three clubs and three countries. Every summer each one gets
+            its own chance to call, on top of the usual offers, and it doesn't care about the
+            "never a step down" rule: any club or country at your level or below would be glad to
+            have you, so a decorated manager can go back to the small club they started at. A job
+            above your level only calls if your record is close to good enough for it, and the
+            closer you are the likelier it gets. Each pick shows whether it's within reach, a long
+            shot, or out of reach for now. Asking never hands you a job; it only makes the call
+            more likely, and a club you ask for comes off the list once you take it.
+          </p>
+          <p>
             Taking a job has real costs, and they're worth knowing before you click. Your current
             squad goes straight to the AI. Your youth academy graduates onto that club's senior
             roster on the way out, so those prospects are gone. Any transfer talks, incoming bids and
@@ -1470,6 +1481,9 @@ export function Manual() {
             off entirely and approaches arrive far more readily, because that's the only way back
             in. Approaches are rarer at the top: manage one of the best teams in the world and only
             a handful of jobs are even a sideways move, so it might be a few summers between calls.
+            If there's a particular country you want, pick it under Jobs you'd like on the Manager
+            page and it gets its own chance to get in touch each summer, the same way a club you
+            ask for does.
           </p>
           <p>
             Your club career isn't invisible to federations, but they discount it heavily. A big
@@ -1822,9 +1836,19 @@ export function Manual() {
             goalscorer. <strong>Team of the Season</strong> fills an 11-man pitch, laid out as a
             4-3-3 &mdash; a keeper, a back four, a midfield three of a holding man, a central
             midfielder and an attacking midfielder, and a front three of two wingers and a striker
-            &mdash; with whoever rates highest at each of those positions across the whole league,
-            blending match rating with the stats that matter most for the role: goals and assists up
-            front, tackles and interceptions in defense and midfield, saves for the keeper. Every
+            &mdash; with whoever rates highest at each of those positions across the whole league.
+            Every position has its own formula, and they all start from the same place: the Player
+            of the Season score, so match rating, goals and assists, and overall quality.
+            Attackers (attacking midfielders, wingers and strikers) are judged on that alone, which
+            means a forward who wins Player of the Season is always the best at his position in
+            that league. Defenders and midfielders also get credit for their defending, counted as
+            tackles and interceptions <em>per game</em> rather than over the whole season, so a
+            defence that spent all year under siege isn't rewarded just for being busy. It counts
+            most for centre-backs, then full-backs and holding midfielders, and only a little for
+            central midfielders. Keepers are judged on save percentage: how many of the shots on
+            target he faced he actually kept out. Goals conceded mostly measures the defence in
+            front of him, and a keeper making loads of saves is usually one facing loads of shots,
+            so neither says as much about the keeper himself. Every
             slot takes a player who actually plays that position, so a great season at a position
             the shape has only one of (striker, say) can still miss out. Both Player of
             the Season and Team of the Season also factor in overall quality, not just the stat
@@ -1911,45 +1935,41 @@ export function Manual() {
             trophy instead of pretending otherwise.
           </p>
           <p>
-            So these two are judged on the things the Ballon d'Or ignores. The keeper's award counts
-            saves and holds goals conceded against him; the defender's counts tackles and
-            interceptions and goals conceded, and is open to centre-backs and full-backs. On top of
-            that come the same worldwide extras the Ballon d'Or uses: the league-strength
-            correction, your Continental Cup run, your summer with your country, your league title,
-            your domestic cup.
+            So these two are judged on the things the Ballon d'Or ignores, using the same formulas
+            as the Team of the Season. The keeper's award counts his save percentage; the
+            defender's counts tackles and interceptions per game, and is open to
+            centre-backs and full-backs. On top of that come the same worldwide extras the Ballon
+            d'Or uses: the league-strength correction, your Continental Cup run, your summer with
+            your country, your league title, your domestic cup.
           </p>
           <p>
-            Those extras count for three times as much here as they do in the Ballon d'Or, and
-            there's a reason for the difference. Tackles, interceptions and saves are counted up
-            over a season and they get big, so a defender's raw defensive work can reach half his
-            score and leave everything else as rounding. A league title was worth under 4% of a
-            defender's total. Tripling the rest puts trophies back roughly where they sit in the
-            Ballon d'Or: about a fifth of a defender's winning score now comes from outside his
-            league, against a sixth for a Ballon d'Or winner.
+            Those extras count exactly as much here as they do in the Ballon d'Or. They used to count
+            three times as much, back when defending was added up over a whole season and a
+            defender's raw totals were big enough to drown out everything else. Defending is counted
+            per game now, so that stopped being needed, and tripling trophies had started handing the
+            award to whichever keeper played for the club that won things rather than the best keeper.
           </p>
           <p>
-            It has a second effect that's worth knowing about, because it's the reason the defender
-            award stopped drifting to weak leagues. Two of those extras &mdash; the Continental Cup
-            and your summer with your country &mdash; are the only parts of the whole calculation
-            that put players from different leagues against each other directly, and a club from a
-            weak league rarely goes deep in the cup. Turning them up pulls the award towards the
-            stronger leagues on its own. Your league title and your domestic cup don't help with
-            that at all, since every league crowns a champion regardless of how good it is.
+            Two of those extras &mdash; the Continental Cup and your summer with your country
+            &mdash; are the only parts of the whole calculation that put players from different
+            leagues against each other directly, and a club from a weak league rarely goes deep in
+            the cup. That, plus the league-strength correction, is what stops these two awards
+            drifting to weak leagues. Your league title and your domestic cup don't help with that
+            at all, since every league crowns a champion regardless of how good it is.
           </p>
           <p>
-            The World Team of the Year is scored the same way, trophies and all, because it's built
-            on the same numbers and had the same problem. So the three agree with each other: the
-            Goalkeeper of the Year is the keeper in that XI, and the Defender of the Year is in its
-            back four. The Ballon d'Or is the one that stands apart, since it's scored on goals and
-            assists rather than on defending, and it keeps its own trophy weighting.
+            The World Team of the Year is scored the same way, trophies and all. So the three agree
+            with each other: the Goalkeeper of the Year is the keeper in that XI, and the Defender
+            of the Year is in its back four. The Ballon d'Or is the one that stands apart, since
+            it's scored on goals and assists rather than on defending, but a trophy is worth the
+            same in all four.
           </p>
           <p>
             One thing worth knowing about how the defender's award reads. Tackles and interceptions
-            are counted up raw over a season rather than as rates, and they vary a lot from one
-            defender to the next. A defender who spends every week under siege makes more of both
-            than an equally good one at a club that controls its games, so the award favours
-            defenders with plenty of defending to do, and centre-backs take it more often than
-            full-backs. It's the same measure the World Team of the Year has always picked its back
+            are counted per game rather than added up over the season, so a defender isn't rewarded
+            just for how much defending his club left him to do. Centre-backs get a little more
+            credit for it than full-backs, because it's a bigger part of the job. It's the same
+            measure every league's Team of the Season and the World Team of the Year pick their back
             four with.
           </p>
           <p>
