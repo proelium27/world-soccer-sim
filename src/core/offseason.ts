@@ -21,6 +21,7 @@ import { extendPlayerNames } from "./players/playerNames.js";
 import { archiveCup } from "./cup/archive.js";
 import {
   academyDuePids, academyRanking, resolveAcademyCheckpoints, trimAcademyToCap, enrolAcademyYouth,
+  clearAcademyDecisions,
 } from "./academyPipeline.js";
 import {
   releaseExpiredContracts, runAIFreeAgency, freeAgencySigningOrder, trimRosterSurplus,
@@ -902,6 +903,10 @@ export function simOffseasonReporting(
   ({ teams } = trimAcademyToCap(
     teams, players, academyTid, nextSeason, academyOrder,
   ));
+  // The user's calls on his academy were for this rollover and both cuts have
+  // now applied them, so they go: next season's decisions start from the
+  // scouts' defaults again.
+  teams = clearAcademyDecisions(teams, academyTid);
 
   // 5.5. Emergency call-up for the user's own roster. Anyone taken off the open
   //      market is logged as a fee-0 arrival from the sentinel, exactly as an AI
