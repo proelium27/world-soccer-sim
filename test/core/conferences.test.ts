@@ -60,12 +60,42 @@ function noClubTwiceAMatchday(games: ScheduleGame[]) {
 describe("the shipped splits", () => {
   const comps = worldCompetitions();
 
-  it("splits exactly the US and Argentine top flights, each into two halves of fifteen", () => {
+  it("splits exactly the US and Argentine top two divisions, and nothing below them", () => {
     const split = comps.filter((c) => competitionConferences(c));
-    expect(split.map((c) => c.country)).toEqual(["Argentina", "United States"]);
-    for (const c of split) expect(competitionTeamCount(c)).toBe(30);
-    expect(competitionTitlePlayoff(split[0])).toBe("zones");
-    expect(competitionTitlePlayoff(split[1])).toBe("conference");
+    expect(split.map((c) => `${c.country}:${c.tier}:${competitionTeamCount(c)}`)).toEqual([
+      "Argentina:1:30", "Argentina:2:36", "United States:1:30", "United States:2:30",
+    ]);
+    const top = (country: string) => split.find((c) => c.country === country && c.tier === 1)!;
+    expect(competitionTitlePlayoff(top("Argentina"))).toBe("zones");
+    expect(competitionTitlePlayoff(top("United States"))).toBe("conference");
+    // A split second division is a promotion race, not a title playoff.
+    for (const c of split.filter((d) => d.tier === 2)) expect(competitionTitlePlayoff(c)).toBe("none");
+  });
+
+  it("gives each split top flight at least one second-division club per top-flight club", () => {
+    for (const country of ["Argentina", "United States"]) {
+      const [d1, d2] = [1, 2].map((tier) => comps.find((c) => c.country === country && c.tier === tier)!);
+      expect(competitionTeamCount(d2)).toBeGreaterThanOrEqual(competitionTeamCount(d1));
+    }
+  });
+
+  it("plays Argentina's second division as zones of 18 (34 games) and the US's as conferences of 15 (30)", () => {
+    const d2 = (country: string) => comps.find((c) => c.country === country && c.tier === 2)!;
+    expect(competitionSeasonGames(d2("Argentina"))).toBe(34);
+    expect(competitionSeasonGames(d2("United States"))).toBe(30);
+  });
+
+  it("puts the eastern US second-division clubs in the Eastern Conference", () => {
+    const teams = worldTeams(comps);
+    const us = comps.find((c) => c.country === "United States" && c.tier === 2)!;
+    const [east, west] = conferenceMembers(teams, us)!;
+    const block = shippedClubsFor("United States")!;
+    const blockStart = teams.find((t) => t.compId === comps.find((c) => c.country === "United States" && c.tier === 1)!.id)!.tid;
+    const names = (tids: number[]) => tids.map((tid) => block[tid - blockStart].name);
+    expect(names(east)).toContain("Charleston Shipwrights");
+    expect(names(east)).toContain("Toledo Quarrymen");
+    expect(names(west)).toContain("Visalia Growers");
+    expect(names(west)).toContain("Anchorage Ironmasters");
   });
 
   it("plays a split format as a plain bracket in a league that isn't split", () => {
@@ -152,10 +182,7 @@ describe("buildCompetitionSchedule on the shipped world", () => {
       noClubTwiceAMatchday(games);
       expect(Math.max(...games.map((g) => g.matchday)), c.name).toBe(SEASON_MATCHDAYS);
       const n = competitionTeamCount(c);
-      const perClub = c.country === "United States" && c.tier === 1 ? 34
-        : c.country === "Argentina" && c.tier === 1 ? 30
-          : 2 * (n - 1);
-      expect(games).toHaveLength((n * perClub) / 2);
+      expect(games).toHaveLength((n * competitionSeasonGames(c)) / 2);
     }
   });
 });
@@ -180,7 +207,11 @@ describe("conference membership", () => {
     expect(newB).toHaveLength(15);
     for (const tid of up) expect(newA).toContain(tid);
     for (const tid of zoneA.filter((x) => x !== down1 && x !== down2)) expect(newA).toContain(tid);
-    expect(after.find((t) => t.tid === down1)!.conference).toBeUndefined();
+    // Argentina's second division is split too, so a relegated club is seated in
+    // a zone there rather than dropping the field: the promoted pair left two
+    // gaps in its zone A, and the relegated pair fills them.
+    expect(after.find((t) => t.tid === down1)!.conference).toBe(0);
+    expect(after.find((t) => t.tid === down2)!.conference).toBe(0);
   });
 });
 

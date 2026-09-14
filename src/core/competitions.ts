@@ -342,13 +342,17 @@ export function competitionTitlePlayoff(comp: Competition): TitlePlayoffFormat {
 
 /**
  * The two halves this division plays its schedule in, or null for a single
- * table. Top flights only (the shipped splits are all top flights, and a lower
- * division's promotion race wants one table), and only for a division big enough
- * to have two halves of at least two clubs.
+ * table. Looked up by country AND tier, so splitting one division never splits
+ * the rest of that country's pyramid: the shipped splits are Argentina's and the
+ * US's top two divisions, whose third divisions stay single tables. Only a
+ * division big enough to have two halves of at least two clubs splits.
+ *
+ * Promotion and relegation are unaffected either way: they read the division's
+ * overall table, and `assignConferences` seats a promoted or relegated club in
+ * whichever half has room.
  */
 export function competitionConferences(comp: Competition): ConferenceFormat | null {
-  if (comp.tier !== 1) return null;
-  const format = comp.conferences ?? COUNTRY_CONFERENCES[comp.country] ?? null;
+  const format = comp.conferences ?? COUNTRY_CONFERENCES[comp.country]?.[comp.tier] ?? null;
   if (!format || competitionTeamCount(comp) < 4) return null;
   return format;
 }
@@ -483,7 +487,10 @@ export function worldCompetitions(): Competition[] {
     // and down on the overall table, and the title decided by a cross-zone
     // knockout the way each of its tournaments ends (COUNTRY_TITLE_PLAYOFF).
     { id: 39, country: "Argentina", tier: 1, name: "Argentine Division 1", teamCount: 30, promotionSpots: 2 },
-    { id: 40, country: "Argentina", tier: 2, name: "Argentine Division 2", promotionSpots: 2 },
+    // The Primera Nacional's real 36, in two zones of 18. Also the fix for a
+    // 30-club top flight losing ground: at least one second-division club for
+    // every top-flight club (see COUNTRY_CONFERENCES).
+    { id: 40, country: "Argentina", tier: 2, name: "Argentine Division 2", teamCount: 36, promotionSpots: 2 },
     { id: 41, country: "Argentina", tier: 3, name: "Argentine Division 3", promotionSpots: 2 },
     // Mexico: CLOSED — Liga MX abolished promotion and relegation in 2026 — with
     // its real 18-club top flight and the Liguilla deciding the title.
@@ -495,7 +502,11 @@ export function worldCompetitions(): Competition[] {
     // and a per-conference playoff for the title. The divisions below stand in
     // for the USL.
     { id: 45, country: "United States", tier: 1, name: "US Division 1", teamCount: 30, promotionSpots: 0 },
-    { id: 46, country: "United States", tier: 2, name: "US Division 2", promotionSpots: 0 },
+    // 30 clubs in Eastern and Western Conferences of 15, placed by geography, so
+    // the top flight has one second-division club per top-flight club (see
+    // COUNTRY_CONFERENCES). The real USL Championship has ~24; the ratio is the
+    // part the dynasty needs.
+    { id: 46, country: "United States", tier: 2, name: "US Division 2", teamCount: 30, promotionSpots: 0 },
     { id: 47, country: "United States", tier: 3, name: "US Division 3", teamCount: 16, promotionSpots: 0 },
   ];
 }

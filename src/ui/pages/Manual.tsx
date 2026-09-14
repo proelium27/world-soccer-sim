@@ -715,7 +715,9 @@ export function Manual() {
             meeting its own zone twice plus a derby with its rival from the other zone, for 30. When
             a club goes up or down in Argentina, the promoted club takes the relegated club&apos;s
             zone. Each half gets its own table on the Standings page, but the overall table is the
-            one that counts for prize money, continental places and relegation.
+            one that counts for prize money, continental places and relegation. Their second
+            divisions are split the same way: Argentina&apos;s has its real 36 clubs in two zones
+            of 18, playing 34 games, and the US has 30 in two conferences of 15, playing 30.
           </p>
           <p>
             <strong>Every country runs three divisions.</strong> Sizes vary — England, Spain and
@@ -802,11 +804,8 @@ export function Manual() {
             <strong>Serbia</strong> weakest of all, and their budgets step down in that same order.
             All eight are selling leagues, and Serbia is the poorest as well as the weakest. The
             American leagues sit on the same ladder: <strong>Brazil</strong> just below France,{" "}
-            <strong>Argentina</strong> just above the Netherlands, the <strong>United States</strong>{" "}
-            between Portugal and Belgium, and <strong>Mexico</strong> level with Belgium. Argentina and
-            the US start a little higher than their real rankings because a 30-club league split in
-            two slowly loses ground to a normal one over a long save, and the head start evens that
-            out. In real life
+            <strong>Argentina</strong> between the Netherlands and Portugal, <strong>Mexico</strong>{" "}
+            level with Belgium and the <strong>United States</strong> level with Turkey. In real life
             MLS has more money than Argentina, but here every league&apos;s budget follows its
             strength, because a league that is weaker but richer climbs past its neighbours over a
             long save. Worth

@@ -391,18 +391,35 @@ export interface ConferenceFormat {
 }
 
 /**
- * The shipped top flights split into conferences. A division of 30 needs one:
- * a double round robin of 30 would take 58 matchdays against a 38-matchday
- * calendar, while two halves of 15 take 30.
+ * The shipped divisions split into conferences, keyed by country and then TIER,
+ * so splitting one division never splits the rest of a pyramid. A division past
+ * 20 clubs needs one: a double round robin of 30 would take 58 matchdays against
+ * a 38-matchday calendar, while two halves of 15 take 30.
  *
- * MLS: own conference twice (28) + a cross-conference rival home and away (2) +
- * four more cross-conference games = 34, its real count. Argentina: own zone
- * twice (28) + the inter-zone derby home and away (2) = 30, the Liga
- * Profesional's two tournaments added together.
+ * Top flights. MLS: own conference twice (28) + a cross-conference rival home
+ * and away (2) + four more cross-conference games = 34, its real count.
+ * Argentina: own zone twice (28) + the inter-zone derby home and away (2) = 30,
+ * the Liga Profesional's two tournaments added together.
+ *
+ * Second divisions, and they are the FIX for a measured problem as much as they
+ * are realism. A 30-club top flight over a 20-club second division has two
+ * second-division clubs for every three of its own, and that ratio alone costs
+ * the league about half the ground a 30-club split top flight loses over a
+ * dynasty (fewer benched youngsters loaned out; see CLAUDE.md's conferences
+ * entry). So both countries get at least one second-division club per top-flight
+ * club, in the shape their real second divisions have: Argentina's Primera
+ * Nacional is 36 clubs in two zones (18 each, zone twice = 34 games), and the
+ * USL Championship plays in two conferences (15 each here, 30 games).
  */
-export const COUNTRY_CONFERENCES: Readonly<Record<string, ConferenceFormat>> = {
-  Argentina: { names: ["Zone A", "Zone B"], crossRounds: 0 },
-  "United States": { names: ["Eastern Conference", "Western Conference"], crossRounds: 4 },
+export const COUNTRY_CONFERENCES: Readonly<Record<string, Readonly<Record<number, ConferenceFormat>>>> = {
+  Argentina: {
+    1: { names: ["Zone A", "Zone B"], crossRounds: 0 },
+    2: { names: ["Zone A", "Zone B"], crossRounds: 0 },
+  },
+  "United States": {
+    1: { names: ["Eastern Conference", "Western Conference"], crossRounds: 4 },
+    2: { names: ["Eastern Conference", "Western Conference"], crossRounds: 0 },
+  },
 };
 
 /**
@@ -475,20 +492,16 @@ export const COUNTRY_STRENGTH_OFFSET: Record<string, number> = {
   // the United States. These are generation-time positions and, like the rest of
   // the ladder, the bottom rungs are expected to converge over a dynasty.
   //
-  // ARGENTINA AND THE US START 1.5 POINTS ABOVE THAT (9 -> 7.5, 12 -> 10.5), and
-  // it is a compensation, not a re-ranking. Their top flights are 30 clubs split
-  // in two, and a 30-club split top flight measurably loses ground to the same
-  // league at 20 clubs: -1.4 against its neighbour over a 20-season, 4-seed
-  // audit (United States->Greece -2.05 against a -0.64 control), confirmed on the
-  // best-XI reading, not just the all-roster mean, so it is weaker football.
-  // About half is the 2-for-3 ratio of second-division clubs beneath a 30-club
-  // top flight (fewer benched youngsters loaned out); the rest is the 30-club
-  // count itself. Playing time and the split schedule were both ruled out. See
-  // scripts/conferenceSizeProbe.ts and CLAUDE.md's conferences entry.
+  // NO HEAD START for Argentina's and the US's 30-club split top flights, though
+  // one was tried: those leagues lose ground over a dynasty at a slower RATE, and
+  // 1.5 points here only postponed it while breaking two more rungs (see
+  // CLAUDE.md's conferences entry). The fix that addresses the cause is their
+  // split second divisions (COUNTRY_CONFERENCES), which restore at least one
+  // second-division club for each top-flight club.
   Brazil: 6,
-  Argentina: 7.5,
+  Argentina: 9,
   Mexico: 11,
-  "United States": 10.5,
+  "United States": 12,
 };
 export function countryStrengthOffset(country: string): number {
   return COUNTRY_STRENGTH_OFFSET[country] ?? 0;
@@ -544,14 +557,11 @@ export const COUNTRY_BUDGET_SCALE: Record<string, number> = {
   // POORER than Argentina although its real squad value is higher. That is the
   // same deliberate call Turkey's entry makes: a weaker-but-richer league climbs
   // the ladder over a dynasty, so "rich but weak" is the one shape the engine
-  // cannot hold. Argentina (7.5) and the US (10.5) moved up with their
-  // compensated strength offsets and sit between their new neighbours:
-  // Argentina 0.62 between Brazil's 0.65 and the Netherlands' 0.60, the US 0.47
-  // between Portugal's 0.50 and Belgium's and Mexico's 0.45.
+  // cannot hold. Each sits on the value of the European league at its offset.
   Brazil: 0.65,
-  Argentina: 0.62,
+  Argentina: 0.55,
   Mexico: 0.45,
-  "United States": 0.47,
+  "United States": 0.4,
 };
 export function countryBudgetScale(country: string): number {
   return COUNTRY_BUDGET_SCALE[country] ?? 1;

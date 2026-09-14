@@ -83,7 +83,7 @@ describe("world integration (generateWorld through the real season/offseason pip
     const playoffs = league.promotionPlayoffs;
     expect(playoffs.length).toBeGreaterThan(0);
     league = simOffseason(league, rng);
-    expect(league.teams).toHaveLength(872);
+    expect(league.teams).toHaveLength(898);
     // Every competition still has its own club count after the swap — divisions
     // are different sizes now, and promotion must preserve each one exactly.
     for (const comp of league.competitions) {

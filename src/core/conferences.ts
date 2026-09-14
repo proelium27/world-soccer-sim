@@ -46,9 +46,14 @@ export function conferenceMembers(
     if ((c === 0 || c === 1) && halves[c].length < capacity[c]) halves[c].push(t.tid);
     else unplaced.push(t.tid);
   }
+  // Fill the first half to capacity, then the second — in tid order. At world
+  // creation nothing is stored, so this is what puts a block's first half of
+  // clubs in the first conference (the US lists its eastern clubs first). After
+  // promotion it seats a newcomer wherever a relegated club left a gap. An
+  // earlier version alternated between the halves instead, which scattered a
+  // geographic block across both conferences.
   for (const tid of unplaced) {
-    const into = halves[0].length - capacity[0] <= halves[1].length - capacity[1] ? 0 : 1;
-    halves[into].push(tid);
+    halves[halves[0].length < capacity[0] ? 0 : 1].push(tid);
   }
   halves[0].sort((a, b) => a - b);
   halves[1].sort((a, b) => a - b);
