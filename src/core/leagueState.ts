@@ -34,6 +34,7 @@ import {
   type Difficulty, type ProgressionModel, type WorldCupSize,
 } from "./constants.js";
 import { isSpectatorTid } from "./spectator.js";
+import type { AwardFormula } from "./awardFormula.js";
 
 export type { StoredTeam } from "./teams/clubs.js";
 export type { ScheduleGame } from "./schedule.js";
@@ -413,6 +414,23 @@ export interface LeagueStore {
    * existed, so no dynasty in progress changes.
    */
   progressionModel: ProgressionModel;
+
+  /**
+   * The weights this save scores its end-of-season awards with, as edited in
+   * God Mode. Absent means the shipped formula, which is every save until
+   * someone edits it, so there is nothing to migrate. Read through
+   * `resolveAwardFormula`, never directly: that merges it over the shipped
+   * weights field by field, so a formula stored before a new weight existed
+   * still reads a sensible value for it.
+   *
+   * Read at one point (offseason step 3, both award passes) and never
+   * retroactively: seasons already played keep the winners they had. It does
+   * reach beyond the trophy cabinet, because a Team of the Season place helps
+   * put a player on the protected-star list, so a different XI changes who AI
+   * clubs will sell and every season after moves with it. Stays in force if
+   * God Mode is switched back off, like a ratings lock.
+   */
+  awardFormula?: AwardFormula;
 
   /**
    * How many nations the World Cup takes: 16, 24, 32 or 48, or "auto" to size
