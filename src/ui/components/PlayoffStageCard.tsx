@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
 import { nextPlayoffStage, playoffStageProgress, type PlayoffStageEntry } from "../../core/playoffStages.js";
 import { seasonYear } from "../format.js";
+import { isSpectator } from "../../core/spectator.js";
 
 /*
  * The staged playoffs on the offseason card. Shared by the managed and the
@@ -27,9 +28,17 @@ export function playoffStagesLeft(league: LeagueStore): number {
  * Europe, and naming each would bury the rest).
  */
 function describe(entries: PlayoffStageEntry[]): string {
+  // "the wild card in the United States" rather than a possessive, which reads
+  // badly on a country whose name ends in s.
+  const place = (country: string) => (country === "United States" ? "the United States" : country);
+  // A numbered round ("round one") takes no article; a named one ("the final") does.
+  const round = (name: string) => {
+    const r = name.toLowerCase();
+    return /^round \w+$/.test(r) ? r : `the ${r}`;
+  };
   const titles = entries
     .filter((e) => e.kind === "title")
-    .map((e) => `${e.country}'s ${e.roundName.toLowerCase()}`);
+    .map((e) => `${round(e.roundName)} in ${place(e.country)}`);
   const promotion = entries.filter((e) => e.kind === "promotion");
   const parts = [...titles];
   if (promotion.length > 0) {
@@ -85,7 +94,7 @@ export function PlayoffStageCard({
           </button>
         )}
       </div>
-      {stage < stages && (
+      {stage < stages && !isSpectator(league) && (
         <p className="card-text text-muted small mt-2 mb-0">
           Simming through stops before any round your club plays in, so you can pick your team.
         </p>
