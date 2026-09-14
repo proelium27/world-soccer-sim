@@ -802,8 +802,11 @@ export function Manual() {
             <strong>Serbia</strong> weakest of all, and their budgets step down in that same order.
             All eight are selling leagues, and Serbia is the poorest as well as the weakest. The
             American leagues sit on the same ladder: <strong>Brazil</strong> just below France,{" "}
-            <strong>Argentina</strong> between the Netherlands and Portugal, <strong>Mexico</strong>{" "}
-            level with Belgium and the <strong>United States</strong> level with Turkey. In real life
+            <strong>Argentina</strong> just above the Netherlands, the <strong>United States</strong>{" "}
+            between Portugal and Belgium, and <strong>Mexico</strong> level with Belgium. Argentina and
+            the US start a little higher than their real rankings because a 30-club league split in
+            two slowly loses ground to a normal one over a long save, and the head start evens that
+            out. In real life
             MLS has more money than Argentina, but here every league&apos;s budget follows its
             strength, because a league that is weaker but richer climbs past its neighbours over a
             long save. Worth

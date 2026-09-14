@@ -99,7 +99,6 @@ for (let s = 0; s < SEASONS; s++) {
     if (resumes >= 3) throw new Error(`season ${league.season} refuses to finish (phase ${league.phase})`);
     league = simThrough(league, { matchday: SEASON_MATCHDAYS }, rng);
   }
-  const endingSeason = league.season;
 
   const tidsBefore = tier1Tids(league);
   for (const [country, tids] of tidsBefore) {

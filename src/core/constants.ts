@@ -471,14 +471,24 @@ export const COUNTRY_STRENGTH_OFFSET: Record<string, number> = {
   // league's players are generated off the same base, so a Brazilian and a
   // Portuguese side are directly comparable. Real league-strength rankings put
   // Brazil and Argentina around Portugal (Brazil a step above), and MLS and Liga
-  // MX in the band with Belgium, the Netherlands and Turkey. Mexico is placed a
-  // point above the United States, which is where every ranking consulted puts
-  // them. These are generation-time positions and, like the rest of the ladder,
-  // the bottom rungs are expected to converge over a dynasty.
+  // MX in the band with Belgium, the Netherlands and Turkey, Mexico a step above
+  // the United States. These are generation-time positions and, like the rest of
+  // the ladder, the bottom rungs are expected to converge over a dynasty.
+  //
+  // ARGENTINA AND THE US START 1.5 POINTS ABOVE THAT (9 -> 7.5, 12 -> 10.5), and
+  // it is a compensation, not a re-ranking. Their top flights are 30 clubs split
+  // in two, and a 30-club split top flight measurably loses ground to the same
+  // league at 20 clubs: -1.4 against its neighbour over a 20-season, 4-seed
+  // audit (United States->Greece -2.05 against a -0.64 control), confirmed on the
+  // best-XI reading, not just the all-roster mean, so it is weaker football.
+  // About half is the 2-for-3 ratio of second-division clubs beneath a 30-club
+  // top flight (fewer benched youngsters loaned out); the rest is the 30-club
+  // count itself. Playing time and the split schedule were both ruled out. See
+  // scripts/conferenceSizeProbe.ts and CLAUDE.md's conferences entry.
   Brazil: 6,
-  Argentina: 9,
+  Argentina: 7.5,
   Mexico: 11,
-  "United States": 12,
+  "United States": 10.5,
 };
 export function countryStrengthOffset(country: string): number {
   return COUNTRY_STRENGTH_OFFSET[country] ?? 0;
@@ -534,11 +544,14 @@ export const COUNTRY_BUDGET_SCALE: Record<string, number> = {
   // POORER than Argentina although its real squad value is higher. That is the
   // same deliberate call Turkey's entry makes: a weaker-but-richer league climbs
   // the ladder over a dynasty, so "rich but weak" is the one shape the engine
-  // cannot hold. Each sits on the value of the European league at its offset.
+  // cannot hold. Argentina (7.5) and the US (10.5) moved up with their
+  // compensated strength offsets and sit between their new neighbours:
+  // Argentina 0.62 between Brazil's 0.65 and the Netherlands' 0.60, the US 0.47
+  // between Portugal's 0.50 and Belgium's and Mexico's 0.45.
   Brazil: 0.65,
-  Argentina: 0.55,
+  Argentina: 0.62,
   Mexico: 0.45,
-  "United States": 0.4,
+  "United States": 0.47,
 };
 export function countryBudgetScale(country: string): number {
   return COUNTRY_BUDGET_SCALE[country] ?? 1;
