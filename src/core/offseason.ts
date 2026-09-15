@@ -39,6 +39,7 @@ import { processLoanReturns, runAILoanMarket } from "./loans.js";
 import { computeStandings, computeTeamSeasonStats, type SeasonHistoryEntry, type StandingsRow, type TeamSeasonStats } from "./standings.js";
 import { computeSeasonAwards, type SeasonAwards } from "./awards.js";
 import { computeWorldAwards } from "./worldAwards.js";
+import { resolveAwardFormula, type AwardFormula } from "./awardFormula.js";
 import { snapshotAwardWinners } from "./awardWinners.js";
 import { buildCupState } from "./cup/cup.js";
 import type { QualificationContext } from "./cup/qualification.js";
@@ -84,11 +85,12 @@ function awardsByCompetition(
   teams: StoredTeam[],
   competitions: Competition[],
   season: number,
+  formula: AwardFormula,
 ): Record<number, SeasonAwards> {
   const result: Record<number, SeasonAwards> = {};
   for (const comp of competitions) {
     const roster = new Set(teams.filter((t) => t.compId === comp.id).flatMap((t) => t.roster));
-    result[comp.id] = computeSeasonAwards(players.filter((p) => roster.has(p.pid)), season);
+    result[comp.id] = computeSeasonAwards(players.filter((p) => roster.has(p.pid)), season, formula);
   }
   return result;
 }
@@ -290,7 +292,13 @@ export function simOffseasonReporting(
   for (const t of league.teams) {
     for (const pid of [...t.roster, ...t.academyRoster]) tidLastSeason.set(pid, t.tid);
   }
-  const awards = awardsByCompetition(league.players, league.teams, league.competitions, endingSeason);
+  // The save's award weights: the shipped ones unless God Mode edited them. Both
+  // award passes below read this one value, so the league XIs and the world
+  // awards can never be scored on two different formulas in the same season.
+  const awardFormula = resolveAwardFormula(league.awardFormula);
+  const awards = awardsByCompetition(
+    league.players, league.teams, league.competitions, endingSeason, awardFormula,
+  );
 
   // 0. Proactive AI contract renewals (cross-division: a club's own player,
   //    regardless of which division that club plays in). "Own" means owns, not
@@ -517,7 +525,7 @@ export function simOffseasonReporting(
     // The Euro / Copa America / AFCON winners from the same offseason, if it
     // staged them (see core/international/confederationCup.ts).
     confederationCupChampions: confederationCupChampions(league.international.confederationCupHistory, endingSeason),
-  });
+  }, awardFormula);
 
   // 3.65. Who those winners actually were. Every award above is stored as a
   //       bare pid, and a pid stops resolving the moment retirement deletes the

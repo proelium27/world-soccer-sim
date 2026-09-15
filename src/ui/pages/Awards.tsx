@@ -20,6 +20,7 @@ import { GoldenBootIcon } from "../components/GoldenBootIcon.js";
 import { CompetitionSelect } from "../components/CompetitionSelect.js";
 import { seasonYear } from "../format.js";
 import { shortName } from "../playerName.js";
+import { isCustomAwardFormula } from "../../core/awardFormula.js";
 
 const SLOTS = TOTS_SLOTS;
 const COORDS = TOTS_LAYOUT;
@@ -491,6 +492,14 @@ export function Awards() {
           the Season inside one competition. Use the dropdown to look back at past seasons.
         </HelpHint>
       </h4>
+      {/* Shown whether or not God Mode is still on: the formula stays in force
+          after the switch goes off, and winners that look odd should say why. */}
+      {isCustomAwardFormula(league.awardFormula) && (
+        <p className="text-muted small">
+          This save uses award formulas edited in God Mode. Seasons finished before the change kept
+          the winners they had.
+        </p>
+      )}
       <div className="mb-3 d-flex gap-2 align-items-center flex-wrap">
         <div className="btn-group" role="group">
           <button

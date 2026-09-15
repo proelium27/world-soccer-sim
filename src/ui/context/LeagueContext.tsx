@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo, u
 import { useNavigate } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
 import type { ProgressionModel, WorldCupSize } from "../../core/constants.js";
+import { isCustomAwardFormula, resolveAwardFormula, type AwardFormula } from "../../core/awardFormula.js";
 import type { SimThrough, IntlMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
 import { saveLeague, loadLeague } from "../../db/leagueDb.js";
@@ -175,6 +176,8 @@ interface LeagueContextValue {
   /** God Mode: take charge of any country, offer or not. */
   godModeTakeNationalJobAction: (nation: string) => Promise<void>;
   godModeSetProgressionModelAction: (model: ProgressionModel) => Promise<void>;
+  /** God Mode: set this save's award weights, or pass null to go back to the shipped ones. */
+  godModeSetAwardFormulaAction: (formula: AwardFormula | null) => Promise<void>;
   /** Set how many nations the World Cup takes, from the next qualifying draw on. */
   setWorldCupSizeAction: (size: WorldCupSize) => Promise<void>;
   movePlayerToClubAction: (pid: number, tid: number) => Promise<void>;
@@ -1129,6 +1132,29 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * God Mode: edit the weights the end-of-season awards are scored with (see
+   * `LeagueStore.awardFormula`).
+   *
+   * Sanitized on the way in through `resolveAwardFormula`, so a cleared input
+   * can never store a NaN that would break every ranking. A formula identical
+   * to the shipped one is stored as no formula at all, which keeps "absent
+   * means default" literally true and lets the Awards page's custom-formula
+   * note key off the field's presence.
+   */
+  const godModeSetAwardFormulaAction = useCallback(
+    (formula: AwardFormula | null) => mutate((l) => {
+      if (!l.godMode) return null;
+      if (formula === null || !isCustomAwardFormula(formula)) {
+        if (l.awardFormula === undefined) return null;
+        const { awardFormula: _dropped, ...rest } = l;
+        return rest;
+      }
+      return { ...l, awardFormula: resolveAwardFormula(formula) };
+    }),
+    [mutate],
+  );
+
+  /**
    * Change how many nations the World Cup takes (see `LeagueStore.worldCupSize`).
    *
    * Not a God Mode action, deliberately. It edits a competition format rather
@@ -1298,6 +1324,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
     godModeSetProgressionModelAction,
+    godModeSetAwardFormulaAction,
     setWorldCupSizeAction,
     releasePlayerGodModeAction,
     editPlayerAction,
@@ -1331,6 +1358,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
     godModeSetProgressionModelAction,
+    godModeSetAwardFormulaAction,
     setWorldCupSizeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
     setClubInterestAction, setNationInterestAction,

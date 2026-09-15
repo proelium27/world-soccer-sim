@@ -12,18 +12,12 @@ import {
   positionGroup, statsFor, ovrDuringSeason, potyScore, totsScore, TOTS_SLOTS,
 } from "./awards.js";
 import {
-  AWARD_MIN_APPEARANCES, AWARD_OVR_BASELINE, BALLON_DOR_SHORTLIST,
-  WORLD_POSITION_AWARD_SHORTLIST, WORLD_TOTS_TROPHY_MULTIPLIER,
-  WORLD_AWARD_TROPHY_STRENGTH_WEIGHT, WORLD_AWARD_TROPHY_STRENGTH_FLOOR,
-  WORLD_AWARD_TROPHY_STRENGTH_CAP, WORLD_AWARD_OVR_WEIGHT,
-  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
-  WORLD_AWARD_LEAGUE_STRENGTH_WEIGHT, WORLD_AWARD_CUP_MULTIPLIER,
-  WORLD_AWARD_CUP_RATING_WEIGHT, WORLD_AWARD_CUP_FULL_INVOLVEMENT, WORLD_AWARD_CUP_RUN_BONUS,
-  WORLD_AWARD_LEAGUE_TITLE_BONUS, WORLD_AWARD_TITLE_FULL_SEASON, WORLD_AWARD_INTL_GOAL_WEIGHT, WORLD_AWARD_INTL_ASSIST_WEIGHT,
-  WORLD_AWARD_INTL_CAP_WEIGHT, WORLD_AWARD_INTL_TOURNAMENT_MULTIPLIER, WORLD_AWARD_WORLD_CUP_BONUS,
-  WORLD_AWARD_DOMESTIC_CUP_BONUS, WORLD_AWARD_DOMESTIC_CUP_FULL_INVOLVEMENT,
-  WORLD_AWARD_INTL_CONFEDERATION_CUP_MULTIPLIER, WORLD_AWARD_CONFEDERATION_CUP_BONUS,
+  AWARD_OVR_BASELINE, BALLON_DOR_SHORTLIST, WORLD_POSITION_AWARD_SHORTLIST,
+  WORLD_AWARD_TROPHY_STRENGTH_FLOOR, WORLD_AWARD_TROPHY_STRENGTH_CAP,
+  WORLD_AWARD_CUP_FULL_INVOLVEMENT, WORLD_AWARD_TITLE_FULL_SEASON,
+  WORLD_AWARD_DOMESTIC_CUP_FULL_INVOLVEMENT,
 } from "./constants.js";
+import { DEFAULT_AWARD_FORMULA, type AwardFormula } from "./awardFormula.js";
 
 /**
  * One player's case for a worldwide award, broken into the parts that made it
@@ -194,16 +188,17 @@ function cupComponent(
   roundsFromFinal: Map<number, number>,
   goalWeight: Record<PositionGroup, number>,
   assistWeight: Record<PositionGroup, number>,
+  f: AwardFormula,
 ): number {
   const line = e.cupLine;
   if (!line || line.appearances === 0) return 0;
   const involvement = Math.min(1, line.appearances / WORLD_AWARD_CUP_FULL_INVOLVEMENT);
   let score =
-    (line.goals * goalWeight[e.group] + line.assists * assistWeight[e.group]) * WORLD_AWARD_CUP_MULTIPLIER;
+    (line.goals * goalWeight[e.group] + line.assists * assistWeight[e.group]) * f.world.cupMultiplier;
   const avg = cupAvgRating(line);
-  if (avg !== null) score += (avg - RATING_BASELINE) * WORLD_AWARD_CUP_RATING_WEIGHT * involvement;
+  if (avg !== null) score += (avg - RATING_BASELINE) * f.world.cupRatingWeight * involvement;
   const rounds = roundsFromFinal.get(e.stats.tid);
-  if (rounds !== undefined) score += (WORLD_AWARD_CUP_RUN_BONUS[rounds] ?? 0) * involvement;
+  if (rounds !== undefined) score += (f.world.cupRunBonus[rounds] ?? 0) * involvement;
   return score;
 }
 
@@ -230,27 +225,29 @@ function intlComponent(
   season: number,
   worldCupChampion: string | null,
   confederationCupChampions: ReadonlySet<string>,
+  f: AwardFormula,
 ): number {
+  const w = f.world;
   const lines = p.intl?.seasons.filter((l) => l.season === season) ?? [];
   let score = 0;
   for (const line of lines) {
     const multiplier = line.kind === "tournament"
-      ? WORLD_AWARD_INTL_TOURNAMENT_MULTIPLIER
+      ? w.worldCupMultiplier
       : line.kind === "confederation"
-        ? WORLD_AWARD_INTL_CONFEDERATION_CUP_MULTIPLIER
+        ? w.confederationCupMultiplier
         : 1;
     score +=
-      (line.goals * WORLD_AWARD_INTL_GOAL_WEIGHT +
-        line.assists * WORLD_AWARD_INTL_ASSIST_WEIGHT +
-        line.caps * WORLD_AWARD_INTL_CAP_WEIGHT) * multiplier;
+      (line.goals * w.intlGoalWeight +
+        line.assists * w.intlAssistWeight +
+        line.caps * w.intlCapWeight) * multiplier;
     // A medal counts only for a player who actually featured, so a squad
     // member who never got on doesn't collect one.
     if (line.caps === 0) continue;
     if (line.kind === "tournament" && worldCupChampion !== null && p.nationality === worldCupChampion) {
-      score += WORLD_AWARD_WORLD_CUP_BONUS;
+      score += w.worldCupBonus;
     }
     if (line.kind === "confederation" && confederationCupChampions.has(p.nationality)) {
-      score += WORLD_AWARD_CONFEDERATION_CUP_BONUS;
+      score += w.confederationCupBonus;
     }
   }
   return score;
@@ -267,8 +264,8 @@ const NO_CHAMPIONS: ReadonlySet<string> = new Set();
  * Uses the same AWARD_OVR_BASELINE, so it's a straight continuation of the same
  * line rather than a second, differently-shaped term.
  */
-function worldOvrComponent(e: Entry): number {
-  return (e.ovr - AWARD_OVR_BASELINE) * WORLD_AWARD_OVR_WEIGHT;
+function worldOvrComponent(e: Entry, f: AwardFormula): number {
+  return (e.ovr - AWARD_OVR_BASELINE) * f.world.ovrWeight;
 }
 
 /**
@@ -286,17 +283,17 @@ function worldOvrComponent(e: Entry): number {
  * win, which is legitimate, from scoring negative and turning a trophy into a
  * penalty. See WORLD_AWARD_TROPHY_STRENGTH_WEIGHT.
  */
-function trophyStrengthScale(e: Entry): number {
-  const raw = 1 + e.ovrDelta * WORLD_AWARD_TROPHY_STRENGTH_WEIGHT;
+function trophyStrengthScale(e: Entry, f: AwardFormula): number {
+  const raw = 1 + e.ovrDelta * f.world.trophyStrengthWeight;
   return Math.min(WORLD_AWARD_TROPHY_STRENGTH_CAP, Math.max(WORLD_AWARD_TROPHY_STRENGTH_FLOOR, raw));
 }
 
 /** Winning your own league, pro-rated by how much of the season you played and scaled by the league's strength. Tier-2 titles aren't in championTidByCompId, so they score nothing. */
-function titleComponent(e: Entry, championTidByCompId: Record<number, number>): number {
+function titleComponent(e: Entry, championTidByCompId: Record<number, number>, f: AwardFormula): number {
   if (championTidByCompId[e.compId] !== e.stats.tid) return 0;
-  return WORLD_AWARD_LEAGUE_TITLE_BONUS
+  return f.world.leagueTitleBonus
     * Math.min(1, e.stats.appearances / WORLD_AWARD_TITLE_FULL_SEASON)
-    * trophyStrengthScale(e);
+    * trophyStrengthScale(e, f);
 }
 
 /**
@@ -323,12 +320,13 @@ function domesticCupComponent(
   e: Entry,
   champions: ReadonlySet<number>,
   lines: Map<number, CupStatLine>,
+  f: AwardFormula,
 ): number {
   if (!champions.has(e.stats.tid)) return 0;
   const appearances = lines.get(e.player.pid)?.appearances ?? 0;
-  return WORLD_AWARD_DOMESTIC_CUP_BONUS
+  return f.world.domesticCupBonus
     * Math.min(1, appearances / WORLD_AWARD_DOMESTIC_CUP_FULL_INVOLVEMENT)
-    * trophyStrengthScale(e);
+    * trophyStrengthScale(e, f);
 }
 
 /**
@@ -346,6 +344,8 @@ interface Scoring {
   domesticChampions: ReadonlySet<number>;
   /** pid -> his domestic cup line, for pro-rating the winner's bonus by ties played. */
   domesticLines: Map<number, CupStatLine>;
+  /** The save's award weights (God Mode can edit them); the shipped ones by default. */
+  formula: AwardFormula;
 }
 
 /**
@@ -370,13 +370,14 @@ function worldAwardParts(
   // The ovr terms fold into `league` rather than becoming a fifth part: the UI
   // already labels that column as including an ovr term, and adding a field
   // would break WorldAwards entries already persisted on old saves.
-  const league = base + e.strength + worldOvrComponent(e);
-  const cup = cupComponent(e, s.roundsFromFinal, goalWeight, assistWeight);
+  const f = s.formula;
+  const league = base + e.strength + worldOvrComponent(e, f);
+  const cup = cupComponent(e, s.roundsFromFinal, goalWeight, assistWeight, f);
   const intl = intlComponent(
-    e.player, s.season, s.ctx.worldCupChampion, s.ctx.confederationCupChampions ?? NO_CHAMPIONS,
+    e.player, s.season, s.ctx.worldCupChampion, s.ctx.confederationCupChampions ?? NO_CHAMPIONS, f,
   );
-  const title = titleComponent(e, s.ctx.championTidByCompId);
-  const domesticCup = domesticCupComponent(e, s.domesticChampions, s.domesticLines);
+  const title = titleComponent(e, s.ctx.championTidByCompId, f);
+  const domesticCup = domesticCupComponent(e, s.domesticChampions, s.domesticLines, f);
   return {
     pid: e.player.pid, tid: e.stats.tid,
     score: league + cup + intl + title + domesticCup,
@@ -394,8 +395,9 @@ function worldAwardParts(
  * constants.ts.
  */
 function ballonDOrParts(e: Entry, s: Scoring): WorldAwardEntry {
+  const f = s.formula;
   return worldAwardParts(
-    e, s, potyScore(e.player, e.stats, s.season), POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
+    e, s, potyScore(e.player, e.stats, s.season, f), f.goalWeight, f.assistWeight,
   );
 }
 
@@ -412,14 +414,15 @@ function ballonDOrParts(e: Entry, s: Scoring): WorldAwardEntry {
 function worldTotsParts(e: Entry, s: Scoring): WorldAwardEntry {
   // Cup end product is priced with the Player of the Season columns, the same
   // ones `totsScore` now uses for his league goals and assists.
+  const f = s.formula;
   const base = worldAwardParts(
-    e, s, totsScore(e.player, e.stats, s.season), POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
+    e, s, totsScore(e.player, e.stats, s.season, f), f.goalWeight, f.assistWeight,
   );
   // Everything beyond his own league season is scaled by
   // WORLD_TOTS_TROPHY_MULTIPLIER (now 1, i.e. the Ballon d'Or's own weighting;
   // see its history note). It is applied HERE, at the shared base, precisely so
   // all three awards built on it stay in agreement about the same player.
-  const m = WORLD_TOTS_TROPHY_MULTIPLIER;
+  const m = f.world.positionAwardTrophyMultiplier;
   const cup = base.cup * m;
   const intl = base.intl * m;
   const title = base.title * m;
@@ -456,9 +459,10 @@ function positionAward(
   entries: Entry[],
   group: PositionGroup,
   parts: Map<number, WorldAwardEntry>,
+  minAppearances: number,
 ): WorldAwardEntry[] {
   const inGroup = entries.filter((e) => e.group === group);
-  const qualified = inGroup.filter((e) => e.stats.appearances >= AWARD_MIN_APPEARANCES);
+  const qualified = inGroup.filter((e) => e.stats.appearances >= minAppearances);
   const pool = qualified.length > 0 ? qualified : inGroup;
   return pool
     .map((e) => ({ entry: e, parts: parts.get(e.player.pid)! }))
@@ -480,6 +484,7 @@ function positionAward(
 function pickWorldTeam(
   entries: Entry[],
   parts: Map<number, WorldAwardEntry>,
+  minAppearances: number,
 ): (number | null)[] {
   const used = new Set<number>();
   return TOTS_SLOTS.map((slotPos) => {
@@ -491,7 +496,7 @@ function pickWorldTeam(
       // still fills its slot rather than going empty (same rule as the
       // per-competition Team of the Season).
       const score =
-        (e.stats.appearances >= AWARD_MIN_APPEARANCES ? 1000 : 0) + parts.get(e.player.pid)!.score;
+        (e.stats.appearances >= minAppearances ? 1000 : 0) + parts.get(e.player.pid)!.score;
       if (best === null || score > bestScore) {
         best = e;
         bestScore = score;
@@ -514,11 +519,16 @@ function pickWorldTeam(
  * context of things already snapshotted per season, so it can be run for any
  * past season — used both by simOffseason (fresh) and migrateLeague (backfill).
  * No rng of any kind.
+ *
+ * `formula` is the save's award formula (God Mode can edit it); omitted, the
+ * shipped weights apply and every score is exactly what it was before the
+ * formula became editable.
  */
 export function computeWorldAwards(
   players: Player[],
   season: number,
   ctx: WorldAwardContext,
+  formula: AwardFormula = DEFAULT_AWARD_FORMULA,
 ): WorldAwards {
   const cupLines = ctx.cup ? cupStatsByPid(ctx.cup) : new Map<number, CupStatLine>();
   const roundsFromFinal = ctx.cup ? cupRoundsFromFinal(ctx.cup) : new Map<number, number>();
@@ -563,15 +573,16 @@ export function computeWorldAwards(
   const deltas = leagueStrengthOffsets(entries);
   for (const e of entries) {
     e.ovrDelta = deltas.get(e.compId) ?? 0;
-    e.strength = e.ovrDelta * WORLD_AWARD_LEAGUE_STRENGTH_WEIGHT;
+    e.strength = e.ovrDelta * formula.world.leagueStrengthWeight;
   }
 
-  const scoring: Scoring = { season, ctx, roundsFromFinal, domesticChampions, domesticLines };
+  const scoring: Scoring = { season, ctx, roundsFromFinal, domesticChampions, domesticLines, formula };
+  const minAppearances = formula.minAppearances;
 
   // Ballon d'Or: a full season's worth of appearances is the bar, but if a world
   // is small or short enough that nobody clears it, everyone who played is
   // considered rather than leaving the award vacant.
-  const qualified = entries.filter((e) => e.stats.appearances >= AWARD_MIN_APPEARANCES);
+  const qualified = entries.filter((e) => e.stats.appearances >= minAppearances);
   const pool = qualified.length > 0 ? qualified : entries;
   const ranked = pool
     .map((e) => ({ entry: e, parts: ballonDOrParts(e, scoring) }))
@@ -594,8 +605,8 @@ export function computeWorldAwards(
 
   return {
     ballonDOr: ranked,
-    worldTeamOfYear: pickWorldTeam(entries, totsParts),
-    goalkeeperOfYear: positionAward(entries, "GK", totsParts),
-    defenderOfYear: positionAward(entries, "DEF", totsParts),
+    worldTeamOfYear: pickWorldTeam(entries, totsParts, minAppearances),
+    goalkeeperOfYear: positionAward(entries, "GK", totsParts, minAppearances),
+    defenderOfYear: positionAward(entries, "DEF", totsParts, minAppearances),
   };
 }
