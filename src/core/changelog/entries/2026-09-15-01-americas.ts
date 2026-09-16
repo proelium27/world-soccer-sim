@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-12",
+  date: "2026-09-15",
   title: "Brazil, Argentina, Mexico and the United States",
   items: [
     "New saves now include **four leagues from the Americas**: Brazil, Argentina, Mexico and the United States. Each has three divisions and its own fictional clubs, and the squads are drawn from each league's real nationality mix, so Liga MX is full of Argentines and Uruguayans and MLS has a big Canadian and South American contingent.",
