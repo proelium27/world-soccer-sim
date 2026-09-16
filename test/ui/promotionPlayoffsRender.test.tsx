@@ -129,7 +129,9 @@ describe("Promotion Playoffs page", () => {
     expect(html).toContain("empty-state");
     expect(html).toContain("No playoffs have been decided yet");
     // And it explains when they are played, rather than only that there are none.
-    expect(html).toContain("the moment the season ends");
+    // They stopped being played in one go when staging shipped, so this tracks
+    // the page's own wording rather than the old "the moment the season ends".
+    expect(html).toContain("played a round at a time once the season ends");
   });
 
   it("renders the live set the season just decided, still on the league", () => {
