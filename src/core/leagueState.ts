@@ -35,6 +35,7 @@ import {
   type Difficulty, type ProgressionModel, type WorldCupSize,
 } from "./constants.js";
 import { isSpectatorTid } from "./spectator.js";
+import type { AwardFormula } from "./awardFormula.js";
 
 export type { StoredTeam } from "./teams/clubs.js";
 export type { ScheduleGame } from "./schedule.js";
@@ -57,6 +58,15 @@ export interface LeagueStore {
      * already means the 2026 those saves have always displayed.
      */
     startYear?: number;
+    /**
+     * The club the user really manages, set only on a multi-season jump's
+     * working copy while `userTid` is parked at the autopilot sentinel.
+     * Everything else in the sim reads `userTid` and so hands the club to the
+     * AI; the academy pipeline reads this instead, because it runs on defaults
+     * and there is no reason a jump should empty it. `endAutopilot` deletes it,
+     * so it never reaches disk, and absent means "same as userTid".
+     */
+    autopilotTid?: number;
     /**
      * Which rating scale this save's stored ratings are on, as the
      * `OVR_SCALE_SHIFT` in force when they were generated.
@@ -388,6 +398,23 @@ export interface LeagueStore {
    * existed, so no dynasty in progress changes.
    */
   progressionModel: ProgressionModel;
+
+  /**
+   * The weights this save scores its end-of-season awards with, as edited in
+   * God Mode. Absent means the shipped formula, which is every save until
+   * someone edits it, so there is nothing to migrate. Read through
+   * `resolveAwardFormula`, never directly: that merges it over the shipped
+   * weights field by field, so a formula stored before a new weight existed
+   * still reads a sensible value for it.
+   *
+   * Read at one point (offseason step 3, both award passes) and never
+   * retroactively: seasons already played keep the winners they had. It does
+   * reach beyond the trophy cabinet, because a Team of the Season place helps
+   * put a player on the protected-star list, so a different XI changes who AI
+   * clubs will sell and every season after moves with it. Stays in force if
+   * God Mode is switched back off, like a ratings lock.
+   */
+  awardFormula?: AwardFormula;
 
   /**
    * How many nations the World Cup takes: 16, 24, 32 or 48, or "auto" to size

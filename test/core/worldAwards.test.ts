@@ -642,8 +642,10 @@ describe("position awards", () => {
   });
 
   it("prefers a qualified player over an unqualified one who scored higher", () => {
+    // Keepers are scored on goals conceded per game, so the full-timer needs a
+    // believable season to beat the squad keepers below, who concede nothing.
     const parttime = keeper(1, 1, 90, { saves: 500, goalsAgainst: 0 });
-    const fulltime = keeper(2, 1, 60, { saves: 50, goalsAgainst: 50 });
+    const fulltime = keeper(2, 1, 70, { saves: 50, goalsAgainst: 30, avgRating: 7.0 });
     const players = [
       { ...parttime, stats: [{ ...parttime.stats[0], appearances: AWARD_MIN_APPEARANCES - 1 }] },
       fulltime,
@@ -694,10 +696,10 @@ describe("position awards", () => {
     expect(worldTeamOfYear[0]).toBe(goalkeeperOfYear![0].pid);
     // The Ballon d'Or takes the league-strength scale on its trophies like
     // everything else — that scale belongs to the trophy, not to one award —
-    // but NOT the tots trophy multiplier, so it stays strictly the smaller.
+    // and the position awards take the trophy multiplier on top of it.
     const ballonTitle = ballonDOr.find((e) => e.pid === 1)!.title;
     expect(ballonTitle).toBeGreaterThan(0);
-    expect(goalkeeperOfYear![0].title).toBeGreaterThan(ballonTitle);
+    expect(goalkeeperOfYear![0].title).toBeCloseTo(ballonTitle * WORLD_TOTS_TROPHY_MULTIPLIER, 6);
   });
 
   it("applies the multiplier to the World XI as well, not just the two awards", () => {
@@ -757,10 +759,13 @@ describe("position awards", () => {
   it("lets a title overturn a league season the title bonus alone could not", () => {
     // The better keeper is at a club that won nothing; the slightly worse one
     // won his league. Both play a full season so the bonus isn't pro-rated.
+    // Keepers are judged on goals conceded per game, so the gap between them is
+    // built from rating and goals conceded; it has to stay wider than an
+    // unmultiplied title for this test to mean anything (asserted below).
     const apps = WORLD_AWARD_TITLE_FULL_SEASON;
     const players = [
-      keeper(1, 2, 78, { saves: 180, goalsAgainst: 28, avgRating: 7.3, appearances: apps }),
-      keeper(2, 1, 78, { saves: 130, goalsAgainst: 34, avgRating: 7.0, appearances: apps }),
+      keeper(1, 2, 78, { saves: 180, goalsAgainst: 26, avgRating: 7.6, appearances: apps }),
+      keeper(2, 1, 78, { saves: 130, goalsAgainst: 36, avgRating: 7.0, appearances: apps }),
       ...squad(100, 11, 55),
     ];
     const noTrophies = computeWorldAwards(players, SEASON, ctx());
@@ -770,10 +775,12 @@ describe("position awards", () => {
     const gap = noTrophies.goalkeeperOfYear!.find((e) => e.pid === 1)!.league
       - noTrophies.goalkeeperOfYear!.find((e) => e.pid === 2)!.league;
 
-    // The gap is wider than an unmultiplied title, so at Ballon d'Or weight the
-    // trophy would NOT have been enough. That is the whole reason the
-    // multiplier exists, and pinning it is what stops the fixture drifting into
-    // a gap so small the test would pass without any multiplier at all.
+    // The gap is wider than the bare title bonus, so the title only overturns
+    // it because a title won in a strong league is scaled up
+    // (WORLD_AWARD_TROPHY_STRENGTH_WEIGHT; both keepers play in the stronger
+    // competition here). Pinning the gap stops the fixture drifting into one so
+    // small that any title would overturn it. The trophy multiplier is 1, so it
+    // plays no part.
     expect(gap).toBeGreaterThan(WORLD_AWARD_LEAGUE_TITLE_BONUS);
 
     const champion = computeWorldAwards(players, SEASON, ctx({ championTidByCompId: { 0: 1 } }));

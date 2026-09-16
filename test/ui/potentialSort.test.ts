@@ -18,7 +18,6 @@ import { makeLeague } from "../helpers/league.js";
 
 /** Pages whose POT column is fogged, and so must never sort on the truth. */
 const FOGGED_POT_PAGES = [
-  "src/ui/pages/YouthIntake.tsx",
   "src/ui/pages/Academy.tsx",
   "src/ui/pages/FreeAgents.tsx",
   "src/ui/pages/Loans.tsx",

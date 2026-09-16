@@ -80,7 +80,7 @@ export function SetScouting() {
             <li>
               A better youth intake. A scouting network is what finds young players
               in the first place, so what you spend here feeds straight into the
-              group your academy turns up next summer.
+              kids who join your academy next summer.
             </li>
           </ul>
         </div>

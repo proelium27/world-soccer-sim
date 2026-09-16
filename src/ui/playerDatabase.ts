@@ -17,7 +17,7 @@ import { weeklyWage } from "../core/contracts.js";
  */
 
 /** Where a player sits in the world. Drives the status filter and the badge. */
-export type PlayerStatus = "senior" | "academy" | "trial" | "free";
+export type PlayerStatus = "senior" | "academy" | "free";
 
 export interface PlayerDbRow {
   player: Player;
@@ -71,7 +71,7 @@ export const PLAYER_DB_PAGE_SIZE = 100;
  * Every player in the world, each tagged with where he sits.
  *
  * Built by walking the clubs rather than the pool, because a player's club is
- * held on the *team* (`roster`/`academyRoster`/`youthTrialists`) and there is no
+ * held on the *team* (`roster`/`academyRoster`) and there is no
  * back-pointer on the player. Anyone no club claims is a free agent — the same
  * definition `freeAgentPids` uses, arrived at from the other side so the row
  * carries the club it found him on.
@@ -120,7 +120,6 @@ export function buildPlayerRows(
     };
     add(team.roster, "senior");
     add(team.academyRoster, "academy");
-    add(team.youthTrialists ?? [], "trial");
   }
 
   for (const player of league.players) {
@@ -138,7 +137,7 @@ export function matchesStatus(row: PlayerDbRow, filter: PlayerStatusFilter): boo
     // it answers is "does somebody own him", not "is he in the first team".
     case "contracted": return row.status !== "free";
     case "free": return row.status === "free";
-    case "academy": return row.status === "academy" || row.status === "trial";
+    case "academy": return row.status === "academy";
   }
 }
 

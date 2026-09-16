@@ -3085,6 +3085,16 @@ body.nav-drawer-open {
   color: var(--sg-text-muted);
   margin-bottom: 0.5rem;
 }
+/* God Mode's award editor keeps Save in reach while you scroll the numbers.
+   Opaque, or the boxes scroll visibly through it. */
+.gm-award-actions {
+  position: sticky;
+  bottom: 0;
+  background: var(--sg-surface);
+  border-top: 1px solid var(--sg-border-strong);
+  padding: 0.6rem 0;
+  z-index: 2;
+}
 
 /* ---- Positions: badge + per-position rating strip ----------------------- */
 /* A player's secondary positions ride alongside his listed one, dimmed so the

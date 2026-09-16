@@ -1,6 +1,6 @@
 /**
- * What the scout directions actually do to a trial group, measured on a real
- * offseason rather than argued from the constants.
+ * What the scout directions actually do to the academy's yearly intake,
+ * measured on a real offseason rather than argued from the constants.
  *
  * Run it before touching SCOUT_POSITION_SHARE: it is sized against what the user
  * can SEE in his group, not against the share it is applied at, and the two
@@ -21,6 +21,7 @@ import { createLeagueState, type LeagueStore } from "../src/core/leagueState.js"
 import { simThrough } from "../src/core/simThrough.js";
 import { simOffseason } from "../src/core/offseason.js";
 import type { Position } from "../src/core/players/types.js";
+import { USER_ACADEMY_ENTRY_AGE } from "../src/core/constants.js";
 
 const SEED = Number(process.env.SEED ?? 4);
 
@@ -47,8 +48,11 @@ function run(positions: Position[]) {
   };
   league = simOffseason(playSeason(league, rng), rng);
   const byPid = new Map(league.players.map((p) => [p.pid, p]));
-  const group = (league.teams.find((t) => t.tid === league.meta.userTid)!.youthTrialists ?? [])
-    .map((pid) => byPid.get(pid)!);
+  // This summer's intake: the academy kids who arrived at the entry age. A
+  // fresh world's academy is empty, so after one offseason that is all of them.
+  const group = league.teams.find((t) => t.tid === league.meta.userTid)!.academyRoster
+    .map((pid) => byPid.get(pid)!)
+    .filter((p) => league.season - p.born === USER_ACADEMY_ENTRY_AGE);
   const mean = (f: (p: (typeof group)[number]) => number) =>
     group.reduce((s, p) => s + f(p), 0) / group.length;
   return {

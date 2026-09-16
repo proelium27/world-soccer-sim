@@ -99,6 +99,8 @@ export function takeNationalJob(league: LeagueStore, nation: string): LeagueStor
       offers: [],
       sacked: false,
       lastVerdict: null,
+      // Taken, so no longer asked for; the club side's `switchClub` does the same.
+      ...(state.interests ? { interests: state.interests.filter((n) => n !== nation) } : {}),
     },
   };
 }

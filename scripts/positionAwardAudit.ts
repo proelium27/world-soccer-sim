@@ -39,7 +39,7 @@ import { simThrough } from "../src/core/simThrough.js";
 import { simOffseason } from "../src/core/offseason.js";
 import { competitionOf } from "../src/core/competitions.js";
 import { positionGroup, ovrDuringSeason, statsFor } from "../src/core/awards.js";
-import { TOTS_TACKLE_WEIGHT, TOTS_INTERCEPTION_WEIGHT, TOTS_SAVE_WEIGHT } from "../src/core/constants.js";
+import { TOTS_POSITION_WORK, TOTS_KEEPER_SAVE_PCT_BASELINE } from "../src/core/constants.js";
 import type { Position } from "../src/core/players/types.js";
 
 const SEASONS = Number(process.env.SEASONS ?? 8);
@@ -143,7 +143,13 @@ for (const seed of SEEDS) {
       lastKeeper = w.pid;
       const p = byPid.get(w.pid);
       const st = p ? statsFor(p, entry.season) : undefined;
-      if (st && w.score > 0) keeperVolumeShare.push((st.saves * TOTS_SAVE_WEIGHT) / w.score);
+      // The save-percentage term's share of his score (absolute: it can be negative).
+      if (st && w.score > 0 && st.saves + st.goalsAgainst > 0) {
+        const savePct = st.saves / (st.saves + st.goalsAgainst);
+        keeperVolumeShare.push(
+          Math.abs((savePct - TOTS_KEEPER_SAVE_PCT_BASELINE) * TOTS_POSITION_WORK.GK.savePct) / w.score,
+        );
+      }
       if (w.score > 0) keeperTrophyShare.push((w.score - w.league) / w.score);
       console.log(
         `  s${entry.season} GK  ${p?.name ?? `#${w.pid}`} (${countryOf(w.tid)}, ovr ` +
@@ -177,7 +183,11 @@ for (const seed of SEEDS) {
       if (world.worldTeamOfYear.slice(1, 5).includes(w.pid)) defenderInXI++;
       const st = p ? statsFor(p, entry.season) : undefined;
       if (st && w.score > 0) {
-        const vol = st.tackles * TOTS_TACKLE_WEIGHT.DEF + st.interceptions * TOTS_INTERCEPTION_WEIGHT.DEF;
+        // The per-game defending term's share of his score.
+        const pos = (winnerPos ?? p?.pos ?? "CB") as Position;
+        const vol = st.appearances > 0
+          ? ((st.tackles + st.interceptions) / st.appearances) * TOTS_POSITION_WORK[pos].defendingPerGame
+          : 0;
         volumeShare.push(vol / w.score);
         trophyShare.push((w.score - w.league) / w.score);
       }

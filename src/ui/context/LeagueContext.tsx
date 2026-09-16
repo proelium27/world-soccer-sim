@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo, u
 import { useNavigate } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
 import type { ProgressionModel, WorldCupSize } from "../../core/constants.js";
+import { isCustomAwardFormula, resolveAwardFormula, type AwardFormula } from "../../core/awardFormula.js";
 import type { SimThrough, IntlMode, PlayoffMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
 import { saveLeague, loadLeague } from "../../db/leagueDb.js";
@@ -11,8 +12,8 @@ import { setSeasonStartYear } from "../format.js";
 import { exportLeagueJSON, importLeagueJSON } from "../../db/exportImport.js";
 import {
   signFreeAgent, releasePlayer, signToAcademy, promoteFromAcademy, releaseAcademyPlayer,
-  signTrialist,
 } from "../../core/freeAgency.js";
+import { setAcademyDecision, type AcademyChoice } from "../../core/academyPipeline.js";
 import { scoutDirectionsOf, type ScoutDirections } from "../../core/scouting/scoutDirections.js";
 import { clampScoutingSpend } from "../../core/finance/scouting.js";
 import type { ProposedClause } from "../../core/transfers/clauses.js";
@@ -37,7 +38,8 @@ import {
   type PlayerEdit, type NewPlayerSpec,
 } from "../../core/godMode.js";
 import { switchClub } from "../../core/manager/switchClub.js";
-import { takeNationalJob, leaveNationalJob } from "../../core/nationalManager/index.js";
+import { takeNationalJob, leaveNationalJob, setNationInterest } from "../../core/nationalManager/index.js";
+import { setClubInterest } from "../../core/manager/interests.js";
 import {
   editableSquad, writeSquad, isValidNationSquad, squadRating, isEligibleNation,
 } from "../../core/international/index.js";
@@ -104,8 +106,6 @@ interface LeagueContextValue {
   signFreeAgentAction: (pid: number) => Promise<void>;
   releasePlayerAction: (pid: number) => Promise<void>;
   signToAcademyAction: (pid: number) => Promise<void>;
-  /** Sign one of this year's youth trialists into the academy. */
-  signTrialistAction: (pid: number) => Promise<void>;
   /**
    * Set what the youth scouts have been told — countries and positions — as a
    * partial, so a panel can change one without restating the other. See
@@ -114,6 +114,11 @@ interface LeagueContextValue {
   setScoutDirectionsAction: (next: Partial<ScoutDirections>) => Promise<void>;
   promoteFromAcademyAction: (pid: number) => Promise<void>;
   releaseAcademyPlayerAction: (pid: number) => Promise<void>;
+  /**
+   * Make (or, with `null`, withdraw) the user's call on an academy kid at the
+   * next rollover. A call that doesn't fit is ignored; see setAcademyDecision.
+   */
+  setAcademyDecisionAction: (pid: number, choice: AcademyChoice | null) => Promise<void>;
   extendAcademyContractAction: (pid: number) => Promise<void>;
   setScoutingSpendAction: (spend: number) => Promise<void>;
   makeOfferAction: (pid: number, amount: number, clauses?: ProposedClause[]) => Promise<void>;
@@ -145,6 +150,10 @@ interface LeagueContextValue {
   declineJobOffersAction: () => Promise<void>;
   /** Save-level switch for whether the board can sack you at all. */
   setSackingEnabledAction: (on: boolean) => Promise<void>;
+  /** Add or remove a club from the jobs you'd like. */
+  setClubInterestAction: (tid: number, on: boolean) => Promise<void>;
+  /** Add or remove a country from the national jobs you'd like. */
+  setNationInterestAction: (nation: string, on: boolean) => Promise<void>;
   /** Take charge of a national team, leaving whichever one you had. */
   takeNationalJobAction: (nation: string) => Promise<void>;
   /** Step down from the national job, going back to club football only. */
@@ -169,6 +178,8 @@ interface LeagueContextValue {
   /** God Mode: take charge of any country, offer or not. */
   godModeTakeNationalJobAction: (nation: string) => Promise<void>;
   godModeSetProgressionModelAction: (model: ProgressionModel) => Promise<void>;
+  /** God Mode: set this save's award weights, or pass null to go back to the shipped ones. */
+  godModeSetAwardFormulaAction: (formula: AwardFormula | null) => Promise<void>;
   /** Set how many nations the World Cup takes, from the next qualifying draw on. */
   setWorldCupSizeAction: (size: WorldCupSize) => Promise<void>;
   movePlayerToClubAction: (pid: number, tid: number) => Promise<void>;
@@ -768,28 +779,6 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     };
   }), [mutate]);
 
-  const signTrialistAction = useCallback((pid: number) => mutate((l) => {
-    const { teams, players } = signTrialist(
-      l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, userSpendPolicy(l),
-    );
-    if (teams === l.teams && players === l.players) return null;
-    // Reuses the academy event rather than adding one: the analytics set is
-    // deliberately "a handful of meaningful moments, not one event per click"
-    // (see analytics.ts), and this is an academy signing by another route.
-    trackEvent("player_signed_to_academy");
-    // Same fee-0 sentinel record an academy signing gets: he arrives at the
-    // club from nowhere, and without it his club-by-season history would name
-    // whichever club last had a record for him (none, for a youth product).
-    const { season, window } = freeAgentSigningWindow(l);
-    return {
-      ...l, teams, players,
-      transfers: [
-        ...l.transfers,
-        { pid, fromTid: FREE_AGENT_TID, toTid: l.meta.userTid, fee: 0, season, window },
-      ],
-    };
-  }), [mutate]);
-
   const setScoutDirectionsAction = useCallback((next: Partial<ScoutDirections>) => mutate((l) => {
     const team = l.teams.find((t) => t.tid === l.meta.userTid);
     if (!team) return null;
@@ -827,6 +816,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     const teams = releaseAcademyPlayer(l.teams, l.meta.userTid, pid);
     if (teams === l.teams) return null;
     return { ...l, teams };
+  }), [mutate]);
+
+  const setAcademyDecisionAction = useCallback((pid: number, choice: AcademyChoice | null) => mutate((l) => {
+    const team = l.teams.find((t) => t.tid === l.meta.userTid);
+    if (!team) return null;
+    const next = setAcademyDecision(team, l.players, l.activeLoans, l.season, pid, choice, l.difficulty);
+    if (next === team) return null;
+    return { ...l, teams: l.teams.map((t) => (t === team ? next : t)) };
   }), [mutate]);
 
   const extendAcademyContractAction = useCallback((pid: number) => mutate(
@@ -973,6 +970,18 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
   const setSackingEnabledAction = useCallback(
     (on: boolean) => mutate((l) => ({ ...l, manager: { ...l.manager, sackingEnabled: on } })),
+    [mutate],
+  );
+
+  // Interests only ever change which offers get drawn at the next review, so
+  // they're safe at any point in the season and need no phase gate.
+  const setClubInterestAction = useCallback(
+    (tid: number, on: boolean) => mutate((l) => setClubInterest(l, tid, on)),
+    [mutate],
+  );
+
+  const setNationInterestAction = useCallback(
+    (nation: string, on: boolean) => mutate((l) => setNationInterest(l, nation, on)),
     [mutate],
   );
 
@@ -1138,6 +1147,29 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * God Mode: edit the weights the end-of-season awards are scored with (see
+   * `LeagueStore.awardFormula`).
+   *
+   * Sanitized on the way in through `resolveAwardFormula`, so a cleared input
+   * can never store a NaN that would break every ranking. A formula identical
+   * to the shipped one is stored as no formula at all, which keeps "absent
+   * means default" literally true and lets the Awards page's custom-formula
+   * note key off the field's presence.
+   */
+  const godModeSetAwardFormulaAction = useCallback(
+    (formula: AwardFormula | null) => mutate((l) => {
+      if (!l.godMode) return null;
+      if (formula === null || !isCustomAwardFormula(formula)) {
+        if (l.awardFormula === undefined) return null;
+        const { awardFormula: _dropped, ...rest } = l;
+        return rest;
+      }
+      return { ...l, awardFormula: resolveAwardFormula(formula) };
+    }),
+    [mutate],
+  );
+
+  /**
    * Change how many nations the World Cup takes (see `LeagueStore.worldCupSize`).
    *
    * Not a God Mode action, deliberately. It edits a competition format rather
@@ -1273,10 +1305,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     signFreeAgentAction,
     releasePlayerAction,
     signToAcademyAction,
-    signTrialistAction,
     setScoutDirectionsAction,
     promoteFromAcademyAction,
     releaseAcademyPlayerAction,
+    setAcademyDecisionAction,
     extendAcademyContractAction,
     setScoutingSpendAction,
     makeOfferAction,
@@ -1300,6 +1332,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     playSuperCupsAction,
     setGodModeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
+    setClubInterestAction, setNationInterestAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,
     setNationalFormationAction, autoPickNationalXIAction,
@@ -1307,6 +1340,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
     godModeSetProgressionModelAction,
+    godModeSetAwardFormulaAction,
     setWorldCupSizeAction,
     releasePlayerGodModeAction,
     editPlayerAction,
@@ -1324,10 +1358,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     customizeTeamsAction, simAction, simLiveAction, liveMatch, chooseLiveMatch,
     finishLiveMatch, jumpSeasonsAction, offseasonAction,
     intlStageAction, playoffStageAction, signFreeAgentAction,
-    releasePlayerAction, signToAcademyAction, signTrialistAction,
+    releasePlayerAction, signToAcademyAction,
     setScoutDirectionsAction,
     promoteFromAcademyAction,
-    releaseAcademyPlayerAction, extendAcademyContractAction, setScoutingSpendAction,
+    releaseAcademyPlayerAction, setAcademyDecisionAction, extendAcademyContractAction, setScoutingSpendAction,
     makeOfferAction, acceptCounterAction, acceptInboundOfferAction,
     rejectInboundOfferAction, counterInboundOfferAction, extendContractAction,
     extendAllContractsAction,
@@ -1340,8 +1374,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSwitchClubAction,
     godModeTakeNationalJobAction,
     godModeSetProgressionModelAction,
+    godModeSetAwardFormulaAction,
     setWorldCupSizeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
+    setClubInterestAction, setNationInterestAction,
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,
     setNationalFormationAction, autoPickNationalXIAction,

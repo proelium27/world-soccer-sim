@@ -349,7 +349,7 @@ export function Manual() {
           </p>
           <p>
             What's gone is everything that needed a squad of your own: Roster, Transfers, Incoming
-            Offers, Loans, Finance, Incoming Talent, Free Agents, the Academy, the scouting slider
+            Offers, Loans, Finance, Free Agents, the Academy, the scouting slider
             and the Manager page. They're dropped from the sidebar rather than greyed out, since
             there's never going to be a club behind them, and an old bookmark to one of them lands
             on a short note saying you're spectating. There's no board, no confidence bar, no
@@ -452,6 +452,17 @@ export function Manual() {
             your peers &mdash; fewer of them, and all from clubs in the same bracket as yours.
           </p>
           <p>
+            <strong>You can also say which jobs you'd like.</strong> Under Jobs you'd like on the
+            Manager page, pick up to three clubs and three countries. Every summer each one gets
+            its own chance to call, on top of the usual offers, and it doesn't care about the
+            "never a step down" rule: any club or country at your level or below would be glad to
+            have you, so a decorated manager can go back to the small club they started at. A job
+            above your level only calls if your record is close to good enough for it, and the
+            closer you are the likelier it gets. Each pick shows whether it's within reach, a long
+            shot, or out of reach for now. Asking never hands you a job; it only makes the call
+            more likely, and a club you ask for comes off the list once you take it.
+          </p>
+          <p>
             Taking a job has real costs, and they're worth knowing before you click. Your current
             squad goes straight to the AI. Your youth academy graduates onto that club's senior
             roster on the way out, so those prospects are gone. Any transfer talks, incoming bids and
@@ -499,13 +510,12 @@ export function Manual() {
             <li><strong>News Feed</strong>. Transfers and player accomplishments woven into one timeline per season, with club and season filters, and your club's items highlighted. It's filtered by how much the story has to do with you, because the world is sixteen leagues across eight countries and reporting all of them equally buries you in news about clubs you'll never play. Your own club is always in, whatever it did &mdash; every transfer, loan, loan return and free signing, and every accomplishment. Your league is next: every deal (loans included) and every accomplishment in it. From the rest of the world you only get the big stories &mdash; a four-goal haul, a 100th career goal, a 35-goal season, the standout performance of the matchday, the Ballon d'Or, the World Team of the Year, Goalkeeper and Defender of the Year, and transfers over $40M. Accomplishments themselves are hat-tricks, one standout performance a matchday, career goal milestones at 50 and then every 50, season goal milestones at 25 and then every 5, and position changes for established players. <strong>Trophies and end-of-season awards land in the feed too</strong>, at the bottom of the season they belong to. Trophies first: who won the Continental Cup and the Continental Shield, and who won the World Cup and each confederation cup, with the final score. Then the honours: anything one of your players wins, plus your league's Player of the Season, Golden Boot and Team of the Season. All of it comes straight off the same records the Awards and cup pages read, so old saves show every trophy and honour they ever handed out, right back to season 1. Last of all comes what it changed: <strong>countries winning and losing Continental Cup places</strong>, saying which way the places went and what the counts went from and to. Those are always reported, wherever they happen, because a place changes hands well under once a season across the whole world and when it does it reshapes the competition everyone plays in. They're worked out from the cups your save already has on record too, so an old dynasty shows every place it ever won or lost. Trophies also reach your dashboard's news panel the moment they're won, and an honour won by one of your own players sits there until the new season kicks off.</li>
             <li><strong>Roster</strong>. Your squad: your Starting XI on a pitch view (with an optional Depth Chart overlay), a stats table for the XI, and a bench table (both with ratings, ages, contracts, and season stats, and goalkeepers also show goals against and xG against). Drag a bench player onto a pitch slot to swap him into the XI, drag one starter onto another to switch their positions, extend contracts, or release players.</li>
             <li><strong>Transfers</strong>. Recommended targets you can actually afford, plus a search across every player in the world, and your live negotiations. Make offers, read counter-offers, close deals. Both tables carry the view switch described below.</li>
-            <li><strong>Watchlist</strong>. Players you&apos;ve starred to keep an eye on. Click the star beside anyone&apos;s name &mdash; on his profile, in the transfer search, or on the Free Agents and Incoming Talent lists &mdash; and he shows up here with his club, this season&apos;s form, his wage, when his contract runs out, what your scouts think he&apos;s worth, and whether his club would entertain an offer at all. It&apos;s a shortlist and nothing more: watching a player doesn&apos;t scout him, doesn&apos;t tell his club anything, and doesn&apos;t change what he costs. Everything on it is worked out fresh each time you open it, so a name you starred three seasons ago shows the club he&apos;s at today at today&apos;s price. He drops off on his own if he retires.</li>
+            <li><strong>Watchlist</strong>. Players you&apos;ve starred to keep an eye on. Click the star beside anyone&apos;s name &mdash; on his profile, in the transfer search, on the Free Agents list or on the Academy page &mdash; and he shows up here with his club, this season&apos;s form, his wage, when his contract runs out, what your scouts think he&apos;s worth, and whether his club would entertain an offer at all. It&apos;s a shortlist and nothing more: watching a player doesn&apos;t scout him, doesn&apos;t tell his club anything, and doesn&apos;t change what he costs. Everything on it is worked out fresh each time you open it, so a name you starred three seasons ago shows the club he&apos;s at today at today&apos;s price. He drops off on his own if he retires.</li>
             <li><strong>Incoming Offers</strong>. AI clubs bidding for <em>your</em> players. Accept, reject, or counter to push the fee upward.</li>
             <li><strong>Loans</strong>. List your own players for a fixed-length loan, look over AI clubs' incoming loan offers, borrow other clubs' young players, and keep track of who's out on loan and who you have in.</li>
             <li><strong>Finance</strong>. Budget, the full wage-bill table, a projected (or final) season settlement, your transfer history, and a league-wide money table.</li>
-            <li><strong>Youth Intake</strong>. This year's crop from your academy, on trial. Offer a contract to a few of them; the rest leave. Also where you set your scout directions &mdash; which countries your scouts look in, and which positions they look for. Sorting the group by potential ranks them on the top of each scouting estimate, not on what they'll really become: nobody has told you that yet, and picking which ones to keep is the whole point of the screen.</li>
             <li><strong>Free Agents</strong>. Every other unsigned player, sign straight to your senior team. The default view shows the best across every position but caps how many of any one position it lists, so a spot that always has lots of free agents (defensive and attacking mids only get two roster spots per club, so their good extras spill into free agency more often) can't crowd out the rest. Pick a position from the dropdown to see that position's full list.</li>
-            <li><strong>Academy</strong>. Your club's youth-academy holding pool: extend, release, or promote to the senior team.</li>
+            <li><strong>Academy</strong>. Your club's youth academy. Kids join at 14 every summer; your scouts decide who stays at 16 and who turns pro at 18, and a Next rollover column lets you change any of those calls. Release or promote anyone early. Also where you set your scout directions &mdash; which countries your scouts look in, and which positions they look for. Sorting by potential ranks kids on the top of each scouting estimate, not on what they'll really become: nobody has told you that yet.</li>
             <li><strong>Box Score</strong>. Per-match detail, in three parts. The scoreboard at the top names the competition and matchday and starts the Man of the Match, the highest-rated player among those who actually played. Under it, a head-to-head strip compares the two sides on possession, shots, shots on target, xG, corners and fouls. Then a full-width stat table per club (xG, passes completed/attempted, crosses and fouls, goals against and xG against on the goalkeeper's row, and a 0&ndash;10 match rating for everyone who appeared), grouped into attacking, keeping, defending, passing and discipline blocks. The play-by-play at the bottom runs down a timeline with one club on each side, showing goals, cards, substitutions, penalties and injuries by default; switch it to "Every event" to add every shot and corner too.</li>
             <li><strong>Leagues</strong>. Your saved leagues. Create, enter, or delete saves. Each one is fully independent. Every save is named after the club you took over, so the row also shows the season it's reached and when you started it, which is how you tell two saves of the same club apart.</li>
             <li><strong>Player Profile</strong>. Click any player's name anywhere in the game (Roster, Stat Leaders, Awards, Transfers, News Feed) to open his full career page: every attribute rating, individual and team honors (Ballon d'Or, World Team of the Year, Goalkeeper of the Year, Defender of the Year, Player of the Season, Golden Boot, Team of the Season, league titles), the fullest season-by-season stat line in the game (goals, assists, goals+assists, shots, shots on target, shot accuracy, conversion rate, xG, goals over or under xG, passes, pass completion, crosses, tackles, interceptions, fouls, yellow and red cards, and average match rating), with a <strong>Career</strong> row underneath totaling the lot. Keepers get their own set instead &mdash; saves, save percentage, goals against, xG against, and goals prevented &mdash; and the shooting columns disappear for them, so nobody carries a row of columns that will only ever read zero (a keeper who has actually scored keeps them). Two of those columns are worth knowing what to do with. <strong>Goals over xG</strong> is the finishing read: xG doesn't care who's taking the shot, so a striker sitting well above his xG season after season really is finishing better than the chances he's getting, and one below it is missing chances an average forward would take. <strong>Goals prevented</strong> is the same idea for keepers, the other way round: xG against minus what he actually let in, so positive means he's saving shots that usually go in. The table carries the same Totals / Per 90 switch as Stat Leaders &mdash; on the Cup tab as well, but not on national-team stats, where caps are recorded without minutes and so have no per-90 reading. Percentages and match ratings stay put in Per 90 mode, since they're already rates. The Career row is worked out from the underlying totals rather than by averaging the seasons above it, so a big season counts for more than a six-game one in his career pass completion or match rating &mdash; full transfer history, a transfer-value-over-time chart, and a season-by-season OVR/POT/attribute history. The value chart plots what he's worth on the market against the seasons he's played, with the line colored by whichever club he was at and club crests marking transfers. Hover any season for a card with his value that year, his age, his OVR and POT, his goals and assists, his appearances, his average match rating, and the club he was at, where a youth-academy year reads as "Club (Academy)". A Value/OVR switch in the corner of the panel flips the same chart to his rating over time, which is worth a look on an older player: a veteran's OVR can sit flat for years while his value falls away underneath it, because the market is paying for the seasons he has left as much as for how good he is. His ratings only move in the offseason, so there's one real value per season and the line between them is just a smooth join, not extra readings. The value is worked out from the same numbers the market uses, which includes his potential &mdash; so if your scouts still only have a range on his POT, the chart is priced off that range rather than the real number, and it sharpens as they do.</li>
@@ -667,9 +677,11 @@ export function Manual() {
             you're in first, so jumping 1 season always means "get me to next year".
           </p>
           <p>
-            While you're gone your club is treated as an AI club in every respect. It picks its own
+            While you're gone your club is treated as an AI club in almost every respect. It picks its own
             formation and XI, buys and sells, renews contracts, signs free agents and trims itself
-            back to 25. Other clubs can bid for your players, and your stars are protected exactly
+            back to 25. The one exception is your <a href="#youth">academy</a>, which keeps running
+            the way it does when you leave it alone: new kids join every summer and the cuts at 16
+            and 18 go to the defaults. Other clubs can bid for your players, and your stars are protected exactly
             the way an AI club's are &mdash; by price, not by a veto. If it gets relegated its best
             players can be pulled up to the first division like anyone else's, and your{" "}
             <a href="#squad">saved starting XI</a>, transfer listings and any talks you had open
@@ -1602,6 +1614,9 @@ export function Manual() {
             off entirely and approaches arrive far more readily, because that's the only way back
             in. Approaches are rarer at the top: manage one of the best teams in the world and only
             a handful of jobs are even a sideways move, so it might be a few summers between calls.
+            If there's a particular country you want, pick it under Jobs you'd like on the Manager
+            page and it gets its own chance to get in touch each summer, the same way a club you
+            ask for does.
           </p>
           <p>
             Your club career isn't invisible to federations, but they discount it heavily. A big
@@ -1954,9 +1969,19 @@ export function Manual() {
             goalscorer. <strong>Team of the Season</strong> fills an 11-man pitch, laid out as a
             4-3-3 &mdash; a keeper, a back four, a midfield three of a holding man, a central
             midfielder and an attacking midfielder, and a front three of two wingers and a striker
-            &mdash; with whoever rates highest at each of those positions across the whole league,
-            blending match rating with the stats that matter most for the role: goals and assists up
-            front, tackles and interceptions in defense and midfield, saves for the keeper. Every
+            &mdash; with whoever rates highest at each of those positions across the whole league.
+            Every position has its own formula, and they all start from the same place: the Player
+            of the Season score, so match rating, goals and assists, and overall quality.
+            Attackers (attacking midfielders, wingers and strikers) are judged on that alone, which
+            means a forward who wins Player of the Season is always the best at his position in
+            that league. Defenders and midfielders also get credit for their defending, counted as
+            tackles and interceptions <em>per game</em> rather than over the whole season, so a
+            defence that spent all year under siege isn't rewarded just for being busy. It counts
+            most for centre-backs, then full-backs and holding midfielders, and only a little for
+            central midfielders. Keepers are judged on save percentage: how many of the shots on
+            target he faced he actually kept out. Goals conceded mostly measures the defence in
+            front of him, and a keeper making loads of saves is usually one facing loads of shots,
+            so neither says as much about the keeper himself. Every
             slot takes a player who actually plays that position, so a great season at a position
             the shape has only one of (striker, say) can still miss out. Both Player of
             the Season and Team of the Season also factor in overall quality, not just the stat
@@ -2043,45 +2068,41 @@ export function Manual() {
             trophy instead of pretending otherwise.
           </p>
           <p>
-            So these two are judged on the things the Ballon d'Or ignores. The keeper's award counts
-            saves and holds goals conceded against him; the defender's counts tackles and
-            interceptions and goals conceded, and is open to centre-backs and full-backs. On top of
-            that come the same worldwide extras the Ballon d'Or uses: the league-strength
-            correction, your Continental Cup run, your summer with your country, your league title,
-            your domestic cup.
+            So these two are judged on the things the Ballon d'Or ignores, using the same formulas
+            as the Team of the Season. The keeper's award counts his save percentage; the
+            defender's counts tackles and interceptions per game, and is open to
+            centre-backs and full-backs. On top of that come the same worldwide extras the Ballon
+            d'Or uses: the league-strength correction, your Continental Cup run, your summer with
+            your country, your league title, your domestic cup.
           </p>
           <p>
-            Those extras count for three times as much here as they do in the Ballon d'Or, and
-            there's a reason for the difference. Tackles, interceptions and saves are counted up
-            over a season and they get big, so a defender's raw defensive work can reach half his
-            score and leave everything else as rounding. A league title was worth under 4% of a
-            defender's total. Tripling the rest puts trophies back roughly where they sit in the
-            Ballon d'Or: about a fifth of a defender's winning score now comes from outside his
-            league, against a sixth for a Ballon d'Or winner.
+            Those extras count exactly as much here as they do in the Ballon d'Or. They used to count
+            three times as much, back when defending was added up over a whole season and a
+            defender's raw totals were big enough to drown out everything else. Defending is counted
+            per game now, so that stopped being needed, and tripling trophies had started handing the
+            award to whichever keeper played for the club that won things rather than the best keeper.
           </p>
           <p>
-            It has a second effect that's worth knowing about, because it's the reason the defender
-            award stopped drifting to weak leagues. Two of those extras &mdash; the Continental Cup
-            and your summer with your country &mdash; are the only parts of the whole calculation
-            that put players from different leagues against each other directly, and a club from a
-            weak league rarely goes deep in the cup. Turning them up pulls the award towards the
-            stronger leagues on its own. Your league title and your domestic cup don't help with
-            that at all, since every league crowns a champion regardless of how good it is.
+            Two of those extras &mdash; the Continental Cup and your summer with your country
+            &mdash; are the only parts of the whole calculation that put players from different
+            leagues against each other directly, and a club from a weak league rarely goes deep in
+            the cup. That, plus the league-strength correction, is what stops these two awards
+            drifting to weak leagues. Your league title and your domestic cup don't help with that
+            at all, since every league crowns a champion regardless of how good it is.
           </p>
           <p>
-            The World Team of the Year is scored the same way, trophies and all, because it's built
-            on the same numbers and had the same problem. So the three agree with each other: the
-            Goalkeeper of the Year is the keeper in that XI, and the Defender of the Year is in its
-            back four. The Ballon d'Or is the one that stands apart, since it's scored on goals and
-            assists rather than on defending, and it keeps its own trophy weighting.
+            The World Team of the Year is scored the same way, trophies and all. So the three agree
+            with each other: the Goalkeeper of the Year is the keeper in that XI, and the Defender
+            of the Year is in its back four. The Ballon d'Or is the one that stands apart, since
+            it's scored on goals and assists rather than on defending, but a trophy is worth the
+            same in all four.
           </p>
           <p>
             One thing worth knowing about how the defender's award reads. Tackles and interceptions
-            are counted up raw over a season rather than as rates, and they vary a lot from one
-            defender to the next. A defender who spends every week under siege makes more of both
-            than an equally good one at a club that controls its games, so the award favours
-            defenders with plenty of defending to do, and centre-backs take it more often than
-            full-backs. It's the same measure the World Team of the Year has always picked its back
+            are counted per game rather than added up over the season, so a defender isn't rewarded
+            just for how much defending his club left him to do. Centre-backs get a little more
+            credit for it than full-backs, because it's a bigger part of the job. It's the same
+            measure every league's Team of the Season and the World Team of the Year pick their back
             four with.
           </p>
           <p>
@@ -2241,7 +2262,7 @@ export function Manual() {
           <p>
             <strong>Roster cap: 30 players.</strong> Signings, transfer buys, and academy promotions
             are blocked once you're full (the Roster, Transfers, and Free Agents pages all show
-            an x/30 count). Your academy has its own separate 10-player cap, covered in{" "}
+            an x/30 count). Your academy has its own separate 20-player cap, covered in{" "}
             <a href="#youth">The Youth Academy</a>.
           </p>
           <p>
@@ -2549,9 +2570,11 @@ export function Manual() {
             Nobody manages your squad for you, so an expiring deal you don't act on just runs out and
             the player leaves on a free the next offseason. To keep that from sneaking up on you, the
             Roster page flags anyone in the final year of his deal with a <strong>"Final year"</strong>{" "}
-            badge and a heads-up banner, so you can extend him before he's gone for nothing. Academy
-            stipends run out the same way, so the Academy page carries the same badge and banner for
-            your prospects.
+            badge and a heads-up banner, so you can extend him before he's gone for nothing. Prospects
+            you sign into your academy from Free Agents are on deals that run out the same way, so
+            the Academy page carries the same badge and banner for them. Kids from your own intake
+            don't need it: their deals end at 16 and 18, where the academy decides for you unless you
+            step in first (see <a href="#youth">The Youth Academy</a>).
           </p>
           <p>
             That banner also carries an <strong>Extend all</strong> button, which re-signs every one
@@ -2709,8 +2732,8 @@ export function Manual() {
             <li>
               <strong>A transfer embargo.</strong> End a season more than{" "}
               <strong>40%</strong> into your overdraft and you can't buy or sign anyone at all next
-              season. You can still sell, still promote from your academy, and still take on
-              trialists &mdash; the ways out stay open, the ways further in don't.
+              season. You can still sell, still promote from your academy, and your academy still
+              takes in its yearly intake &mdash; the ways out stay open, the ways further in don't.
             </li>
             <li>
               <strong>A points deduction.</strong> End it more than <strong>75%</strong> in and
@@ -2748,10 +2771,17 @@ export function Manual() {
 
         <Section id="youth" title="The Youth Academy">
           <p>
-            Every offseason, your club's academy turns out <strong>3&ndash;5 new 16-year-olds</strong>,
-            landing in a holding pool on the Academy page instead of straight onto your senior
-            roster. They show up raw, well below first-team level, but with youth on their side, and
-            some will develop into stars (and some won't, see <a href="#players">potential</a>).
+            Every offseason, <strong>6&ndash;8 kids aged 14</strong> join your club's academy on their
+            own. There's nothing to sign and nobody to pick: they're just there on the Academy page
+            when the new season starts, rather than on your senior roster. They show up raw, well
+            below first-team level, but with years on their side, and some will develop into stars
+            (and some won't, see <a href="#players">potential</a>).
+          </p>
+          <p>
+            Kids grow through their first two seasons. Each one arrives a couple of seasons short of
+            the player he'll be at 16 and catches up by then, some doing most of it in the first year
+            and some in the second. Where he ends up at 16 doesn't depend on how fast he got there, so
+            a quick start isn't a sign of a better player. From 16 he develops like anyone else.
           </p>
           <p>
             Academy quality starts from a fixed trait each club has, set when the league is created,
@@ -2768,13 +2798,42 @@ export function Manual() {
           </p>
           <p>
             Academy players draw a cheap flat weekly stipend instead of the normal wage formula, and
-            they can't be transferred. Each has a one-button <strong>Extend</strong> (fresh stipend
-            terms once his contract hits its final season) or <strong>Release</strong> (cut him
-            outright, since the academy has no depth floor to protect, unlike your senior roster);
-            <strong> Extend all</strong> in the banner does the whole final-year group at once.
-            When one's ready, <strong>Promote</strong> moves him onto your senior roster on a normal
-            ovr-based wage, which is blocked once you're at the 30-man roster cap. The academy has
-            its own cap, separate from your senior roster's, at 10 prospects.
+            they can't be transferred. The decisions come at two ages, and doing nothing is always
+            a real choice:
+          </p>
+          <ul>
+            <li>
+              <strong>At 16, the scholarship cut.</strong> His first deal is up. Leave it and he
+              stays on until 18, as long as there's room. The academy holds 20, and when the new
+              intake would overfill it, the kids turning 16 that your scouts rate lowest are let go.
+            </li>
+            <li>
+              <strong>At 18, the pro cut.</strong> He joins your senior squad if there's room
+              under the 30-man cap, best-rated first, or he leaves.
+            </li>
+            <li>
+              <strong>Any time before that</strong>, <strong>Release</strong> cuts a kid outright
+              (the academy has no depth floor to protect), and <strong>Promote</strong> moves one onto
+              your senior roster early, on a normal ovr-based wage. Promoting is blocked once you're
+              at the 30-man roster cap.
+            </li>
+          </ul>
+          <p>
+            The Academy page's <strong>Next rollover</strong> column has a dropdown for every kid at
+            a cut. It starts on your scouts' call: joins the first team, leaves, kept to 18, or cut if
+            full, which means he only goes if the new intake fills the academy. Change it and the
+            rollover does what you picked instead: keep or release at 16, promote or release at 18.
+            You can only pick what there's room for, so once your promotions fill the senior places
+            you'll have, Promote greys out, and once the kids you keep would leave no room for the new
+            intake, so does Keep. Your picks last until that rollover, then the next season starts
+            back on the scouts' calls. Those calls are made
+            on your scouts' estimates as they stand before the new season, not on how good a kid will
+            really be, so they can be wrong the same way you can. "Joins the first team" and "kept to
+            18" are promises. "Leaves" is the worst case: it counts the players coming back from loan
+            and the ones whose deals are up, but a senior who retires over the summer frees a place
+            it couldn't see coming. Prospects you sign in from Free Agents are the exception: they're
+            on ordinary academy deals, with an <strong>Extend</strong> button and an{" "}
+            <strong>Extend all</strong> in the banner, like anywhere else.
           </p>
           <p>
             AI clubs don't keep a real academy pool. Their youth intake lands straight on their
@@ -2791,30 +2850,22 @@ export function Manual() {
             on the Academy page regularly instead.
           </p>
           <p>
-            Every summer your academy turns up a group of 16-year-olds on trial, and they land on
-            the <strong>Youth Intake</strong> page. Nobody's signed until you say so. You can offer
-            a contract to five of them, and whoever's left when you start the next season has gone,
-            free for anyone else to sign, so passing on the right one can come back to bite you.
-            Their ceilings are estimates like everywhere else, which is the whole difficulty of it:
-            you're choosing on a guess.
-          </p>
-          <p>
-            How good that group is comes down to four things. Your academy's standing, fixed when
+            How good each intake is comes down to four things. Your academy's standing, fixed when
             the league was created. How you've been finishing lately. And two you control directly:{" "}
             <strong>what you spend on scouting</strong>, which is what finds young players in the
             first place, and <strong>your hype</strong>, because kids want to join a club people are
-            excited about. Those last two are worth a few rating points on the whole group at full
+            excited about. Those last two are worth a few rating points on the whole intake at full
             tilt. Not transformative on their own, but they compound over a decade of intakes, and
             scouting money now buys you something beyond a clearer view of a player's ceiling.
           </p>
           <p>
-            The Youth Intake page also carries your <strong>scout directions</strong>: two things
-            you can tell your scouts before they go out. Both take effect at your next intake,
-            not the group already on your desk.
+            The Academy page also carries your <strong>scout directions</strong>: two things you
+            can tell your scouts before they go out. Both take effect at your next intake, not the
+            kids already there.
           </p>
           <p>
             <strong>Countries</strong> &mdash; up to three, and they'll turn up most of next
-            summer's group between them, with the rest still coming from around your own league.
+            summer's intake between them, with the rest still coming from around your own league.
             Be clear about what this one does: your scouts find you <em>different</em> players, not
             better ones. Where a player is from decides his name and which country is allowed to
             pick him, and nothing else. That eligibility part is the reason to bother with it, if
@@ -2823,14 +2874,14 @@ export function Manual() {
           <p>
             <strong>Positions</strong> &mdash; up to three, if you can see a hole coming in a few
             years and would rather start filling it now. It's a strong lean and not a filter: ask
-            for centre-backs and you'll get a lot of centre-backs, never a group of nothing else,
+            for centre-backs and you'll get a lot of centre-backs, never an intake of nothing else,
             because an academy that stopped producing everything you weren't thinking about this
             year would cost you more than it gave you.
           </p>
           <p>
             One honest note on positions. Your own academy turns up a handful of kids each summer
             on its own, and those arrive as they are &mdash; positions shape the ones your{" "}
-            <em>scouts</em> go out and find, which is most of the group but not all of it.
+            <em>scouts</em> go out and find, which is most of the intake but not all of it.
             Countries are the exception and cover everyone, because that only changes where a
             player is from rather than what kind of player he is.
           </p>
@@ -3133,6 +3184,7 @@ export function Manual() {
             <li><strong>Create players.</strong> The <em>God Mode</em> page has a Create Player tool. Build a player from scratch and drop him onto any club or leave him a free agent.</li>
             <li><strong>Build any club's roster.</strong> The same page lets you pick any club and add, move, or release its players directly.</li>
             <li><strong>Set club finances and identity.</strong> Set any club's budget and hype to whatever you want, and rename or recolor any club.</li>
+            <li><strong>Rewrite the award formulas.</strong> The God Mode page has an Awards tab for changing what the end-of-season awards reward. The quick way is a style: <em>Goals win awards</em> doubles what goals and assists are worth, <em>Defenders get their due</em> doubles tackles, interceptions and save percentage for the Team of the Season and the defensive world awards, <em>Trophies decide it</em> triples titles and cup runs, and <em>Form only</em> stops a player's overall rating counting at all. Underneath, <em>Fine-tune the numbers</em> lists every weight: goals and assists by position, match rating, overall, tackles and interceptions per game, save percentage, the league games needed to qualify (19 out of the box), and everything the Ballon d&apos;Or adds for league strength, trophies, cup runs and international football. Each one is explained as what it's worth in goals by a forward. Before you save, the tab shows who would have won last season's Ballon d&apos;Or, Goalkeeper and Defender of the Year and your league's Player of the Season under your numbers, judged on the players still in the game. Save and your formula is used the next time awards are handed out. Seasons already played keep their winners, and picking <em>As shipped</em> puts the game's own formula back. Worth knowing: a Team of the Season place is part of what makes a big club refuse to sell a star, so changing that formula also changes who&apos;s on the market. Like a ratings lock, it stays in force if you switch God Mode off, and the Awards page says so.</li>
             <li><strong>See true potential.</strong> The scouting fog lifts while God Mode is on, so every player's exact potential shows everywhere, not an estimate.</li>
           </ul>
           <p>

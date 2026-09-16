@@ -16,12 +16,13 @@ import { manageableNations } from "../../core/international/index.js";
 import { isSpectator } from "../../core/spectator.js";
 import { NationName } from "./nationalTeams/shared.js";
 import { currencyCompact } from "../format.js";
+import { AwardFormulas } from "./GodModeAwards.js";
 
 const NATION_NAMES = Object.keys(NATIONALITIES);
 const flatRatings = (v: number): PlayerRatings =>
   Object.fromEntries(SKILL_KEYS.map((k) => [k, v])) as PlayerRatings;
 
-type Tab = "club" | "nation" | "development" | "create" | "roster" | "finance";
+type Tab = "club" | "nation" | "development" | "awards" | "create" | "roster" | "finance";
 
 export function GodMode() {
   const league = useLeague().league;
@@ -39,12 +40,13 @@ export function GodMode() {
       </p>
 
       <ul className="nav nav-tabs mb-3">
-        {(["club", "nation", "development", "create", "roster", "finance"] as Tab[]).map((t) => (
+        {(["club", "nation", "development", "awards", "create", "roster", "finance"] as Tab[]).map((t) => (
           <li key={t} className="nav-item">
             <button className={`nav-link ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
               {t === "club" ? "Switch Club"
                 : t === "nation" ? "Switch Country"
                 : t === "development" ? "Development"
+                : t === "awards" ? "Awards"
                 : t === "create" ? "Create Player"
                 : t === "roster" ? "Roster Builder" : "Club Finances"}
             </button>
@@ -55,6 +57,7 @@ export function GodMode() {
       {tab === "club" && <SwitchClub />}
       {tab === "nation" && <SwitchCountry />}
       {tab === "development" && <Development />}
+      {tab === "awards" && <AwardFormulas />}
       {tab === "create" && <CreatePlayer />}
       {tab === "roster" && <RosterBuilder />}
       {tab === "finance" && <ClubFinances />}

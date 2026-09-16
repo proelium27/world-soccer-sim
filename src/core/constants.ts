@@ -1114,6 +1114,25 @@ export const YOUTH_AGE = 16;
  * season 2, 18-19 at season 3, and 28-29 by season 13.
  */
 export const INITIAL_AGE_MIN = YOUTH_AGE;
+
+/**
+ * THE AGE DEVELOPMENT STARTS AT. Below it `progressPlayer` discards the rating
+ * step (after spending every draw, so the rng stream is untouched) and
+ * `estimatePotential` forecasts from this age rather than from the player's own.
+ *
+ * It exists so the user's academy can take kids in younger than the world's
+ * YOUTH_AGE without handing them free growth years. `generatePlayer` rolls
+ * ratings with no age term, so a 14-year-old generated off the same base as a
+ * 16-year-old IS that 16-year-old; letting him develop for two extra seasons
+ * would hand every academy graduate two years nobody else gets. With the
+ * discard he simply holds until 16 and then follows the ordinary path.
+ *
+ * Inert for every player at or above it, which on a world whose YOUTH_AGE is
+ * this value means inert for everyone outside the user's academy — measured
+ * on a world-wide intake at 15, see CLAUDE.md, before this was narrowed to the
+ * academy alone.
+ */
+export const YOUTH_BASE_REFERENCE_AGE = 16;
 export const INITIAL_AGE_MAX = 38;
 
 /**
@@ -1999,13 +2018,16 @@ export const YOUTH_CONTRACT_LENGTH = 2;
  */
 export const ACADEMY_STIPEND_WEEKLY = 500;
 /**
- * Hard ceiling on the academy pool, mirroring ROSTER_CAP's role for the
- * senior roster — bounds how many prospects a player can sign into the
- * academy via Incoming Talent (youth intake itself isn't gated by this, same
- * convention as ROSTER_CAP/youth intake).
+ * Ceiling on the academy pool, mirroring ROSTER_CAP's role for the senior
+ * roster. Bounds signings into the academy from free agency, and it is what the
+ * scholarship cut keeps the academy under by default: the yearly intake itself
+ * is never refused (same convention as ROSTER_CAP and AI youth intake), so the
+ * room comes out of the kids reaching ACADEMY_SCHOLARSHIP_AGE, lowest-scouted
+ * first. At USER_ACADEMY_INTAKE_MIN..MAX a year that keeps roughly three of each
+ * year's intake to ACADEMY_GRADUATION_AGE.
  */
-export const ACADEMY_ROSTER_CAP = 10;
-/** Free agents at or under this age show up on Incoming Talent (prospects) instead of Free Agents. */
+export const ACADEMY_ROSTER_CAP = 20;
+/** The age line for a "prospect": the academy's signing ceiling and the AI's prospect slots. */
 export const PROSPECT_AGE_MAX = 21;
 
 /**
@@ -3333,23 +3355,59 @@ export const POTY_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = 
   FWD: 0.05, MID: 0.07, DEF: 0.09, GK: 0.16,
 };
 
-/** Team of the Season: avgRating plus every position-relevant season stat, not just goals/assists. */
-export const TOTS_GOAL_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.06, MID: 0.08, DEF: 0.11, GK: 0.3,
+/**
+ * Team of the Season: each position has its own formula, built as the Player of
+ * the Season score (match rating, goals, assists, ovr) plus the work that
+ * position does and the scoreline can't show (`totsScore` in core/awards.ts):
+ *
+ *  - `defendingPerGame` × (tackles + interceptions) per appearance.
+ *  - `savePct` × (his save percentage − TOTS_KEEPER_SAVE_PCT_BASELINE). Keepers
+ *    only.
+ *
+ * **Per appearance, never season totals (2026-09-13).** The old formula paid
+ * 0.01-0.03 per tackle and interception on season totals, which rewarded a
+ * defence for how much it had to defend rather than how well: a centre-back's
+ * ~160 a season was worth ~5 points against a rating spread of ~1, and a
+ * forward's 0.01 was enough for a busy striker to take the one ST slot off a
+ * Ballon d'Or winner. Measured over 10 simmed seasons of tier-1 players, the per-game
+ * rate DOES track quality (correlation with ovr: CB 0.41, DM 0.35, CM 0.36,
+ * FB 0.31), so it measures the right thing once volume is taken out.
+ *
+ * **Keepers are judged on save percentage, the one keeper stat that tracks the
+ * keeper rather than the defence in front of him.** Measured over 5,720
+ * qualified keeper-seasons, correlation with his own ovr / with his club's
+ * outfield ovr: save % 0.27 / 0.07, goals conceded per game -0.27 / -0.22,
+ * saves per game 0.01 / -0.25, goals prevented against xG -0.01 / 0.01 (noise).
+ * Goals conceded per game shipped first and was replaced: it rewarded the
+ * keeper behind a good defence, and the Goalkeeper of the Year winner's median
+ * ovr rank among the world's keepers fell from 5 to 15.
+ *
+ * **Attackers (AM, W, ST) add nothing**, so their Team of the Season score IS
+ * the Player of the Season score. That is what makes a forward who wins his
+ * league's Player of the Season the best at his position by construction.
+ */
+export const TOTS_POSITION_WORK: Record<
+  "GK" | "CB" | "FB" | "DM" | "CM" | "AM" | "W" | "ST",
+  { defendingPerGame: number; savePct: number }
+> = {
+  GK: { defendingPerGame: 0, savePct: 4 },
+  CB: { defendingPerGame: 0.3, savePct: 0 },
+  FB: { defendingPerGame: 0.24, savePct: 0 },
+  DM: { defendingPerGame: 0.24, savePct: 0 },
+  CM: { defendingPerGame: 0.06, savePct: 0 },
+  AM: { defendingPerGame: 0, savePct: 0 },
+  W: { defendingPerGame: 0, savePct: 0 },
+  ST: { defendingPerGame: 0, savePct: 0 },
 };
-export const TOTS_ASSIST_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.04, MID: 0.055, DEF: 0.07, GK: 0.2,
-};
-export const TOTS_TACKLE_WEIGHT: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0.01, MID: 0.02, DEF: 0.03, GK: 0,
-};
-export const TOTS_INTERCEPTION_WEIGHT = TOTS_TACKLE_WEIGHT;
-/** Goalkeepers only. */
-export const TOTS_SAVE_WEIGHT = 0.035;
-/** Penalty per goal conceded across the season, heaviest for GK/DEF. */
-export const TOTS_GOALS_AGAINST_PENALTY: Record<"GK" | "DEF" | "MID" | "FWD", number> = {
-  FWD: 0, MID: 0.006, DEF: 0.02, GK: 0.03,
-};
+
+/**
+ * The save percentage an average qualified keeper posts (measured 0.668, sd
+ * 0.048, p10 0.608, p90 0.727), so `TOTS_POSITION_WORK.GK.savePct` credits a
+ * keeper only for how far he sits above or below it. Only keepers are ever
+ * compared with each other on this term, so the baseline moves no ranking; it
+ * keeps an ordinary keeper's score where the Player of the Season score puts it.
+ */
+export const TOTS_KEEPER_SAVE_PCT_BASELINE = 0.67;
 
 /* ────────────────────────────────────────────────────────────────────────
  * Worldwide awards — Ballon d'Or and World Team of the Year (core/worldAwards.ts)
@@ -3474,7 +3532,20 @@ export const WORLD_POSITION_AWARD_SHORTLIST = 5;
  * same page. **A correction that belongs to a shared base has to be applied at
  * the base, or the things built on it quietly stop agreeing.**
  */
-export const WORLD_TOTS_TROPHY_MULTIPLIER = 3;
+/*
+ * **Now 1 (2026-09-13, user call), i.e. the Ballon d'Or's own weighting; the
+ * note above is the record of why it was 3.** The dilution it corrected came
+ * from counting tackles and interceptions as season totals, and the Team of the
+ * Season formula now counts them per game (TOTS_POSITION_WORK), so the base is no
+ * longer inflated. At 3 on the new base the trophies started deciding the award:
+ * measured over 4 seeds × 5 seasons (scripts/totsWeightProbe.ts), on identical
+ * worlds since this constant feeds no sim state, the Goalkeeper of the Year
+ * winner's ovr rank among the world's keepers read median 10 / mean 15.2 / worst
+ * 57 at 3, against 6 / 9.6 / 43 at 1; Defender of the Year 9 / 23.1 / 100 against
+ * 7 / 15.2 / 68. Every winner of both awards still came from the big four at 1
+ * (16/16), so the weak-league drift it was introduced to stop does not return.
+ */
+export const WORLD_TOTS_TROPHY_MULTIPLIER = 1;
 
 /**
  * How much a league title and a domestic cup are scaled by how strong the
@@ -5340,6 +5411,23 @@ export const MANAGER_OFFER_MAX_CHANCE = 0.8;
  */
 export const MANAGER_SACKED_PRESTIGE_PENALTY = 0.18;
 
+/**
+ * Clubs you can say you'd like to manage at once. Small on purpose: "I want
+ * these three jobs" is a statement of intent, and a list of thirty would just be
+ * a second, worse offer generator.
+ */
+export const MANAGER_MAX_INTERESTS = 3;
+/**
+ * Per-offseason chance a club you've asked about comes calling, when you're
+ * comfortably good enough for it. Scaled down by how far the club sits above your
+ * level (see `interestReach`), so it never reaches a job the ordinary band would
+ * call out of reach. More than double `MANAGER_OFFER_BASE_CHANCE`, since telling a
+ * club you want it is supposed to matter, and well short of certain, since a
+ * club still picks its manager rather than the other way round.
+ */
+export const MANAGER_INTEREST_CHANCE = 0.5;
+export const MANAGER_INTEREST_MAX_CHANCE = 0.85;
+
 /** Reputation a manager starts a career on, before any results, 0-100. */
 export const MANAGER_REP_BASE = 30;
 export const MANAGER_REP_TITLE_WEIGHT = 13;
@@ -5476,6 +5564,16 @@ export const NATIONAL_OFFER_MAX_CHANCE = 0.85;
 /** Losing a job drops the calibre of nation that will take you next. */
 export const NATIONAL_SACKED_PRESTIGE_PENALTY = 0.2;
 
+/** Countries you can say you'd like to manage at once. The club side's reasoning. */
+export const NATIONAL_MAX_INTERESTS = 3;
+/**
+ * Per-offseason chance a country you've asked about gets in touch, when you're
+ * good enough for it — scaled by `interestReach` against `NATIONAL_OFFER_BAND`
+ * exactly as the club version is.
+ */
+export const NATIONAL_INTEREST_CHANCE = 0.5;
+export const NATIONAL_INTEREST_MAX_CHANCE = 0.85;
+
 /** Reputation as an international manager, 0-100, derived from the stint record. */
 export const NATIONAL_REP_BASE = 30;
 export const NATIONAL_REP_TITLE_WEIGHT = 22;
@@ -5536,29 +5634,57 @@ export const AI_PROSPECT_MAX_AGE = PROSPECT_AGE_MAX;
 export const AI_PROSPECT_MIN_POT = 70 + OVR_SCALE_SHIFT;
 
 /**
- * The user's youth intake is a TRIAL GROUP he chooses from, not a squad handed
- * to him — the Youth Intake screen (formerly Incoming Talent).
+ * The user's academy fills itself. Every offseason USER_ACADEMY_INTAKE_MIN..MAX
+ * kids join it at USER_ACADEMY_ENTRY_AGE, and the decisions come later, at
+ * ACADEMY_SCHOLARSHIP_AGE and ACADEMY_GRADUATION_AGE (see core/academyPipeline.ts).
  *
- * Sized against the decision it is meant to be. A club's ordinary intake is
- * YOUTH_INTAKE_MIN..MAX (3-5) against an ACADEMY_ROSTER_CAP of 10, so "pick
- * from your intake" over that group is a confirmation dialog rather than a
- * choice — you would keep nearly all of them nearly every year. A group of
- * ~10-12 against YOUTH_TRIAL_SIGN_LIMIT is a real call with a real cost to
- * getting it wrong, and the potential fog is what stops it being obvious.
+ * Replaced a trial group of 10-12 unsigned 16-year-olds the user picked five
+ * from. The decision moved rather than disappeared: instead of one call on a
+ * blind group, a kid is watched for two seasons before the scholarship cut and
+ * two more before the professional one, which is how real academies work and
+ * gives the potential fog something to do.
  *
  * **USER'S CLUB ONLY, and that keeps it out of the equilibrium entirely.** AI
- * clubs keep their existing 3-5 intake straight onto the senior roster. The
- * extra trialists are generated on their own seeded stream and their pids are
- * allocated after every club's ordinary intake, so the shared rng draw count
- * and every other club's pid assignment are untouched — one club's academy
- * cannot shift the world's generation. Same containment principle the
- * difficulty levers rest on.
+ * clubs keep their 3-5 intake at YOUTH_AGE straight onto the senior roster. The
+ * user's ordinary intake is still drawn inside the world loop on the shared rng
+ * (generated at the entry age, which spends exactly the same draws because
+ * `estimatePotential` forecasts from YOUTH_BASE_REFERENCE_AGE either way); the
+ * extras that top it up are drawn on their own stream, with pids allocated after
+ * every club's intake. So one club's academy cannot shift the world.
+ *
+ * Sized at 6-8 so the cuts are real choices: two intake years at ~7 plus two
+ * kept scholarship years share ACADEMY_ROSTER_CAP, which leaves room to keep
+ * about three of each year past sixteen by default.
  */
-export const YOUTH_TRIAL_GROUP_MIN = 10;
-export const YOUTH_TRIAL_GROUP_MAX = 12;
-/** How many of the trial group can be signed to the academy. The rest leave. */
-export const YOUTH_TRIAL_SIGN_LIMIT = 5;
-/** Seeded-stream tag for the extra trialists (never the shared rng). */
+export const USER_ACADEMY_ENTRY_AGE = 14;
+export const USER_ACADEMY_INTAKE_MIN = 6;
+export const USER_ACADEMY_INTAKE_MAX = 8;
+/**
+ * How unevenly an academy kid's last year before YOUTH_BASE_REFERENCE_AGE is
+ * split: each kid closes between (1 - spread) and (1 + spread) seasons' worth
+ * of growth in his first year and the rest in his second, keyed off his pid.
+ * Only the path moves — every kid still lands on the ratings he was rolled with
+ * the season he turns sixteen (see `youthRatingsAt`), so this cannot move the
+ * sixteen-year-old average. Below 1 so no kid ever goes backwards.
+ */
+export const ACADEMY_GROWTH_TIMING_SPREAD = 0.5;
+/**
+ * The scholarship cut: at this age a kid's first academy deal is up. Undecided,
+ * he is kept to ACADEMY_GRADUATION_AGE while the academy has room, and the ones
+ * the user's scouts rate lowest go when it doesn't.
+ */
+export const ACADEMY_SCHOLARSHIP_AGE = YOUTH_BASE_REFERENCE_AGE;
+/**
+ * The professional cut: at this age an academy player either joins the senior
+ * squad or leaves. Undecided, he is promoted while the senior roster has room
+ * (ROSTER_CAP), best-scouted first, and released otherwise.
+ */
+export const ACADEMY_GRADUATION_AGE = 18;
+/**
+ * Seeded-stream tag for the user academy's extra intake (never the shared rng).
+ * The value predates the academy — it was the trial group's — and is kept so
+ * saves carry on drawing the same kids.
+ */
 export const YOUTH_TRIAL_STREAM = 88;
 
 /**

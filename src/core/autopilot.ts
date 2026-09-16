@@ -76,18 +76,13 @@ export function beginAutopilot(league: LeagueStore): LeagueStore {
   const userTid = league.meta.userTid;
   return {
     ...league,
-    meta: { ...league.meta, userTid: AUTOPILOT_TID },
+    // The academy is the one thing that keeps running for the real club: its
+    // cuts are defaults that need nobody to decide them, so the offseason reads
+    // `autopilotTid` for the academy steps and a jump no longer empties it.
+    meta: { ...league.meta, userTid: AUTOPILOT_TID, autopilotTid: userTid },
     teams: league.teams.map((t): StoredTeam =>
       t.tid === userTid
-        // Trialists go with the rest of the standing instructions the user
-        // can't be around to give. Load-bearing rather than tidy: during the
-        // jump meta.userTid is AUTOPILOT_TID, so the offseason's trial-group
-        // reset (which keys off userTid) matches no team at all — left here,
-        // the group survives the whole jump with its pids locked out of the
-        // free-agent pool, and the user comes back to a Youth Intake page
-        // offering 26-year-old "16-year-olds on trial".
-        ? { ...t, starters: null, transferListed: [], moreMinutes: [],
-            youthTrialists: [], youthTrialSignings: 0 }
+        ? { ...t, starters: null, transferListed: [], moreMinutes: [] }
         : t,
     ),
     negotiations: [],
@@ -121,7 +116,11 @@ export function beginAutopilot(league: LeagueStore): LeagueStore {
  *   eleven men with a keeper among them, and it costs nothing to keep.
  */
 export function endAutopilot(league: LeagueStore, userTid: number): LeagueStore {
-  const restored: LeagueStore = { ...league, meta: { ...league.meta, userTid } };
+  // Drop the jump's pointer at the real club along with the sentinel: absent
+  // means "same as userTid", and a stale one would keep the academy keyed to a
+  // club the user may have left by the time they next jump.
+  const { autopilotTid: _autopilotTid, ...meta } = league.meta;
+  const restored: LeagueStore = { ...league, meta: { ...meta, userTid } };
   const { teams, players, marketSignings } = ensureUserRosterSafety(
     restored.teams, restored.players, userTid, restored.season, restored.activeLoans,
   );

@@ -1,10 +1,6 @@
 import type { Player, Position, SeasonStats } from "./players/types.js";
-import {
-  AWARD_MIN_APPEARANCES, AWARD_OVR_BASELINE, AWARD_OVR_WEIGHT,
-  POTY_GOAL_WEIGHT, POTY_ASSIST_WEIGHT,
-  TOTS_GOAL_WEIGHT, TOTS_ASSIST_WEIGHT, TOTS_TACKLE_WEIGHT, TOTS_INTERCEPTION_WEIGHT,
-  TOTS_SAVE_WEIGHT, TOTS_GOALS_AGAINST_PENALTY,
-} from "./constants.js";
+import { AWARD_OVR_BASELINE, TOTS_KEEPER_SAVE_PCT_BASELINE } from "./constants.js";
+import { DEFAULT_AWARD_FORMULA, type AwardFormula } from "./awardFormula.js";
 
 export type PositionGroup = "GK" | "DEF" | "MID" | "FWD";
 
@@ -85,10 +81,11 @@ export function positionGroup(pos: Position): PositionGroup {
  * of all slots and wingers fall from 18.2% to under 1%.
  *
  * The cause is not the versatility model, and this is the durable lesson.
- * `totsScore` is a *within-position* statistic: TOTS_TACKLE_WEIGHT and
- * TOTS_INTERCEPTION_WEIGHT pay a defender 0.03 apiece against a forward's 0.01,
- * on stats defenders collect in vastly greater volume, so a centre-back's score
- * is not commensurable with a winger's at all. Exact matching is not an
+ * `totsScore` is a *within-position* statistic: every position has its own
+ * formula (TOTS_POSITION_WORK), and at the time this was measured the formula
+ * paid a defender 0.03 per tackle and interception on season totals against a
+ * forward's 0.01, on stats defenders collect in vastly greater volume, so a
+ * centre-back's score was not commensurable with a winger's at all. Exact matching is not an
  * oversight hiding that — it is the guardrail that keeps the formula valid, by
  * only ever comparing a player against others at his own position.
  * `secondaryPositions` is the *better* of the two cover-rules by construction
@@ -137,40 +134,60 @@ export function ovrDuringSeason(p: Player, season: number): number {
   return snapshot?.ovr ?? p.ovr;
 }
 
-function ovrBonus(p: Player, season: number): number {
-  return (ovrDuringSeason(p, season) - AWARD_OVR_BASELINE) * AWARD_OVR_WEIGHT;
+function ovrBonus(p: Player, season: number, f: AwardFormula): number {
+  return (ovrDuringSeason(p, season) - AWARD_OVR_BASELINE) * f.ovrWeight;
 }
 
-export function potyScore(p: Player, s: SeasonStats, season: number): number {
+/**
+ * A player's Player of the Season case. `f` is the save's award formula
+ * (`resolveAwardFormula(league.awardFormula)`), defaulting to the shipped
+ * weights. With the default, `ratingWeight` is 1 and multiplying by exactly 1
+ * is exact in floating point, so every score is bit-identical to the formula
+ * before it became editable.
+ */
+export function potyScore(
+  p: Player, s: SeasonStats, season: number, f: AwardFormula = DEFAULT_AWARD_FORMULA,
+): number {
   const group = positionGroup(p.pos);
-  return s.avgRating + s.goals * POTY_GOAL_WEIGHT[group] + s.assists * POTY_ASSIST_WEIGHT[group]
-    + ovrBonus(p, season);
+  return s.avgRating * f.ratingWeight + s.goals * f.goalWeight[group] + s.assists * f.assistWeight[group]
+    + ovrBonus(p, season, f);
 }
 
-export function totsScore(p: Player, s: SeasonStats, season: number): number {
-  const group = positionGroup(p.pos);
-  let score = s.avgRating;
-  score += s.goals * TOTS_GOAL_WEIGHT[group];
-  score += s.assists * TOTS_ASSIST_WEIGHT[group];
-  score += s.tackles * TOTS_TACKLE_WEIGHT[group];
-  score += s.interceptions * TOTS_INTERCEPTION_WEIGHT[group];
-  if (group === "GK") score += s.saves * TOTS_SAVE_WEIGHT;
-  score -= s.goalsAgainst * TOTS_GOALS_AGAINST_PENALTY[group];
-  score += ovrBonus(p, season);
-  return score;
+/**
+ * A player's Team of the Season case, on his own position's formula: his Player
+ * of the Season score plus the work his position does per game. See
+ * TOTS_POSITION_WORK for the weights and the measurements behind them.
+ *
+ * Built on `potyScore` deliberately, so the two awards can only disagree about
+ * a player by what his position does beyond the scoreline. For an attacker they
+ * cannot disagree at all.
+ */
+export function totsScore(
+  p: Player, s: SeasonStats, season: number, f: AwardFormula = DEFAULT_AWARD_FORMULA,
+): number {
+  const work = f.positionWork[p.pos];
+  const games = Math.max(1, s.appearances);
+  // A keeper who faced no shots has no save percentage; he reads as average
+  // rather than being docked for it.
+  const shotsFaced = s.saves + s.goalsAgainst;
+  const savePct = shotsFaced > 0 ? s.saves / shotsFaced : TOTS_KEEPER_SAVE_PCT_BASELINE;
+  return potyScore(p, s, season, f)
+    + ((s.tackles + s.interceptions) / games) * work.defendingPerGame
+    + (savePct - TOTS_KEEPER_SAVE_PCT_BASELINE) * work.savePct;
 }
 
 function pickPlayerOfSeason(
   entries: { player: Player; stats: SeasonStats }[],
   season: number,
+  f: AwardFormula,
 ): number | null {
-  const qualified = entries.filter((e) => e.stats.appearances >= AWARD_MIN_APPEARANCES);
+  const qualified = entries.filter((e) => e.stats.appearances >= f.minAppearances);
   const pool = qualified.length > 0 ? qualified : entries;
   if (pool.length === 0) return null;
   let best = pool[0];
-  let bestScore = potyScore(best.player, best.stats, season);
+  let bestScore = potyScore(best.player, best.stats, season, f);
   for (const e of pool.slice(1)) {
-    const score = potyScore(e.player, e.stats, season);
+    const score = potyScore(e.player, e.stats, season, f);
     const bestGA = best.stats.goals + best.stats.assists;
     const ga = e.stats.goals + e.stats.assists;
     if (
@@ -207,6 +224,7 @@ function pickTeamOfSeason(
   entries: { player: Player; stats: SeasonStats }[],
   formation: Position[],
   season: number,
+  f: AwardFormula,
 ): (number | null)[] {
   const used = new Set<number>();
   return formation.map((slotPos) => {
@@ -227,11 +245,11 @@ function pickTeamOfSeason(
     return best.player.pid;
 
     function scoreForSlot(e: { player: Player; stats: SeasonStats }): number {
-      const qualifies = e.stats.appearances >= AWARD_MIN_APPEARANCES;
+      const qualifies = e.stats.appearances >= f.minAppearances;
       // Qualified players always outrank unqualified ones; within each group,
       // rank by totsScore. Keeps every slot filled even when a thin position
       // has no one over the appearances bar.
-      return (qualifies ? 1000 : 0) + totsScore(e.player, e.stats, season);
+      return (qualifies ? 1000 : 0) + totsScore(e.player, e.stats, season, f);
     }
   });
 }
@@ -242,8 +260,15 @@ function pickTeamOfSeason(
  * pruned, so this can be run for any past season, not just the one that
  * just ended — used both by simOffseason (fresh) and migrateLeague
  * (backfilling old saves that predate this feature).
+ *
+ * `formula` is the save's award formula (God Mode can edit it); omitted, the
+ * shipped weights apply.
  */
-export function computeSeasonAwards(players: Player[], season: number): SeasonAwards {
+export function computeSeasonAwards(
+  players: Player[],
+  season: number,
+  formula: AwardFormula = DEFAULT_AWARD_FORMULA,
+): SeasonAwards {
   const entries: { player: Player; stats: SeasonStats }[] = [];
   for (const player of players) {
     const stats = statsFor(player, season);
@@ -251,8 +276,8 @@ export function computeSeasonAwards(players: Player[], season: number): SeasonAw
   }
 
   return {
-    playerOfSeasonPid: pickPlayerOfSeason(entries, season),
+    playerOfSeasonPid: pickPlayerOfSeason(entries, season, formula),
     goldenBootPid: pickGoldenBoot(entries),
-    teamOfSeason: pickTeamOfSeason(entries, TOTS_SLOTS, season),
+    teamOfSeason: pickTeamOfSeason(entries, TOTS_SLOTS, season, formula),
   };
 }
