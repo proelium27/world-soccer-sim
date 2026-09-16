@@ -74,7 +74,7 @@ describe("WorldSetup renders", () => {
     for (const country of ["England", "Spain", "Italy", "Germany", "France", "Portugal", "Belgium", "Turkey"]) {
       expect(html).toContain(country);
     }
-    expect(html).toContain("16 countries, 48 divisions, 898 clubs");
+    expect(html).toContain("16 countries, 48 divisions, 884 clubs");
     expect(html).not.toContain("alert-warning");
   });
 
@@ -85,7 +85,7 @@ describe("WorldSetup renders", () => {
     expect(html).toContain("Money");
     expect(html).toContain("Continental Cup places");
     expect(html).toContain("Continental Shield places");
-    expect(html).toContain("17 countries, 50 divisions, 938 clubs");
+    expect(html).toContain("17 countries, 50 divisions, 924 clubs");
   });
 
   it("keeps the shipped rows collapsed, so eight panels don't bury the checkboxes", () => {
@@ -267,7 +267,9 @@ describe("WorldSetup renders", () => {
     const last = entries.length - 1;
     entries[last] = { ...entries[last], spec: { ...entries[last].spec, divisions: 3 } };
     const html = render(entries);
-    expect(html).toContain('aria-label="How the last promotion place is decided"');
+    // One picker per link: the top one and the one below it.
+    expect(html).toContain('aria-label="How the last promotion place is decided (divisions 1 and 2)"');
+    expect(html).toContain('aria-label="How the last promotion place is decided (divisions 2 and 3)"');
   });
 
   it("shows a name the player set", () => {
@@ -403,7 +405,8 @@ describe("a shipped league's settings panel", () => {
   }
 
   /** The value a `<select>`/`<input>` in this panel is showing. */
-  function shown(html: string, label: string): string {
+  function shown(html: string, rawLabel: string): string {
+    const label = rawLabel.replace(/[()]/g, "\\$&");
     const select = new RegExp(`<select[^>]*aria-label="${label}"[^>]*>(.*?)</select>`, "s")
       .exec(html);
     if (select) return /<option value="([^"]*)" selected="">/.exec(select[1])?.[1] ?? "";
@@ -448,8 +451,12 @@ describe("a shipped league's settings panel", () => {
     const spain = panel("Spain");
     expect(shown(spain, "Divisions")).toBe("3");
     expect(shown(spain, "Clubs per division")).toBe("20");
-    expect(shown(spain, "Clubs promoted and relegated each season"))
+    expect(shown(spain, "Clubs promoted and relegated each season (divisions 1 and 2)"))
       .toBe(String(PROMOTION_RELEGATION_COUNT));
+    // Spain sends four up from its third tier, and the panel says so.
+    expect(shown(spain, "Clubs promoted and relegated each season (divisions 2 and 3)")).toBe("4");
+    // The Netherlands' third tier is closed.
+    expect(shown(panel("Netherlands"), "Clubs promoted and relegated each season (divisions 2 and 3)")).toBe("0");
 
     const turkey = panel("Turkey");
     expect(shown(turkey, "Divisions")).toBe("3");
@@ -492,7 +499,7 @@ describe("the card can be collapsed", () => {
     // The whole case for collapsing rests on this line. Without it the player
     // has to open a twelve-row card to find out what they are about to get.
     const html = renderShut(defaultWorldEntries());
-    expect(html).toContain("16 countries, 48 divisions, 898 clubs");
+    expect(html).toContain("16 countries, 48 divisions, 884 clubs");
     expect(html).toContain("World setup");
   });
 

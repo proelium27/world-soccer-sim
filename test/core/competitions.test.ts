@@ -148,19 +148,18 @@ describe("countryClubRanges", () => {
       { country: "Italy", start: 120, end: 180 },
       { country: "Germany", start: 180, end: 236 },
       { country: "France", start: 236, end: 290 },
-      { country: "Portugal", start: 290, end: 344 },
-      { country: "Belgium", start: 344, end: 392 },
-      { country: "Turkey", start: 392, end: 448 },
-      { country: "Netherlands", start: 448, end: 504 },
-      { country: "Scotland", start: 504, end: 536 },
-      { country: "Greece", start: 536, end: 578 },
-      { country: "Serbia", start: 578, end: 626 },
-      // The Americas are appended, so every European block above is unchanged.
-      { country: "Brazil", start: 626, end: 686 },
-      // Argentina (30/36/20) and the US (30/30/16) field split top two divisions.
-      { country: "Argentina", start: 686, end: 772 },
-      { country: "Mexico", start: 772, end: 822 },
-      { country: "United States", start: 822, end: 898 },
+      { country: "Portugal", start: 290, end: 346 },
+      { country: "Belgium", start: 346, end: 396 },
+      { country: "Turkey", start: 396, end: 450 },
+      { country: "Netherlands", start: 450, end: 506 },
+      { country: "Scotland", start: 506, end: 538 },
+      { country: "Greece", start: 538, end: 580 },
+      { country: "Serbia", start: 580, end: 616 },
+      { country: "Brazil", start: 616, end: 676 },
+      // Argentina (30/36/20) and the US (30/25/17) field split top two divisions.
+      { country: "Argentina", start: 676, end: 762 },
+      { country: "Mexico", start: 762, end: 812 },
+      { country: "United States", start: 812, end: 884 },
     ]);
   });
 });
