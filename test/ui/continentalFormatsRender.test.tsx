@@ -112,6 +112,19 @@ describe("continental cup page in each format", () => {
     }, Cup);
     expect(html).toContain("From next season:");
   });
+
+  it("stays quiet when next season plays the same custom format as this one", () => {
+    const groups = { ...DEFAULT_CONTINENTAL_FORMAT, opening: "groups" as const };
+    const html = render({ ...base, cup: draw(groups), continentalFormats: { continental: groups } }, Cup);
+    expect(html).toContain("8 groups of four");
+    expect(html).not.toContain("From next season");
+  });
+
+  it("says so when a custom cup goes back to the game's own format", () => {
+    const cup = draw({ ...DEFAULT_CONTINENTAL_FORMAT, opening: "knockout" });
+    const html = render({ ...base, cup }, Cup);
+    expect(html).toContain("From next season: 32 clubs in one league phase");
+  });
 });
 
 describe("God Mode cup formats tab", () => {

@@ -12,7 +12,7 @@ import {
 } from "../../core/cup/cup.js";
 import { leaguePhaseTable, groupTable, groupQualifiers } from "../../core/cup/leaguePhase.js";
 import {
-  continentalFormatFor, describeCupShape, isDefaultContinentalFormat, resolveCupShape,
+  DEFAULT_CONTINENTAL_FORMAT, continentalFormatFor, describeCupShape, isDefaultContinentalFormat, resolveCupShape,
 } from "../../core/cup/cupShape.js";
 import { countryCoefficients, reallocateCupSlots } from "../../core/cup/coefficients.js";
 import { cupSlotsForCompetition } from "../../core/cup/qualification.js";
@@ -173,6 +173,19 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
   // The format the next draw will use, which God Mode can change.
   const nextSettings = continentalFormatFor(league.continentalFormats, competition);
   const customNext = !isDefaultContinentalFormat(nextSettings);
+  // Only worth saying when next season really plays differently from the cup
+  // on screen, in either direction: a custom cup going back to the game's own
+  // format is a change too, and the same custom format again is not.
+  const nextField = largestValidCupField(format.fieldSize);
+  const nextShape = resolveCupShape(nextField, nextSettings);
+  const nextSentence = describeCupShape(nextShape, nextField);
+  const currentField = currentCup?.leaguePhase?.teams.length ?? nextField;
+  const currentShape = currentCup
+    ? currentCup.shape ?? resolveCupShape(currentField, DEFAULT_CONTINENTAL_FORMAT)
+    : null;
+  const nextDiffers = currentShape
+    ? describeCupShape(currentShape, currentField) !== nextSentence
+    : customNext;
 
   if (!hasAny) {
     return (
@@ -329,25 +342,19 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
               From there it&apos;s a straight knockout.{" "}
             </>
           )}
-          {customNext && (
-            <>From next season it&apos;s played a different way:{" "}
-              {describeCupShape(resolveCupShape(largestValidCupField(format.fieldSize), nextSettings), largestValidCupField(format.fieldSize))}{" "}
-            </>
+          {nextDiffers && (
+            <>From next season it&apos;s played a different way: {nextSentence}{" "}</>
           )}
           If your club reaches the final, the sim pauses so you can play it.
         </HelpHint>
       </h4>
-      {(currentCup?.shape || customNext) && (
+      {(currentCup?.shape || nextDiffers) && (
         // Visible, not only in the help popover: a format God Mode changed is
         // the first thing to explain on a page whose stages no longer match the
         // Manual's description.
         <p className="text-muted small mb-2">
           {currentCup?.shape && describeCupShape(currentCup.shape, currentCup.leaguePhase?.teams.length ?? format.fieldSize)}
-          {customNext && (
-            <>{currentCup?.shape ? " " : ""}From next season:{" "}
-              {describeCupShape(resolveCupShape(largestValidCupField(format.fieldSize), nextSettings), largestValidCupField(format.fieldSize))}
-            </>
-          )}
+          {nextDiffers && <>{currentCup?.shape ? " " : ""}From next season: {nextSentence}</>}
         </p>
       )}
       <div className="mb-3">
