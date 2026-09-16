@@ -70,6 +70,12 @@ export function awardWinnerPids(entry: {
   for (const pid of entry.world?.worldTeamOfYear ?? []) note(pid);
   for (const e of entry.world?.goalkeeperOfYear ?? []) note(e.pid);
   for (const e of entry.world?.defenderOfYear ?? []) note(e.pid);
+  // The Americas' own set is shown by name on the awards page just the same.
+  const americas = entry.world?.americas;
+  for (const e of americas?.ballonDOr ?? []) note(e.pid);
+  for (const pid of americas?.worldTeamOfYear ?? []) note(pid);
+  for (const e of americas?.goalkeeperOfYear ?? []) note(e.pid);
+  for (const e of americas?.defenderOfYear ?? []) note(e.pid);
   for (const a of Object.values(entry.awards ?? {})) {
     note(a.playerOfSeasonPid);
     note(a.goldenBootPid);

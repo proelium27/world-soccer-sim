@@ -22,8 +22,10 @@ const SECTIONS: [id: string, title: string][] = [
   ["world", "The World"],
   ["cup", "The Continental Cup"],
   ["shield", "The Continental Shield"],
+  ["americas-cup", "The Americas Cup"],
   ["domestic-cup", "The Domestic Cup"],
   ["champions-cups", "The Champions Cups"],
+  ["title-playoffs", "Title Playoffs"],
   ["international", "International Football"],
   ["players", "Players: Ratings, OVR & Potential"],
   ["development", "Player Development & Aging"],
@@ -491,17 +493,19 @@ export function Manual() {
             <li><strong>Standings</strong>. The league table, plus each club's current OVR/POT. A season dropdown lets you pull up any past season&apos;s final table next to the current one. The champion&apos;s row is highlighted, and the <a href="#cup">Continental Cup</a> and <a href="#shield">Continental Shield</a> qualification places are shaded.</li>
             <li><strong>Continental Cup</strong>. The live league-phase table and knockout bracket for the current season, plus past winners via a season dropdown. More in <a href="#cup">The Continental Cup</a>.</li>
             <li><strong>Continental Shield</strong>. The same page for the second competition, for clubs finishing just below the Cup places. More in <a href="#shield">The Continental Shield</a>.</li>
+            <li><strong>Americas Cup</strong>. The same page again for the Americas&apos; own competition. More in <a href="#americas-cup">The Americas Cup</a>.</li>
+            <li><strong>Title Playoffs</strong>. The brackets that decide the champions of the leagues that crown theirs in a knockout, for any country and any past season. More in <a href="#title-playoffs">Title Playoffs</a>.</li>
             <li><strong>Domestic Cup</strong>. Every round of your country&apos;s cup as it&apos;s drawn and played, with a dropdown for any other country and for past seasons. More in <a href="#domestic-cup">The Domestic Cup</a>.</li>
             <li><strong>National Teams</strong>. A whole section for the summer's national-team football: Player Pool (call players into your own country's squad) and My Squad (pick its eleven), Federation (your international career, and who wants you), the current World Cup, Qualifying and Confederation Cups (the Euro, Copa América and AFCON), Rosters showing every nation's named squad, a Schedule of fixtures, Power Rankings of every nation, Stat Leaders (top nations and top players, filterable by country), and History with past winners and each nation's record. More in <a href="#international">International Football</a>.</li>
-            <li><strong>Power Rankings</strong>. Every club in the world ranked by a blended Power score: squad OVR (Starting XI plus bench, depth-weighted, same formula as Standings' OVR column) plus a current-season form bonus or penalty. Form isn't just your record. Beating a strong side counts for more than beating a weak one (and losing to a weak side hurts more than losing to a strong one), and goal difference factors in too, so a club can rank above or below its raw OVR depending on how it's actually playing. Record, goal difference, OVR, and the blended Power score all sit side by side, with a badge showing each club's competition and its rank within it. Click a team to expand its full roster in place. The rankings also get snapshotted every 10 matchdays (plus once after the final matchday), so four times a season, and a dropdown lets you browse any past snapshot from any season, with arrows showing how far each club rose or fell since the last one. Snapshots taken before this cadence changed are kept, so an older save has a denser dropdown for its early seasons. Historical views can't expand rosters, since past squads aren't stored, and snapshots only start piling up from the point this feature shipped.</li>
+            <li><strong>Power Rankings</strong>. Every club in the world ranked by a blended Power score: squad OVR (Starting XI plus bench, depth-weighted, same formula as Standings' OVR column) plus a current-season form bonus or penalty. Form isn't just your record. Beating a strong side counts for more than beating a weak one (and losing to a weak side hurts more than losing to a strong one), and goal difference factors in too, so a club can rank above or below its raw OVR depending on how it's actually playing. Record, goal difference, OVR, and the blended Power score all sit side by side, with a badge showing each club's competition and its rank within it. Click a team to expand its full roster in place. In a world with leagues in the Americas, a Europe / Americas switch shows one continent at a time, and the rank column counts within that continent, since the two never meet in a club competition. The rankings also get snapshotted every 10 matchdays (plus once after the final matchday), so four times a season, and a dropdown lets you browse any past snapshot from any season, with arrows showing how far each club rose or fell since the last one. Snapshots taken before this cadence changed are kept, so an older save has a denser dropdown for its early seasons. Historical views can't expand rosters, since past squads aren't stored, and snapshots only start piling up from the point this feature shipped.</li>
             <li><strong>Schedule</strong>. Every matchday's fixtures and results. Click a played match for its box score.</li>
             <li><strong>Stat Leaders</strong>. A Players tab (league-wide leaderboards for one season at a time: goals, assists, shots, shots on target, xG, tackles, interceptions, passes, crosses, fouls, yellow cards, red cards, saves, minutes, and average match rating, with a season dropdown covering the current season and every completed one) and a Teams tab (the same stats plus possession, goals against, and xG against, totaled per club, with its own season dropdown). Match rating is an average rather than a running total, so to keep a one-off cameo from topping the chart a player needs to have appeared in at least half of the games played so far before he shows up on the match-rating board (a threshold that scales as the season goes, so it works ten games in as well as at the end). A <strong>Totals / Per 90</strong> switch sits next to the stat dropdown: Per 90 divides each stat by the number of full matches the player's minutes add up to, which is how you find the squad player outproducing a starter rather than just the one who played most. Per-90 mode has a playing-time floor of its own &mdash; 30% of the minutes available so far, quoted above the table &mdash; because a rate is far easier to fluke than a total: score in a twelve-minute cameo and you've "scored" 7.5 per 90. It's counted in minutes rather than appearances, since twenty run-outs off the bench is exactly the case an appearance count would wave through. Appearances, minutes and match rating stay as totals either way (the first two are what the rate divides by, and a match rating is already an average). For career totals and all-time bests across every season at once, see <a href="#frivolities">Frivolities</a>' All-Time Leaders.</li>
             <li><strong>Database</strong>. Every player in the world in one sortable table. Click any heading to sort by it, and a column-set switch swaps between four sets: <strong>Overview</strong> (rating, potential, market value, wage, contract length), <strong>Attributes</strong>, which puts all fourteen ratings side by side, <strong>Season</strong> (appearances, minutes, goals, assists, shots, xG, tackles, interceptions, saves, passes, crosses, fouls, cards and average match rating, with a dropdown for any season on record), and <strong>Career</strong>, the same stats totalled across a whole career. So "who is the fastest player in the world", "the best finisher in the second division" and "who has scored the most goals of anyone still playing" are each one click. The Season view lists the players that season has a record of and shows the club they played for <em>then</em>, not the one they're at now; cards don't appear on the Career view, because they're kept per season and never totalled, and a column of zeros pretending to be a career figure would be worse than no column. The filters narrow the whole world before anything is ranked, so what you see really is the top of what you asked for: position, nationality, age, overall, potential, value, wage, contract length, name, whether he's at a club or a free agent, and where to look. That last one is a single dropdown covering everything from one division up to the whole world, with presets for the top divisions only and for the top 5 leagues &mdash; and "top 5" means the five strongest countries in <em>your</em> world, worked out from the leagues themselves, so it still means something if you've added or retuned leagues in World setup. The table shows 100 players at a time with the full count beside the page buttons; that cap is deliberate, since a page trying to draw fifteen thousand rows at once is what makes a browser hang. One thing to know about the potential column: it's your scouts' estimate, exactly as it is everywhere else, and sorting and filtering both use the <strong>top</strong> of that estimate rather than the real number &mdash; otherwise ordering the table would quietly tell you something your scouts haven't found out yet. The top end rather than the middle because it's the number you can see: sort by potential and the right-hand figure in each band counts down the column, so the order explains itself. Market value is worked out from the <em>middle</em> of the band instead, since a price is what he's worth on balance rather than at his best. Whatever you've filtered and sorted goes into the page's address, so a view is a link you can bookmark or hand to someone else, and only the things you actually changed show up in it. A <strong>Clubs</strong> tab does the same for all 626 clubs, on three column sets: <strong>Overview</strong> (squad rating and potential, power score, squad size, average age, hype), <strong>Finance</strong> (budget, how full its savings ceiling is, wage bill, and what it has spent and taken in on transfers this season), and <strong>Season</strong> (played, won, drawn, lost, goals for and against, goal difference, points, then shots, shots on target, xG, xG against, saves, tackles, possession and average match rating). So "who has the biggest wage bill in Europe", "which second-division club has scored the most" and "who is running closest to their savings cap" are all a click. Its strength columns are the same numbers the Power Rankings page shows and its money columns the same ones Finance shows, so no two screens disagree about the same club.</li>
-            <li><strong>Awards</strong>. Two tabs. World gives the Ballon d'Or for the best player in the world that season (with a top-10 shortlist and a breakdown of where his points came from), a Goalkeeper and a Defender of the Year judged on the defensive work the Ballon d'Or can't see, and a World Team of the Year pitch view. By league gives Player of the Season, the Golden Boot, and a Team of the Season pitch view for one competition. Both have a dropdown to browse past years.</li>
+            <li><strong>Awards</strong>. World gives the Ballon d'Or for the best player in the world that season (with a top-10 shortlist and a breakdown of where his points came from), a Goalkeeper and a Defender of the Year judged on the defensive work the Ballon d'Or can't see, and a World Team of the Year pitch view. Americas, in a world with leagues there, gives the same four honours for the Americas alone: a Player, Goalkeeper, Defender and Team of the Year. By league gives Player of the Season, the Golden Boot, and a Team of the Season pitch view for one competition. Both have a dropdown to browse past years.</li>
             <li><strong>Season History</strong>. Who won what, one line per season, newest first &mdash; so you can read a twenty-year dynasty in one screen instead of clicking through twenty seasons. It&apos;s also where you land after <a href="#season">jumping ahead</a>, since that&apos;s the moment you most want it. Each line gives the Continental Cup and Continental Shield winners, whoever won the World Cup or their confederation&apos;s championship in the offseason that followed, and then one column per country holding that country&apos;s champion. A toggle swaps those country columns between <strong>league champions</strong> and <strong>domestic cup winners</strong>. The country columns use three-letter club codes to keep the whole world on one line &mdash; hover one for the full name, or click through to what that club did that year. Your own club&apos;s titles are shaded. Two things worth knowing: the continental finals are played before a season rolls over, so the season you&apos;re in appears as soon as one of them is decided, marked &quot;(now)&quot; and with its league columns still empty; and an international tournament is played in the offseason <em>after</em> a season, so it sits on that season&apos;s line. It&apos;s all read straight off the records your save already keeps, so a dynasty that started long before this page existed shows its whole back catalogue.</li>
             <li><strong>Club History</strong>. A per-club honours page (yours by default, with a dropdown for any club in the world): a trophy case (league titles, second-tier titles, Continental Cups, domestic cups, any trebles, promotions and relegations), individual honours won by the club's players (Player of the Season, Golden Boot, Team of the Season selections, and they stay on the list after the player retires), franchise records (best finish, most points and wins in a season, all-time record), and a season-by-season table of every completed season (each season's note also shows how far the club got in that year's Continental Cup and domestic cup). It also ranks the club's greatest players &mdash; see <a href="#frivolities">Frivolities</a> for how that score is worked out.</li>
             <li><strong>A club in one season</strong>. Click any club anywhere in the game &mdash; a table, a transfer, the club beside a season on a player's profile &mdash; and you land on what that club did that year: the squad, where it finished and its record, how far it got in the domestic cup, the Continental Cup and the Continental Shield, and where the Power Rankings had it at the end. A dropdown walks you through the club's other seasons. Two things to know about an old squad. It's who <em>finished</em> the season there, so a player sold in January shows up at his new club and not his old one. And players who retired long ago may be missing altogether, because the game only keeps a permanent career record for the ones worth remembering &mdash; the rest are gone for good. Retirees who are still on record show their appearances and the rating they played at, but not their goals and assists for that year, which aren't kept.</li>
-            <li><strong>Frivolities</strong>. All-time lists that don't affect play: GOAT rankings for players and clubs, an awards record book (most Ballon d'Ors, World Team of the Year places, Players of the Season, Golden Boots and Team of the Season places, the highest-scoring individual seasons ever, and awards by club and country), all-time records (most dominant and worst team seasons, highest rating ever reached, longest careers, biggest transfer fees), All-Time Leaders (the top 10 in every stat at a glance, click through for the full board, career totals or best single seasons, world-wide and including retired players), an international record book (most caps, international goals and World Cups won, laid out the same way and filterable by country), player bios (oldest, youngest, where players come from, one-club men, name oddities), and club records (trophy cabinet, longest title droughts, biggest spenders and best traders). More in <a href="#frivolities">Frivolities</a>.</li>
+            <li><strong>Frivolities</strong>. All-time lists that don't affect play (in a world with leagues in the Americas, the GOAT, Records, All-Time Leaders and Club Records tabs have a Europe / Americas switch: clubs belong to their league's continent, and a player to wherever he made most of his appearances): GOAT rankings for players and clubs, an awards record book (most Ballon d'Ors, World Team of the Year places, Players of the Season, Golden Boots and Team of the Season places, the highest-scoring individual seasons ever, and awards by club and country), all-time records (most dominant and worst team seasons, highest rating ever reached, longest careers, biggest transfer fees), All-Time Leaders (the top 10 in every stat at a glance, click through for the full board, career totals or best single seasons, world-wide and including retired players), an international record book (most caps, international goals and World Cups won, laid out the same way and filterable by country), player bios (oldest, youngest, where players come from, one-club men, name oddities), and club records (trophy cabinet, longest title droughts, biggest spenders and best traders). More in <a href="#frivolities">Frivolities</a>.</li>
             <li><strong>Season Preview</strong>. A snapshot of how the offseason shook out: the league's top 10 highest-rated players, top 10 highest-rated teams (both by OVR), the top 10 biggest transfers from the summer window ranked by fee, and who <a href="#development">retired</a>. It opens automatically the moment you advance past a season, with a link through to Awards.</li>
             <li><strong>News Feed</strong>. Transfers and player accomplishments woven into one timeline per season, with club and season filters, and your club's items highlighted. It's filtered by how much the story has to do with you, because the world is sixteen leagues across eight countries and reporting all of them equally buries you in news about clubs you'll never play. Your own club is always in, whatever it did &mdash; every transfer, loan, loan return and free signing, and every accomplishment. Your league is next: every deal (loans included) and every accomplishment in it. From the rest of the world you only get the big stories &mdash; a four-goal haul, a 100th career goal, a 35-goal season, the standout performance of the matchday, the Ballon d'Or, the World Team of the Year, Goalkeeper and Defender of the Year, and transfers over $40M. Accomplishments themselves are hat-tricks, one standout performance a matchday, career goal milestones at 50 and then every 50, season goal milestones at 25 and then every 5, and position changes for established players. <strong>Trophies and end-of-season awards land in the feed too</strong>, at the bottom of the season they belong to. Trophies first: who won the Continental Cup and the Continental Shield, and who won the World Cup and each confederation cup, with the final score. Then the honours: anything one of your players wins, plus your league's Player of the Season, Golden Boot and Team of the Season. All of it comes straight off the same records the Awards and cup pages read, so old saves show every trophy and honour they ever handed out, right back to season 1. Last of all comes what it changed: <strong>countries winning and losing Continental Cup places</strong>, saying which way the places went and what the counts went from and to. Those are always reported, wherever they happen, because a place changes hands well under once a season across the whole world and when it does it reshapes the competition everyone plays in. They're worked out from the cups your save already has on record too, so an old dynasty shows every place it ever won or lost. Trophies also reach your dashboard's news panel the moment they're won, and an honour won by one of your own players sits there until the new season kicks off.</li>
             <li><strong>Roster</strong>. Your squad: your Starting XI on a pitch view (with an optional Depth Chart overlay), a stats table for the XI, and a bench table (both with ratings, ages, contracts, and season stats, and goalkeepers also show goals against and xG against). Drag a bench player onto a pitch slot to swap him into the XI, drag one starter onto another to switch their positions, extend contracts, or release players.</li>
@@ -696,13 +700,36 @@ export function Manual() {
 
         <Section id="world" title="The World">
           <p>
-            A new save drops you into one shared world: twelve countries (<strong>England</strong>,{" "}
-            <strong>Spain</strong>, <strong>Italy</strong>, <strong>Germany</strong>,{" "}
-            <strong>France</strong>, the <strong>Netherlands</strong>, <strong>Portugal</strong>,{" "}
-            <strong>Belgium</strong>, <strong>Turkey</strong>, <strong>Greece</strong>,{" "}
-            <strong>Scotland</strong> and <strong>Serbia</strong>), each with its own league
-            pyramid, for 36 leagues and 626 clubs total. You pick any club in any country and
+            A new save drops you into one shared world: sixteen countries. Twelve are in Europe
+            (<strong>England</strong>, <strong>Spain</strong>, <strong>Italy</strong>,{" "}
+            <strong>Germany</strong>, <strong>France</strong>, the <strong>Netherlands</strong>,{" "}
+            <strong>Portugal</strong>, <strong>Belgium</strong>, <strong>Turkey</strong>,{" "}
+            <strong>Greece</strong>, <strong>Scotland</strong> and <strong>Serbia</strong>) and
+            four are in the Americas (<strong>Brazil</strong>, <strong>Argentina</strong>,{" "}
+            <strong>Mexico</strong> and the <strong>United States</strong>). Each has its own league
+            pyramid, for 48 leagues and 872 clubs total. You pick any club in any country and
             division when you start.
+          </p>
+          <p>
+            <strong>The Americas work a little differently.</strong> Their clubs play their
+            continental football in the <a href="#americas-cup">Americas Cup</a>, never in the
+            Continental Cup or Shield, so a Brazilian club and an English one only meet in a
+            transfer negotiation or the preseason <a href="#champions-cups">Intercontinental Cup</a>.
+            Brazil plays a straight table with four up and four down, and Argentina swaps two.{" "}
+            <strong>Mexico and the United States are closed leagues</strong>: nobody is promoted or
+            relegated, so a club starts and stays in its division, however well or badly it does.
+            Argentina, Mexico and the US also give their title to the winner of a{" "}
+            <a href="#title-playoffs">title playoff</a> rather than to whoever tops the table.
+            <strong>Argentina and the US field their real 30 clubs, split in two.</strong> The US
+            plays in an Eastern and a Western Conference, with clubs placed by where they are, and
+            each club plays its own conference twice, one rival from the other conference home and
+            away, and four more games across: 34 in all. Argentina plays in two zones of 15, each club
+            meeting its own zone twice plus a derby with its rival from the other zone, for 30. When
+            a club goes up or down in Argentina, the promoted club takes the relegated club&apos;s
+            zone. Each half gets its own table on the Standings page, but the overall table is the
+            one that counts for prize money, continental places and relegation. Their second
+            divisions are split the same way: Argentina&apos;s has its real 36 clubs in two zones
+            of 18, playing 34 games, and the US has 30 in two conferences of 15, playing 30.
           </p>
           <p>
             <strong>Every country runs three divisions.</strong> Sizes vary — England, Spain and
@@ -773,10 +800,15 @@ export function Manual() {
             only the German one is offered.
           </p>
           <p>
-            It's played the moment the season ends, before anyone retires or moves clubs, so a
-            veteran on his way out gets one last game. Suspensions don't carry into it — there are
-            no matchdays left to serve a ban against — but injuries do. Results are on the{" "}
-            <strong>Promotion Playoffs</strong> page, for any country and any past season.
+            It's played after the last matchday, before anyone retires or moves clubs, so a
+            veteran on his way out gets one last game. The brackets are drawn off the final table
+            and then played a round per sim, from the Dashboard or the Sim menu, alongside the{" "}
+            <a href="#title-playoffs">title playoffs</a>: each click plays one round everywhere, and
+            the rounds are lined up so every final is on the last click. "Sim through the playoffs"
+            plays them all, but stops before any round your club is in so you can pick your team.
+            Suspensions don't carry into it — there are no matchdays left to serve a ban against —
+            but injuries do. Results are on the <strong>Promotion Playoffs</strong> page, for any
+            country and any past season.
           </p>
           <p>
             The big four (England, Spain, Italy and Germany) are all built to the same strength and
@@ -787,7 +819,13 @@ export function Manual() {
             <strong>Portugal</strong>, then <strong>Belgium</strong>, then <strong>Turkey</strong>,
             then <strong>Greece</strong>, then <strong>Scotland</strong>, then{" "}
             <strong>Serbia</strong> weakest of all, and their budgets step down in that same order.
-            All eight are selling leagues, and Serbia is the poorest as well as the weakest. Worth
+            All eight are selling leagues, and Serbia is the poorest as well as the weakest. The
+            American leagues sit on the same ladder: <strong>Brazil</strong> just below France,{" "}
+            <strong>Argentina</strong> between the Netherlands and Portugal, <strong>Mexico</strong>{" "}
+            level with Belgium and the <strong>United States</strong> level with Turkey. In real life
+            MLS has more money than Argentina, but here every league&apos;s budget follows its
+            strength, because a league that is weaker but richer climbs past its neighbours over a
+            long save. Worth
             knowing that these gaps close as a save gets long: weaker leagues develop players faster
             than the big four do, so by season 20 or so the bottom few leagues are bunched much
             closer together than they started. The order is real when you begin, and it softens from
@@ -814,13 +852,15 @@ export function Manual() {
             ones, with the last place up decided by a playoff) runs on its
             own within each country at the end of every season, so a rough season in Spain's top
             flight doesn't touch any other country's tables. Standings, Awards, and Stat Leaders each have a competition dropdown,
-            grouped by country, so you can browse any of the 36 leagues. It defaults to
+            grouped by country, so you can browse any of the 48 leagues. It defaults to
             whichever one your own club is currently in.
           </p>
           <p>
-            <strong>Shaping your own world.</strong> The twelve countries above are the default, not
+            <strong>Shaping your own world.</strong> The sixteen countries above are the default, not
             the only option. The <strong>World setup</strong> panel on the New League screen lets you
-            switch any of them off and add leagues of your own. An added league's clubs get
+            switch any of them off and add leagues of your own. Countries are grouped under Europe
+            and the Americas, and the checkbox on each heading switches that whole continent on or
+            off in one click. An added league's clubs get
             generated names and colours, since the game ships no real clubs. The panel is on both
             ways in, whether you started a plain new league or came through Import Custom League.
           </p>
@@ -1195,6 +1235,39 @@ export function Manual() {
           </p>
         </Section>
 
+        <Section id="americas-cup" title="The Americas Cup">
+          <p>
+            The Americas Cup is the continental competition for Brazil, Argentina, Mexico and the
+            United States, the way the Libertadores and the Champions Cup are in real life. The{" "}
+            <strong>top four</strong> in each of those four top flights get in, for{" "}
+            <strong>16 clubs</strong>. Clubs from Europe never play in it, and American clubs never
+            play in the Continental Cup or the Shield, so the two sides of the world only meet in
+            the preseason <a href="#champions-cups">Intercontinental Cup</a>.
+          </p>
+          <p>
+            There are two other ways in, the same two the European competitions use. The{" "}
+            <strong>holders</strong> keep their place however their league went, and each
+            country&apos;s <strong>domestic cup winner</strong> takes one of its four places. Either
+            one knocks out the fourth-placed club in that league, and most years it changes nothing
+            because the winner finished high enough anyway.
+          </p>
+          <p>
+            It plays like the others: a league phase of six games against clubs from other countries,
+            then the top eight go straight into two-legged quarter-finals and semi-finals and a
+            one-off final. There&apos;s no playoff round, because a 16-club field has none to fill.
+            It runs on the same matchdays as the European competitions, and the sim stops before
+            your final. Places don&apos;t move with results the way the Continental Cup&apos;s do:
+            every American league always sends four.
+          </p>
+          <p>
+            The prize money is the same as the Shield&apos;s: $4M for qualifying, $600k a win and
+            $200k a draw in the league phase, then $2.5M / $3.5M / $5.5M through the knockout. It
+            counts on a club&apos;s trophy case and the all-time boards, weighted between a Shield
+            and a Continental Cup, and it counts as the continental part of a treble for an
+            American club. Like the Shield, it doesn&apos;t currently feed the Ballon d&apos;Or.
+          </p>
+        </Section>
+
         <Section id="domestic-cup" title="The Domestic Cup">
           <p>
             Every country also runs its own cup, and this one is open to{" "}
@@ -1294,9 +1367,11 @@ export function Manual() {
             There's one in <strong>every country</strong>: your league champions against your{" "}
             <a href="#domestic-cup">domestic cup</a> winners. If the same club won both, the{" "}
             <strong>league runners-up</strong> take the other place, because a club can't play
-            itself. And there's one more on top of those, the only match of the year between the
-            two continental competitions: the <a href="#cup">Continental Cup</a> winners against
-            the <a href="#shield">Continental Shield</a> winners.
+            itself. And there are two more on top of those. The <a href="#cup">Continental Cup</a>{" "}
+            winners play the <a href="#shield">Continental Shield</a> winners, and the Continental
+            Cup winners also play the <a href="#americas-cup">Americas Cup</a> winners in the{" "}
+            <strong>Intercontinental Cup</strong>, the one match of the year between European and
+            American club football.
           </p>
           <p>
             They're <strong>one-off matches at a neutral ground</strong>, so nobody has home
@@ -1324,6 +1399,63 @@ export function Manual() {
             There's nothing to contest in season one, since nobody has won anything yet, so your
             first champions cups are at the start of season two. Older saves pick them up at their
             next offseason the same way.
+          </p>
+        </Section>
+
+        <Section id="title-playoffs" title="Title Playoffs">
+          <p>
+            Most leagues give the title to whoever finishes top. Three don&apos;t:{" "}
+            <strong>Argentina</strong>, <strong>Mexico</strong> and the{" "}
+            <strong>United States</strong> finish their season with a knockout for the title, the
+            way the Liguilla and MLS Cup work in real life.
+          </p>
+          <p>
+            <strong>Mexico</strong> takes the <strong>top eight</strong>: 1st v 8th, 4th v 5th, 2nd v
+            7th and 3rd v 6th, then semi-finals and a final. Every round, final included, is two legs,
+            with the better-placed club at home for the second, and it uses the Liguilla&apos;s real
+            tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s level on aggregate goes
+            to the club that finished higher, with no extra time, no penalties and no away goals. Only
+            the final goes to extra time and penalties, and there where you finished no longer helps.
+          </p>
+          <p>
+            The <strong>US</strong> takes the <strong>top nine in each conference</strong>. Eighth
+            hosts ninth in a one-off wild card. The first round is <strong>best of three</strong>:
+            first plays the wild card winner, second plays seventh, third plays sixth and fourth plays
+            fifth, with games one and three at the better-placed club. A level game in the wild card
+            or the first round goes straight to penalties. Then come one-off conference semi-finals and
+            conference finals, and the two conference champions meet in the final, at the ground of
+            whichever finished higher in the overall table. From the conference semi-finals on, a level
+            game gets extra time before penalties.
+          </p>
+          <p>
+            <strong>Argentina</strong> takes the <strong>top eight in each zone</strong>. The round of
+            16 pairs 1st in one zone with 8th in the other, 2nd with 7th and so on, so the two zone
+            winners can only meet in the final. Every game is one-off at the better-placed club&apos;s
+            ground and a level game goes straight to penalties, except the final, which is at a neutral
+            ground and gets extra time first.
+          </p>
+          <p>
+            The winner is the champion: it&apos;s their name in the history books, on the trophy case
+            and on the players&apos; profiles, and they play in the champions cup.
+          </p>
+          <p>
+            <strong>The table still counts for everything else.</strong> Prize money, hype,
+            continental places and what your board makes of your season all come from where you
+            finished, so topping the table and going out in the quarter-finals is still a good year,
+            just not a title-winning one. The board does give you credit for the title if you win it.
+          </p>
+          <p>
+            It&apos;s played after the last matchday, before anyone retires or moves clubs, with
+            injuries honoured and suspensions wiped, the same as the{" "}
+            <a href="#world">promotion playoffs</a>, and on the same clock: the season ends, the
+            brackets are drawn, and you play them a round at a time from the Dashboard. The deepest
+            bracket (the US, five rounds) starts first and the others join as they come level, so
+            every final lands on the same click. The offseason, and your board&apos;s verdict on the
+            season, wait until the finals are played. If you&apos;re in one, simming through stops
+            before each round you play so you can set your lineup. The brackets are on the{" "}
+            <strong>Title Playoffs</strong> page. The number beside each club is where it finished,
+            with its zone&apos;s letter in Argentina (A1 is first in Zone A); the US page draws each
+            conference as its own bracket, with the final between the two champions underneath.
           </p>
         </Section>
 
@@ -1424,9 +1556,10 @@ export function Manual() {
             quarter-final, while a confederation with only a handful of real football nations plays
             a single group and sends its top two straight to the final. A confederation that can't
             field even four nations doesn't hold one at all, which is why you'll usually see the
-            Euro, Copa América and AFCON and not the others: nearly every player in the world is
-            born into one of the twelve countries whose leagues you play in, so the rest of the world
-            is thin. Fill it out — with an imported roster, say — and those cups start
+            Euro, Copa América, the Gold Cup, AFCON and usually the Asian Cup, but not the OFC
+            Nations Cup: nearly every player in the world is born into one of the sixteen countries
+            whose leagues you play in, so the rest of the world is thin, and Oceania has only one
+            nation with enough players to field a squad. Fill it out — with an imported roster, say — and those cups start
             being played on their own.
           </p>
           <p>
@@ -1584,7 +1717,7 @@ export function Manual() {
           <p>
             One consequence worth knowing: the lower you go, the further the game runs below what
             those games cover. A third division here sits in the 30s and 40s, because this world
-            has twelve countries and three divisions each &mdash; a lot of football that a game
+            has sixteen countries and three divisions each &mdash; a lot of football that a game
             built around the top flights never has to put a number on.
           </p>
           <p>
@@ -1977,6 +2110,26 @@ export function Manual() {
             Frivolities award boards, and they count towards the GOAT ranking. Seasons you played
             before this update don't have them: awards are written down when they're won and never
             recalculated, so an old save picks these up from its next completed season onward.
+          </p>
+          <p>
+            <strong>The Americas and the world awards.</strong> The world awards are really about
+            Europe. Anything a player does at a club in Brazil, Argentina, Mexico or the United
+            States counts for a quarter of the same thing in Europe: his league season, his Americas
+            Cup run, his title and his international football all take the same cut. So a great
+            season over there doesn't get near the Ballon d'Or, the World Team of the Year or the
+            keeper and defender awards. A player who moves to Europe is judged like anyone else
+            from then on.
+          </p>
+          <p>
+            The Americas get honours of their own instead, on the Awards page's
+            <strong> Americas</strong> tab: a <strong>Player of the Year</strong> with a top-10
+            shortlist, a <strong>Goalkeeper</strong> and a <strong>Defender of the Year</strong>, and
+            a <strong>Team of the Year</strong>. They're worked out exactly like the world awards,
+            but only over the leagues of the Americas and with no cut, and the Americas Cup counts
+            where the Continental Cup does in Europe. They show up on player profiles, in a club&apos;s
+            history, on the Frivolities award boards and in the News Feed if your league is in the
+            Americas, and they count towards the GOAT ranking at the same discount as everything else
+            done there.
           </p>
           <p>
             <strong>xG (expected goals).</strong> Every shot's chance of going in before you know
@@ -2845,6 +2998,16 @@ export function Manual() {
             full correction and isn't meant to be: a forward can win the Ballon d'Or on top of
             everything a defender can win, so the ceiling is still higher for attackers. The formula
             is a first draft.
+          </p>
+          <p>
+            Anything done at a club in the Americas counts for a quarter here, the same cut the
+            world awards use. That goes season by season: his rating in those years, the seasons
+            themselves, and the titles, cups and awards he won there each get their own discounted
+            line in the breakdown, so you can see where the points came from. Goals, assists, caps,
+            match rating and World Cups are only kept as career totals, so those are cut by the
+            share of his games played in the Americas. A career spent there doesn't reach the top
+            of the board; a player who starts there and makes his name in Europe can. Clubs in the
+            Americas take the same cut on the club board.
           </p>
           <p>
             The same score ranks each club's own greatest players, on{" "}

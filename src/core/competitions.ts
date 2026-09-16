@@ -43,6 +43,9 @@ import {
   SHIELD_STRONG_LEAGUE_SLOTS, SHIELD_WEAK_LEAGUE_SLOTS, largestValidCupField,
   NUM_TEAMS, NUM_TEAMS_D2, NUM_TEAMS_D3, PROMOTION_RELEGATION_COUNT,
   COUNTRY_PLAYOFF_FORMAT, DEFAULT_PLAYOFF_FORMAT, type PlayoffFormat,
+  COUNTRY_REGION, DEFAULT_CONTINENTAL_REGION, type ContinentalRegion,
+  COUNTRY_TITLE_PLAYOFF, type TitlePlayoffFormat, AMERICAS_CUP_LEAGUE_SLOTS,
+  COUNTRY_CONFERENCES, type ConferenceFormat,
 } from "./constants.js";
 import {
   LEAGUE_NATIONALITY_WEIGHTS, sanitizeNationalityWeights, type NationalityWeights,
@@ -116,9 +119,16 @@ export interface Competition {
    * the circle method and an odd field leaves a club unpaired every round. It is
    * also capped: a division of n clubs plays 2(n-1) matchdays and the season
    * calendar is a fixed grid (see MAX_DIVISION_TEAMS), so a bigger division has
-   * nowhere to put its fixtures.
+   * nowhere to put its fixtures — UNLESS it is split into conferences (see
+   * `conferences`), which is how MLS and Argentina seat 30.
    */
   teamCount?: number;
+  /**
+   * The two halves this top flight plays its schedule in. Absent →
+   * `COUNTRY_CONFERENCES`, else one table. Resolve through
+   * `competitionConferences`, never the field.
+   */
+  conferences?: ConferenceFormat;
   /**
    * How many clubs swap with the division below (or above) at the end of each
    * season. Absent → PROMOTION_RELEGATION_COUNT, which is what every shipped
@@ -168,6 +178,19 @@ export interface Competition {
    * disagree with itself.
    */
   nationalities?: NationalityWeights;
+  /**
+   * The continent whose club competitions this league plays in. Absent → the
+   * shipped `COUNTRY_REGION` entry, else Europe. Resolve through
+   * `competitionRegion`, never the field.
+   */
+  region?: ContinentalRegion;
+  /**
+   * How this country's top flight decides its champion. Absent → the shipped
+   * `COUNTRY_TITLE_PLAYOFF` entry, else a straight table. Written to every one
+   * of a country's divisions like `playoffFormat`, but only the top flight's is
+   * ever read. Resolve through `competitionTitlePlayoff`, never the field.
+   */
+  titlePlayoff?: TitlePlayoffFormat;
 }
 
 /* ── Per-league tuning accessors ─────────────────────────────────────────────
@@ -298,6 +321,62 @@ export function effectivePromotionSpots(
   );
 }
 
+/** The continent this league plays its club competitions in. See Competition.region. */
+export function competitionRegion(comp: Competition): ContinentalRegion {
+  return comp.region ?? COUNTRY_REGION[comp.country] ?? DEFAULT_CONTINENTAL_REGION;
+}
+
+/**
+ * How this league decides its champion. Only a top flight holds a title
+ * playoff — a lower division's title is a promotion race, and that already has
+ * its own playoff (see PlayoffFormat) — so every other tier answers `none`.
+ */
+export function competitionTitlePlayoff(comp: Competition): TitlePlayoffFormat {
+  if (comp.tier !== 1) return "none";
+  const format = comp.titlePlayoff ?? COUNTRY_TITLE_PLAYOFF[comp.country] ?? "none";
+  // Both split formats seed per half, so a division that isn't split plays a
+  // plain bracket instead of one with nothing to seed from.
+  if ((format === "conference" || format === "zones") && !competitionConferences(comp)) return "single";
+  return format;
+}
+
+/**
+ * The two halves this division plays its schedule in, or null for a single
+ * table. Looked up by country AND tier, so splitting one division never splits
+ * the rest of that country's pyramid: the shipped splits are Argentina's and the
+ * US's top two divisions, whose third divisions stay single tables. Only a
+ * division big enough to have two halves of at least two clubs splits.
+ *
+ * Promotion and relegation are unaffected either way: they read the division's
+ * overall table, and `assignConferences` seats a promoted or relegated club in
+ * whichever half has room.
+ */
+export function competitionConferences(comp: Competition): ConferenceFormat | null {
+  const format = comp.conferences ?? COUNTRY_CONFERENCES[comp.country]?.[comp.tier] ?? null;
+  if (!format || competitionTeamCount(comp) < 4) return null;
+  return format;
+}
+
+/**
+ * League games each club in this division plays in a season. A double round
+ * robin, 2(n-1), for a single table; for a split one, its own half twice plus
+ * the rival (an odd half) and the extra cross rounds — MLS's 34, Argentina's 30.
+ *
+ * Must agree with `conferenceSchedule`, which is what actually builds the games;
+ * `conferences.test.ts` pins the two together. Anything that prices a season by
+ * its length (a transfer's appearance bonus, say) reads this rather than
+ * assuming a double round robin, which reads a 30-club split league as 58.
+ */
+export function competitionSeasonGames(comp: Competition): number {
+  const n = competitionTeamCount(comp);
+  const split = competitionConferences(comp);
+  if (!split) return 2 * (n - 1);
+  const half = Math.floor(n / 2);
+  const odd = half % 2 === 1;
+  const own = odd ? 2 * half : 2 * (half - 1);
+  return own + Math.min(split.crossRounds, half - (odd ? 1 : 0));
+}
+
 /** This league's money multiplier, before the tier scale. See Competition.budgetScale. */
 export function competitionBudgetScale(comp: Competition): number {
   return comp.budgetScale ?? COUNTRY_BUDGET_SCALE[comp.country] ?? 1;
@@ -393,6 +472,42 @@ export function worldCompetitions(): Competition[] {
     { id: 33, country: "Serbia", tier: 1, name: "Serbian Division 1", teamCount: 16, promotionSpots: 2 },
     { id: 34, country: "Serbia", tier: 2, name: "Serbian Division 2", teamCount: 16, promotionSpots: 2 },
     { id: 35, country: "Serbia", tier: 3, name: "Serbian Division 3", teamCount: 16, promotionSpots: 2 },
+    // ── The Americas ────────────────────────────────────────────────────────
+    // Appended, so every European country's tids and generated players are
+    // untouched. Each plays its continental football in the Americas Cup rather
+    // than Europe's competitions (COUNTRY_REGION) and all four run three
+    // divisions, for the symmetry reason given at the top of this table.
+    //
+    // Brazil: the Brasileirão's real shape, 20/20/20 with four up and down.
+    { id: 36, country: "Brazil", tier: 1, name: "Brazilian Division 1", promotionSpots: 4 },
+    { id: 37, country: "Brazil", tier: 2, name: "Brazilian Division 2", promotionSpots: 4 },
+    { id: 38, country: "Brazil", tier: 3, name: "Brazilian Division 3", promotionSpots: 4 },
+    // Argentina: the Liga Profesional's real 30, split into two zones of 15
+    // (COUNTRY_CONFERENCES) so the season fits the 38-matchday calendar, two up
+    // and down on the overall table, and the title decided by a cross-zone
+    // knockout the way each of its tournaments ends (COUNTRY_TITLE_PLAYOFF).
+    { id: 39, country: "Argentina", tier: 1, name: "Argentine Division 1", teamCount: 30, promotionSpots: 2 },
+    // The Primera Nacional's real 36, in two zones of 18. Also the fix for a
+    // 30-club top flight losing ground: at least one second-division club for
+    // every top-flight club (see COUNTRY_CONFERENCES).
+    { id: 40, country: "Argentina", tier: 2, name: "Argentine Division 2", teamCount: 36, promotionSpots: 2 },
+    { id: 41, country: "Argentina", tier: 3, name: "Argentine Division 3", promotionSpots: 2 },
+    // Mexico: CLOSED — Liga MX abolished promotion and relegation in 2026 — with
+    // its real 18-club top flight and the Liguilla deciding the title.
+    { id: 42, country: "Mexico", tier: 1, name: "Mexican Division 1", teamCount: 18, promotionSpots: 0 },
+    { id: 43, country: "Mexico", tier: 2, name: "Mexican Division 2", teamCount: 16, promotionSpots: 0 },
+    { id: 44, country: "Mexico", tier: 3, name: "Mexican Division 3", teamCount: 16, promotionSpots: 0 },
+    // United States: CLOSED like MLS, with its real 30 clubs in Eastern and
+    // Western Conferences of 15 (COUNTRY_CONFERENCES, clubs placed by geography)
+    // and a per-conference playoff for the title. The divisions below stand in
+    // for the USL.
+    { id: 45, country: "United States", tier: 1, name: "US Division 1", teamCount: 30, promotionSpots: 0 },
+    // 30 clubs in Eastern and Western Conferences of 15, placed by geography, so
+    // the top flight has one second-division club per top-flight club (see
+    // COUNTRY_CONFERENCES). The real USL Championship has ~24; the ratio is the
+    // part the dynasty needs.
+    { id: 46, country: "United States", tier: 2, name: "US Division 2", teamCount: 30, promotionSpots: 0 },
+    { id: 47, country: "United States", tier: 3, name: "US Division 3", teamCount: 16, promotionSpots: 0 },
   ];
 }
 
@@ -459,6 +574,10 @@ export interface LeagueSpec {
    * divisions get the same one.
    */
   nationalities?: NationalityWeights;
+  /** The continent it plays its club competitions in. Absent → the shipped table, else Europe. */
+  region?: ContinentalRegion;
+  /** How its top flight decides the champion. Absent → the shipped table, else a straight table. */
+  titlePlayoff?: TitlePlayoffFormat;
 }
 
 /**
@@ -492,6 +611,8 @@ export function buildCompetitions(specs: LeagueSpec[]): Competition[] {
       promotionSpots: spec.promotionSpots,
       playoffFormat: spec.playoffFormat,
       nationalities: spec.nationalities,
+      region: spec.region,
+      titlePlayoff: spec.titlePlayoff,
       continentalSlots: Object.keys(slots).length > 0 ? slots : undefined,
     });
     // One competition per tier the country asked for, top flight first — which
@@ -549,6 +670,7 @@ export interface ResolvedLeagueSpec {
   cupSlots: number;
   shieldSlots: number;
   nationalities: NationalityWeights;
+  region: ContinentalRegion;
 }
 
 export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
@@ -558,7 +680,13 @@ export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
   // shipped league the player has weakened takes the weak league's places, which
   // is what the world will actually do with it.
   const weak = strengthOffset > 0;
+  // A league outside Europe earns no European places whatever it asks for (see
+  // cupSlotsForCompetition), so its resolved European counts are zero — which is
+  // what keeps the field warnings below from counting it toward the Cup.
+  const region = spec.region ?? COUNTRY_REGION[spec.country] ?? DEFAULT_CONTINENTAL_REGION;
+  const european = region === "europe";
   return {
+    region,
     divisions: spec.divisions ?? 2,
     strengthOffset,
     budgetScale: spec.budgetScale ?? COUNTRY_BUDGET_SCALE[spec.country] ?? 1,
@@ -568,8 +696,12 @@ export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
     promotionSpots: spec.promotionSpots ?? PROMOTION_RELEGATION_COUNT,
     playoffFormat: spec.playoffFormat
       ?? COUNTRY_PLAYOFF_FORMAT[spec.country] ?? DEFAULT_PLAYOFF_FORMAT,
-    cupSlots: spec.cupSlots ?? (weak ? CUP_WEAK_LEAGUE_SLOTS : CUP_STRONG_LEAGUE_SLOTS),
-    shieldSlots: spec.shieldSlots ?? (weak ? SHIELD_WEAK_LEAGUE_SLOTS : SHIELD_STRONG_LEAGUE_SLOTS),
+    cupSlots: european
+      ? spec.cupSlots ?? (weak ? CUP_WEAK_LEAGUE_SLOTS : CUP_STRONG_LEAGUE_SLOTS)
+      : 0,
+    shieldSlots: european
+      ? spec.shieldSlots ?? (weak ? SHIELD_WEAK_LEAGUE_SLOTS : SHIELD_STRONG_LEAGUE_SLOTS)
+      : 0,
     // England's table is the honest answer for a country with no table of its
     // own, because England's is what pickNationality would actually draw from.
     nationalities: spec.nationalities
@@ -666,6 +798,13 @@ export function worldTuningWarnings(specs: LeagueSpec[]): string[] {
     ["Continental Cup", resolved.reduce((total, r) => total + r.cupSlots, 0)],
     ["Continental Shield", resolved.reduce((total, r) => total + r.shieldSlots, 0)],
   ];
+  // The Americas Cup is checked only in a world that has an American league at
+  // all — a European world has no Americas Cup to be too small, and saying so
+  // would be noise.
+  const americasLeagues = resolved.filter((r) => r.region === "americas").length;
+  if (americasLeagues > 0) {
+    fields.push(["Americas Cup", americasLeagues * AMERICAS_CUP_LEAGUE_SLOTS]);
+  }
 
   for (const [name, asked] of fields) {
     const played = largestValidCupField(asked);

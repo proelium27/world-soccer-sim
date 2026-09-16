@@ -33,6 +33,10 @@ import { Panel, Empty, ClubCell, PlayerCell, RankTable } from "../components/boa
 import { GoatBreakdown, partLabel } from "../components/GoatBreakdown.js";
 import { currency, seasonYear } from "../format.js";
 import { isSpectator } from "../../core/spectator.js";
+import type { ContinentalRegion } from "../../core/constants.js";
+import {
+  RegionSwitch, defaultRegion, worldHasAmericas, regionFilter, type RegionView,
+} from "../components/RegionSwitch.js";
 import { shortName } from "../playerName.js";
 
 type Tab = "goat" | "awards" | "records" | "leaders" | "international" | "bios" | "clubs";
@@ -59,11 +63,17 @@ function Col({ children, wide = false }: { children: ReactNode; wide?: boolean }
 // --- GOAT ------------------------------------------------------------------
 
 
-function GoatTab() {
+function GoatTab({ region, both = false }: { region?: ContinentalRegion; both?: boolean }) {
   const { league } = useLeague();
   const [side, setSide] = useState<"players" | "clubs">("players");
-  const players = useMemo(() => (league ? playerGoatRanking(league) : []), [league]);
-  const clubs = useMemo(() => (league ? teamGoatRanking(league) : []), [league]);
+  const players = useMemo(
+    () => (league ? playerGoatRanking(league, undefined, region) : []),
+    [league, region],
+  );
+  const clubs = useMemo(
+    () => (league ? teamGoatRanking(league, undefined, region) : []),
+    [league, region],
+  );
   if (!league) return null;
 
   return (
@@ -71,6 +81,12 @@ function GoatTab() {
       <p className="text-secondary small">
         Ranked by a fixed formula weighing peak rating, years spent near that peak, career length
         and match rating, individual awards, trophies, and goals and assists.
+        {region === "europe" &&
+          " Players are listed where they made most of their appearances. Anything done at a club in the Americas counts for a quarter here."}
+        {region === "americas" &&
+          " Careers spent mostly in the Americas, compared with each other at full weight."}
+        {both &&
+          " Every career on one list. Anything done at a club in the Americas counts for a quarter here."}
       </p>
 
       <ul className="nav nav-pills nav-sm mb-3">
@@ -134,7 +150,7 @@ function GoatTab() {
           <RankTable
             rows={clubs}
             headers={[
-              "Club", "Titles", "Cups", "Shields", "Dom. cups", "Trebles",
+              "Club", "Titles", "Cups", "Shields", "Americas", "Dom. cups", "Trebles",
               "Top 4", "Seasons", "PPG", "Score",
             ]}
             render={(r: TeamGoatRow) => [
@@ -142,6 +158,7 @@ function GoatTab() {
               r.leagueTitles,
               r.cupTitles,
               r.shieldTitles,
+              r.americasTitles,
               r.domesticCupTitles,
               r.trebles,
               r.topFinishes,
@@ -169,6 +186,10 @@ const AWARD_LABELS: Record<AwardKey, string> = {
   worldXI: "World XI",
   goalkeeperOfYear: "Goalkeeper of the Year",
   defenderOfYear: "Defender of the Year",
+  americasPlayerOfYear: "Americas Player of the Year",
+  americasTeamOfYear: "Americas Team of the Year",
+  americasGoalkeeperOfYear: "Americas Goalkeeper of the Year",
+  americasDefenderOfYear: "Americas Defender of the Year",
   playerOfSeason: "Player of the Season",
   goldenBoot: "Golden Boot",
   teamOfSeason: "Team of the Season",
@@ -181,6 +202,10 @@ const AWARD_SHORT: Record<AwardKey, string> = {
   worldXI: "World XI",
   goalkeeperOfYear: "Keeper",
   defenderOfYear: "Defender",
+  americasPlayerOfYear: "Am POTY",
+  americasTeamOfYear: "Am XI",
+  americasGoalkeeperOfYear: "Am Keeper",
+  americasDefenderOfYear: "Am Defender",
   playerOfSeason: "POTS",
   goldenBoot: "Boot",
   teamOfSeason: "TOTS",
@@ -195,6 +220,7 @@ const AWARD_SHORT: Record<AwardKey, string> = {
  */
 const TALLY_COLUMNS: AwardKey[] = [
   "ballonDOr", "worldXI", "goalkeeperOfYear", "defenderOfYear",
+  "americasPlayerOfYear", "americasTeamOfYear", "americasGoalkeeperOfYear", "americasDefenderOfYear",
   "playerOfSeason", "goldenBoot", "teamOfSeason", "total",
 ];
 
@@ -643,9 +669,12 @@ function careerCells(c: CareerRow, value: ReactNode, extra?: ReactNode): ReactNo
   ];
 }
 
-function RecordsTab() {
+function RecordsTab({ region }: { region?: ContinentalRegion }) {
   const { league } = useLeague();
-  const book = useMemo(() => (league ? computeRecordBook(league) : null), [league]);
+  const book = useMemo(
+    () => (league ? computeRecordBook(league, undefined, region) : null),
+    [league, region],
+  );
   if (!league || !book) return null;
 
   const careerHeaders = (last: string, extra?: string) =>
@@ -894,7 +923,7 @@ function LeaderBoard({ stat, scope, rows, userTid, onBack }: {
   );
 }
 
-export function LeadersTab() {
+export function LeadersTab({ region }: { region?: ContinentalRegion } = {}) {
   const { league } = useLeague();
   const [open, setOpen] = useState<AllTimeStatKey | null>(null);
   const [scope, setScope] = useState<LeaderScope>("career");
@@ -904,8 +933,8 @@ export function LeadersTab() {
   // career list fourteen times over. The full board a card opens into is a
   // slice of the same result, so the two can't disagree.
   const boards = useMemo(
-    () => (league ? allTimeLeaderBoards(league, scope) : null),
-    [league, scope],
+    () => (league ? allTimeLeaderBoards(league, scope, undefined, region) : null),
+    [league, scope, region],
   );
   if (!league || !boards) return null;
 
@@ -1216,9 +1245,12 @@ function BiosTab() {
 
 // --- Club trivia -----------------------------------------------------------
 
-function ClubsTab() {
+function ClubsTab({ region }: { region?: ContinentalRegion }) {
   const { league } = useLeague();
-  const trivia = useMemo(() => (league ? computeClubTrivia(league) : null), [league]);
+  const trivia = useMemo(
+    () => (league ? computeClubTrivia(league, undefined, region) : null),
+    [league, region],
+  );
   if (!league || !trivia) return null;
 
   if (trivia.seasonsRecorded === 0) {
@@ -1240,13 +1272,13 @@ function ClubsTab() {
         <Col wide>
           <Panel
             title="Trophy cabinet"
-            note="A treble is the top flight, the Continental Cup and the domestic cup in one season. Those three wins are already in the total, so a treble doesn't add to it."
+            note="A treble is the top flight, the club's continental cup (the Continental Cup, or the Americas Cup in the Americas) and the domestic cup in one season. Those three wins are already in the total, so a treble doesn't add to it."
           >
             <RankTable
               rows={trivia.records}
               headers={[
                 "Club", "Total Trophies", "D1 Championships", "Continental Cups",
-                "Continental Shields", "Domestic Cups", "Trebles",
+                "Continental Shields", "Americas Cups", "Domestic Cups", "Trebles",
                 "D2 Championships", "Seasons", "Top flight",
               ]}
               render={(r: ClubRecordRow) => [
@@ -1255,6 +1287,7 @@ function ClubsTab() {
                 r.leagueTitles,
                 r.cupTitles,
                 r.shieldTitles,
+                r.americasTitles,
                 r.domesticCupTitles,
                 r.trebles,
                 r.secondTierTitles,
@@ -1327,14 +1360,31 @@ function ClubsTab() {
 
 // --- Page ------------------------------------------------------------------
 
+/** The tabs that list clubs or club careers, and so can be split by continent. */
+const REGION_TABS: ReadonlySet<Tab> = new Set<Tab>(["goat", "records", "leaders", "clubs"]);
+
 export function Frivolities() {
   const { league } = useLeague();
   const [tab, setTab] = useState<Tab>("goat");
+  const [regionSel, setRegionSel] = useState<RegionView | null>(null);
   if (!league) return null;
+
+  // One continent at a time on the club and career lists, in a world with
+  // leagues on both, or both together. A world without the Americas, and the
+  // "Both" view, pass no region, which is the world-wide list every tab showed
+  // before the switch existed.
+  const hasAmericas = worldHasAmericas(league);
+  const view: RegionView | undefined = hasAmericas ? (regionSel ?? defaultRegion(league)) : undefined;
+  const region = regionFilter(view);
 
   return (
     <div>
-      <h1 className="h4 mb-3">Frivolities</h1>
+      <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-3">
+        <h1 className="h4 mb-0">Frivolities</h1>
+        {view && REGION_TABS.has(tab) && (
+          <RegionSwitch value={view} onChange={setRegionSel} includeBoth />
+        )}
+      </div>
 
       <ul className="nav nav-tabs mb-3">
         {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
@@ -1349,13 +1399,13 @@ export function Frivolities() {
         ))}
       </ul>
 
-      {tab === "goat" && <GoatTab />}
+      {tab === "goat" && <GoatTab region={region} both={view === "both"} />}
       {tab === "awards" && <AwardsTab />}
-      {tab === "records" && <RecordsTab />}
-      {tab === "leaders" && <LeadersTab />}
+      {tab === "records" && <RecordsTab region={region} />}
+      {tab === "leaders" && <LeadersTab region={region} />}
       {tab === "international" && <InternationalTab />}
       {tab === "bios" && <BiosTab />}
-      {tab === "clubs" && <ClubsTab />}
+      {tab === "clubs" && <ClubsTab region={region} />}
     </div>
   );
 }

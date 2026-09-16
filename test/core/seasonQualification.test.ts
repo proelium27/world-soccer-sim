@@ -7,7 +7,9 @@ import { seasonQualification } from "../../src/core/cup/seasonQualification.js";
 import type { CupState } from "../../src/core/cup/types.js";
 import {
   CUP_LEAGUE_PHASE_SIZE, SHIELD_LEAGUE_PHASE_SIZE, COEFFICIENT_MIN_SEASONS,
+  AMERICAS_CUP_LEAGUE_PHASE_SIZE,
 } from "../../src/core/constants.js";
+import { competitionRegion } from "../../src/core/competitions.js";
 
 /**
  * The projection the Standings page shades with. It has two input paths — the
@@ -37,9 +39,11 @@ function domesticCup(country: string, season: number, championTid: number | null
 }
 
 describe("seasonQualification", () => {
-  it("awards exactly the two fields' worth of places, and no club twice", () => {
+  it("awards exactly the three fields' worth of places, and no club twice", () => {
     const q = seasonQualification(withOneMatch(makeLeague(0, 1)), "current");
-    expect(q.byTid.size).toBe(CUP_LEAGUE_PHASE_SIZE + SHIELD_LEAGUE_PHASE_SIZE);
+    expect(q.byTid.size).toBe(
+      CUP_LEAGUE_PHASE_SIZE + SHIELD_LEAGUE_PHASE_SIZE + AMERICAS_CUP_LEAGUE_PHASE_SIZE,
+    );
   });
 
   it("is unsettled until every country's cup is decided, then settled", () => {
@@ -107,7 +111,10 @@ describe("seasonQualification", () => {
     // pass-through that dropped the flag would show places moving on a save
     // that turned the feature off.
     const base = withOneMatch(makeLeague(0, 1));
-    const weak = base.competitions.filter((c) => c.tier === 1).at(-1)!;
+    // The last EUROPEAN top flight: an American league holds no Continental Cup
+    // places, so a coefficient could never move one onto it.
+    const weak = base.competitions
+      .filter((c) => c.tier === 1 && competitionRegion(c) === "europe").at(-1)!;
     const strong = base.competitions.find((c) => c.tier === 1)!;
     const clubOf = (compId: number): number =>
       base.teams.find((t) => t.compId === compId)!.tid;

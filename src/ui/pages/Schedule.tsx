@@ -167,6 +167,7 @@ export function Schedule() {
   const cupRows = [
     ...userCupRows(league.cup, userTid),
     ...userCupRows(league.shield, userTid),
+    ...userCupRows(league.americasCup ?? null, userTid),
   ];
   const domesticRows = userDomesticRows(league.domesticCups ?? [], userTid);
 
@@ -229,7 +230,8 @@ export function Schedule() {
                       <span className="badge text-bg-secondary ms-2 align-middle" style={{ fontWeight: 400 }}>
                         {row.kind === "domestic"
                           ? "Domestic cup"
-                          : row.competition === "shield" ? "Shield" : "Cup"} · {row.label}
+                          : row.competition === "shield" ? "Shield"
+                            : row.competition === "americas" ? "Americas Cup" : "Cup"} · {row.label}
                       </span>
                     )}
                   </td>
@@ -242,7 +244,8 @@ export function Schedule() {
                       ) : (
                         <Link to={
                           row.kind === "domestic" ? "/domestic-cup"
-                            : row.competition === "shield" ? "/shield" : "/cup"
+                            : row.competition === "shield" ? "/shield"
+                              : row.competition === "americas" ? "/americas-cup" : "/cup"
                         }>
                           {row.result.homeGoals} - {row.result.awayGoals}
                         </Link>

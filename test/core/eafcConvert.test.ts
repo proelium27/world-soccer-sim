@@ -247,9 +247,14 @@ describe("league mapping", () => {
     expect(mapLeague("NIFL Premiership")).toBeNull();
   });
 
-  it("covers every first and second division in the shipped world", () => {
+  it("covers every European first and second division in the shipped world", () => {
+    // The American leagues are deliberately uncovered for now, for the reason the
+    // third divisions are: no rule may be written without an export to verify its
+    // league ids against, and none has been checked for Brazil, Argentina, Mexico
+    // or the United States yet. Their clubs keep their generated identities.
+    const AMERICAS = ["Brazil", "Argentina", "Mexico", "United States"];
     const uncovered = worldCompetitions()
-      .filter((c) => c.tier <= 2)
+      .filter((c) => c.tier <= 2 && !AMERICAS.includes(c.country))
       .map((c) => c.name)
       .filter((n) => !COVERED_COMPETITIONS.includes(n));
     expect(uncovered).toEqual([]);

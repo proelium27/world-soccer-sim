@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { computeClubSeason, type ClubRun, type ClubSeasonPlayer } from "../../core/clubSeason.js";
-import { competitionOf } from "../../core/competitions.js";
+import { competitionOf, competitionRegion } from "../../core/competitions.js";
 import { POSITIONS } from "../../core/players/types.js";
 import { ClubCrest } from "../components/ClubCrest.js";
 import { Flag } from "../components/Flag.js";
@@ -241,12 +241,23 @@ export function ClubSeason() {
         <div className="col-12 col-md-4">
           <RunCard title="Domestic cup" run={clubSeason.domesticCupRun} to="/domestic-cup" />
         </div>
-        <div className="col-12 col-md-4">
-          <RunCard title="Continental Cup" run={clubSeason.cupRun} to="/cup" note="Didn't qualify" />
-        </div>
-        <div className="col-12 col-md-4">
-          <RunCard title="Continental Shield" run={clubSeason.shieldRun} to="/shield" note="Didn't qualify" />
-        </div>
+        {/* A club only ever plays its own continent's competitions, so an
+            American club shows the Americas Cup where a European one shows the
+            two European competitions. */}
+        {competitionRegion(competitionOf(league.competitions, clubSeason.compId)) === "americas" ? (
+          <div className="col-12 col-md-4">
+            <RunCard title="Americas Cup" run={clubSeason.americasRun} to="/americas-cup" note="Didn't qualify" />
+          </div>
+        ) : (
+          <>
+            <div className="col-12 col-md-4">
+              <RunCard title="Continental Cup" run={clubSeason.cupRun} to="/cup" note="Didn't qualify" />
+            </div>
+            <div className="col-12 col-md-4">
+              <RunCard title="Continental Shield" run={clubSeason.shieldRun} to="/shield" note="Didn't qualify" />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card">

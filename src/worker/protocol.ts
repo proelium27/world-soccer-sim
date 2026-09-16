@@ -12,6 +12,12 @@ export type { SimThrough } from "../core/simThrough.js";
 /** Play one staged international stage, or blast through every remaining one. */
 export type IntlMode = "stage" | "through";
 
+/**
+ * Play the next playoff block, or keep playing blocks until the playoffs are
+ * done or the next one is a round the user's club is in.
+ */
+export type PlayoffMode = "stage" | "through";
+
 // UI -> Worker
 export type WorkerCommand =
   | { type: "sim"; through: SimThrough; league: LeagueStore }
@@ -40,6 +46,7 @@ export type WorkerCommand =
       cupChampions?: OffseasonInputs["cupChampions"];
     }
   | { type: "intl"; mode: IntlMode; league: LeagueStore }
+  | { type: "playoffs"; mode: PlayoffMode; league: LeagueStore }
   /** Play `seasons` whole seasons with the AI running the user's club (core/autopilot.ts). */
   | { type: "jump"; seasons: number; league: LeagueStore };
 
@@ -57,6 +64,7 @@ export type WorkerResponse =
       culledPids?: number[];
     }
   | { type: "intlResult"; league: LeagueStore }
+  | { type: "playoffsResult"; league: LeagueStore }
   | { type: "jumpResult"; league: LeagueStore }
   /**
    * Fired as each jumped season starts playing out. The whole jump is one

@@ -15,6 +15,7 @@ import type { Competition } from "./competitions.js";
 import type { CupState } from "./cup/types.js";
 import type { DomesticCupState } from "./domesticCup/types.js";
 import type { PromotionPlayoff } from "./promotionPlayoff.js";
+import type { TitlePlayoff } from "./titlePlayoff.js";
 import type { SuperCupTie } from "./superCup/types.js";
 import { buildDomesticCups } from "./domesticCup/cup.js";
 import type { InternationalState } from "./international/types.js";
@@ -25,8 +26,8 @@ import type { NationalManagerState } from "./nationalManager/types.js";
 import { emptyNationalManagerState } from "./nationalManager/types.js";
 import { generateWorld } from "./league/generate.js";
 import { assignIdentities, assignAIFormations } from "./teams/clubs.js";
-import { generateSchedule } from "./schedule.js";
-import { SEASON_MATCHDAYS } from "./calendar.js";
+import { buildCompetitionSchedule } from "./schedule.js";
+import { assignConferences } from "./conferences.js";
 import { worldCompetitions } from "./competitions.js";
 import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
 import {
@@ -39,45 +40,8 @@ import type { AwardFormula } from "./awardFormula.js";
 export type { StoredTeam } from "./teams/clubs.js";
 export type { ScheduleGame } from "./schedule.js";
 
-/** One competition's worth of fixtures per competition, concatenated — shared by createLeagueState and any test/tooling code that assembles a LeagueStore from a League + competitions table by hand. */
-export function buildCompetitionSchedule(
-  teams: Pick<StoredTeam, "tid" | "compId">[],
-  competitions: Competition[],
-): ScheduleGame[] {
-  return competitions.flatMap((comp) => {
-    const fixtures = generateSchedule(
-      teams.filter((t) => t.compId === comp.id).map((t) => t.tid),
-    );
-    return spreadOverSeason(fixtures);
-  });
-}
-
-/**
- * Stretch a competition's rounds across the fixed SEASON_MATCHDAYS grid, so a
- * division of any size still starts near matchday 1 and finishes on the last
- * one, taking blank matchdays in between.
- *
- * A 20-club division plays 38 rounds and maps one-to-one, so **the shipped world
- * is untouched** — round r keeps matchday r. A 16-club division plays 30 rounds
- * and sits them at 1, 3, 4, 5, 6, 8 … 38.
- *
- * Spreading rather than letting a short season simply end early is what keeps
- * the rest of the calendar meaningful for it: the winter window still opens
- * mid-season, deadline day still falls with games left to play, and its run-in
- * still lines up with the continental finals. Blank matchdays are also why
- * injuries and bans have to tick per club that actually played (see
- * simThrough), not once per matchday for everyone.
- */
-function spreadOverSeason(fixtures: ScheduleGame[]): ScheduleGame[] {
-  const rounds = fixtures.length === 0
-    ? 0
-    : Math.max(...fixtures.map((g) => g.matchday));
-  if (rounds === 0 || rounds === SEASON_MATCHDAYS) return fixtures;
-  return fixtures.map((g) => ({
-    ...g,
-    matchday: Math.round((g.matchday * SEASON_MATCHDAYS) / rounds),
-  }));
-}
+/** Every competition's season, concatenated. Lives in schedule.ts; re-exported for the callers that always imported it from here. */
+export { buildCompetitionSchedule } from "./schedule.js";
 
 export interface LeagueStore {
   lid: number;
@@ -251,6 +215,18 @@ export interface LeagueStore {
   /** Every completed Continental Shield, oldest first (archived at offseason rollover). */
   shieldHistory: CupState[];
   /**
+   * The Americas Cup being played during the current season — the continental
+   * competition for the Americas' top flights. Null in season 1 and in any
+   * world with too few American leagues to field one.
+   *
+   * Optional, unlike the two European competitions, so a test fixture or a
+   * hand-built league written before the Americas existed still typechecks and
+   * simply has none; migrate backfills it for real saves.
+   */
+  americasCup?: CupState | null;
+  /** Every completed Americas Cup, oldest first (archived at offseason rollover). */
+  americasCupHistory?: CupState[];
+  /**
    * This season's domestic cups, one per country — a straight knockout across
    * both of a country's divisions, drawn open round by round. Unlike the
    * Continental Cup these run from season 1 (nothing has to qualify), so the
@@ -275,6 +251,14 @@ export interface LeagueStore {
    * See core/promotionPlayoff.ts.
    */
   promotionPlayoffs: PromotionPlayoff[];
+  /**
+   * The title playoffs decided by the season that just ended — transient in
+   * exactly the way `promotionPlayoffs` is, and for the same reason: filled at
+   * the season boundary, copied onto that season's history entry and emptied by
+   * the offseason. Optional so a fixture written before them still typechecks.
+   * See core/titlePlayoff.ts.
+   */
+  titlePlayoffs?: TitlePlayoff[];
   /**
    * This preseason's super cups — one per country between its league champions
    * and its domestic cup winners, plus the one worldwide match between the
@@ -488,9 +472,11 @@ export function createLeagueState(
   const league = generateWorld(rng, seed, competitions, progressionModel);
   // Each AI club lines up in the formation that fields its strongest XI; the
   // user's club keeps the neutral 4-3-3 default and picks its own on the Roster page.
-  const teams = assignAIFormations(
+  // Each club in a split top flight is given its conference here, so it keeps
+  // it from season to season (see core/conferences.ts).
+  const teams = assignConferences(assignAIFormations(
     assignIdentities(league, competitions, userTid, difficulty), league.players, userTid,
-  );
+  ), competitions);
   const schedule = buildCompetitionSchedule(teams, competitions);
 
   // Fog-of-war: stamp the user's initial senior roster as first-observed in
@@ -539,12 +525,16 @@ export function createLeagueState(
     // Same for the Shield — both are seeded together at the first offseason.
     shield: null,
     shieldHistory: [],
+    // And the Americas Cup, seeded the same way from the same tables.
+    americasCup: null,
+    americasCupHistory: [],
     // Domestic cups need no qualification, so unlike the Continental Cup they
     // run from season 1. Drawn with no tables to rank on, which the field
     // builder handles by falling back to tid order.
     domesticCups: buildDomesticCups(competitions, teams, new Map(), 1),
     domesticCupHistory: [],
     promotionPlayoffs: [],
+    titlePlayoffs: [],
     // Season 1 has no super cups: nothing has been won yet to contest one.
     superCups: [],
     debtSanctions: [],

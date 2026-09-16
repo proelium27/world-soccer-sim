@@ -747,6 +747,11 @@ function migrateFields(league: LeagueStore): LeagueStore {
     // next offseason, exactly as pre-cup saves did for the Continental Cup.
     shield: anyVersion.shield ?? null,
     shieldHistory: (anyVersion.shieldHistory ?? []).map((c) => archiveCup(c)),
+    // The Americas Cup, for the same reason and on the same terms. A save made
+    // before the Americas existed has no American leagues to field one, so it
+    // stays null forever there, which is exactly right.
+    americasCup: anyVersion.americasCup ?? null,
+    americasCupHistory: (anyVersion.americasCupHistory ?? []).map((c) => archiveCup(c)),
     // Pre-domestic-cup saves start with none rather than having one drawn
     // mid-season: a cup drawn in, say, February would have to cram its rounds
     // into the matchdays that are left, and half of them are already gone. The
@@ -767,6 +772,9 @@ function migrateFields(league: LeagueStore): LeagueStore {
     // them would be inventing results. A save mid-season picks its first
     // playoff up when that season ends. See core/promotionPlayoff.ts.
     promotionPlayoffs: anyVersion.promotionPlayoffs ?? [],
+    // Title playoffs, on the same terms: empty outside the one offseason window
+    // that holds them, and never invented for a season already decided.
+    titlePlayoffs: anyVersion.titlePlayoffs ?? [],
     // Same one-way reasoning as the playoffs above: a season that opened before
     // super cups existed did not play one, so an old save picks its first up at
     // its next rollover rather than having one invented for a preseason that is
@@ -897,6 +905,9 @@ function backfillManager(anyVersion: LeagueStoreAnyVersion): ManagerState {
   const domesticTitles = (anyVersion.domesticCupHistory ?? []).filter(
     (c) => c.championTid === userTid,
   ).length;
+  const americasTitles = (anyVersion.americasCupHistory ?? []).filter(
+    (c) => cupRunSummary(c, userTid)?.isChampion,
+  ).length;
 
   return {
     confidence: 100,
@@ -906,7 +917,7 @@ function backfillManager(anyVersion: LeagueStoreAnyVersion): ManagerState {
       endSeason: null,
       seasons: history.length,
       titles,
-      trophies: cupTitles + shieldTitles + domesticTitles,
+      trophies: cupTitles + shieldTitles + domesticTitles + americasTitles,
       overperformance: 0,
       ending: null,
     }],

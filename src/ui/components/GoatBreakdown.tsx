@@ -43,6 +43,7 @@ const TERM_LABELS: Record<string, string> = {
   worldCups: "World Cup",
   cupTitles: "Continental Cup",
   shieldTitles: "Continental Shield",
+  americasTitles: "Americas Cup",
   domesticCupTitles: "domestic cup",
   leagueTitles: "league title",
   goals: "goals",
@@ -53,6 +54,20 @@ const TERM_LABELS: Record<string, string> = {
   ppgSurplus: "points per game above 1.40, added up across every season",
   secondTierTitles: "second-tier title",
   trebles: "treble (league, Continental Cup and domestic cup in one season)",
+  // Anything done at a club in the Americas scores at a discount, and gets a
+  // line of its own so the working says where each point came from.
+  peakOvrAmericas: `rating above ${GOAT_OVR_BASELINE} at his peak, at a club in the Americas`,
+  primeOvrAmericas: `rating above ${GOAT_OVR_BASELINE}, added up across his seasons in the Americas`,
+  seasonsAmericas: "seasons played in the Americas",
+  playerOfSeasonAmericas: "Player of the Season in the Americas",
+  goldenBootAmericas: "Golden Boot in the Americas",
+  teamOfSeasonAmericas: "Team of the Season in the Americas",
+  leagueTitlesAmericas: "league title in the Americas",
+  domesticCupTitlesAmericas: "domestic cup in the Americas",
+  americasPlayerOfYear: "Americas Player of the Year",
+  americasTeamOfYear: "Americas Team of the Year",
+  americasGoalkeeperOfYear: "Americas Goalkeeper of the Year",
+  americasDefenderOfYear: "Americas Defender of the Year",
 };
 
 export function partLabel(key: string): string {
@@ -62,6 +77,15 @@ export function partLabel(key: string): string {
 /** A number that reads cleanly whether it's a count of trophies or a rating surplus. */
 function termCount(count: number): string {
   return Number.isInteger(count) ? String(count) : count.toFixed(2);
+}
+
+/**
+ * A weight, trimmed. Discounted weights (a league title in the Americas, or a
+ * goal from a career partly spent there) are products that print as long
+ * fractions, and three places is enough to check the arithmetic by.
+ */
+function termWeight(weight: number): string {
+  return Number.isInteger(weight) ? String(weight) : String(Number(weight.toFixed(3)));
 }
 
 /** Term points are exact, so show the decimal rather than a figure that won't multiply out. */
@@ -98,7 +122,7 @@ export function GoatBreakdown({ components, score }: { components: GoatComponent
             {c.terms.map((t) => (
               <div key={t.key} className="d-flex justify-content-between gap-2 text-muted">
                 <span>
-                  {TERM_LABELS[t.key] ?? t.key}: {termCount(t.count)} x {t.weight}
+                  {TERM_LABELS[t.key] ?? t.key}: {termCount(t.count)} x {termWeight(t.weight)}
                 </span>
                 <span className="text-nowrap">{termPoints(t.points)}</span>
               </div>

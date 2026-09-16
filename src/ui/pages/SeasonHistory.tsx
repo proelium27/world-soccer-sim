@@ -6,7 +6,7 @@ import { EmptyState } from "../components/EmptyState.js";
 import { Flag } from "../components/Flag.js";
 import { HelpHint } from "../components/HelpHint.js";
 import { seasonYear } from "../format.js";
-import { competitionAbbrev } from "../../core/competitions.js";
+import { competitionAbbrev, competitionRegion } from "../../core/competitions.js";
 import {
   seasonSummaries, type SeasonInternationalWin, type SeasonSummaryRow,
 } from "../../core/seasonSummary.js";
@@ -163,6 +163,10 @@ export function SeasonHistory() {
     );
   };
 
+  // The Americas Cup gets a column only in a world that plays it — a world of
+  // European leagues would otherwise carry a column of dashes forever.
+  const showAmericas = league.competitions.some((c) => competitionRegion(c) === "americas");
+
   return (
     <div className="container-fluid p-3">
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
@@ -198,6 +202,7 @@ export function SeasonHistory() {
                   <th className="sh-season">Season</th>
                   <th>Continental Cup</th>
                   <th>Continental Shield</th>
+                  {showAmericas && <th>Americas Cup</th>}
                   <th className="sh-intl-col">International</th>
                   {topFlights.map((comp, i) => countryHead(comp, i))}
                 </tr>
@@ -215,6 +220,7 @@ export function SeasonHistory() {
                     </th>
                     <td>{continentalCell(row.continentalCup, row.season)}</td>
                     <td>{continentalCell(row.continentalShield, row.season)}</td>
+                    {showAmericas && <td>{continentalCell(row.americasCup, row.season)}</td>}
                     <td className="sh-intl-col">
                       {row.international.length === 0 ? (
                         <span className="text-muted">—</span>

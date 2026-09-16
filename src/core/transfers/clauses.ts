@@ -4,7 +4,7 @@ import type { StoredTeam } from "../teams/clubs.js";
 import type { Competition } from "../competitions.js";
 import { trueTransferValue } from "../finance/valuation.js";
 import {
-  tierOf, competitionTeamCount, competitionPromotionSpots, divisionAbove,
+  tierOf, competitionTeamCount, competitionPromotionSpots, divisionAbove, competitionSeasonGames,
 } from "../competitions.js";
 import { cupSlotsForCompetition } from "../cup/qualification.js";
 import { SEASON_MATCHDAYS } from "../calendar.js";
@@ -215,10 +215,15 @@ function appearanceShare(playerOvr: number, starterOvr: number | null): number {
   return Math.min(1, Math.max(0, BONUS_APPEARANCE_SHARE_FLOOR + span * p));
 }
 
-/** League games the club plays in a season: a double round robin of its division. */
+/**
+ * League games the club plays in a season. Through `competitionSeasonGames`, not
+ * 2(n-1): a split division (MLS, Argentina) plays 34 or 30, and reading it as a
+ * 30-club double round robin (58) made an appearance target look far easier to
+ * reach than it is.
+ */
 function leagueGames(obligor: StoredTeam, competitions: Competition[]): number {
   const comp = competitions.find((c) => c.id === obligor.compId);
-  return comp ? 2 * (competitionTeamCount(comp) - 1) : SEASON_MATCHDAYS;
+  return comp ? competitionSeasonGames(comp) : SEASON_MATCHDAYS;
 }
 
 /**

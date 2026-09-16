@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { isIntlStagePending } from "../../core/international/index.js";
+import { playoffsPending } from "../../core/playoffStages.js";
+import { playoffStageButton, playoffStagesLeft } from "./PlayoffStageCard.js";
 import { qualifyingLeg } from "../../core/constants.js";
 import {
   intlStageButton,
@@ -26,7 +28,7 @@ interface TopBarProps {
 
 export function TopBar({ onToggleNav }: TopBarProps) {
   const {
-    league, simAction, simLiveAction, intlStageAction, jumpSeasonsAction, simming,
+    league, simAction, simLiveAction, intlStageAction, playoffStageAction, jumpSeasonsAction, simming,
     exportJSON, switchLeagueAction, setGodModeAction,
   } = useLeague();
   const { brand } = useSportName();
@@ -123,6 +125,29 @@ export function TopBar({ onToggleNav }: TopBarProps) {
                     See who'll have you
                   </button>
                 </li>
+              ) : playoffsPending(league) ? (
+                <>
+                  <li>
+                    <button
+                      className="dropdown-item"
+                      onClick={() => playoffStageAction("stage")}
+                      disabled={simDisabled}
+                    >
+                      {playoffStageButton(league)}
+                    </button>
+                  </li>
+                  {playoffStagesLeft(league) > 1 && (
+                    <li>
+                      <button
+                        className="dropdown-item"
+                        onClick={() => playoffStageAction("through")}
+                        disabled={simDisabled}
+                      >
+                        Sim through the playoffs
+                      </button>
+                    </li>
+                  )}
+                </>
               ) : isIntlStagePending(league.international) ? (
                 <>
                   <li>

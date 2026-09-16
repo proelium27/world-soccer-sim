@@ -25,6 +25,7 @@ import { computeStandings } from "../standings.js";
 import { difficultyProfile } from "../constants.js";
 import { computeCountrySwaps } from "../promotion.js";
 import { playoffOutcomes, type PromotionPlayoff } from "../promotionPlayoff.js";
+import type { TitlePlayoff } from "../titlePlayoff.js";
 import { cupRunSummary } from "../cup/cup.js";
 import { deriveExpectations, actualFinish } from "./expectation.js";
 import { judgeSeason, type SeasonVerdict } from "./confidence.js";
@@ -62,6 +63,8 @@ export interface ReviewInput {
   played: PlayedMatch[];
   cup: CupState | null;
   shield: CupState | null;
+  /** The Americas Cup. Optional so callers from before it existed still typecheck. */
+  americasCup?: CupState | null;
   domesticCups: DomesticCupState[];
   /**
    * This season's promotion playoffs, already played.
@@ -73,6 +76,12 @@ export interface ReviewInput {
    * plain top-N promotion the swap then applies.
    */
   promotionPlayoffs?: PromotionPlayoff[];
+  /**
+   * This season's title playoffs, already played. A league that holds one gives
+   * its title to the playoff winner rather than the table leader, so the board
+   * credits the title the club actually won. Omitted → the table decides.
+   */
+  titlePlayoffs?: TitlePlayoff[];
 }
 
 export interface ManagerReview {
@@ -152,9 +161,12 @@ export function reviewSeason(input: ReviewInput): ManagerReview {
   let trophies = 0;
   if (input.cup && cupRunSummary(input.cup, userTid)?.isChampion) trophies++;
   if (input.shield && cupRunSummary(input.shield, userTid)?.isChampion) trophies++;
+  if (input.americasCup && cupRunSummary(input.americasCup, userTid)?.isChampion) trophies++;
   if (input.domesticCups.some((c) => c.championTid === userTid)) trophies++;
 
-  const titles = finish === 1 ? 1 : 0;
+  const titlePlayoff = input.titlePlayoffs?.find((p) => p.compId === mine.compId);
+  const wonTitle = titlePlayoff?.winnerTid != null ? titlePlayoff.winnerTid === userTid : finish === 1;
+  const titles = wonTitle ? 1 : 0;
   const verdict = judgeSeason(
     {
       finish,

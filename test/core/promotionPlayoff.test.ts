@@ -209,8 +209,10 @@ describe("promotionPlayoffFields — a deeper pyramid", () => {
     }
     for (const { country, divisions } of countryDivisions(world)) {
       // Scotland gives out one place, so there is no spare one to play for and
-      // it holds none at either step.
-      const want = competitionPlayoffFormat(divisions[0], divisions[1]) === "none"
+      // it holds none at either step. Mexico and the United States are closed —
+      // no places at all — so they hold none either.
+      const closed = divisions[0].promotionSpots === 0;
+      const want = closed || competitionPlayoffFormat(divisions[0], divisions[1]) === "none"
         ? 0
         : divisions.length - 1;
       expect([country, held.get(country) ?? 0]).toEqual([country, want]);

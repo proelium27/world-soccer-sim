@@ -187,6 +187,12 @@ export function resolveCupTie(
    * are already venue-neutral here, so a neutral tie is neutral end to end.
    */
   neutral = false,
+  /**
+   * Whether a level game gets extra time before penalties. False sends it
+   * straight to the shootout — MLS's wild card and first round and Argentina's
+   * knockout rounds. Every cup caller omits it and is bit-identical to before.
+   */
+  extraTime = true,
 ): CupTie {
   const result = simMatchDetailed(rng, hd.composites, ad.composites, hd.xi, ad.xi, hd.bench, ad.bench, {
     recompute: { home: hd.recompute, away: ad.recompute },
@@ -201,10 +207,12 @@ export function resolveCupTie(
   let awayPens = 0;
 
   if (homeGoals === awayGoals) {
-    wentToExtraTime = true;
-    const et = playExtraTime(rng, hd.composites, ad.composites, hd.xi, ad.xi, box);
-    homeGoals += et.homeGoals;
-    awayGoals += et.awayGoals;
+    if (extraTime) {
+      wentToExtraTime = true;
+      const et = playExtraTime(rng, hd.composites, ad.composites, hd.xi, ad.xi, box);
+      homeGoals += et.homeGoals;
+      awayGoals += et.awayGoals;
+    }
     if (homeGoals === awayGoals) {
       wentToPens = true;
       ({ homePens, awayPens } = playShootout(rng, hd.composites, ad.composites));
@@ -249,6 +257,13 @@ export function playFirstLeg(
  * (from `home`'s perspective) for display. The home-and-away swap cancels home
  * advantage and doubles the sample, so the tie tracks squad strength far more
  * than a single-match coin flip.
+ *
+ * `levelGoesTo`, when given, replaces extra time and the shootout: a tie level
+ * on aggregate is awarded straight to that club. That is the Liguilla's real
+ * quarter- and semi-final rule (the better-placed club goes through). Every cup
+ * omits it, and a tie that isn't level never reads it, so no existing result
+ * moves. Skipping extra time also skips its rng draws, which is safe only
+ * because every caller passing this runs the tie on a stream of its own.
  */
 export function resolveTwoLeggedTie(
   rng: () => number,
@@ -256,6 +271,7 @@ export function resolveTwoLeggedTie(
   hd: TeamMatchData,
   ad: TeamMatchData,
   matchday: number,
+  levelGoesTo?: number,
 ): CupTie {
   const { round, home, away } = firstLeg;
   // Leg 2: `away` hosts, so leg2.home is the `away` club and leg2.away is `home`.
@@ -280,6 +296,15 @@ export function resolveTwoLeggedTie(
   let wentToPens = false;
   let homePens = 0;
   let awayPens = 0;
+
+  // The Liguilla's quarter- and semi-final rule: level on aggregate goes straight
+  // to the named club, and extra time and the shootout are never played.
+  if (homeGoals === awayGoals && levelGoesTo !== undefined) {
+    return {
+      round, matchday, home, away, homeGoals, awayGoals, wentToExtraTime, wentToPens,
+      homePens, awayPens, winner: levelGoesTo, boxScore: box, legs, decidedByTablePosition: true,
+    };
+  }
 
   if (homeGoals === awayGoals) {
     wentToExtraTime = true;

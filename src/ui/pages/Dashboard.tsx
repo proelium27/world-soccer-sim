@@ -10,9 +10,12 @@ import { nextMatchday, transferWindowState } from "../../core/transfers/window.j
 import { SimTargetForm } from "../components/SimTargetForm.js";
 import { SCOUTING_SPEND_MAX, RATING_LEADER_QUALIFY_FRACTION } from "../../core/constants.js";
 import { wageBill } from "../../core/finance/budget.js";
+import { competitionRegion } from "../../core/competitions.js";
 import { cupFinalists, isCupComplete } from "../../core/cup/cup.js";
 import { domesticFinalists } from "../../core/domesticCup/cup.js";
 import { isIntlStagePending, editableSquad } from "../../core/international/index.js";
+import { playoffsPending } from "../../core/playoffStages.js";
+import { PlayoffStageCard } from "../components/PlayoffStageCard.js";
 import { superCupsPending } from "../../core/superCup/superCup.js";
 import { projectAcademyCheckpoints } from "../../core/academyPipeline.js";
 import {
@@ -178,7 +181,7 @@ export function Dashboard() {
 // maps, the wage bill, and the stat-leader scans over the whole player pool.
 function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: StoredTeam }) {
   const {
-    simAction, simLiveAction, setScoutingSpendAction, intlStageAction, simming,
+    simAction, simLiveAction, setScoutingSpendAction, intlStageAction, playoffStageAction, simming,
     playSuperCupsAction,
   } = useLeague();
   const navigate = useNavigate();
@@ -280,6 +283,8 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
       cupHistory: league.cupHistory,
       shield: league.shield,
       shieldHistory: league.shieldHistory,
+      americasCup: league.americasCup ?? null,
+      americasCupHistory: league.americasCupHistory ?? [],
       // Only the live ones: the panel shows the season in progress, and this
       // preseason's super cups are exactly that. Archived ones belong to
       // seasons the panel has already stopped reporting.
@@ -315,16 +320,19 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
     // warning lives in the Finances card below, which does not age out.
     const shownSanctions = debtNewsBySeason(league.debtSanctions).get(league.season) ?? [];
 
+    const userComp = league.competitions.find((c) => c.id === comps[userTid]);
     const newsTimeline = buildSeasonTimeline(currentSeasonTransfers, currentSeasonEvents, {
       userTid,
       userCompId: comps[userTid],
       compOf: (tid) => comps[tid],
+      userRegion: userComp ? competitionRegion(userComp) : undefined,
     }, lastSeasonHonours, shownTrophies, [], shownPromotions, shownSanctions);
     return [...newsTimeline].slice(-NEWS_TOP_N).reverse();
   }, [
     league.transfers, league.newsEvents, league.season, league.played,
     league.meta.userTid, league.teams, league.seasonHistory,
     league.cup, league.cupHistory, league.shield, league.shieldHistory, league.international,
+    league.americasCup, league.americasCupHistory,
     league.promotionPlayoffs,
     league.superCups,
     league.debtSanctions,
@@ -509,7 +517,9 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
 
       {/* A continental final: the season sim halts before it, so flag why. The
           user's club can only be in one of the two competitions. */}
-      {([["cup", league.cup], ["shield", league.shield]] as const).map(([kind, comp]) =>
+      {([
+        ["cup", league.cup], ["shield", league.shield], ["americas-cup", league.americasCup ?? null],
+      ] as const).map(([kind, comp]) =>
         comp && !isCupComplete(comp) && cupFinalists(comp).includes(league.meta.userTid) ? (
           <div key={kind} className="alert alert-warning d-flex justify-content-between align-items-center mb-3">
             <span>
@@ -552,6 +562,15 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
                     See who'll have you
                   </button>
                 </>
+              ) : playoffsPending(league) ? (
+                // The playoffs come first: they close the club season, and the
+                // board's verdict waits for them.
+                <PlayoffStageCard
+                  league={league}
+                  simming={simming}
+                  onStage={() => playoffStageAction("stage")}
+                  onThrough={() => playoffStageAction("through")}
+                />
               ) : isIntlStagePending(league.international) ? (
                 <>
                   <p className="card-text">
@@ -995,6 +1014,11 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
         <div className="col-lg-4">
           <CupBracketPanel cup={league.shield} title="Continental Shield" href="/shield" />
         </div>
+        {(league.americasCup ?? null) !== null && (
+          <div className="col-lg-4">
+            <CupBracketPanel cup={league.americasCup ?? null} title="Americas Cup" href="/americas-cup" />
+          </div>
+        )}
       </div>
 
     </div>

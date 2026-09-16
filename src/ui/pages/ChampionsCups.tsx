@@ -62,6 +62,7 @@ export function ChampionsCups() {
           <ul>
             <li>Its league champion against its domestic cup winner.</li>
             <li>The Continental Cup holder against the Continental Shield holder.</li>
+            <li>The Continental Cup holder against the Americas Cup holder, in the Intercontinental Cup.</li>
           </ul>
         </EmptyState>
       </div>
@@ -74,6 +75,7 @@ export function ChampionsCups() {
   // The one worldwide match leads, then each country's, alphabetically — a
   // stable order, rather than the competition-table order they are built in.
   const ordered = [
+    ...shown.filter((sc) => sc.competition === "intercontinental"),
     ...shown.filter((sc) => sc.competition === "continental"),
     ...shown.filter((sc) => sc.competition === "domestic")
       .sort((a, b) => (a.country ?? "").localeCompare(b.country ?? "")),

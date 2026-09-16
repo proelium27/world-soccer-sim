@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { CupState, LeaguePhaseMatch, CupTie } from "../../src/core/cup/types.js";
-import { worldCompetitions } from "../../src/core/competitions.js";
+import { worldCompetitions, competitionRegion } from "../../src/core/competitions.js";
 import {
   countryCoefficients, reallocateCupSlots, coefficientSlots,
 } from "../../src/core/cup/coefficients.js";
@@ -10,7 +10,9 @@ import {
 } from "../../src/core/constants.js";
 
 const comps = worldCompetitions();
-const tier1 = comps.filter((c) => c.tier === 1);
+// Europe's top flights only: the coefficient is a Continental Cup mechanic, and
+// an American league holds no Continental Cup places to rank or reallocate.
+const tier1 = comps.filter((c) => c.tier === 1 && competitionRegion(c) === "europe");
 
 /** One club per tier-1 league, tid = league index, so a country is a tid. */
 const teams = tier1.map((c, i) => ({ tid: i, compId: c.id }));

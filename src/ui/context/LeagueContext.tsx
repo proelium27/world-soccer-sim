@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
 import type { ProgressionModel, WorldCupSize } from "../../core/constants.js";
 import { isCustomAwardFormula, resolveAwardFormula, type AwardFormula } from "../../core/awardFormula.js";
-import type { SimThrough, IntlMode } from "../../worker/protocol.js";
+import type { SimThrough, IntlMode, PlayoffMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
 import { saveLeague, loadLeague } from "../../db/leagueDb.js";
 import { loadCrests, saveCrests } from "../../db/crestDb.js";
@@ -101,6 +101,8 @@ interface LeagueContextValue {
   offseasonAction: () => Promise<void>;
   /** Play the next staged international stage ("stage") or every remaining one ("through"). */
   intlStageAction: (mode: IntlMode) => Promise<void>;
+  /** Play the next playoff block ("stage"), or blocks until one the user's club is in ("through"). */
+  playoffStageAction: (mode: PlayoffMode) => Promise<void>;
   signFreeAgentAction: (pid: number) => Promise<void>;
   releasePlayerAction: (pid: number) => Promise<void>;
   signToAcademyAction: (pid: number) => Promise<void>;
@@ -215,7 +217,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const [loadingActiveLeague, setLoadingActiveLeague] = useState(
     () => getActiveLid() !== null,
   );
-  const { sim, runOffseason, runIntlStage, runJump, simming } = useSimWorker();
+  const { sim, runOffseason, runIntlStage, runPlayoffStage, runJump, simming } = useSimWorker();
   // Declared here rather than beside its first user because two of them —
   // finishing a jump and opening the live match viewer — sit either side of the
   // file, and a hook cannot be called twice conditionally.
@@ -631,6 +633,19 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       console.error("International stage failed:", err);
     }
   }), [runExclusive, runIntlStage, commitLeague]);
+
+  const playoffStageAction = useCallback((mode: PlayoffMode) => runExclusive(async () => {
+    const current = leagueRef.current;
+    if (!current) return;
+    try {
+      const result = await runPlayoffStage(mode, current);
+      const lid = await saveLeague(result);
+      commitLeague({ ...result, lid });
+      trackEvent("playoff_stage_played", { mode });
+    } catch (err) {
+      console.error("Playoff stage failed:", err);
+    }
+  }), [runExclusive, runPlayoffStage, commitLeague]);
 
   const signFreeAgentAction = useCallback((pid: number) => mutate((l) => {
     const { teams, players } = signFreeAgent(
@@ -1286,6 +1301,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     jumpSeasonsAction,
     offseasonAction,
     intlStageAction,
+    playoffStageAction,
     signFreeAgentAction,
     releasePlayerAction,
     signToAcademyAction,
@@ -1341,7 +1357,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     league, crests, loadingActiveLeague, setLeague, loadLeagueAction, switchLeagueAction,
     customizeTeamsAction, simAction, simLiveAction, liveMatch, chooseLiveMatch,
     finishLiveMatch, jumpSeasonsAction, offseasonAction,
-    intlStageAction, signFreeAgentAction,
+    intlStageAction, playoffStageAction, signFreeAgentAction,
     releasePlayerAction, signToAcademyAction,
     setScoutDirectionsAction,
     promoteFromAcademyAction,

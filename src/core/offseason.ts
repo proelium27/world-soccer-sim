@@ -50,9 +50,13 @@ import { archiveDomesticCup } from "./domesticCup/archive.js";
 import { buildSuperCups } from "./superCup/superCup.js";
 import { computeCountrySwaps, applyCompetitionSwaps, stepAcademyBaseConvergence } from "./promotion.js";
 import {
-  playPromotionPlayoffs, playoffOutcomes, playoffsForSeason,
+  playPromotionPlayoffs, playoffOutcomes, playoffsForSeason, completePromotionPlayoffs,
 } from "./promotionPlayoff.js";
-import { generateSchedule } from "./schedule.js";
+import {
+  playTitlePlayoffs, titlePlayoffsForSeason, titleChampions, completeTitlePlayoffs,
+} from "./titlePlayoff.js";
+import { buildCompetitionSchedule } from "./schedule.js";
+import { assignConferences } from "./conferences.js";
 import { updateHype } from "./finance/hype.js";
 import {
   settleSeasonEnd, chargeSeasonStart, wageBill, financeScaleFor, clampBudget,
@@ -71,7 +75,7 @@ import { reviewNationalCampaign } from "./nationalManager/index.js";
 import { carryIntlInjuries } from "./injuries.js";
 import { hashInts, mulberry32 } from "../engine/rng.js";
 import {
-  NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, difficultyProfile,
+  NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, AMERICAS_CUP_FORMAT, difficultyProfile,
   USER_ACADEMY_INTAKE_MIN, USER_ACADEMY_INTAKE_MAX, USER_ACADEMY_ENTRY_AGE,
   YOUTH_TRIAL_STREAM, MOP_UP_FA_STREAM, MOP_UP_MIN_OVR,
 } from "./constants.js";
@@ -139,7 +143,7 @@ export interface OffseasonInputs {
    * off the league", which is right for every direct caller (tests, scripts,
    * and `jump`, which is exempt from detaching).
    */
-  cupChampions?: Pick<HonourSources, "cup" | "shield" | "domestic">;
+  cupChampions?: Pick<HonourSources, "cup" | "shield" | "domestic" | "americas" | "americasTids">;
 }
 
 /** What the offseason did that the caller cannot work out from the league alone. */
@@ -255,10 +259,24 @@ export function simOffseasonReporting(
   // derived from the league's own content, and both read end-of-season squads,
   // which is why this sits above contract renewals rather than beside the swap
   // it feeds at step 3.6. No shared-`rng` draw, so no league scoreline moves.
+  // A playoff the game drew but a caller left partly played (the game plays
+  // them a round per sim block, see playoffStages.ts) is finished here on the
+  // same streams, so it lands on the same result it would have on the clicks.
   const playedPlayoffs = playoffsForSeason(league.promotionPlayoffs, endingSeason);
   const promotionPlayoffs = playedPlayoffs.length > 0
-    ? playedPlayoffs
+    ? completePromotionPlayoffs(playedPlayoffs, league.teams, league.players, league.lid)
     : playPromotionPlayoffs(
+      league.competitions, league.teams, league.players, tablesByCompId,
+      league.lid, endingSeason,
+    );
+
+  // Title playoffs, on exactly the same terms: normally already played at the
+  // season boundary, finished or replayed here for a caller that skipped it.
+  // Their winners become the season's champions at step 3.5.
+  const playedTitles = titlePlayoffsForSeason(league.titlePlayoffs, endingSeason);
+  const titlePlayoffs = playedTitles.length > 0
+    ? completeTitlePlayoffs(playedTitles, league.teams, league.players, league.lid)
+    : playTitlePlayoffs(
       league.competitions, league.teams, league.players, tablesByCompId,
       league.lid, endingSeason,
     );
@@ -498,8 +516,14 @@ export function simOffseasonReporting(
   const standings = league.competitions.flatMap((comp) => tablesByCompId.get(comp.id)!);
   const teamStats =
     precomputedTeamStats ?? computeTeamSeasonStats(teams.map((t) => t.tid), league.played);
+  // A top flight's champion is its title playoff's winner where it holds one,
+  // else whoever topped the table. This is the one fact a title playoff moves;
+  // everything above and below this line still reads the table.
+  const titleWinners = titleChampions(titlePlayoffs);
   const championTidByCompId: Record<number, number> = Object.fromEntries(
-    league.competitions.filter((c) => c.tier === 1).map((c) => [c.id, tablesByCompId.get(c.id)![0].tid]),
+    league.competitions.filter((c) => c.tier === 1).map((c) => [
+      c.id, titleWinners.get(c.id) ?? tablesByCompId.get(c.id)![0].tid,
+    ]),
   );
 
   // 3.6. Worldwide honors — the Ballon d'Or ranking and the World Team of the
@@ -515,6 +539,9 @@ export function simOffseasonReporting(
     competitions: league.competitions,
     championTidByCompId,
     cup: league.cup,
+    // The Americas Cup that ran alongside it, credited the same way for clubs
+    // in the Americas (and then discounted with the rest of their case).
+    americasCup: league.americasCup ?? null,
     // The domestic cups that ran during this season, read before the archive a
     // few steps below folds their box scores away. Archiving keeps the champion
     // and the per-player lines this needs, so the order isn't load-bearing, but
@@ -559,6 +586,7 @@ export function simOffseasonReporting(
     // world holds none, so a save that never plays one carries no empty arrays
     // through its whole history.
     promotionPlayoffs: promotionPlayoffs.length > 0 ? promotionPlayoffs : undefined,
+    titlePlayoffs: titlePlayoffs.length > 0 ? titlePlayoffs : undefined,
     // The super cups that *opened* this season, moved off the live field now
     // that it is about to be reseeded for the next one. Unlike every other
     // record on this entry these describe the season's first day rather than
@@ -586,6 +614,10 @@ export function simOffseasonReporting(
       // directly rather than coming through the precomputed past.
       cup: [...pastChampions.cup, ...champion(league.cup)],
       shield: [...pastChampions.shield, ...champion(league.shield)],
+      americas: [...(pastChampions.americas ?? []), ...champion(league.americasCup)],
+      // Which clubs play in the Americas, so a retiree's time there is scored
+      // at the same discount the GOAT board applies.
+      americasTids: pastChampions.americasTids,
       domestic: [
         ...pastChampions.domestic,
         ...(league.domesticCups ?? []).map((c) => ({ season: c.season, championTid: c.championTid })),
@@ -683,6 +715,9 @@ export function simOffseasonReporting(
     league.competitions, tablesByCompId, playoffOutcomes(promotionPlayoffs),
   );
   teams = applyCompetitionSwaps(teams, swaps);
+  // A promoted club takes the conference a relegated one left, and a relegated
+  // one carries nothing into a single table (see core/conferences.ts).
+  teams = assignConferences(teams, league.competitions);
   teams = stepAcademyBaseConvergence(teams, league.competitions);
 
   // 3.7. Guaranteed ceiling on Division 2 quality, first pass: any
@@ -1084,9 +1119,12 @@ export function simOffseasonReporting(
   teams = assignAIFormations(teams, players, league.meta.userTid);
 
   // 7. New per-competition schedules, new season, back to regular play.
-  const schedule = league.competitions.flatMap((comp) =>
-    generateSchedule(teams.filter((t) => t.compId === comp.id).map((t) => t.tid)),
-  );
+  //
+  // Through the same builder world creation uses. This used to call the raw
+  // round-robin generator, which left a division smaller than 20 UNSPREAD from
+  // season 2 on — a 16-club league played its 30 rounds on matchdays 1-30 and
+  // sat out the last eight, contradicting the season 1 it was created with.
+  const schedule = buildCompetitionSchedule(teams, league.competitions);
 
   // Drop any listing for a player no longer on the user's senior roster
   // (sold, released, retired, or just loaned out this offseason) — a stale
@@ -1115,6 +1153,7 @@ export function simOffseasonReporting(
     holders: {
       continental: league.cup?.championTid ?? undefined,
       shield: league.shield?.championTid ?? undefined,
+      americas: league.americasCup?.championTid ?? undefined,
     },
     // How many places each country gets, off its rolling continental record.
     // The season that just ended counts, so its competitions are passed in
@@ -1243,6 +1282,9 @@ export function simOffseasonReporting(
     // buildCupState returns null if that format's field can't be filled.
     cup: buildCupState(league.competitions, tablesByCompId, nextSeason, CONTINENTAL_CUP_FORMAT, cupRoutes),
     shield: buildCupState(league.competitions, tablesByCompId, nextSeason, SHIELD_FORMAT, cupRoutes),
+    // The Americas Cup draws from the other continent's leagues through the
+    // same one-pass allocation, so it can never share a club with the two above.
+    americasCup: buildCupState(league.competitions, tablesByCompId, nextSeason, AMERICAS_CUP_FORMAT, cupRoutes),
     // International football already played out (in stages) before this advance;
     // carry its state forward, resetting the per-offseason stage marker (and the
     // just-consumed injury carry-over list) so the new season starts clean.
@@ -1256,6 +1298,9 @@ export function simOffseasonReporting(
     shieldHistory: league.shield
       ? [...league.shieldHistory, archiveCup(league.shield)]
       : league.shieldHistory,
+    americasCupHistory: league.americasCup
+      ? [...(league.americasCupHistory ?? []), archiveCup(league.americasCup)]
+      : (league.americasCupHistory ?? []),
     // Domestic cups roll over the same way. Note `teams` here is the post-
     // promotion/relegation roster of clubs, so a promoted club enters next
     // season's cup as a top-flight one, while the ranking that decides who has
@@ -1274,6 +1319,7 @@ export function simOffseasonReporting(
       domesticCups: league.domesticCups ?? [],
       cup: league.cup,
       shield: league.shield,
+      americasCup: league.americasCup ?? null,
       season: nextSeason,
     }),
     domesticCupHistory: [
@@ -1285,6 +1331,7 @@ export function simOffseasonReporting(
     // Holding both would keep a second copy of every scoreline for a whole
     // season and mean two places the page could read a different answer from.
     promotionPlayoffs: [],
+    titlePlayoffs: [],
     nextPid,
     retiredPlayers,
     // Assembled at step 3.66, where the farewell list is also scored against

@@ -130,6 +130,24 @@ describe("the club picker shows one division at a time", () => {
   });
 });
 
+describe("the club picker groups countries by continent", () => {
+  it("lists European countries under Europe and American ones under the Americas", () => {
+    const html = renderNewLeague("/new-league");
+    const europe = html.indexOf('aria-label="Choose a league in Europe"');
+    const americas = html.indexOf('aria-label="Choose a league in Americas"');
+    expect(europe).toBeGreaterThan(-1);
+    expect(americas).toBeGreaterThan(europe);
+    const europeGroup = html.slice(europe, americas);
+    expect(europeGroup).toContain("England");
+    expect(europeGroup).not.toContain("Brazil");
+    const americasGroup = html.slice(americas, html.indexOf('aria-label="Choose a division"'));
+    for (const country of ["Brazil", "Argentina", "Mexico", "United States"]) {
+      expect(americasGroup).toContain(country);
+    }
+    expect(americasGroup).not.toContain("England");
+  });
+});
+
 describe("the New League screen offers the world editor", () => {
   it("shows it once a roster file has been imported", () => {
     const html = renderNewLeague("/new-league?roster=1", [
@@ -159,7 +177,7 @@ describe("the New League screen offers the world editor", () => {
     // picking a club. What has to be present is the way in, plus the summary
     // that says what world you would get without opening it.
     expect(html).toContain('aria-controls="world-setup-body"');
-    expect(html).toContain("12 countries, 36 divisions, 626 clubs");
+    expect(html).toContain("16 countries, 48 divisions, 898 clubs");
     expect(html).not.toContain("Add a league");
   });
 

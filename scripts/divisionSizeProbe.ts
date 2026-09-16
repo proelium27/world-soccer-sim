@@ -103,6 +103,13 @@ const genMean = new Map([...snapshot(league)].map(([c, m]) => [c, mean([...m.val
 
 for (let s = 0; s < SEASONS; s++) {
   league = simThrough(league, { matchday: SEASON_MATCHDAYS }, rng);
+  // simThrough pauses before the user's cup final and simOffseason silently
+  // no-ops on any phase but "offseason", so a season where club 0 reached a
+  // final would otherwise record no offseason. Same loop weakLeaguesAudit uses.
+  for (let resumes = 0; (league.phase as string) !== "offseason"; resumes++) {
+    if (resumes >= 3) throw new Error(`season ${league.season} refuses to finish (phase ${league.phase})`);
+    league = simThrough(league, { matchday: SEASON_MATCHDAYS }, rng);
+  }
 
   // Mean raw points per tier-1 club: the free-agency sort key.
   const tidsBefore = tier1Tids(league);

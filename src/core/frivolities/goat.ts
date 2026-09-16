@@ -11,10 +11,13 @@ import {
   GOAT_TEAM_DOMESTIC_CUP_TITLE_WEIGHT, GOAT_TEAM_SECOND_TIER_TITLE_WEIGHT,
   GOAT_TEAM_TOP_FINISH_WEIGHT, GOAT_TEAM_TOP_FINISH_POSITION, GOAT_TEAM_SEASON_WEIGHT,
   GOAT_TEAM_PPG_BASELINE, GOAT_TEAM_PPG_WEIGHT, GOAT_TEAM_SECOND_TIER_SCALE,
-  GOAT_TEAM_TREBLE_WEIGHT,
+  GOAT_TEAM_TREBLE_WEIGHT, GOAT_AMERICAS_TITLE_WEIGHT, GOAT_TEAM_AMERICAS_TITLE_WEIGHT,
+  AMERICAS_ACCOMPLISHMENT_SCALE,
 } from "../constants.js";
 import { allCareers, type CareerRow } from "./careers.js";
 import { trebleCountByTid } from "./trebles.js";
+import { americasTids, careerRegion, inRegion } from "../americasClubs.js";
+import type { ContinentalRegion } from "../constants.js";
 
 /** How many rows the GOAT boards show. */
 export const GOAT_LIST_LIMIT = 50;
@@ -33,9 +36,34 @@ export interface PlayerHonours {
   leagueTitles: number;
   cupTitles: number;
   shieldTitles: number;
+  /** Americas Cup wins while he was in the squad. */
+  americasTitles: number;
   /** Domestic cup wins while he was in the squad. */
   domesticCupTitles: number;
   worldCups: number;
+  /** The Americas' own Player of the Year wins (`WorldAwards.americas`). */
+  americasPlayerOfYear: number;
+  /** Americas Team of the Year places. */
+  americasTeamOfYear: number;
+  /** Americas Goalkeeper of the Year wins. */
+  americasGoalkeeperOfYear: number;
+  /** Americas Defender of the Year wins. */
+  americasDefenderOfYear: number;
+  /**
+   * How many of the league-level counts above were won at a club in the
+   * Americas — a subset of them, never extra. The counts stay whole for display
+   * and this is what the GOAT score reads to discount that part of them.
+   */
+  inAmericas: AmericasShare;
+}
+
+/** The part of a player's league-level honours won at clubs in the Americas. */
+export interface AmericasShare {
+  playerOfSeason: number;
+  goldenBoot: number;
+  teamOfSeason: number;
+  leagueTitles: number;
+  domesticCupTitles: number;
 }
 
 /**
@@ -47,8 +75,11 @@ export function emptyHonours(): PlayerHonours {
   return {
     ballonDOr: 0, worldXI: 0, goalkeeperOfYear: 0, defenderOfYear: 0,
     playerOfSeason: 0, goldenBoot: 0,
-    teamOfSeason: 0, leagueTitles: 0, cupTitles: 0, shieldTitles: 0, domesticCupTitles: 0,
-    worldCups: 0,
+    teamOfSeason: 0, leagueTitles: 0, cupTitles: 0, shieldTitles: 0, americasTitles: 0,
+    domesticCupTitles: 0, worldCups: 0,
+    americasPlayerOfYear: 0, americasTeamOfYear: 0,
+    americasGoalkeeperOfYear: 0, americasDefenderOfYear: 0,
+    inAmericas: { playerOfSeason: 0, goldenBoot: 0, teamOfSeason: 0, leagueTitles: 0, domesticCupTitles: 0 },
   };
 }
 
@@ -80,7 +111,19 @@ export interface HonourSources {
   seasonHistory: readonly LeagueStore["seasonHistory"][number][];
   cup: readonly CupChampion[];
   shield: readonly CupChampion[];
+  /**
+   * The Americas Cup. Optional so a source object built before the Americas
+   * existed still typechecks and simply counts none.
+   */
+  americas?: readonly CupChampion[];
   domestic: readonly CupChampion[];
+  /**
+   * The clubs that play in the Americas (see `americasTids`), whose
+   * accomplishments score at AMERICAS_ACCOMPLISHMENT_SCALE. Optional: absent
+   * scores everything at full weight, which is how every source built before
+   * the Americas existed reads.
+   */
+  americasTids?: readonly number[];
 }
 
 /** Honour sources off a whole league — correct anywhere the histories are attached. */
@@ -91,7 +134,9 @@ export function honourSourcesOf(league: LeagueStore): HonourSources {
     seasonHistory: league.seasonHistory,
     cup: champions(league.cupHistory),
     shield: champions(league.shieldHistory),
+    americas: champions(league.americasCupHistory),
     domestic: champions(league.domesticCupHistory),
+    americasTids: americasTids(league.teams, league.competitions),
   };
 }
 
@@ -143,7 +188,22 @@ export function computeHonours(
     return honoursFor(pid);
   };
 
+  const americas = new Set(sources.americasTids ?? []);
+
   for (const h of sources.seasonHistory) {
+    // The Americas' own honours, winners only like the world's below.
+    const am = h.world?.americas;
+    const amPlayer = award(am?.ballonDOr?.[0]?.pid, h.season);
+    if (amPlayer) amPlayer.americasPlayerOfYear += 1;
+    for (const pid of am?.worldTeamOfYear ?? []) {
+      const xi = award(pid, h.season);
+      if (xi) xi.americasTeamOfYear += 1;
+    }
+    const amKeeper = award(am?.goalkeeperOfYear?.[0]?.pid, h.season);
+    if (amKeeper) amKeeper.americasGoalkeeperOfYear += 1;
+    const amDefender = award(am?.defenderOfYear?.[0]?.pid, h.season);
+    if (amDefender) amDefender.americasDefenderOfYear += 1;
+
     const ballon = award(h.world?.ballonDOr?.[0]?.pid, h.season);
     if (ballon) ballon.ballonDOr += 1;
     for (const pid of h.world?.worldTeamOfYear ?? []) {
@@ -156,14 +216,33 @@ export function computeHonours(
     if (bestKeeper) bestKeeper.goalkeeperOfYear += 1;
     const bestDefender = award(h.world?.defenderOfYear?.[0]?.pid, h.season);
     if (bestDefender) bestDefender.defenderOfYear += 1;
-    for (const awards of Object.values(h.awards ?? {})) {
+    // A competition is in the Americas when its clubs are. Read off that
+    // season's own club-to-competition map, since the awards are keyed by the
+    // competition that gave them.
+    const americasComps = new Set<number>();
+    if (americas.size > 0) {
+      for (const [tid, compId] of Object.entries(h.compsByTid ?? {})) {
+        if (americas.has(Number(tid))) americasComps.add(compId);
+      }
+    }
+    for (const [key, awards] of Object.entries(h.awards ?? {})) {
+      const inAmericas = americasComps.has(Number(key));
       const poty = award(awards.playerOfSeasonPid, h.season);
-      if (poty) poty.playerOfSeason += 1;
+      if (poty) {
+        poty.playerOfSeason += 1;
+        if (inAmericas) poty.inAmericas.playerOfSeason += 1;
+      }
       const boot = award(awards.goldenBootPid, h.season);
-      if (boot) boot.goldenBoot += 1;
+      if (boot) {
+        boot.goldenBoot += 1;
+        if (inAmericas) boot.inAmericas.goldenBoot += 1;
+      }
       for (const pid of awards.teamOfSeason ?? []) {
         const tots = award(pid, h.season);
-        if (tots) tots.teamOfSeason += 1;
+        if (tots) {
+          tots.teamOfSeason += 1;
+          if (inAmericas) tots.inAmericas.teamOfSeason += 1;
+        }
       }
     }
   }
@@ -182,6 +261,10 @@ export function computeHonours(
   for (const shield of sources.shield) {
     if (shield.championTid != null) shieldChampionBySeason.set(shield.season, shield.championTid);
   }
+  const americasChampionBySeason = new Map<number, number>();
+  for (const cup of sources.americas ?? []) {
+    if (cup.championTid != null) americasChampionBySeason.set(cup.season, cup.championTid);
+  }
   // Keyed by season AND tid, unlike the Continental Cup: eight countries each
   // crown a domestic champion in the same season, so a season maps to a set.
   const domesticChampions = new Set<string>();
@@ -194,10 +277,18 @@ export function computeHonours(
     // Squad membership, not appearances — the same rule core/playerHonors.ts
     // credits a profile's league-title pills on. These two must agree.
     for (const s of career.seasons) {
-      if (championsBySeason.get(s.season)?.has(s.tid)) h.leagueTitles += 1;
+      const there = americas.has(s.tid);
+      if (championsBySeason.get(s.season)?.has(s.tid)) {
+        h.leagueTitles += 1;
+        if (there) h.inAmericas.leagueTitles += 1;
+      }
       if (cupChampionBySeason.get(s.season) === s.tid) h.cupTitles += 1;
       if (shieldChampionBySeason.get(s.season) === s.tid) h.shieldTitles += 1;
-      if (domesticChampions.has(`${s.season}:${s.tid}`)) h.domesticCupTitles += 1;
+      if (americasChampionBySeason.get(s.season) === s.tid) h.americasTitles += 1;
+      if (domesticChampions.has(`${s.season}:${s.tid}`)) {
+        h.domesticCupTitles += 1;
+        if (there) h.inAmericas.domesticCupTitles += 1;
+      }
     }
     h.worldCups = career.intlTitles;
   }
@@ -278,44 +369,100 @@ export function pointsOf(row: PlayerGoatRow, key: GoatComponent["key"]): number 
   return row.components.find((c) => c.key === key)?.points ?? 0;
 }
 
+/** No clubs in the Americas: every accomplishment at full weight. */
+const NO_AMERICAS: ReadonlySet<number> = new Set();
+
 /**
  * Score one career.
  *
  * See the `GOAT_*` block in constants.ts for what each weight is trying to say
  * and, importantly, for the positional bias this first draft carries.
+ *
+ * **Anything done at a club in the Americas scores AMERICAS_ACCOMPLISHMENT_SCALE
+ * of the same thing done in Europe.** What belongs to a season is scaled by the
+ * club he was at that season — his peak, his prime, his seasons, his titles,
+ * cups and league awards — and shown as a line of its own, so the breakdown
+ * says where the points came from. What a career keeps only as a total (match
+ * rating, goals, assists, caps, World Cups) is scaled by the share of his
+ * appearances made in the Americas. A career spent wholly in Europe scores
+ * exactly as it did before: every scale is 1, and every Americas line is zero
+ * and dropped.
  */
-export function scorePlayer(career: CareerRow, honours: PlayerHonours): PlayerGoatRow {
+export function scorePlayer(
+  career: CareerRow,
+  honours: PlayerHonours,
+  americas: ReadonlySet<number> = NO_AMERICAS,
+  americasScale = AMERICAS_ACCOMPLISHMENT_SCALE,
+): PlayerGoatRow {
+  const k = americasScale;
   // Area under his career rating curve, above the "good starter" line. A long
   // stretch near the top out-earns a single spike, which is the difference the
   // formula most wants to capture.
-  // Seasons he actually played: `seasons` now also carries squad-membership
-  // rows with no appearances (needed for title attribution), and crediting a
-  // rating arc for a year he sat out would reward being injured.
-  const primeOvr = career.seasons.reduce(
-    (sum, s) => sum + (s.apps > 0 ? Math.max(0, s.ovr - GOAT_OVR_BASELINE) : 0), 0,
-  );
+  // Seasons he actually played: `seasons` also carries squad-membership rows
+  // with no appearances (needed for title attribution), and crediting a rating
+  // arc for a year he sat out would reward being injured.
+  let primeOvr = 0;
+  let primeOvrAmericas = 0;
+  let seasonsAmericas = 0;
+  let apps = 0;
+  let appsAmericas = 0;
+  for (const s of career.seasons) {
+    if (s.apps <= 0) continue;
+    const surplus = Math.max(0, s.ovr - GOAT_OVR_BASELINE);
+    apps += s.apps;
+    if (americas.has(s.tid)) {
+      primeOvrAmericas += surplus;
+      seasonsAmericas += 1;
+      appsAmericas += s.apps;
+    } else {
+      primeOvr += surplus;
+    }
+  }
+  // The share of his career, by appearances, that counts at full weight.
+  const careerScale = apps > 0 ? (apps - appsAmericas + appsAmericas * k) / apps : 1;
+  // A rating snapshot is stamped at the end of a season, so the peak was played
+  // the season after its stamp — the same offset CareerRow.seasons uses.
+  const peakRow = career.seasons.find((s) => s.season === career.peakSeason + 1)
+    ?? career.seasons.find((s) => s.season === career.peakSeason);
+  const peakTid = peakRow?.tid ?? career.tid;
+  const peakInAmericas = peakTid !== null && americas.has(peakTid);
   // Damped until he has a real sample, so a handful of good games can't buy a
   // sustained-quality score.
   const sample = Math.min(1, career.totals.appearances / GOAT_RATING_FULL_SAMPLE);
+  const share = honours.inAmericas ?? emptyHonours().inAmericas;
 
   const components: GoatComponent[] = [
     component("peak", [
-      { key: "peakOvr", count: Math.max(0, career.peakOvr - GOAT_OVR_BASELINE), weight: GOAT_PEAK_WEIGHT },
+      {
+        key: peakInAmericas ? "peakOvrAmericas" : "peakOvr",
+        count: Math.max(0, career.peakOvr - GOAT_OVR_BASELINE),
+        weight: peakInAmericas ? GOAT_PEAK_WEIGHT * k : GOAT_PEAK_WEIGHT,
+      },
     ]),
     component("prime", [
       { key: "primeOvr", count: primeOvr, weight: GOAT_PRIME_WEIGHT },
+      { key: "primeOvrAmericas", count: primeOvrAmericas, weight: GOAT_PRIME_WEIGHT * k },
     ]),
     component("longevity", [
-      { key: "seasons", count: career.seasonsPlayed, weight: GOAT_LONGEVITY_WEIGHT },
+      {
+        key: "seasons",
+        count: Math.max(0, career.seasonsPlayed - seasonsAmericas),
+        weight: GOAT_LONGEVITY_WEIGHT,
+      },
+      { key: "seasonsAmericas", count: seasonsAmericas, weight: GOAT_LONGEVITY_WEIGHT * k },
       {
         key: "rating",
         count: Math.max(0, career.totals.avgRating - RATING_BASELINE) * sample,
-        weight: GOAT_RATING_WEIGHT,
+        weight: GOAT_RATING_WEIGHT * careerScale,
       },
     ]),
     component("awards", [
       { key: "ballonDOr", count: honours.ballonDOr, weight: GOAT_BALLON_DOR_WEIGHT },
-      { key: "playerOfSeason", count: honours.playerOfSeason, weight: GOAT_POTY_WEIGHT },
+      {
+        key: "playerOfSeason",
+        count: honours.playerOfSeason - share.playerOfSeason,
+        weight: GOAT_POTY_WEIGHT,
+      },
       { key: "worldXI", count: honours.worldXI, weight: GOAT_WORLD_XI_WEIGHT },
       {
         key: "goalkeeperOfYear",
@@ -327,24 +474,57 @@ export function scorePlayer(career: CareerRow, honours: PlayerHonours): PlayerGo
         count: honours.defenderOfYear,
         weight: GOAT_DEFENDER_AWARD_WEIGHT,
       },
-      { key: "goldenBoot", count: honours.goldenBoot, weight: GOAT_GOLDEN_BOOT_WEIGHT },
-      { key: "teamOfSeason", count: honours.teamOfSeason, weight: GOAT_TOTS_WEIGHT },
+      { key: "goldenBoot", count: honours.goldenBoot - share.goldenBoot, weight: GOAT_GOLDEN_BOOT_WEIGHT },
+      { key: "teamOfSeason", count: honours.teamOfSeason - share.teamOfSeason, weight: GOAT_TOTS_WEIGHT },
+      // Honours won in the Americas: the league awards at a club there, and the
+      // Americas' own awards, each priced as its European equivalent and then
+      // discounted.
+      { key: "playerOfSeasonAmericas", count: share.playerOfSeason, weight: GOAT_POTY_WEIGHT * k },
+      { key: "goldenBootAmericas", count: share.goldenBoot, weight: GOAT_GOLDEN_BOOT_WEIGHT * k },
+      { key: "teamOfSeasonAmericas", count: share.teamOfSeason, weight: GOAT_TOTS_WEIGHT * k },
+      {
+        key: "americasPlayerOfYear",
+        count: honours.americasPlayerOfYear ?? 0,
+        weight: GOAT_BALLON_DOR_WEIGHT * k,
+      },
+      { key: "americasTeamOfYear", count: honours.americasTeamOfYear ?? 0, weight: GOAT_WORLD_XI_WEIGHT * k },
+      {
+        key: "americasGoalkeeperOfYear",
+        count: honours.americasGoalkeeperOfYear ?? 0,
+        weight: GOAT_GOALKEEPER_AWARD_WEIGHT * k,
+      },
+      {
+        key: "americasDefenderOfYear",
+        count: honours.americasDefenderOfYear ?? 0,
+        weight: GOAT_DEFENDER_AWARD_WEIGHT * k,
+      },
     ]),
     component("trophies", [
-      { key: "worldCups", count: honours.worldCups, weight: GOAT_WORLD_CUP_WEIGHT },
+      { key: "worldCups", count: honours.worldCups, weight: GOAT_WORLD_CUP_WEIGHT * careerScale },
       { key: "cupTitles", count: honours.cupTitles, weight: GOAT_CUP_TITLE_WEIGHT },
-      { key: "leagueTitles", count: honours.leagueTitles, weight: GOAT_LEAGUE_TITLE_WEIGHT },
+      {
+        key: "leagueTitles",
+        count: honours.leagueTitles - share.leagueTitles,
+        weight: GOAT_LEAGUE_TITLE_WEIGHT,
+      },
       { key: "shieldTitles", count: honours.shieldTitles, weight: GOAT_SHIELD_TITLE_WEIGHT },
       {
         key: "domesticCupTitles",
-        count: honours.domesticCupTitles,
+        count: honours.domesticCupTitles - share.domesticCupTitles,
         weight: GOAT_DOMESTIC_CUP_TITLE_WEIGHT,
+      },
+      { key: "americasTitles", count: honours.americasTitles, weight: GOAT_AMERICAS_TITLE_WEIGHT * k },
+      { key: "leagueTitlesAmericas", count: share.leagueTitles, weight: GOAT_LEAGUE_TITLE_WEIGHT * k },
+      {
+        key: "domesticCupTitlesAmericas",
+        count: share.domesticCupTitles,
+        weight: GOAT_DOMESTIC_CUP_TITLE_WEIGHT * k,
       },
     ]),
     component("production", [
-      { key: "goals", count: career.totals.goals, weight: GOAT_GOAL_WEIGHT },
-      { key: "assists", count: career.totals.assists, weight: GOAT_ASSIST_WEIGHT },
-      { key: "caps", count: career.caps, weight: GOAT_CAP_WEIGHT },
+      { key: "goals", count: career.totals.goals, weight: GOAT_GOAL_WEIGHT * careerScale },
+      { key: "assists", count: career.totals.assists, weight: GOAT_ASSIST_WEIGHT * careerScale },
+      { key: "caps", count: career.caps, weight: GOAT_CAP_WEIGHT * careerScale },
     ]),
   ];
 
@@ -375,8 +555,9 @@ export function goatScores(
   careers: readonly CareerRow[],
 ): Map<number, number> {
   const honours = computeHonours(sources, careers);
+  const americas = new Set(sources.americasTids ?? []);
   return new Map(
-    careers.map((c) => [c.pid, scorePlayer(c, honours.get(c.pid) ?? emptyHonours()).score]),
+    careers.map((c) => [c.pid, scorePlayer(c, honours.get(c.pid) ?? emptyHonours(), americas).score]),
   );
 }
 
@@ -384,11 +565,22 @@ export function goatScores(
 export function playerGoatRanking(
   league: LeagueStore,
   limit = GOAT_LIST_LIMIT,
+  /**
+   * One continent's board: careers spent mostly there (see `careerRegion`).
+   * The Americas' board scores without AMERICAS_ACCOMPLISHMENT_SCALE — the
+   * discount exists to keep those careers off the world's lists, and among
+   * themselves it would only shrink every score alike. Absent means the world.
+   */
+  region?: ContinentalRegion,
 ): PlayerGoatRow[] {
-  const careers = allCareers(league);
-  const honours = computeHonours(honourSourcesOf(league), careers);
+  const sources = honourSourcesOf(league);
+  const americas = new Set(sources.americasTids ?? []);
+  const careers = allCareers(league)
+    .filter((c) => region === undefined || careerRegion(c.seasons, americas) === region);
+  const honours = computeHonours(sources, careers);
+  const scale = region === "americas" ? 1 : AMERICAS_ACCOMPLISHMENT_SCALE;
   return careers
-    .map((c) => scorePlayer(c, honours.get(c.pid) ?? emptyHonours()))
+    .map((c) => scorePlayer(c, honours.get(c.pid) ?? emptyHonours(), americas, scale))
     .sort((a, b) => b.score - a.score || a.career.pid - b.career.pid)
     .slice(0, limit);
 }
@@ -403,6 +595,7 @@ export interface TeamGoatRow {
   leagueTitles: number;
   cupTitles: number;
   shieldTitles: number;
+  americasTitles: number;
   domesticCupTitles: number;
   /** League, Continental Cup and domestic cup in one season. Scored as a bonus on top of all three. */
   trebles: number;
@@ -421,7 +614,12 @@ export interface TeamGoatRow {
  * club the save has ever recorded a season for — including one currently in the
  * second tier, which is the point of ranking careers rather than current form.
  */
-export function teamGoatRanking(league: LeagueStore, limit = GOAT_LIST_LIMIT): TeamGoatRow[] {
+export function teamGoatRanking(
+  league: LeagueStore,
+  limit = GOAT_LIST_LIMIT,
+  /** One continent's clubs, on the same terms as `playerGoatRanking`'s. Absent means the world. */
+  region?: ContinentalRegion,
+): TeamGoatRow[] {
   const tierByCompId = new Map(league.competitions.map((c) => [c.id, c.tier]));
   const rows = new Map<number, TeamGoatRow>();
   const rowFor = (tid: number): TeamGoatRow => {
@@ -429,7 +627,7 @@ export function teamGoatRanking(league: LeagueStore, limit = GOAT_LIST_LIMIT): T
     if (!r) {
       r = {
         tid, score: 0, components: [], leagueTitles: 0, cupTitles: 0, shieldTitles: 0,
-        domesticCupTitles: 0, trebles: 0, secondTierTitles: 0,
+        americasTitles: 0, domesticCupTitles: 0, trebles: 0, secondTierTitles: 0,
         topFinishes: 0, seasons: 0, topFlightSeasons: 0, ppg: 0,
       };
       rows.set(tid, r);
@@ -459,12 +657,16 @@ export function teamGoatRanking(league: LeagueStore, limit = GOAT_LIST_LIMIT): T
       const sorted = [...table].sort(
         (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.tid - b.tid,
       );
+      // A top flight's champion is the recorded one, not the table leader: a
+      // title playoff can crown someone other than the club that topped it.
+      const recordedChampion = tier === 1 ? h.championTidByCompId?.[compId] : undefined;
       sorted.forEach((row, i) => {
         const r = rowFor(row.tid);
         const position = i + 1;
         r.seasons += 1;
         if (tier === 1) r.topFlightSeasons += 1;
-        if (position === 1) {
+        const wonIt = recordedChampion !== undefined ? recordedChampion === row.tid : position === 1;
+        if (wonIt) {
           if (tier === 1) r.leagueTitles += 1; else r.secondTierTitles += 1;
         }
         // Contending seasons only count in the division that matters.
@@ -493,41 +695,50 @@ export function teamGoatRanking(league: LeagueStore, limit = GOAT_LIST_LIMIT): T
   for (const shield of league.shieldHistory ?? []) {
     if (shield.championTid != null) rowFor(shield.championTid).shieldTitles += 1;
   }
+  for (const cup of league.americasCupHistory ?? []) {
+    if (cup.championTid != null) rowFor(cup.championTid).americasTitles += 1;
+  }
   for (const cup of league.domesticCupHistory ?? []) {
     if (cup.championTid != null) rowFor(cup.championTid).domesticCupTitles += 1;
   }
 
   const treblesByTid = trebleCountByTid(league);
+  const americas = new Set(americasTids(league.teams, league.competitions));
 
   for (const r of rows.values()) {
     const p = played.get(r.tid) ?? 0;
     r.ppg = p > 0 ? (points.get(r.tid) ?? 0) / p : 0;
     r.trebles = treblesByTid.get(r.tid) ?? 0;
+    // A club never leaves its continent, so a club in the Americas has every
+    // line of its case discounted, the same scale its players' careers take.
+    const k = americas.has(r.tid) && region !== "americas" ? AMERICAS_ACCOMPLISHMENT_SCALE : 1;
     r.components = [
       component("trophies", [
-        { key: "cupTitles", count: r.cupTitles, weight: GOAT_TEAM_CUP_TITLE_WEIGHT },
-        { key: "leagueTitles", count: r.leagueTitles, weight: GOAT_TEAM_LEAGUE_TITLE_WEIGHT },
-        { key: "shieldTitles", count: r.shieldTitles, weight: GOAT_TEAM_SHIELD_TITLE_WEIGHT },
+        { key: "cupTitles", count: r.cupTitles, weight: GOAT_TEAM_CUP_TITLE_WEIGHT * k },
+        { key: "leagueTitles", count: r.leagueTitles, weight: GOAT_TEAM_LEAGUE_TITLE_WEIGHT * k },
+        { key: "shieldTitles", count: r.shieldTitles, weight: GOAT_TEAM_SHIELD_TITLE_WEIGHT * k },
+        { key: "americasTitles", count: r.americasTitles, weight: GOAT_TEAM_AMERICAS_TITLE_WEIGHT * k },
         {
           key: "domesticCupTitles",
           count: r.domesticCupTitles,
-          weight: GOAT_TEAM_DOMESTIC_CUP_TITLE_WEIGHT,
+          weight: GOAT_TEAM_DOMESTIC_CUP_TITLE_WEIGHT * k,
         },
         // Sits with the trophies because that is what it is made of, and after
         // them so the row reads as "these three, and all three at once".
-        { key: "trebles", count: r.trebles, weight: GOAT_TEAM_TREBLE_WEIGHT },
-        { key: "secondTierTitles", count: r.secondTierTitles, weight: GOAT_TEAM_SECOND_TIER_TITLE_WEIGHT },
+        { key: "trebles", count: r.trebles, weight: GOAT_TEAM_TREBLE_WEIGHT * k },
+        { key: "secondTierTitles", count: r.secondTierTitles, weight: GOAT_TEAM_SECOND_TIER_TITLE_WEIGHT * k },
       ]),
       component("longevity", [
-        { key: "topFinishes", count: r.topFinishes, weight: GOAT_TEAM_TOP_FINISH_WEIGHT },
-        { key: "topFlightSeasons", count: r.topFlightSeasons, weight: GOAT_TEAM_SEASON_WEIGHT },
-        { key: "ppgSurplus", count: ppgSurplus.get(r.tid) ?? 0, weight: GOAT_TEAM_PPG_WEIGHT },
+        { key: "topFinishes", count: r.topFinishes, weight: GOAT_TEAM_TOP_FINISH_WEIGHT * k },
+        { key: "topFlightSeasons", count: r.topFlightSeasons, weight: GOAT_TEAM_SEASON_WEIGHT * k },
+        { key: "ppgSurplus", count: ppgSurplus.get(r.tid) ?? 0, weight: GOAT_TEAM_PPG_WEIGHT * k },
       ]),
     ];
     r.score = r.components.reduce((sum, c) => sum + c.points, 0);
   }
 
   return [...rows.values()]
+    .filter((r) => region === undefined || inRegion(r.tid, region, americas))
     .sort((a, b) => b.score - a.score || a.tid - b.tid)
     .slice(0, limit);
 }

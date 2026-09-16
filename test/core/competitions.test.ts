@@ -37,8 +37,8 @@ describe("competitions", () => {
 describe("worldCompetitions", () => {
   const comps = worldCompetitions();
 
-  it("has 36 entries: twelve countries, three divisions each", () => {
-    expect(comps).toHaveLength(36);
+  it("has 48 entries: sixteen countries, three divisions each", () => {
+    expect(comps).toHaveLength(48);
   });
 
   it("starts with England, matching englandCompetitions() exactly", () => {
@@ -89,6 +89,7 @@ describe("worldCompetitions", () => {
     expect(chains.map((c) => c.country)).toEqual([
       "England", "Spain", "Italy", "Germany", "France", "Portugal", "Belgium", "Turkey",
       "Netherlands", "Scotland", "Greece", "Serbia",
+      "Brazil", "Argentina", "Mexico", "United States",
     ]);
     for (const { country, divisions } of chains) {
       expect(divisions.map((d) => d.tier)).toEqual([1, 2, 3]);
@@ -135,7 +136,7 @@ function divisionsOfTiers(comps: Competition[], country: string): number[] {
 }
 
 describe("countryClubRanges", () => {
-  it("splits the world into 12 contiguous ranges, in table order", () => {
+  it("splits the world into 16 contiguous ranges, in table order", () => {
     const ranges = countryClubRanges(worldCompetitions());
     expect(ranges).toEqual([
       // Blocks are sized by each country's real division sizes and by how deep
@@ -154,6 +155,12 @@ describe("countryClubRanges", () => {
       { country: "Scotland", start: 504, end: 536 },
       { country: "Greece", start: 536, end: 578 },
       { country: "Serbia", start: 578, end: 626 },
+      // The Americas are appended, so every European block above is unchanged.
+      { country: "Brazil", start: 626, end: 686 },
+      // Argentina (30/36/20) and the US (30/30/16) field split top two divisions.
+      { country: "Argentina", start: 686, end: 772 },
+      { country: "Mexico", start: 772, end: 822 },
+      { country: "United States", start: 822, end: 898 },
     ]);
   });
 });
