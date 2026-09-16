@@ -12,7 +12,7 @@
 import type { LeagueStore } from "../../core/leagueState.js";
 import type { PlayedMatch } from "../../core/standings.js";
 import type { CupState } from "../../core/cup/types.js";
-import { competitionOf } from "../../core/competitions.js";
+import { competitionOf, competitionSplit } from "../../core/competitions.js";
 import { cupRoundName, koRoundsOf } from "../../core/cup/cup.js";
 import type { DomesticCupState } from "../../core/domesticCup/types.js";
 import { domesticRoundName } from "../../core/domesticCup/cup.js";
@@ -94,6 +94,7 @@ function leagueCandidate(
         liveTableRows(
           compTeamIds, priorMatches, [match, ...otherMatches], minute,
           pointsDeductionMap(before.debtSanctions, before.season),
+          competitionSplit(competitionOf(before.competitions, userTeam.compId)),
         ),
       lineups: matchLineups(played.boxScore),
     },

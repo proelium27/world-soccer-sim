@@ -1,3 +1,4 @@
+import { compareStandingsRows, recordedChampion } from "../standings.js";
 import type { LeagueStore } from "../leagueState.js";
 import { RATING_BASELINE } from "../../engine/matchRating.js";
 import {
@@ -655,17 +656,17 @@ export function teamGoatRanking(
     for (const [compId, table] of byComp) {
       const tier = tierByCompId.get(compId) ?? 1;
       const sorted = [...table].sort(
-        (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.tid - b.tid,
+        compareStandingsRows,
       );
       // A top flight's champion is the recorded one, not the table leader: a
       // title playoff can crown someone other than the club that topped it.
-      const recordedChampion = tier === 1 ? h.championTidByCompId?.[compId] : undefined;
+      const recorded = recordedChampion(h, compId, tier);
       sorted.forEach((row, i) => {
         const r = rowFor(row.tid);
         const position = i + 1;
         r.seasons += 1;
         if (tier === 1) r.topFlightSeasons += 1;
-        const wonIt = recordedChampion !== undefined ? recordedChampion === row.tid : position === 1;
+        const wonIt = recorded !== undefined ? recorded === row.tid : position === 1;
         if (wonIt) {
           if (tier === 1) r.leagueTitles += 1; else r.secondTierTitles += 1;
         }

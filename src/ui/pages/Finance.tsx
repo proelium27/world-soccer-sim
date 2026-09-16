@@ -11,7 +11,7 @@ import {
 import { seasonPrizeIncome } from "../../core/finance/prizeIncome.js";
 import { ClauseLedger } from "../components/ClauseLedger.js";
 import { CompetitionSelect } from "../components/CompetitionSelect.js";
-import { competitionOf, competitionTeamCount } from "../../core/competitions.js";
+import { competitionOf, competitionTeamCount, competitionSplit } from "../../core/competitions.js";
 import { clausesOwedBy, clausesOwedTo } from "../../core/transfers/clauses.js";
 import {
   SCOUTING_SPEND_MAX, difficultyProfile, DEBT_INTEREST_RATE, DEBT_DEDUCTION_POINTS,
@@ -154,6 +154,7 @@ export function Finance() {
     const matches = league.played.filter((m) => divisionTids.has(m.home));
     const standings = computeStandings(
       divisionTeamIds, matches, pointsDeductionMap(league.debtSanctions, league.season),
+      competitionSplit(competitionOf(league.competitions, userTeam.compId)),
     );
     return {
       rank: standings.findIndex((r) => r.tid === league.meta.userTid) + 1,

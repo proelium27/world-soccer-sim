@@ -46,7 +46,9 @@ import {
   COUNTRY_REGION, DEFAULT_CONTINENTAL_REGION, type ContinentalRegion,
   COUNTRY_TITLE_PLAYOFF, type TitlePlayoffFormat, AMERICAS_CUP_LEAGUE_SLOTS,
   COUNTRY_CONFERENCES, type ConferenceFormat,
+  COUNTRY_LOWER_TITLE_PLAYOFF, COUNTRY_SEASON_FORMAT, type SeasonFormat,
 } from "./constants.js";
+import { SEASON_MATCHDAYS } from "./calendar.js";
 import {
   LEAGUE_NATIONALITY_WEIGHTS, sanitizeNationalityWeights, type NationalityWeights,
 } from "./players/nationalities.js";
@@ -130,14 +132,25 @@ export interface Competition {
    */
   conferences?: ConferenceFormat;
   /**
+   * How the league season is played when it is not a plain double round robin:
+   * how many times clubs meet, and whether the table then splits into groups.
+   * Absent → `COUNTRY_SEASON_FORMAT`. Resolve through `competitionSeasonFormat`,
+   * never the field.
+   */
+  seasonFormat?: SeasonFormat;
+  /**
    * How many clubs swap with the division below (or above) at the end of each
    * season. Absent → PROMOTION_RELEGATION_COUNT, which is what every shipped
    * country plays and what a save made before the knob existed keeps.
    *
-   * Written to BOTH divisions of a country, because buildCompetitions builds
-   * the pair from one spec and they cannot drift; either one answers the
-   * question. Meaningless on a one-division country, which has no partner to
-   * swap with — promotionLinks emits no link for it, so this is never read.
+   * A division's own value describes the link to the division ABOVE it, which
+   * is what lets a country run different counts at each step (Spain: three up
+   * from its second tier, four from its third). A top flight's value is only
+   * the fallback for a division below that carries none. buildCompetitions
+   * writes the spec's count to every division and a per-link override on the
+   * third, so a save made before per-link rules carries one value everywhere
+   * and reads exactly as it did. Meaningless on a one-division country, which
+   * has no partner to swap with — promotionLinks emits no link for it.
    *
    * Resolve through competitionPromotionSpots, never the field: it also holds
    * the number inside what the divisions can supply.
@@ -149,7 +162,7 @@ export interface Competition {
    * `DEFAULT_PLAYOFF_FORMAT`, so no existing save carries this field and none
    * needed migrating for it.
    *
-   * Written to both divisions like `promotionSpots`, and for the same reason.
+   * Per link, read off the lower division first, exactly like `promotionSpots`.
    * Resolve through `competitionPlayoffFormat`, never the field.
    */
   playoffFormat?: PlayoffFormat;
@@ -244,7 +257,12 @@ export function competitionTeamCount(comp: Competition): number {
  */
 export function competitionPromotionSpots(comp: Competition, partner: Competition | null): number {
   if (!partner) return 0;
-  const want = comp.promotionSpots ?? partner.promotionSpots ?? PROMOTION_RELEGATION_COUNT;
+  // The LOWER division's own value describes the link above it, so a country
+  // can run different rules at each step of its pyramid (Spain sends three up
+  // from its second tier but four from its third). A save written before that
+  // carries the same value on every division, so it reads identically.
+  const [upper, lower] = comp.tier <= partner.tier ? [comp, partner] : [partner, comp];
+  const want = lower.promotionSpots ?? upper.promotionSpots ?? PROMOTION_RELEGATION_COUNT;
   // A non-finite value would survive the clamp as NaN, which `slice(-NaN)` then
   // reads as slicing the whole table. Treat it as no swap rather than every swap.
   if (!Number.isFinite(want)) return 0;
@@ -266,7 +284,9 @@ export function competitionPlayoffFormat(
   d1: Competition,
   d2: Competition | null,
 ): PlayoffFormat {
-  const set = d1.playoffFormat ?? d2?.playoffFormat;
+  // Lower division first, for the reason competitionPromotionSpots gives.
+  const [upper, lower] = !d2 || d1.tier <= d2.tier ? [d1, d2] : [d2, d1];
+  const set = lower?.playoffFormat ?? upper.playoffFormat;
   if (set) return set;
   return COUNTRY_PLAYOFF_FORMAT[d1.country] ?? DEFAULT_PLAYOFF_FORMAT;
 }
@@ -332,11 +352,17 @@ export function competitionRegion(comp: Competition): ContinentalRegion {
  * its own playoff (see PlayoffFormat) — so every other tier answers `none`.
  */
 export function competitionTitlePlayoff(comp: Competition): TitlePlayoffFormat {
-  if (comp.tier !== 1) return "none";
-  const format = comp.titlePlayoff ?? COUNTRY_TITLE_PLAYOFF[comp.country] ?? "none";
-  // Both split formats seed per half, so a division that isn't split plays a
+  // A lower division only holds one where the shipped table says so, which is
+  // only ever a closed division (see COUNTRY_LOWER_TITLE_PLAYOFF). The
+  // competition's own field is not read below the top flight, because
+  // buildCompetitions writes it to every division of a country.
+  const format = comp.tier === 1
+    ? comp.titlePlayoff ?? COUNTRY_TITLE_PLAYOFF[comp.country] ?? "none"
+    : COUNTRY_LOWER_TITLE_PLAYOFF[comp.country]?.[comp.tier] ?? "none";
+  // The split formats seed per half, so a division that isn't split plays a
   // plain bracket instead of one with nothing to seed from.
-  if ((format === "conference" || format === "zones") && !competitionConferences(comp)) return "single";
+  const split = format === "conference" || format === "zones" || format === "conference-single";
+  if (split && !competitionConferences(comp)) return "single";
   return format;
 }
 
@@ -370,11 +396,114 @@ export function competitionConferences(comp: Competition): ConferenceFormat | nu
 export function competitionSeasonGames(comp: Competition): number {
   const n = competitionTeamCount(comp);
   const split = competitionConferences(comp);
-  if (!split) return 2 * (n - 1);
+  if (!split) {
+    // A season format plays its first phase, then the largest group's games.
+    const format = competitionSeasonFormat(comp);
+    const groupGames = format.split
+      ? Math.max(...format.split.groups.map((g, i) => format.split!.legs[i] * (g - 1)))
+      : 0;
+    return format.legs * (n - 1) + groupGames;
+  }
+  // Two unequal halves (an odd division) play only their own half twice, and
+  // the larger half's count is the season's length.
+  if (n % 2 === 1) return 2 * (Math.ceil(n / 2) - 1);
   const half = Math.floor(n / 2);
   const odd = half % 2 === 1;
   const own = odd ? 2 * half : 2 * (half - 1);
   return own + Math.min(split.crossRounds, half - (odd ? 1 : 0));
+}
+
+/** Rounds a round robin of `n` clubs takes to play `legs` times: n-1 a leg, or n with a bye when odd. */
+export function roundRobinRounds(n: number, legs: number): number {
+  return legs * (n % 2 === 1 ? n : n - 1);
+}
+
+/** A plain double round robin, and what every division without a format plays. */
+const DOUBLE_ROUND_ROBIN: SeasonFormat = { legs: 2 };
+
+/**
+ * How this division's season is played. Falls back to a double round robin
+ * whenever the configured format cannot run here, rather than half-running it:
+ *
+ *  - a split division's groups must add up to exactly its clubs, or a club
+ *    would belong to no group (or two);
+ *  - the whole season must fit the SEASON_MATCHDAYS grid;
+ *  - a division already split into conferences plays its conference schedule,
+ *    which is a different answer to the same calendar problem.
+ */
+export function competitionSeasonFormat(comp: Competition): SeasonFormat {
+  if (competitionConferences(comp)) return DOUBLE_ROUND_ROBIN;
+  const format = comp.seasonFormat ?? COUNTRY_SEASON_FORMAT[comp.country]?.[comp.tier];
+  if (!format) return DOUBLE_ROUND_ROBIN;
+  const n = competitionTeamCount(comp);
+  const legs = Math.floor(format.legs);
+  if (!(legs >= 1)) return DOUBLE_ROUND_ROBIN;
+  if (!format.split) {
+    return roundRobinRounds(n, legs) <= SEASON_MATCHDAYS ? { legs } : DOUBLE_ROUND_ROBIN;
+  }
+  const { groups, legs: groupLegs } = format.split;
+  const valid = groups.length >= 2
+    && groups.length === groupLegs.length
+    && groups.every((g) => Number.isInteger(g) && g >= 2)
+    && groupLegs.every((l) => Number.isInteger(l) && l >= 1)
+    && groups.reduce((a, b) => a + b, 0) === n;
+  if (!valid) return DOUBLE_ROUND_ROBIN;
+  return seasonFormatRounds({ legs, split: format.split }, n).total <= SEASON_MATCHDAYS
+    ? { legs, split: format.split }
+    : DOUBLE_ROUND_ROBIN;
+}
+
+/** How many rounds each phase of a season format takes, for a division of `n` clubs. */
+export function seasonFormatRounds(
+  format: SeasonFormat,
+  n: number,
+): { first: number; second: number; total: number } {
+  const first = roundRobinRounds(n, format.legs);
+  const second = format.split
+    ? Math.max(...format.split.groups.map((g, i) => roundRobinRounds(g, format.split!.legs[i])))
+    : 0;
+  return { first, second, total: first + second };
+}
+
+/**
+ * Which matchday on the season grid a division's round lands on, given how
+ * many rounds its whole season has. A 38-round season maps one to one; a
+ * shorter one spreads evenly so it still starts early and finishes on the last
+ * matchday. Never throws: rounds past the grid are the caller's to prevent.
+ */
+export function roundToMatchday(round: number, totalRounds: number): number {
+  if (totalRounds === SEASON_MATCHDAYS) return round;
+  return Math.round((round * SEASON_MATCHDAYS) / totalRounds);
+}
+
+/** What `computeStandings` needs to rank a split table. See `StandingsSplit`. */
+export interface CompetitionSplit {
+  /** Group sizes, top first. */
+  groups: readonly number[];
+  /** Group names, index-aligned with `groups`. */
+  names: readonly string[];
+  /** The last grid matchday of the first phase: matches on or before it seed the groups. */
+  lastFirstPhaseMatchday: number;
+  /** How many matches the first phase has; the split only applies once all of them are played. */
+  firstPhaseMatches: number;
+}
+
+/**
+ * The split this division's table follows, or undefined for a single table.
+ * Every table a human reads or the sim decides anything on passes this to
+ * `computeStandings`, so a club finishes inside its group everywhere at once.
+ */
+export function competitionSplit(comp: Competition): CompetitionSplit | undefined {
+  const format = competitionSeasonFormat(comp);
+  if (!format.split) return undefined;
+  const n = competitionTeamCount(comp);
+  const rounds = seasonFormatRounds(format, n);
+  return {
+    groups: format.split.groups,
+    names: format.split.names,
+    lastFirstPhaseMatchday: roundToMatchday(rounds.first, rounds.total),
+    firstPhaseMatches: format.legs * (n * (n - 1)) / 2,
+  };
 }
 
 /** This league's money multiplier, before the tier scale. See Competition.budgetScale. */
@@ -441,37 +570,56 @@ export function worldCompetitions(): Competition[] {
     { id: 2, country: "England", tier: 3, name: "English Division 3" },
     { id: 3, country: "Spain", tier: 1, name: "Spanish Division 1" },
     { id: 4, country: "Spain", tier: 2, name: "Spanish Division 2" },
-    { id: 5, country: "Spain", tier: 3, name: "Spanish Division 3" },
+    // Spain and Italy send three up from their second tiers (two automatic, one
+    // playoff) but FOUR up from their third: the bottom four of the second tier
+    // go down, which is LaLiga 2's real rule and the one Serie B's pyramid uses.
+    { id: 5, country: "Spain", tier: 3, name: "Spanish Division 3", promotionSpots: 4 },
     { id: 6, country: "Italy", tier: 1, name: "Italian Division 1" },
     { id: 7, country: "Italy", tier: 2, name: "Italian Division 2" },
-    { id: 8, country: "Italy", tier: 3, name: "Italian Division 3" },
+    { id: 8, country: "Italy", tier: 3, name: "Italian Division 3", promotionSpots: 4 },
     { id: 9, country: "Germany", tier: 1, name: "German Division 1", teamCount: 18 },
     { id: 10, country: "Germany", tier: 2, name: "German Division 2", teamCount: 18 },
     { id: 11, country: "Germany", tier: 3, name: "German Division 3" },
     { id: 12, country: "France", tier: 1, name: "French Division 1", teamCount: 18 },
     { id: 13, country: "France", tier: 2, name: "French Division 2", teamCount: 18 },
-    { id: 14, country: "France", tier: 3, name: "French Division 3", teamCount: 18 },
-    { id: 15, country: "Portugal", tier: 1, name: "Portuguese Division 1", teamCount: 18, promotionSpots: 2 },
-    { id: 16, country: "Portugal", tier: 2, name: "Portuguese Division 2", teamCount: 18, promotionSpots: 2 },
-    { id: 17, country: "Portugal", tier: 3, name: "Portuguese Division 3", teamCount: 18, promotionSpots: 2 },
-    { id: 18, country: "Belgium", tier: 1, name: "Belgian Division 1", teamCount: 16, promotionSpots: 2 },
+    // France's top link plays the French ladder (COUNTRY_PLAYOFF_FORMAT); its
+    // third tier plays an English bracket into the second, set here.
+    { id: 14, country: "France", tier: 3, name: "French Division 3", teamCount: 18, playoffFormat: "english" },
+    // Portugal: 18/18/20, two up and two down automatically at each step and a
+    // third place settled by the German tie (COUNTRY_PLAYOFF_FORMAT).
+    { id: 15, country: "Portugal", tier: 1, name: "Portuguese Division 1", teamCount: 18 },
+    { id: 16, country: "Portugal", tier: 2, name: "Portuguese Division 2", teamCount: 18 },
+    { id: 17, country: "Portugal", tier: 3, name: "Portuguese Division 3" },
+    // Belgium: 18/16, the bottom two and top two swap straight. Its real third
+    // tier is a semi-professional patchwork with no way up, so the third
+    // division here is closed.
+    { id: 18, country: "Belgium", tier: 1, name: "Belgian Division 1", teamCount: 18, promotionSpots: 2 },
     { id: 19, country: "Belgium", tier: 2, name: "Belgian Division 2", teamCount: 16, promotionSpots: 2 },
-    { id: 20, country: "Belgium", tier: 3, name: "Belgian Division 3", teamCount: 16, promotionSpots: 2 },
+    { id: 20, country: "Belgium", tier: 3, name: "Belgian Division 3", teamCount: 16, promotionSpots: 0 },
+    // Turkey: 18/18, three up and down with an English bracket at each step.
     { id: 21, country: "Turkey", tier: 1, name: "Turkish Division 1", teamCount: 18 },
-    { id: 22, country: "Turkey", tier: 2, name: "Turkish Division 2" },
+    { id: 22, country: "Turkey", tier: 2, name: "Turkish Division 2", teamCount: 18 },
     { id: 23, country: "Turkey", tier: 3, name: "Turkish Division 3", teamCount: 18 },
-    { id: 24, country: "Netherlands", tier: 1, name: "Dutch Division 1", teamCount: 18, promotionSpots: 2 },
-    { id: 25, country: "Netherlands", tier: 2, name: "Dutch Division 2", promotionSpots: 2 },
-    { id: 26, country: "Netherlands", tier: 3, name: "Dutch Division 3", teamCount: 18, promotionSpots: 2 },
-    { id: 27, country: "Scotland", tier: 1, name: "Scottish Division 1", teamCount: 12, promotionSpots: 1 },
-    { id: 28, country: "Scotland", tier: 2, name: "Scottish Division 2", teamCount: 10, promotionSpots: 1 },
-    { id: 29, country: "Scotland", tier: 3, name: "Scottish Division 3", teamCount: 10, promotionSpots: 1 },
+    // Netherlands: 18/20 with the German system between them. The Dutch third
+    // tier is semi-professional with no promotion, so it is closed here.
+    { id: 24, country: "Netherlands", tier: 1, name: "Dutch Division 1", teamCount: 18 },
+    { id: 25, country: "Netherlands", tier: 2, name: "Dutch Division 2" },
+    { id: 26, country: "Netherlands", tier: 3, name: "Dutch Division 3", teamCount: 18, promotionSpots: 0 },
+    // Scotland: 12/10/10. The top flight is a triple round robin that splits
+    // into two sixes; the two below play each other four times
+    // (COUNTRY_SEASON_FORMAT). One up and down automatically at each step, the
+    // second place by the German tie (the second tier's runner-up against the
+    // top flight's eleventh).
+    { id: 27, country: "Scotland", tier: 1, name: "Scottish Division 1", teamCount: 12, promotionSpots: 2 },
+    { id: 28, country: "Scotland", tier: 2, name: "Scottish Division 2", teamCount: 10, promotionSpots: 2 },
+    { id: 29, country: "Scotland", tier: 3, name: "Scottish Division 3", teamCount: 10, promotionSpots: 2 },
     { id: 30, country: "Greece", tier: 1, name: "Greek Division 1", teamCount: 14, promotionSpots: 2 },
     { id: 31, country: "Greece", tier: 2, name: "Greek Division 2", teamCount: 16, promotionSpots: 2 },
     { id: 32, country: "Greece", tier: 3, name: "Greek Division 3", teamCount: 12, promotionSpots: 2 },
-    { id: 33, country: "Serbia", tier: 1, name: "Serbian Division 1", teamCount: 16, promotionSpots: 2 },
-    { id: 34, country: "Serbia", tier: 2, name: "Serbian Division 2", teamCount: 16, promotionSpots: 2 },
-    { id: 35, country: "Serbia", tier: 3, name: "Serbian Division 3", teamCount: 16, promotionSpots: 2 },
+    // Serbia: down to 12/12, the size its league is moving to.
+    { id: 33, country: "Serbia", tier: 1, name: "Serbian Division 1", teamCount: 12, promotionSpots: 2 },
+    { id: 34, country: "Serbia", tier: 2, name: "Serbian Division 2", teamCount: 12, promotionSpots: 2 },
+    { id: 35, country: "Serbia", tier: 3, name: "Serbian Division 3", teamCount: 12, promotionSpots: 2 },
     // ── The Americas ────────────────────────────────────────────────────────
     // Appended, so every European country's tids and generated players are
     // untouched. Each plays its continental football in the Americas Cup rather
@@ -502,12 +650,12 @@ export function worldCompetitions(): Competition[] {
     // and a per-conference playoff for the title. The divisions below stand in
     // for the USL.
     { id: 45, country: "United States", tier: 1, name: "US Division 1", teamCount: 30, promotionSpots: 0 },
-    // 30 clubs in Eastern and Western Conferences of 15, placed by geography, so
-    // the top flight has one second-division club per top-flight club (see
-    // COUNTRY_CONFERENCES). The real USL Championship has ~24; the ratio is the
-    // part the dynasty needs.
-    { id: 46, country: "United States", tier: 2, name: "US Division 2", teamCount: 30, promotionSpots: 0 },
-    { id: 47, country: "United States", tier: 3, name: "US Division 3", teamCount: 16, promotionSpots: 0 },
+    // The USL Championship's shape: 25 clubs in Eastern and Western Conferences
+    // of 13 and 12, placed by geography, with the top eight of each into a
+    // playoff. Below it USL League One's single table of 17, top eight into a
+    // playoff (COUNTRY_LOWER_TITLE_PLAYOFF).
+    { id: 46, country: "United States", tier: 2, name: "US Division 2", teamCount: 25, promotionSpots: 0 },
+    { id: 47, country: "United States", tier: 3, name: "US Division 3", teamCount: 17, promotionSpots: 0 },
   ];
 }
 
@@ -568,6 +716,15 @@ export interface LeagueSpec {
    * system for a shipped country, else the default. See PlayoffFormat.
    */
   playoffFormat?: PlayoffFormat;
+  /**
+   * The link between the second and third divisions, when it differs from the
+   * one above it. Absent → `promotionSpots` / `playoffFormat`. Ignored unless
+   * `divisions` is 3. Zero closes the third division off entirely, which is the
+   * Netherlands' and Belgium's real situation (a semi-professional tier with no
+   * way up).
+   */
+  d3PromotionSpots?: number;
+  d3PlayoffFormat?: PlayoffFormat;
   /**
    * The league's nationality mix, as relative weights. Absent → the shipped
    * country table, or England's for an invented country. Both of a country's
@@ -635,6 +792,12 @@ export function buildCompetitions(specs: LeagueSpec[]): Competition[] {
         name: names[tier - 1]?.trim() || `${spec.country} Division ${tier}`,
         ...shared,
         ...withDefined({ teamCount: counts[tier - 1] }),
+        // The third division carries the link above it, so its own override
+        // replaces the shared value there and nowhere else.
+        ...(tier === 3 ? withDefined({
+          promotionSpots: spec.d3PromotionSpots,
+          playoffFormat: spec.d3PlayoffFormat,
+        }) : {}),
       });
     }
   }
@@ -667,6 +830,9 @@ export interface ResolvedLeagueSpec {
   d3Teams: number;
   promotionSpots: number;
   playoffFormat: PlayoffFormat;
+  /** The second-to-third link, resolved. Equal to the pair above unless overridden. */
+  d3PromotionSpots: number;
+  d3PlayoffFormat: PlayoffFormat;
   cupSlots: number;
   shieldSlots: number;
   nationalities: NationalityWeights;
@@ -685,6 +851,9 @@ export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
   // what keeps the field warnings below from counting it toward the Cup.
   const region = spec.region ?? COUNTRY_REGION[spec.country] ?? DEFAULT_CONTINENTAL_REGION;
   const european = region === "europe";
+  const promotionSpots = spec.promotionSpots ?? PROMOTION_RELEGATION_COUNT;
+  const playoffFormat = spec.playoffFormat
+    ?? COUNTRY_PLAYOFF_FORMAT[spec.country] ?? DEFAULT_PLAYOFF_FORMAT;
   return {
     region,
     divisions: spec.divisions ?? 2,
@@ -693,9 +862,10 @@ export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
     d1Teams: spec.d1Teams ?? NUM_TEAMS,
     d2Teams: spec.d2Teams ?? NUM_TEAMS_D2,
     d3Teams: spec.d3Teams ?? NUM_TEAMS_D3,
-    promotionSpots: spec.promotionSpots ?? PROMOTION_RELEGATION_COUNT,
-    playoffFormat: spec.playoffFormat
-      ?? COUNTRY_PLAYOFF_FORMAT[spec.country] ?? DEFAULT_PLAYOFF_FORMAT,
+    promotionSpots,
+    playoffFormat,
+    d3PromotionSpots: spec.d3PromotionSpots ?? promotionSpots,
+    d3PlayoffFormat: spec.d3PlayoffFormat ?? playoffFormat,
     cupSlots: european
       ? spec.cupSlots ?? (weak ? CUP_WEAK_LEAGUE_SLOTS : CUP_STRONG_LEAGUE_SLOTS)
       : 0,
@@ -845,6 +1015,10 @@ export function worldLeagueSpecs(): LeagueSpec[] {
       ...(d3?.teamCount === undefined ? {} : { d3Teams: d3.teamCount }),
       ...(d1.promotionSpots === undefined ? {} : { promotionSpots: d1.promotionSpots }),
       ...(d1.playoffFormat === undefined ? {} : { playoffFormat: d1.playoffFormat }),
+      // A third division that runs its own link spells it out; one that follows
+      // the pair above carries the same value (or none), so nothing is emitted.
+      ...(d3 && d3.promotionSpots !== d1.promotionSpots ? { d3PromotionSpots: d3.promotionSpots } : {}),
+      ...(d3 && d3.playoffFormat !== d1.playoffFormat ? { d3PlayoffFormat: d3.playoffFormat } : {}),
       ...(d2 ? { d2Name: d2.name } : {}),
       ...(d3 ? { d3Name: d3.name } : {}),
       // Two is the default, so only a country that differs spells it out — which

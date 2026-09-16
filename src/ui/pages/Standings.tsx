@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useLeague } from "../context/LeagueContext.js";
 import { HelpHint, PotHelp } from "../components/HelpHint.js";
 import { computeStandings, type StandingsRow } from "../../core/standings.js";
@@ -6,7 +6,7 @@ import { pointsDeductionMap } from "../../core/finance/debt.js";
 import { computeTeamRating } from "../../core/teams/teamRating.js";
 import { teamSlots } from "../../core/lineup/formations.js";
 import {
-  tierOf, competitionRegion, competitionConferences, competitionTitlePlayoff,
+  tierOf, competitionRegion, competitionConferences, competitionTitlePlayoff, competitionSplit,
 } from "../../core/competitions.js";
 import { conferenceMembers } from "../../core/conferences.js";
 import { worldHasCup, cupSlotsForCompetition, cupSlotRange } from "../../core/cup/cup.js";
@@ -15,6 +15,7 @@ import type { QualificationRoute } from "../../core/cup/qualification.js";
 import type { CupCompetitionId } from "../../core/constants.js";
 import {
   SHIELD_FORMAT, AMERICAS_CUP_FORMAT, CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS,
+  CONFERENCE_SINGLE_PLAYOFF_TEAMS,
 } from "../../core/constants.js";
 import { CompetitionSelect } from "../components/CompetitionSelect.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -144,6 +145,8 @@ export function Standings() {
       // A past season's stored table already has its deductions applied — the
       // offseason computed it that way — so only the live table needs them here.
       pointsDeductionMap(league.debtSanctions, league.season),
+      // Likewise its split: a stored table is already in group order.
+      comp ? competitionSplit(comp) : undefined,
     );
     // A "champion" only means something once the season has actually been
     // DECIDED, which is the offseason phase — not merely once a ball has been
@@ -167,7 +170,9 @@ export function Standings() {
         .map(([tid]) => Number(tid)),
     );
     standings = entry.table.filter((row) => compTids.has(row.tid));
-    championTid = entry.championTidByCompId[compId] ?? (standings[0]?.tid ?? -1);
+    championTid = entry.championTidByCompId[compId]
+      ?? entry.lowerChampionTidByCompId?.[compId]
+      ?? (standings[0]?.tid ?? -1);
   }
 
   // The two halves of a split league. Only for the season being played: no
@@ -178,7 +183,12 @@ export function Standings() {
   const titleFormat = comp ? competitionTitlePlayoff(comp) : "none";
   const playoffCut = titleFormat === "conference" ? CONFERENCE_PLAYOFF_TEAMS
     : titleFormat === "zones" ? ZONE_PLAYOFF_TEAMS
-      : 0;
+      : titleFormat === "conference-single" ? CONFERENCE_SINGLE_PLAYOFF_TEAMS
+        : 0;
+  // The groups a split table finishes in, named on a divider row where each
+  // starts. Only while the table is in its natural order: sorted by another
+  // column, the groups interleave and a divider would label the wrong rows.
+  const groupNames = comp ? competitionSplit(comp)?.names : undefined;
   const showHalves = !!halves && view === "conferences";
 
   // OVR/POT are only shown (and sortable) for the current season. Precompute
@@ -243,8 +253,10 @@ export function Standings() {
           </tr>
         </thead>
         <tbody>
-          {displayRows.map((row) => {
+          {displayRows.map((row, i) => {
             const pos = posByTid.get(row.tid) ?? 0;
+            const groupStarts = naturalOrder && row.group !== undefined
+              && (i === 0 || displayRows[i - 1].group !== row.group);
             const isUser = row.tid === league.meta.userTid;
             const isChampion = row.tid === championTid;
             const place = qualification.byTid.get(row.tid);
@@ -259,7 +271,15 @@ export function Standings() {
             const qualBar = qualBarClass(shown);
             const rating = ratingByTid.get(row.tid) ?? null;
             return (
-              <tr key={row.tid} className={rowClass}>
+              <Fragment key={row.tid}>
+              {groupStarts && (
+                <tr className="table-group-divider-row">
+                  <td colSpan={season === "current" ? 12 : 10} className="small text-muted fw-semibold">
+                    {groupNames?.[row.group!] ?? `Group ${row.group! + 1}`}
+                  </td>
+                </tr>
+              )}
+              <tr className={rowClass}>
                 <td className="text-end qual-pos">
                   {/* Qualification is a bar on the row's leading edge, the
                       league-table convention. It is absolutely positioned, so
@@ -316,6 +336,7 @@ export function Standings() {
                 {season === "current" && <td className="text-end">{rating?.ovr ?? "-"}</td>}
                 {season === "current" && <td className="text-end">{rating?.pot ?? "-"}</td>}
               </tr>
+              </Fragment>
             );
           })}
         </tbody>

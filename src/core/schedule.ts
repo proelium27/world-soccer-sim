@@ -1,7 +1,12 @@
 import type { Competition } from "./competitions.js";
-import { competitionConferences } from "./competitions.js";
+import {
+  competitionConferences, competitionSeasonFormat, seasonFormatRounds, roundToMatchday,
+  competitionSplit, competitionTeamCount,
+} from "./competitions.js";
 import { conferenceMembers, type ConferenceTeam } from "./conferences.js";
 import { SEASON_MATCHDAYS } from "./calendar.js";
+import type { MatchScore } from "./standings.js";
+import { computeStandings } from "./standings.js";
 
 /** Flat fixture kept for backward compatibility with existing tests and season.ts. */
 export interface Fixture {
@@ -115,6 +120,57 @@ export function generateSchedule(teamIds: number[]): ScheduleGame[] {
 const BYE = -1;
 
 /**
+ * Every club meets every other `legs` times, one round per `matchday` (1-based,
+ * before any spreading across the season grid).
+ *
+ * An odd field takes a bye each round: a stand-in club is added and its games
+ * dropped, so a division of 17 plays 34 rounds and each club sits out two.
+ *
+ * Legs alternate the two halves of the circle-method double round robin, so an
+ * even number of legs gives every club the same home games and an odd number
+ * leaves each within one of level. **A double round robin of an even field is
+ * exactly `generateSchedule`**, which is what keeps every existing division's
+ * fixtures byte-identical.
+ */
+export function roundRobin(teamIds: number[], legs: number): ScheduleGame[] {
+  if (teamIds.length < 2) return [];
+  const odd = teamIds.length % 2 === 1;
+  const base = generateSchedule(odd ? [...teamIds, BYE] : teamIds);
+  if (legs === 2) return base.filter((g) => g.home !== BYE && g.away !== BYE);
+  const perLeg = (odd ? teamIds.length + 1 : teamIds.length) - 1;
+  const out: ScheduleGame[] = [];
+  for (let leg = 0; leg < legs; leg++) {
+    const half = leg % 2;
+    for (const g of base) {
+      if (g.home === BYE || g.away === BYE) continue;
+      const inHalf = half === 0 ? g.matchday <= perLeg : g.matchday > perLeg;
+      if (!inHalf) continue;
+      const round = half === 0 ? g.matchday : g.matchday - perLeg;
+      out.push({ matchday: leg * perLeg + round, home: g.home, away: g.away });
+    }
+  }
+  return out;
+}
+
+/**
+ * Two halves of different sizes (an odd division split in two, like the USL
+ * Championship's 13 and 12): each plays its own half twice, and the shorter
+ * half's rounds are spread across the longer half's so both finish together.
+ * No cross-half games — there is no way to pair unequal halves off round by
+ * round without some clubs playing more than others.
+ */
+function unequalConferenceSchedule(halves: [number[], number[]]): ScheduleGame[] {
+  const [a, b] = [roundRobin(halves[0], 2), roundRobin(halves[1], 2)];
+  const rounds = (games: ScheduleGame[]) => Math.max(0, ...games.map((g) => g.matchday));
+  const total = Math.max(rounds(a), rounds(b));
+  const stretch = (games: ScheduleGame[]) => {
+    const r = rounds(games);
+    return r === total ? games : games.map((g) => ({ ...g, matchday: Math.round((g.matchday * total) / r) }));
+  };
+  return [...stretch(a), ...stretch(b)];
+}
+
+/**
  * A split division's season (see ConferenceFormat): every club plays its own
  * half twice, and games across the divide on top.
  *
@@ -223,11 +279,75 @@ export function buildCompetitionSchedule(
   competitions: readonly Competition[],
 ): ScheduleGame[] {
   return competitions.flatMap((comp) => {
-    const format = competitionConferences(comp);
-    const halves = format ? conferenceMembers(teams, comp) : null;
-    const fixtures = format && halves && halves[0].length === halves[1].length && halves[0].length >= 2
-      ? conferenceSchedule(halves, format.crossRounds)
-      : generateSchedule(teams.filter((t) => t.compId === comp.id).map((t) => t.tid));
-    return spreadOverSeason(fixtures);
+    const tids = teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
+    const conferences = competitionConferences(comp);
+    const halves = conferences ? conferenceMembers(teams, comp) : null;
+    if (conferences && halves && halves[1].length >= 2) {
+      return spreadOverSeason(halves[0].length === halves[1].length
+        ? conferenceSchedule(halves, conferences.crossRounds)
+        : unequalConferenceSchedule(halves));
+    }
+    // A season format lays its first phase out against the WHOLE season's
+    // length, second phase included, so the split lands where it belongs on the
+    // grid and the second phase (built later, see splitSecondPhaseFixtures) fills
+    // the matchdays after it.
+    const format = competitionSeasonFormat(comp);
+    if (format.legs !== 2 || format.split) {
+      const total = seasonFormatRounds(format, tids.length).total;
+      return roundRobin(tids, format.legs).map((g) => ({
+        ...g, matchday: roundToMatchday(g.matchday, total),
+      }));
+    }
+    return spreadOverSeason(roundRobin(tids, 2));
   });
+}
+
+/**
+ * The second phase of every split division whose first phase has just been
+ * completed, to be appended to the season's schedule.
+ *
+ * Derived rather than recorded: a division needs its second phase exactly when
+ * it has played every first-phase match and has nothing left on the schedule.
+ * Once added those fixtures are on the schedule, and once played the division
+ * has more matches than its first phase holds — so the same league can never
+ * be handed the same second phase twice, whoever calls this and however often.
+ *
+ * The groups come from the first-phase table (deductions included), and each
+ * group's rounds spread across the second phase's matchdays, so a group of four
+ * playing six games shares the window with a group of six playing ten.
+ */
+export function splitSecondPhaseFixtures(
+  teams: readonly { tid: number; compId: number }[],
+  competitions: readonly Competition[],
+  played: readonly MatchScore[],
+  schedule: readonly ScheduleGame[],
+  deductions?: ReadonlyMap<number, number>,
+): ScheduleGame[] {
+  const out: ScheduleGame[] = [];
+  for (const comp of competitions) {
+    const split = competitionSplit(comp);
+    if (!split) continue;
+    const tids = teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
+    if (tids.length !== split.groups.reduce((a, b) => a + b, 0)) continue;
+    const members = new Set(tids);
+    if (schedule.some((g) => members.has(g.home))) continue;
+    const compPlayed = played.filter((m) => members.has(m.home));
+    if (compPlayed.length !== split.firstPhaseMatches) continue;
+
+    const format = competitionSeasonFormat(comp);
+    const rounds = seasonFormatRounds(format, competitionTeamCount(comp));
+    const seeding = computeStandings(tids, compPlayed, deductions);
+    let cursor = 0;
+    split.groups.forEach((size, g) => {
+      const group = seeding.slice(cursor, cursor + size).map((r) => r.tid);
+      cursor += size;
+      const games = roundRobin(group, format.split!.legs[g]);
+      const groupRounds = Math.max(...games.map((x) => x.matchday));
+      for (const game of games) {
+        const round = rounds.first + Math.round((game.matchday * rounds.second) / groupRounds);
+        out.push({ ...game, matchday: roundToMatchday(round, rounds.total) });
+      }
+    });
+  }
+  return out;
 }

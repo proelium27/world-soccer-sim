@@ -2,6 +2,8 @@ import type { PlayedMatch } from "./standings.js";
 import type { PlayerMatchLine } from "../engine/attribution.js";
 import type { LeagueStore } from "./leagueState.js";
 import type { ScheduleGame } from "./schedule.js";
+import { splitSecondPhaseFixtures } from "./schedule.js";
+import { competitionSplit } from "./competitions.js";
 import type { LeagueTeam } from "./league/generate.js";
 import type { Player } from "./players/types.js";
 import { leagueMatchData } from "./league/composites.js";
@@ -278,6 +280,10 @@ export function simThrough(
   );
 
   const newResults: PlayedMatch[] = [];
+  // Only a world with a split division ever needs its second phase built, so
+  // every other world skips the per-matchday check entirely.
+  const hasSplitDivision = league.competitions.some((c) => competitionSplit(c) !== undefined);
+  const deductions = pointsDeductionMap(league.debtSanctions, league.season);
   // When set, the batch stopped before this matchday (the user's Continental
   // Cup final): every game from here on is pushed back to `remaining` so the
   // user regains control and can sim the final deliberately.
@@ -611,6 +617,27 @@ export function simThrough(
     );
 
     newResults.push(...mdResults);
+
+    // A split division that has just finished its first phase gets its second
+    // one now, seeded off the table as it stands. Added to this batch if it
+    // falls inside it, otherwise left on the schedule for the next.
+    if (hasSplitDivision) {
+      const upcoming = [...toSim.filter((g) => g.matchday > matchday), ...remaining];
+      const secondPhase = splitSecondPhaseFixtures(
+        currentTeams, league.competitions, [...league.played, ...newResults], upcoming, deductions,
+      );
+      for (const game of secondPhase) {
+        if (game.matchday <= targetMatchday) {
+          toSim.push(game);
+          if (!matchdays.includes(game.matchday)) {
+            matchdays.push(game.matchday);
+            matchdays.sort((a, b) => a - b);
+          }
+        } else {
+          remaining.push(game);
+        }
+      }
+    }
 
     // Persist a power-rankings snapshot at fixed points through the season
     // (every POWER_SNAPSHOT_INTERVAL matchdays, plus the finale — 38 matching

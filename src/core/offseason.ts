@@ -62,7 +62,7 @@ import {
   settleSeasonEnd, chargeSeasonStart, wageBill, financeScaleFor, clampBudget,
 } from "./finance/budget.js";
 import { clampScoutingSpend } from "./finance/scouting.js";
-import { competitionOf, competitionTeamCount, competitionNationalities, tierOf } from "./competitions.js";
+import { competitionOf, competitionTeamCount, competitionNationalities, tierOf, competitionSplit } from "./competitions.js";
 import type { TransferClause } from "./transfers/clauses.js";
 import {
   pointsDeductionMap, assessDebtSanction, breachStreak, applyDebtInterest,
@@ -247,6 +247,9 @@ export function simOffseasonReporting(
         // the map that decides promotion and relegation, prize money, European
         // places, and the finish the board reviews.
         pointsDeductionMap(league.debtSanctions, league.season),
+        // A split division's clubs finish inside their groups, so relegation
+        // and European places come from the group they played in.
+        competitionSplit(comp),
       ),
     );
   }
@@ -525,6 +528,13 @@ export function simOffseasonReporting(
       c.id, titleWinners.get(c.id) ?? tablesByCompId.get(c.id)![0].tid,
     ]),
   );
+  // A closed lower division with a title playoff (the USL's) crowns its winner,
+  // recorded apart from the top flights' champions — see SeasonHistoryEntry.
+  const lowerChampionTidByCompId: Record<number, number> = Object.fromEntries(
+    league.competitions
+      .filter((c) => c.tier > 1 && titleWinners.has(c.id))
+      .map((c) => [c.id, titleWinners.get(c.id)!]),
+  );
 
   // 3.6. Worldwide honors — the Ballon d'Or ranking and the World Team of the
   //      Year — scored across every competition at once. Computed here rather
@@ -579,6 +589,7 @@ export function simOffseasonReporting(
     world,
     compsByTid,
     championTidByCompId,
+    ...(Object.keys(lowerChampionTidByCompId).length > 0 ? { lowerChampionTidByCompId } : {}),
     // An award winner outlives his own record by decades, so his name travels
     // with the award (step 3.65 above).
     awardWinners,

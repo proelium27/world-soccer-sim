@@ -10,7 +10,7 @@ import { nextMatchday, transferWindowState } from "../../core/transfers/window.j
 import { SimTargetForm } from "../components/SimTargetForm.js";
 import { SCOUTING_SPEND_MAX, RATING_LEADER_QUALIFY_FRACTION } from "../../core/constants.js";
 import { wageBill } from "../../core/finance/budget.js";
-import { competitionRegion } from "../../core/competitions.js";
+import { competitionRegion, competitionSplit, competitionOf } from "../../core/competitions.js";
 import { cupFinalists, isCupComplete } from "../../core/cup/cup.js";
 import { domesticFinalists } from "../../core/domesticCup/cup.js";
 import { isIntlStagePending, editableSquad } from "../../core/international/index.js";
@@ -216,6 +216,7 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
         return home?.compId === userTeam.compId;
       }),
       pointsDeductionMap(league.debtSanctions, league.season),
+      competitionSplit(competitionOf(league.competitions, userTeam.compId)),
     );
     const userRow = standings.find((r) => r.tid === league.meta.userTid);
     const leaguePosition = standings.findIndex((r) => r.tid === league.meta.userTid) + 1;
