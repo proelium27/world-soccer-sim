@@ -3,7 +3,7 @@ import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import type { ScheduleGame } from "../../core/schedule.js";
 import type { CupState } from "../../core/cup/types.js";
-import { cupRoundName, koRoundsOf, koLegMatchdays } from "../../core/cup/cup.js";
+import { cupRoundName, koRoundsOf, koLegMatchdays, openingStageName } from "../../core/cup/cup.js";
 import type { CupCompetitionId } from "../../core/constants.js";
 import type { DomesticCupState } from "../../core/domesticCup/types.js";
 import { domesticRoundName } from "../../core/domesticCup/cup.js";
@@ -89,16 +89,17 @@ function userCupRows(cup: CupState | null, userTid: number): FixtureRow[] {
   // League phase.
   for (const m of cup.leaguePhase?.matches ?? []) {
     if (!mine(m.home, m.away)) continue;
-    push(m.matchday, m.home, m.away, m.played ? { homeGoals: m.homeGoals, awayGoals: m.awayGoals } : null, "League phase");
+    push(m.matchday, m.home, m.away, m.played ? { homeGoals: m.homeGoals, awayGoals: m.awayGoals } : null, openingStageName(cup));
   }
 
   // Single-leg playoff (Swiss) — played tie if resolved, else the known pairing.
   if (cup.playoff) {
     const po = cup.playoff;
     const t = po.ties.find((x) => mine(x.home, x.away));
-    if (t) push(po.matchday, t.home, t.away, { homeGoals: t.homeGoals, awayGoals: t.awayGoals }, "Playoff");
+    const poName = cup.shape?.opening === "knockout" ? "Preliminary round" : "Playoff";
+    if (t) push(po.matchday, t.home, t.away, { homeGoals: t.homeGoals, awayGoals: t.awayGoals }, poName);
     else for (let i = 0; i + 1 < po.teams.length; i += 2) {
-      if (mine(po.teams[i], po.teams[i + 1])) push(po.matchday, po.teams[i], po.teams[i + 1], null, "Playoff");
+      if (mine(po.teams[i], po.teams[i + 1])) push(po.matchday, po.teams[i], po.teams[i + 1], null, poName);
     }
   }
 

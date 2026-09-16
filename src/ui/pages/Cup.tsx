@@ -8,9 +8,12 @@ import { seasonYear } from "../format.js";
 import type { CupState, CupTie, KnockoutLeg } from "../../core/cup/types.js";
 import {
   matchupsForRound, cupRoundName, cupFinalists, isCupComplete, worldHasCup,
-  isSwissCup, koRoundsOf,
+  isSwissCup, koRoundsOf, cupSplitPlan, hasOpeningStage, prelimRoundName,
 } from "../../core/cup/cup.js";
-import { leaguePhaseTable } from "../../core/cup/leaguePhase.js";
+import { leaguePhaseTable, groupTable, groupQualifiers } from "../../core/cup/leaguePhase.js";
+import {
+  continentalFormatFor, describeCupShape, isDefaultContinentalFormat, resolveCupShape,
+} from "../../core/cup/cupShape.js";
 import { countryCoefficients, reallocateCupSlots } from "../../core/cup/coefficients.js";
 import { cupSlotsForCompetition } from "../../core/cup/qualification.js";
 import type { LeagueStore } from "../../core/leagueState.js";
@@ -167,6 +170,9 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
     : isShield ? league.shieldHistory ?? [] : league.cupHistory)]
     .sort((a, b) => b.season - a.season);
   const hasAny = currentCup !== null || history.length > 0;
+  // The format the next draw will use, which God Mode can change.
+  const nextSettings = continentalFormatFor(league.continentalFormats, competition);
+  const customNext = !isDefaultContinentalFormat(nextSettings);
 
   if (!hasAny) {
     return (
@@ -199,8 +205,9 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
               )}
             </p>
             <p>
-              Everyone starts together in a single league phase of six games, then the table splits:
-              {" "}{splitBlurb(format.fieldSize)}.
+              {customNext
+                ? describeCupShape(resolveCupShape(largestValidCupField(format.fieldSize), nextSettings), largestValidCupField(format.fieldSize))
+                : <>Everyone starts together in a single league phase of six games, then the table splits:{" "}{splitBlurb(format.fieldSize)}.</>}
             </p>
             <p>
               Who gets in is decided by this season&apos;s final league tables, so the place you are
@@ -312,13 +319,37 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
         {format.name}
         <HelpHint>
           A {format.fieldSize}-club competition played alongside the league
-          {isShield ? ", for the clubs that finish just below the Continental Cup places" : ""}. It
-          opens with a league phase where everyone plays six games in one table, then{" "}
-          {splitBlurb(currentCup ? currentCup.leaguePhase?.teams.length ?? format.fieldSize : format.fieldSize)}.
-          From there it&apos;s a straight knockout. If your club reaches the final, the sim pauses
-          so you can play it.
+          {isShield ? ", for the clubs that finish just below the Continental Cup places" : ""}.{" "}
+          {currentCup?.shape ? (
+            <>{describeCupShape(currentCup.shape, currentCup.leaguePhase?.teams.length ?? format.fieldSize)}{" "}</>
+          ) : (
+            <>
+              It opens with a league phase where everyone plays six games in one table, then{" "}
+              {splitBlurb(currentCup ? currentCup.leaguePhase?.teams.length ?? format.fieldSize : format.fieldSize)}.
+              From there it&apos;s a straight knockout.{" "}
+            </>
+          )}
+          {customNext && (
+            <>From next season it&apos;s played a different way:{" "}
+              {describeCupShape(resolveCupShape(largestValidCupField(format.fieldSize), nextSettings), largestValidCupField(format.fieldSize))}{" "}
+            </>
+          )}
+          If your club reaches the final, the sim pauses so you can play it.
         </HelpHint>
       </h4>
+      {(currentCup?.shape || customNext) && (
+        // Visible, not only in the help popover: a format God Mode changed is
+        // the first thing to explain on a page whose stages no longer match the
+        // Manual's description.
+        <p className="text-muted small mb-2">
+          {currentCup?.shape && describeCupShape(currentCup.shape, currentCup.leaguePhase?.teams.length ?? format.fieldSize)}
+          {customNext && (
+            <>{currentCup?.shape ? " " : ""}From next season:{" "}
+              {describeCupShape(resolveCupShape(largestValidCupField(format.fieldSize), nextSettings), largestValidCupField(format.fieldSize))}
+            </>
+          )}
+        </p>
+      )}
       <div className="mb-3">
         <select
           className="form-select form-select-sm"
@@ -353,8 +384,10 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
 
           {!isShield && !isAmericas && seasonSel === "current" && <CoefficientTable league={league} />}
 
-          {swiss && cup.leaguePhase && (
-            <LeaguePhaseSection cup={cup} teamCell={teamCell} userTid={userTid} />
+          {swiss && cup.leaguePhase && hasOpeningStage(cup) && (
+            cup.leaguePhase.groups
+              ? <GroupStageSection cup={cup} teamCell={teamCell} userTid={userTid} />
+              : <LeaguePhaseSection cup={cup} teamCell={teamCell} userTid={userTid} />
           )}
 
           {/* A real bracket: the knockout pairings are fixed, so each tie sits
@@ -366,7 +399,7 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
             {cup.playoff && (
               <div className="cup-round" key="playoff">
                 <div className="cup-round-title">
-                  <span>{cupRoundName(-1)}</span>
+                  <span>{prelimRoundName(cup)}</span>
                   <span className="cup-round-count">{prelimSlots(cup.playoff).length}</span>
                 </div>
                 <div className="cup-round-body">
@@ -466,7 +499,8 @@ function LeaguePhaseSection({
 }) {
   const table = leaguePhaseTable(cup.leaguePhase!, cup.seeds);
   const played = cup.leaguePhase!.matches.some((m) => m.played);
-  const { directQF, playoffTeams } = cupKnockoutPlan(table.length);
+  const rounds = new Set(cup.leaguePhase!.matches.map((m) => m.round)).size;
+  const { directQF, playoffTeams } = cupSplitPlan(cup);
   const opener = cupRoundName(0, koRoundsOf(cup));
   const zoneClass = (pos: number): string => {
     if (pos <= directQF) return "cup-lp-direct";
@@ -478,7 +512,7 @@ function LeaguePhaseSection({
       <div className="cup-round-title">League Phase</div>
       {!played && (
         <p className="text-muted small mb-2">
-          The draw is set. Standings fill in as the six league-phase rounds are played.
+          The draw is set. Standings fill in as the {rounds} league-phase rounds are played.
         </p>
       )}
       <table className="table table-sm cup-lp-table">
@@ -516,6 +550,63 @@ function LeaguePhaseSection({
           <span className="cup-lp-key-item"><span className="cup-lp-swatch cup-lp-playoff" /> {directQF > 0 ? "Next" : "Top"} {playoffTeams} to the playoff</span>
         )}
         <span className="cup-lp-key-item"><span className="cup-lp-swatch cup-lp-out" /> Rest eliminated</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A groups-format cup's group stage: one small table per group, with the clubs
+ * currently in a qualifying place shaded. Who is "in" is read off the same
+ * groupQualifiers the draw uses, so a third-placed side the bracket would take
+ * is shaded too and the shading can't disagree with who goes through.
+ */
+function GroupStageSection({
+  cup, teamCell, userTid,
+}: {
+  cup: CupState;
+  teamCell: (tid: number, isWinner: boolean) => ReactNode;
+  userTid: number;
+}) {
+  const lp = cup.leaguePhase!;
+  const played = lp.matches.some((m) => m.played);
+  const through = new Set(groupQualifiers(lp, cup.seeds, cup.teams.length).map((q) => q.tid));
+  const opener = cupRoundName(0, koRoundsOf(cup)).toLowerCase();
+  return (
+    <div className="cup-league-phase mb-4">
+      <div className="cup-round-title">Group stage</div>
+      <p className="text-muted small mb-2">
+        {played
+          ? `Shaded clubs are in a place that goes through to the ${opener} right now.`
+          : "The draw is set. Each group plays home and away over six rounds."}
+      </p>
+      <div className="row g-3">
+        {lp.groups!.map((group, gi) => (
+          <div className="col-12 col-md-6 col-xl-3" key={gi}>
+            <div className="small fw-semibold mb-1">Group {String.fromCharCode(65 + gi)}</div>
+            <table className="table table-sm cup-lp-table mb-0">
+              <thead>
+                <tr>
+                  <th>Club</th>
+                  <th className="text-end">P</th><th className="text-end">GD</th><th className="text-end">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupTable(lp, group, cup.seeds).map((r) => (
+                  <tr
+                    key={r.tid}
+                    className={`${played && through.has(r.tid) ? "cup-lp-direct" : "cup-lp-out"}${r.tid === userTid ? " cup-lp-user" : ""}`}
+                  >
+                    <td>{teamCell(r.tid, false)}</td>
+                    <td className="text-end">{r.played}</td>
+                    <td className="text-end">{r.gd > 0 ? `+${r.gd}` : r.gd}</td>
+                    <td className="text-end fw-bold">{r.points}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
       </div>
     </div>
   );

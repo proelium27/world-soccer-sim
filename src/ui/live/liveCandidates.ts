@@ -13,7 +13,7 @@ import type { LeagueStore } from "../../core/leagueState.js";
 import type { PlayedMatch } from "../../core/standings.js";
 import type { CupState } from "../../core/cup/types.js";
 import { competitionOf } from "../../core/competitions.js";
-import { cupRoundName, koRoundsOf } from "../../core/cup/cup.js";
+import { cupRoundName, koRoundsOf, openingStageName } from "../../core/cup/cup.js";
 import type { DomesticCupState } from "../../core/domesticCup/types.js";
 import { domesticRoundName } from "../../core/domesticCup/cup.js";
 import { leaguePhaseTable } from "../../core/cup/leaguePhase.js";
@@ -105,14 +105,22 @@ function leaguePhaseRowsAtMinute(
   cup: CupState,
   matchday: number,
   minute: number,
+  /** Whose group to show, for a groups-format cup. */
+  focusTid: number,
 ): LiveTableRow[] {
   const lp = cup.leaguePhase!;
+  // A groups-format cup shows only the user's own group, which is the table a
+  // group game can actually move; the rest are other groups' business.
+  const group = lp.groups?.find((g) => g.includes(focusTid));
   const matches = lp.matches.map((m) => {
     if (m.matchday !== matchday || !m.boxScore) return m;
     const score = scoreAtMinute(m.boxScore.events, minute);
     return { ...m, homeGoals: score.home, awayGoals: score.away };
   });
-  return leaguePhaseTable({ ...lp, matches }, cup.seeds).map((r) => ({
+  const scoped = group
+    ? { teams: group, matches: matches.filter((m) => group.includes(m.home) && group.includes(m.away)) }
+    : { ...lp, matches };
+  return leaguePhaseTable(scoped, cup.seeds).map((r) => ({
     tid: r.tid,
     points: r.points,
   }));
@@ -175,8 +183,8 @@ function cupCandidate(
       return build(
         asLive(ours),
         today.filter((m) => m !== ours).map(asLive),
-        `League phase, round ${ours.round + 1}`,
-        (minute) => leaguePhaseRowsAtMinute(cup, matchday, minute),
+        `${openingStageName(cup)}, round ${ours.round + 1}`,
+        (minute) => leaguePhaseRowsAtMinute(cup, matchday, minute, userTid),
         matchLineups(ours.boxScore!),
       );
     }

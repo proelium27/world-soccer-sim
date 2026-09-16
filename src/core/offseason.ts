@@ -42,6 +42,7 @@ import { computeWorldAwards } from "./worldAwards.js";
 import { resolveAwardFormula, type AwardFormula } from "./awardFormula.js";
 import { snapshotAwardWinners } from "./awardWinners.js";
 import { buildCupState } from "./cup/cup.js";
+import { continentalFormatFor } from "./cup/cupShape.js";
 import type { QualificationContext } from "./cup/qualification.js";
 import { domesticCupWinners, qualificationByTid } from "./cup/qualification.js";
 import { coefficientSlots } from "./cup/coefficients.js";
@@ -1280,11 +1281,15 @@ export function simOffseasonReporting(
     // one of his country's Shield places. Both formats are allocated in one
     // pass, so a club is placed in exactly one of them — see cup/qualification.
     // buildCupState returns null if that format's field can't be filled.
-    cup: buildCupState(league.competitions, tablesByCompId, nextSeason, CONTINENTAL_CUP_FORMAT, cupRoutes),
-    shield: buildCupState(league.competitions, tablesByCompId, nextSeason, SHIELD_FORMAT, cupRoutes),
+    // Each is drawn in the format God Mode set for it, if any (default otherwise).
+    cup: buildCupState(league.competitions, tablesByCompId, nextSeason, CONTINENTAL_CUP_FORMAT, cupRoutes,
+      continentalFormatFor(league.continentalFormats, CONTINENTAL_CUP_FORMAT.id)),
+    shield: buildCupState(league.competitions, tablesByCompId, nextSeason, SHIELD_FORMAT, cupRoutes,
+      continentalFormatFor(league.continentalFormats, SHIELD_FORMAT.id)),
     // The Americas Cup draws from the other continent's leagues through the
     // same one-pass allocation, so it can never share a club with the two above.
-    americasCup: buildCupState(league.competitions, tablesByCompId, nextSeason, AMERICAS_CUP_FORMAT, cupRoutes),
+    americasCup: buildCupState(league.competitions, tablesByCompId, nextSeason, AMERICAS_CUP_FORMAT, cupRoutes,
+      continentalFormatFor(league.continentalFormats, AMERICAS_CUP_FORMAT.id)),
     // International football already played out (in stages) before this advance;
     // carry its state forward, resetting the per-offseason stage marker (and the
     // just-consumed injury carry-over list) so the new season starts clean.
