@@ -42,6 +42,7 @@ export interface SeasonSummaryRow {
   domesticCupWinners: Record<string, number>;
   continentalCup: SeasonTrophyWin | null;
   continentalShield: SeasonTrophyWin | null;
+  americasCup: SeasonTrophyWin | null;
   /**
    * The World Cup winner, or every confederation champion, from the offseason
    * that followed this season. Empty in the two qualifying-only years of each
@@ -105,6 +106,7 @@ export function seasonSummaries(records: SeasonSummaryRecords): SeasonSummaryRow
         domesticCupWinners: {},
         continentalCup: null,
         continentalShield: null,
+        americasCup: null,
         international: [],
       };
       rows.set(season, row);
@@ -137,6 +139,8 @@ export function seasonSummaries(records: SeasonSummaryRecords): SeasonSummaryRow
         rowFor(season).continentalCup = { name: t.name, tid: t.tid };
       } else if (t.kind === "continentalShield" && t.tid !== undefined) {
         rowFor(season).continentalShield = { name: t.name, tid: t.tid };
+      } else if (t.kind === "americasCup" && t.tid !== undefined) {
+        rowFor(season).americasCup = { name: t.name, tid: t.tid };
       } else if ((t.kind === "worldCup" || t.kind === "confederationCup") && t.nation) {
         rowFor(season).international.push({
           name: t.name,

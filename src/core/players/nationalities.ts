@@ -307,6 +307,12 @@ export const NATIONALITIES: Record<string, NationalityDef> = {
       "Martin", "Mauro", "Pablo", "Patricio", "Ricardo", "Sebastian", "Sergio", "Victor",
       "Adrian", "Alan", "Axel", "Braian", "Damian", "Dante", "Dario", "Enzo",
       "Gaston", "Ivan", "Jonathan", "Kevin", "Milton", "Nazareno", "Thiago", "Uriel",
+      // Deepened when Argentina became a home league (see LEAGUE_NATIONALITY_WEIGHTS),
+      // which generates ~1,500 Argentines a world rather than the handful an import
+      // tail supplies.
+      "Rafael", "Emanuel", "Cristobal", "Lisandro", "Walter", "Hugo", "Raul", "Oscar",
+      "Claudio", "Marcelo", "Eduardo", "Fernando", "Jorge", "Mariano", "Gustavo", "Leonel",
+      "Bautista", "Benjamin",
     ],
     last: [
       "Gonzalez", "Rodriguez", "Gomez", "Fernandez", "Lopez", "Diaz", "Martinez", "Perez",
@@ -317,6 +323,9 @@ export const NATIONALITIES: Record<string, NationalityDef> = {
       "Torres", "Vargas", "Vega", "Vera", "Villalba", "Zapata", "Silva", "Mendoza",
       "Arce", "Barrios", "Bustos", "Cabrera", "Cardozo", "Carrizo", "Coria", "Escobar",
       "Figueroa", "Godoy", "Guzman", "Juarez", "Leiva", "Maidana", "Ojeda", "Sandoval",
+      "Paz", "Quiroga", "Benavidez", "Olivera", "Ponce", "Galvan", "Moreno", "Cano",
+      "Acuna", "Villegas", "Aranda", "Montenegro", "Palacios", "Salinas", "Cejas", "Quintana",
+      "Brizuela", "Chavez",
     ],
   },
   Scotland: {
@@ -1053,6 +1062,10 @@ export const NATIONALITIES: Record<string, NationalityDef> = {
       "Rojas", "Salazar", "Vega", "Cortes", "Estrada", "Fuentes", "Herrera", "Ibarra",
       "Lara", "Medina", "Navarro", "Ochoa", "Padilla", "Quintero", "Rangel", "Sandoval",
       "Trejo", "Urbina", "Valdez", "Zamora", "Carrillo", "Dominguez", "Escobedo", "Figueroa",
+      // Deepened when Mexico became a home league.
+      "Arellano", "Barragan", "Cervantes", "Duran", "Escalante", "Galindo", "Hinojosa", "Lozano",
+      "Montes", "Nunez", "Olvera", "Pacheco", "Robles", "Solis", "Tapia", "Villanueva",
+      "Zavala", "Beltran",
     ],
   },
   Canada: {
@@ -3216,6 +3229,84 @@ export const LEAGUE_NATIONALITY_WEIGHTS: Record<string, Record<string, number>> 
     Hungary: 4, Ukraine: 4, Gambia: 4, "Burkina Faso": 3, "DR Congo": 3,
     Portugal: 3, Belgium: 3, Italy: 3, Slovakia: 3,
     [REST]: 16,
+  },
+  // ── The Americas ──────────────────────────────────────────────────────────
+  // All four are real published breakdowns, entered as PLAYER COUNTS (the table
+  // normalizes to its own total, so a count is as good a weight as a share).
+  // Each source lists only its top nationalities, so each under-sums; the gap is
+  // named explicitly as a tail of small nations rather than poured into REST,
+  // for the reason Serbia's comment gives — the rest-of-world bucket is ~40%
+  // English, and three of these leagues have no English players at all. REST is
+  // held to ~0.5-1% of each table. Tail nations are this file's choice, not the
+  // source's; the listed nations are the source's exactly.
+  //
+  // Brazilian Série A, 666 players: 74.9% Brazilian, then Argentina 44, Uruguay
+  // 26, Colombia 16, Paraguay 13, Ecuador 10, Chile 9, Venezuela 6, Peru 4,
+  // Bolivia 3, Portugal 3, United States 2, Spain 2, Angola 1, Costa Rica 1.
+  // 27 unlisted: a 21-player named tail plus REST.
+  Brazil: {
+    Brazil: 499, Argentina: 44, Uruguay: 26, Colombia: 16, Paraguay: 13,
+    Ecuador: 10, Chile: 9, Venezuela: 6, Peru: 4, Bolivia: 3,
+    Portugal: 3, "United States": 2, Spain: 2, Angola: 1, "Costa Rica": 1,
+    Italy: 2, France: 2, Netherlands: 2, Mexico: 2,
+    "Cape Verde": 1, Mozambique: 1, "Guinea-Bissau": 1, Honduras: 1, Panama: 1,
+    Japan: 2, Haiti: 1, Nigeria: 2, Germany: 1, Cameroon: 2,
+    Canada: 1, Belgium: 1, Switzerland: 1,
+    [REST]: 3,
+  },
+  // Argentine Liga Profesional, 891 players: 83.7% Argentine, then Uruguay 38,
+  // Colombia 24, Paraguay 20, Chile 11, Ecuador 7, Venezuela 5, Peru 4, Brazil 3,
+  // Mexico 2, United States 2, Spain 2, Italy 1, Bolivia 1. 25 unlisted: a
+  // 19-player named tail plus REST.
+  Argentina: {
+    Argentina: 746, Uruguay: 38, Colombia: 24, Paraguay: 20, Chile: 11,
+    Ecuador: 7, Venezuela: 5, Peru: 4, Brazil: 3, Mexico: 2,
+    "United States": 2, Spain: 2, Italy: 1, Bolivia: 1,
+    France: 2, Portugal: 2,
+    Honduras: 1, "Costa Rica": 1, Panama: 1, Canada: 2, Guatemala: 1,
+    "Dominican Republic": 1, Cuba: 1, Haiti: 2, Japan: 1, Israel: 1,
+    Germany: 2, Netherlands: 1, Nicaragua: 1, "El Salvador": 1, Belgium: 1,
+    [REST]: 3,
+  },
+  // Liga MX, 480 players: 62.9% Mexican, then Argentina 43, Colombia 27, Uruguay
+  // 19, Brazil 19, United States 13, Spain 12, Paraguay 8, Ecuador 6, Chile 4,
+  // Venezuela 3, Panama 3, Morocco 3, Portugal 3, Costa Rica 2, Canada 2, Peru 1,
+  // Nigeria 1, France 1, Jamaica 1. Only 7 unlisted.
+  Mexico: {
+    Mexico: 302, Argentina: 43, Colombia: 27, Uruguay: 19, Brazil: 19,
+    "United States": 13, Spain: 12, Paraguay: 8, Ecuador: 6, Chile: 4,
+    Venezuela: 3, Panama: 3, Morocco: 3, Portugal: 3, "Costa Rica": 2,
+    Canada: 2, Peru: 1, Nigeria: 1, France: 1, Jamaica: 1,
+    Honduras: 2, Netherlands: 1, Italy: 1, Ghana: 1,
+    [REST]: 2,
+  },
+  // MLS, 872 players (US and Canadian clubs): 39.7% American and 6.1% Canadian,
+  // then Brazil 40, Argentina 31, Colombia 26, Germany 17, England 16, Ghana 15,
+  // Spain 14, Mexico 13, France 12, Uruguay 12, Denmark 12, Venezuela 11,
+  // Jamaica 11, Serbia 9, and 8 each for Norway, Chile, Israel, Poland, Ecuador
+  // and Australia. The world only has US clubs, so Canada is an import here.
+  //
+  // The list stops at the 22nd nation and leaves 186 players (21%) unnamed, by
+  // far the broadest tail of the four. It is named at 7 or fewer per nation
+  // (nothing below the list's cut can exceed it) from the regions MLS publishes
+  // its foreign intake from: Scandinavia and central Europe, West Africa,
+  // Central America and the Caribbean, East Asia and Oceania. REST is ~1%, which
+  // still lifts England from its stated 1.8% to ~2.2%.
+  "United States": {
+    "United States": 346, Canada: 53, Brazil: 40, Argentina: 31, Colombia: 26,
+    Germany: 17, England: 16, Ghana: 15, Spain: 14, Mexico: 13,
+    France: 12, Uruguay: 12, Denmark: 12, Venezuela: 11, Jamaica: 11,
+    Serbia: 9, Norway: 8, Chile: 8, Israel: 8, Poland: 8,
+    Ecuador: 8, Australia: 8,
+    Sweden: 7, Netherlands: 7, Portugal: 7, Japan: 7, Paraguay: 7,
+    Honduras: 7, "Costa Rica": 7,
+    Nigeria: 6, Cameroon: 6, Senegal: 6, "Ivory Coast": 6, Scotland: 6,
+    Croatia: 6, Peru: 6, Switzerland: 6, Austria: 6,
+    "South Korea": 5, Italy: 5, Haiti: 5, Panama: 5, "Trinidad and Tobago": 5,
+    "New Zealand": 5, Belgium: 5, Wales: 5, "Republic of Ireland": 5,
+    "El Salvador": 4, Guatemala: 4, Iceland: 4, Finland: 4, Slovenia: 4,
+    Guinea: 3, Kenya: 3, Mali: 3, Romania: 3,
+    [REST]: 9,
   },
 };
 

@@ -75,11 +75,16 @@ export function referencedPids(league: LeagueStore): Set<number> {
     }
     for (const e of h.world?.ballonDOr ?? []) pids.add(e.pid);
     for (const pid of h.world?.worldTeamOfYear ?? []) if (pid != null) pids.add(pid);
+    for (const e of h.world?.americas?.ballonDOr ?? []) pids.add(e.pid);
+    for (const pid of h.world?.americas?.worldTeamOfYear ?? []) if (pid != null) pids.add(pid);
   }
   for (const cup of league.cupHistory ?? []) {
     for (const l of cup.statLines ?? []) pids.add(l.pid);
   }
   for (const cup of league.shieldHistory ?? []) {
+    for (const l of cup.statLines ?? []) pids.add(l.pid);
+  }
+  for (const cup of league.americasCupHistory ?? []) {
     for (const l of cup.statLines ?? []) pids.add(l.pid);
   }
   for (const cup of league.domesticCupHistory ?? []) {

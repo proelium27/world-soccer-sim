@@ -4,9 +4,9 @@ import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { usePlayerMap } from "../usePlayerMap.js";
 import { computeClubHistory, type ClubIndividualHonour, type ClubSeasonRecord } from "../../core/clubHistory.js";
-import { competitionOf, countriesOf } from "../../core/competitions.js";
+import { competitionOf, countriesOf, competitionRegion } from "../../core/competitions.js";
 import { worldHasCup } from "../../core/cup/cup.js";
-import { SHIELD_FORMAT } from "../../core/constants.js";
+import { SHIELD_FORMAT, AMERICAS_CUP_FORMAT } from "../../core/constants.js";
 import type { Player } from "../../core/players/types.js";
 import { ClubCrest } from "../components/ClubCrest.js";
 import { GoldenBootIcon } from "../components/GoldenBootIcon.js";
@@ -217,6 +217,10 @@ export function ClubHistory() {
   const countries = countriesOf(league.competitions);
   const hasCup = worldHasCup(league.competitions);
   const hasShield = worldHasCup(league.competitions, SHIELD_FORMAT);
+  // An American club's continental cabinet is the Americas Cup, a European
+  // club's is the two European competitions, so each shows only its own.
+  const inAmericas = !!currentComp && competitionRegion(currentComp) === "americas";
+  const hasAmericas = inAmericas && worldHasCup(league.competitions, AMERICAS_CUP_FORMAT);
 
   const titleYears = (seasons: number[]) => seasons.map((s) => seasonYear(s)).join(", ");
 
@@ -271,7 +275,22 @@ export function ClubHistory() {
                 sub={history.leagueTitles.length > 0 ? titleYears(history.leagueTitles) : "—"}
               />
             </div>
-            {hasCup && (
+            {hasAmericas && (
+              <div className="col-6 col-md-3">
+                <StatCard
+                  label="Americas Cups"
+                  value={history.americasTitles.length}
+                  sub={
+                    history.americasTitles.length > 0
+                      ? titleYears(history.americasTitles)
+                      : history.americasFinals.length > 0
+                        ? `${history.americasFinals.length} final${history.americasFinals.length === 1 ? "" : "s"} lost`
+                        : "—"
+                  }
+                />
+              </div>
+            )}
+            {hasCup && !inAmericas && (
               <div className="col-6 col-md-3">
                 <StatCard
                   label="Continental Cups"
@@ -286,7 +305,7 @@ export function ClubHistory() {
                 />
               </div>
             )}
-            {hasShield && (
+            {hasShield && !inAmericas && (
               <div className="col-6 col-md-3">
                 <StatCard
                   label="Continental Shields"
@@ -389,6 +408,41 @@ export function ClubHistory() {
                 playersByPid={playersByPid}
               />
             </div>
+            {/* The Americas' own honours, only for a club that has won one: four
+                empty cards on every European club would read as a promise. */}
+            {history.americasPlayerOfYearWinners.length + history.americasTeamOfYearSelections.length
+              + history.americasGoalkeeperOfYearWinners.length + history.americasDefenderOfYearWinners.length > 0 && (
+              <>
+                <div className="col-md-4">
+                  <HonourList
+                    title="Americas Player of the Year"
+                    honours={history.americasPlayerOfYearWinners}
+                    playersByPid={playersByPid}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <HonourList
+                    title="Americas Team of the Year"
+                    honours={history.americasTeamOfYearSelections}
+                    playersByPid={playersByPid}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <HonourList
+                    title="Americas Goalkeeper of the Year"
+                    honours={history.americasGoalkeeperOfYearWinners}
+                    playersByPid={playersByPid}
+                  />
+                </div>
+                <div className="col-md-4">
+                  <HonourList
+                    title="Americas Defender of the Year"
+                    honours={history.americasDefenderOfYearWinners}
+                    playersByPid={playersByPid}
+                  />
+                </div>
+              </>
+            )}
             <div className="col-md-4">
               <HonourList title="Player of the Season" honours={history.playerOfSeason} playersByPid={playersByPid} />
             </div>
@@ -479,6 +533,7 @@ export function ClubHistory() {
                 const cupNote = cupRunNote(s.cupRun);
                 if (cupNote) notes.push(cupNote);
                 if (s.shieldRun) notes.push(`Shield ${s.shieldRun.note}`);
+                if (s.americasRun) notes.push(`Americas Cup ${s.americasRun.note}`);
                 if (s.domesticCupRun) notes.push(`Domestic cup ${s.domesticCupRun.note.toLowerCase()}`);
                 if (s.treble) notes.push("The treble");
                 const href = `/club/${tid}/${s.season}`;

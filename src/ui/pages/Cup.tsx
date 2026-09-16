@@ -158,8 +158,13 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
 
   const format = CUP_FORMATS[competition];
   const isShield = competition === "shield";
-  const currentCup = isShield ? league.shield : league.cup;
-  const history = [...(isShield ? league.shieldHistory ?? [] : league.cupHistory)]
+  const isAmericas = competition === "americas";
+  const currentCup = isAmericas
+    ? (league.americasCup ?? null)
+    : isShield ? league.shield : league.cup;
+  const history = [...(isAmericas
+    ? league.americasCupHistory ?? []
+    : isShield ? league.shieldHistory ?? [] : league.cupHistory)]
     .sort((a, b) => b.season - a.season);
   const hasAny = currentCup !== null || history.length > 0;
 
@@ -172,7 +177,14 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
             headline={`The ${format.name} kicks off next season.`}
           >
             <p>
-              {isShield ? (
+              {isAmericas ? (
+                <>
+                  A {format.fieldSize}-club competition played alongside the league for the best
+                  clubs in the Americas. The top four of each American top flight get in, and a
+                  country&apos;s domestic cup winner takes one of those four places if they didn&apos;t
+                  finish there already. Clubs from Europe never play in it.
+                </>
+              ) : isShield ? (
                 <>
                   A {format.fieldSize}-club competition played alongside the league, for the clubs
                   that just miss out on the Continental Cup. The 5th and 6th placed clubs of each of
@@ -322,7 +334,7 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
       </div>
 
       {!cup ? (
-        <p className="text-muted">No {isShield ? "Shield" : "cup"} for this season.</p>
+        <p className="text-muted">No {isShield ? "Shield" : isAmericas ? "Americas Cup" : "cup"} for this season.</p>
       ) : (
         <>
           {cup.championTid !== null ? (
@@ -339,7 +351,7 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
             <p className="text-muted small mb-3">Your club is in this season&apos;s {format.name}.</p>
           ) : null}
 
-          {!isShield && seasonSel === "current" && <CoefficientTable league={league} />}
+          {!isShield && !isAmericas && seasonSel === "current" && <CoefficientTable league={league} />}
 
           {swiss && cup.leaguePhase && (
             <LeaguePhaseSection cup={cup} teamCell={teamCell} userTid={userTid} />
@@ -437,6 +449,11 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
 /** The Continental Shield's page — the same component, reading the Shield's state. */
 export function Shield() {
   return <Cup competition="shield" />;
+}
+
+/** The Americas Cup's page — the same component again, reading the Americas Cup's state. */
+export function AmericasCup() {
+  return <Cup competition="americas" />;
 }
 
 /** The Swiss league-phase table, with the qualification cut lines shaded. */

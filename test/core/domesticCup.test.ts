@@ -138,7 +138,8 @@ describe("the open draw", () => {
     for (let r = 0; r < cup.totalRounds; r++) {
       const round = pendingRound(cup)!;
       expect(round.round).toBe(r);
-      expect(round.matchday).toBe(DOMESTIC_CUP_MATCHDAYS[r]);
+      // A cup takes the LAST totalRounds matchdays, so the final always lands together.
+      expect(round.matchday).toBe(DOMESTIC_CUP_MATCHDAYS.slice(-cup.totalRounds)[r]);
       seen.push(round.pairings.flatMap((p) => [p.home, p.away]));
       cup = homeWinsRound(cup);
     }
@@ -176,8 +177,9 @@ describe("the open draw", () => {
 
   it("only reports a round due once its matchday arrives", () => {
     const cup = buildDomesticCup("England", comps, worldTeams(), new Map(), 1)!;
-    expect(domesticRoundDue(cup, DOMESTIC_CUP_MATCHDAYS[0] - 1)).toBe(false);
-    expect(domesticRoundDue(cup, DOMESTIC_CUP_MATCHDAYS[0])).toBe(true);
+    const first = DOMESTIC_CUP_MATCHDAYS.slice(-cup.totalRounds)[0];
+    expect(domesticRoundDue(cup, first - 1)).toBe(false);
+    expect(domesticRoundDue(cup, first)).toBe(true);
   });
 });
 

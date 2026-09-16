@@ -25,6 +25,7 @@ export const AWARD_CAREER_LIMIT = 50;
  */
 export const AWARD_KEYS = [
   "total", "ballonDOr", "worldXI", "goalkeeperOfYear", "defenderOfYear",
+  "americasPlayerOfYear", "americasTeamOfYear", "americasGoalkeeperOfYear", "americasDefenderOfYear",
   "playerOfSeason", "goldenBoot", "teamOfSeason",
 ] as const;
 export type AwardKey = typeof AWARD_KEYS[number];
@@ -35,6 +36,8 @@ export type AwardKey = typeof AWARD_KEYS[number];
  */
 const INDIVIDUAL_KEYS = [
   "ballonDOr", "worldXI", "goalkeeperOfYear", "defenderOfYear",
+  // The Americas' own set (`WorldAwards.americas`), after the world's.
+  "americasPlayerOfYear", "americasTeamOfYear", "americasGoalkeeperOfYear", "americasDefenderOfYear",
   "playerOfSeason", "goldenBoot", "teamOfSeason",
 ] as const;
 
@@ -44,6 +47,10 @@ export interface AwardTally {
   worldXI: number;
   goalkeeperOfYear: number;
   defenderOfYear: number;
+  americasPlayerOfYear: number;
+  americasTeamOfYear: number;
+  americasGoalkeeperOfYear: number;
+  americasDefenderOfYear: number;
   playerOfSeason: number;
   goldenBoot: number;
   teamOfSeason: number;
@@ -54,6 +61,7 @@ export interface AwardTally {
 function emptyTally(): AwardTally {
   return {
     ballonDOr: 0, worldXI: 0, goalkeeperOfYear: 0, defenderOfYear: 0,
+    americasPlayerOfYear: 0, americasTeamOfYear: 0, americasGoalkeeperOfYear: 0, americasDefenderOfYear: 0,
     playerOfSeason: 0, goldenBoot: 0, teamOfSeason: 0, total: 0,
   };
 }
@@ -276,6 +284,10 @@ export function computeAwardTrivia(league: LeagueStore): AwardTrivia {
   for (const h of league.seasonHistory) {
     for (const e of h.world?.ballonDOr ?? []) note(e.pid);
     for (const pid of h.world?.worldTeamOfYear ?? []) note(pid);
+    note(h.world?.americas?.ballonDOr?.[0]?.pid);
+    for (const pid of h.world?.americas?.worldTeamOfYear ?? []) note(pid);
+    note(h.world?.americas?.goalkeeperOfYear?.[0]?.pid);
+    note(h.world?.americas?.defenderOfYear?.[0]?.pid);
     for (const a of Object.values(h.awards ?? {})) {
       note(a.playerOfSeasonPid);
       note(a.goldenBootPid);
@@ -431,6 +443,18 @@ export function computeAwardTrivia(league: LeagueStore): AwardTrivia {
       credit(pid, h.season, "worldXI");
       select(pid, h.season, slot, "worldXI");
     });
+    // The Americas' own honours, winners only, credited to club and country the
+    // same way. Their entries carry the club like the Ballon d'Or's do.
+    const americas = h.world?.americas;
+    const amPlayer = americas?.ballonDOr?.[0];
+    if (amPlayer) credit(amPlayer.pid, h.season, "americasPlayerOfYear", amPlayer.tid);
+    for (const pid of americas?.worldTeamOfYear ?? []) {
+      if (pid != null) credit(pid, h.season, "americasTeamOfYear");
+    }
+    const amKeeper = americas?.goalkeeperOfYear?.[0];
+    if (amKeeper) credit(amKeeper.pid, h.season, "americasGoalkeeperOfYear", amKeeper.tid);
+    const amDefender = americas?.defenderOfYear?.[0];
+    if (amDefender) credit(amDefender.pid, h.season, "americasDefenderOfYear", amDefender.tid);
     for (const a of Object.values(h.awards ?? {})) {
       if (a.playerOfSeasonPid != null) credit(a.playerOfSeasonPid, h.season, "playerOfSeason");
       if (a.goldenBootPid != null) credit(a.goldenBootPid, h.season, "goldenBoot");

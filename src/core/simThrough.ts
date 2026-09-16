@@ -37,7 +37,8 @@ import { playKnockoutLeg, playPlayIn, playLeaguePhaseRound, playPlayoff } from "
 import { clampBudget, financeScaleFor, domesticCupScaleFor } from "./finance/budget.js";
 import { initInternationalCampaign } from "./international/index.js";
 import { reviewSeason, tablesByCompetition } from "./manager/index.js";
-import { playPromotionPlayoffs } from "./promotionPlayoff.js";
+import { playPromotionPlayoffs, drawPromotionPlayoffs, promotionPlayoffRoundsLeft } from "./promotionPlayoff.js";
+import { playTitlePlayoffs, drawTitlePlayoffs, titlePlayoffRoundsLeft } from "./titlePlayoff.js";
 import { POWER_SNAPSHOT_INTERVAL, INTL_FIELD_SIZE } from "./constants.js";
 import { pointsDeductionMap } from "./finance/debt.js";
 
@@ -170,6 +171,16 @@ export function simThrough(
   through: SimThrough,
   rng: () => number,
   onMatchday?: MatchdayProgress,
+  options: {
+    /**
+     * Draw the season's playoffs when it ends instead of playing them, so the
+     * game can play them a round per sim block (see core/playoffStages.ts), and
+     * hold the board's review until they are decided. Only the game's worker
+     * asks for this; every other caller keeps the single-pass playoffs, and the
+     * two land on the same results.
+     */
+    stagePlayoffs?: boolean;
+  } = {},
 ): LeagueStore {
   if (league.phase !== "regular" || league.schedule.length === 0) {
     return league;
@@ -236,6 +247,9 @@ export function simThrough(
   // disjoint field (see CUP_FORMATS), so it is advanced through the very same
   // path — just with its own state, baseline and rng streams.
   let shield: CupState | null = league.shield;
+  // The Americas Cup, likewise: its field is drawn from a different continent's
+  // leagues, so it shares the calendar with both European competitions safely.
+  let americasCup: CupState | null = league.americasCup ?? null;
   // This season's domestic cups (one per country), advanced round by round on
   // their own matchdays exactly like the Continental Cup above.
   let domesticCups: DomesticCupState[] = league.domesticCups ?? [];
@@ -283,7 +297,7 @@ export function simThrough(
       cupFinalists(c).includes(league.meta.userTid);
     if (
       matchday > currentMatchday &&
-      (userFinalDue(cup) || userFinalDue(shield))
+      (userFinalDue(cup) || userFinalDue(shield) || userFinalDue(americasCup))
     ) {
       stoppedBeforeMatchday = matchday;
       break;
@@ -459,7 +473,9 @@ export function simThrough(
     cup = cupAdvance.cup;
     const shieldAdvance = advanceCompetition(shield);
     shield = shieldAdvance.cup;
-    const mdCupTies: CupTie[] = [...cupAdvance.ties, ...shieldAdvance.ties];
+    const americasAdvance = advanceCompetition(americasCup);
+    americasCup = americasAdvance.cup;
+    const mdCupTies: CupTie[] = [...cupAdvance.ties, ...shieldAdvance.ties, ...americasAdvance.ties];
 
     // Domestic cups: each country's cup plays its due round here, on its own
     // seeded stream. The composites baseline pools the WHOLE country — both
@@ -644,22 +660,43 @@ export function simThrough(
   // a league that never came through here, which is how headless callers get
   // the same world the game does.
   const allPlayed = [...league.played, ...newResults];
-  const promotionPlayoffs = enteringOffseason
-    ? playPromotionPlayoffs(
-      league.competitions, currentTeams, currentPlayers,
-      tablesByCompetition(
-        currentTeams, league.competitions, allPlayed,
-        pointsDeductionMap(league.debtSanctions, league.season),
-      ),
-      league.lid, league.season,
+  const finalTables = enteringOffseason
+    ? tablesByCompetition(
+      currentTeams, league.competitions, allPlayed,
+      pointsDeductionMap(league.debtSanctions, league.season),
     )
+    : null;
+  // With `stagePlayoffs` (the game) they are only drawn here and played a round
+  // per sim block afterwards; the brackets come out of the same tables either way.
+  const stagePlayoffs = options.stagePlayoffs === true;
+  const promotionPlayoffs = finalTables
+    ? (stagePlayoffs
+      ? drawPromotionPlayoffs(league.competitions, finalTables, league.season)
+      : playPromotionPlayoffs(
+        league.competitions, currentTeams, currentPlayers, finalTables,
+        league.lid, league.season,
+      ))
     : league.promotionPlayoffs;
+  // And the title playoffs, at the same moment and for the same reasons — the
+  // board should know who won the league before it judges the season.
+  const titlePlayoffs = finalTables
+    ? (stagePlayoffs
+      ? drawTitlePlayoffs(league.competitions, finalTables, currentTeams, league.season)
+      : playTitlePlayoffs(
+        league.competitions, currentTeams, currentPlayers, finalTables,
+        league.lid, league.season,
+      ))
+    : (league.titlePlayoffs ?? []);
+  const playoffsLeft = promotionPlayoffs.some((p) => promotionPlayoffRoundsLeft(p) > 0)
+    || titlePlayoffs.some((p) => titlePlayoffRoundsLeft(p) > 0);
 
   // Same boundary, same reasoning: the board reviews the season the moment it
   // ends, so a sacking or a job offer is answered *before* the offseason runs
   // and a manager who moves manages his new club's summer, not his old one's.
-  // Pure state — no player is touched and no shared-stream rng is drawn.
-  const manager = enteringOffseason
+  // Pure state — no player is touched and no shared-stream rng is drawn. When
+  // the playoffs are staged and some are still to play, the review waits for
+  // the block that decides the last of them (playPlayoffStage).
+  const manager = enteringOffseason && !(stagePlayoffs && playoffsLeft)
     ? reviewSeason({
       league,
       teams: currentTeams,
@@ -667,8 +704,10 @@ export function simThrough(
       played: allPlayed,
       cup,
       shield,
+      americasCup,
       domesticCups,
       promotionPlayoffs,
+      titlePlayoffs,
     }).manager
     : league.manager;
 
@@ -689,8 +728,10 @@ export function simThrough(
     powerRankingHistory: [...league.powerRankingHistory, ...newSnapshots],
     cup,
     shield,
+    americasCup,
     domesticCups,
     promotionPlayoffs,
+    titlePlayoffs,
     superCups,
   };
 }

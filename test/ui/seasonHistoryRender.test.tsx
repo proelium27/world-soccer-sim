@@ -105,11 +105,13 @@ describe("Season History page", () => {
     });
 
     // The header row is one column per top flight plus Season / Cup / Shield /
-    // International; every body row then adds its own <th> for the season.
+    // Americas Cup / International (the Americas Cup column appears because the
+    // shipped world has American leagues); every body row then adds its own <th>
+    // for the season.
     const seasons = [...html.matchAll(/<th scope="row" class="sh-season">(\d+)/g)]
       .map((m) => Number(m[1]));
     expect(seasons).toHaveLength(2);
-    expect(html.match(/<th\b/g)).toHaveLength(4 + d1.length + seasons.length);
+    expect(html.match(/<th\b/g)).toHaveLength(5 + d1.length + seasons.length);
 
     expect(seasons).toEqual([...seasons].sort((a, b) => b - a));
 

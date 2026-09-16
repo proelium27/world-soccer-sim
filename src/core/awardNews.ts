@@ -11,6 +11,10 @@ export type AwardNewsKind =
   | "worldTeamOfYear"
   | "goalkeeperOfYear"
   | "defenderOfYear"
+  | "americasPlayerOfYear"
+  | "americasTeamOfYear"
+  | "americasGoalkeeperOfYear"
+  | "americasDefenderOfYear"
   | "playerOfSeason"
   | "goldenBoot"
   | "teamOfSeason";
@@ -76,6 +80,27 @@ export function seasonAwardNews(entry: SeasonHistoryEntry | null | undefined): A
     if (gk) out.push({ kind: "goalkeeperOfYear", pid: gk.pid, tid: gk.tid ?? clubOf(gk.pid) });
     const def = world.defenderOfYear?.[0];
     if (def) out.push({ kind: "defenderOfYear", pid: def.pid, tid: def.tid ?? clubOf(def.pid) });
+
+    // The Americas' own set, winners only. Absent on a world without the
+    // Americas and on seasons played before it existed.
+    const americas = world.americas;
+    if (americas) {
+      const player = americas.ballonDOr[0];
+      if (player) {
+        out.push({ kind: "americasPlayerOfYear", pid: player.pid, tid: player.tid ?? clubOf(player.pid) });
+      }
+      americas.worldTeamOfYear.forEach((pid, slot) => {
+        if (pid !== null) out.push({ kind: "americasTeamOfYear", pid, tid: clubOf(pid), slot });
+      });
+      const keeper = americas.goalkeeperOfYear?.[0];
+      if (keeper) {
+        out.push({ kind: "americasGoalkeeperOfYear", pid: keeper.pid, tid: keeper.tid ?? clubOf(keeper.pid) });
+      }
+      const defender = americas.defenderOfYear?.[0];
+      if (defender) {
+        out.push({ kind: "americasDefenderOfYear", pid: defender.pid, tid: defender.tid ?? clubOf(defender.pid) });
+      }
+    }
   }
 
   // Per competition. compId comes from the record's own key rather than from
@@ -112,7 +137,7 @@ export function seasonAwardNews(entry: SeasonHistoryEntry | null | undefined): A
  * so is a Ballon d'Or placing behind the winner: sixteen leagues' Players of the
  * Season would otherwise be sixteen times the honours a reader has any stake in.
  */
-export function awardNewsScope(a: AwardNews): "world" | "league" {
+export function awardNewsScope(a: AwardNews): "world" | "league" | "americas" {
   switch (a.kind) {
     case "ballonDOr":
       return a.placing === 1 ? "world" : "league";
@@ -120,6 +145,13 @@ export function awardNewsScope(a: AwardNews): "world" | "league" {
     case "goalkeeperOfYear":
     case "defenderOfYear":
       return "world";
+    // The Americas' honours are news to anyone whose league is in the Americas,
+    // and to nobody in Europe beyond the winner's own club and league.
+    case "americasPlayerOfYear":
+    case "americasTeamOfYear":
+    case "americasGoalkeeperOfYear":
+    case "americasDefenderOfYear":
+      return "americas";
     case "playerOfSeason":
     case "goldenBoot":
     case "teamOfSeason":

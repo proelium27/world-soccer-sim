@@ -12,6 +12,7 @@ import type { DomesticCupState } from "./domesticCup/types.js";
 export interface HonorCups {
   cupHistory?: CupState[];
   shieldHistory?: CupState[];
+  americasCupHistory?: CupState[];
   domesticCupHistory?: DomesticCupState[];
 }
 
@@ -23,6 +24,14 @@ export interface PlayerHonors {
   goalkeeperOfYear: number[];
   /** Seasons he was named the best defender in the world. */
   defenderOfYear: number[];
+  /** Seasons he won the Americas' own Player of the Year. */
+  americasPlayerOfYear: number[];
+  /** Seasons he made the Americas Team of the Year. */
+  americasTeamOfYear: number[];
+  /** Seasons he was the Americas Goalkeeper of the Year. */
+  americasGoalkeeperOfYear: number[];
+  /** Seasons he was the Americas Defender of the Year. */
+  americasDefenderOfYear: number[];
   playerOfSeason: number[];
   goldenBoot: number[];
   teamOfSeason: number[];
@@ -32,6 +41,8 @@ export interface PlayerHonors {
   continentalCups: number[];
   /** Seasons his club won the Continental Shield while he was in the squad. */
   shields: number[];
+  /** Seasons his club won the Americas Cup while he was in the squad. */
+  americasCups: number[];
   /** Seasons his club won its domestic cup while he was in the squad. */
   domesticCups: number[];
   hasAny: boolean;
@@ -113,12 +124,17 @@ function honorsOf(
   const worldTeamOfYear: number[] = [];
   const goalkeeperOfYear: number[] = [];
   const defenderOfYear: number[] = [];
+  const americasPlayerOfYear: number[] = [];
+  const americasTeamOfYear: number[] = [];
+  const americasGoalkeeperOfYear: number[] = [];
+  const americasDefenderOfYear: number[] = [];
   const playerOfSeason: number[] = [];
   const goldenBoot: number[] = [];
   const teamOfSeason: number[] = [];
   const leagueTitles: number[] = [];
   const continentalCups: number[] = [];
   const shields: number[] = [];
+  const americasCups: number[] = [];
   const domesticCups: number[] = [];
 
   // Cup wins are team honours attributed exactly like a league title: the club
@@ -133,6 +149,11 @@ function honorsOf(
   for (const cup of cups.shieldHistory ?? []) {
     if (cup.championTid != null && squadTid(cup.season) === cup.championTid) {
       shields.push(cup.season);
+    }
+  }
+  for (const cup of cups.americasCupHistory ?? []) {
+    if (cup.championTid != null && squadTid(cup.season) === cup.championTid) {
+      americasCups.push(cup.season);
     }
   }
   for (const cup of cups.domesticCupHistory ?? []) {
@@ -157,6 +178,12 @@ function honorsOf(
     // no record of them and is never rescored (see WorldAwards).
     if (entry.world?.goalkeeperOfYear?.[0]?.pid === pid) goalkeeperOfYear.push(entry.season);
     if (entry.world?.defenderOfYear?.[0]?.pid === pid) defenderOfYear.push(entry.season);
+    // The Americas' own set, on the same terms: winners only, absent before it existed.
+    const americas = entry.world?.americas;
+    if (americas?.ballonDOr[0]?.pid === pid) americasPlayerOfYear.push(entry.season);
+    if (americas?.worldTeamOfYear.includes(pid)) americasTeamOfYear.push(entry.season);
+    if (americas?.goalkeeperOfYear?.[0]?.pid === pid) americasGoalkeeperOfYear.push(entry.season);
+    if (americas?.defenderOfYear?.[0]?.pid === pid) americasDefenderOfYear.push(entry.season);
 
     const tid = squadTid(entry.season);
     if (tid !== undefined && Object.values(entry.championTidByCompId).includes(tid)) {
@@ -169,24 +196,34 @@ function honorsOf(
     worldTeamOfYear,
     goalkeeperOfYear,
     defenderOfYear,
+    americasPlayerOfYear,
+    americasTeamOfYear,
+    americasGoalkeeperOfYear,
+    americasDefenderOfYear,
     playerOfSeason,
     goldenBoot,
     teamOfSeason,
     leagueTitles,
     continentalCups,
     shields,
+    americasCups,
     domesticCups,
     hasAny:
       ballonDOr.length > 0 ||
       worldTeamOfYear.length > 0 ||
       goalkeeperOfYear.length > 0 ||
       defenderOfYear.length > 0 ||
+      americasPlayerOfYear.length > 0 ||
+      americasTeamOfYear.length > 0 ||
+      americasGoalkeeperOfYear.length > 0 ||
+      americasDefenderOfYear.length > 0 ||
       playerOfSeason.length > 0 ||
       goldenBoot.length > 0 ||
       teamOfSeason.length > 0 ||
       leagueTitles.length > 0 ||
       continentalCups.length > 0 ||
       shields.length > 0 ||
+      americasCups.length > 0 ||
       domesticCups.length > 0,
   };
 }

@@ -3,6 +3,7 @@ import { simThrough } from "../core/simThrough.js";
 import { simOffseasonReporting } from "../core/offseason.js";
 import { jumpSeasons } from "../core/autopilot.js";
 import { playIntlStage, simThroughInternational } from "../core/international/index.js";
+import { playPlayoffStage, simThroughPlayoffs } from "../core/playoffStages.js";
 import { mulberry32 } from "../engine/rng.js";
 import type { WorkerCommand, WorkerResponse } from "./protocol.js";
 
@@ -30,6 +31,9 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
         };
         self.postMessage(progress);
       },
+      // The game plays the playoffs a round per sim block, so a season that
+      // ends here only draws them (see core/playoffStages.ts).
+      { stagePlayoffs: true },
     );
     const response: WorkerResponse = { type: "simResult", league: result };
     self.postMessage(response);
@@ -70,6 +74,15 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
         : playIntlStage(cmd.league.international, cmd.league.players, cmd.league.lid, cmd.league.season);
     const result = { ...cmd.league, international, players };
     const response: WorkerResponse = { type: "intlResult", league: result };
+    self.postMessage(response);
+  } else if (cmd.type === "playoffs") {
+    // One playoff block, or blocks until the playoffs are done or the next one
+    // is a round the user's club plays in. No rng: every tie runs on its own
+    // seeded stream (see core/playoffStages.ts).
+    const result = cmd.mode === "through"
+      ? simThroughPlayoffs(cmd.league, { stopBeforeUserRound: true })
+      : playPlayoffStage(cmd.league);
+    const response: WorkerResponse = { type: "playoffsResult", league: result };
     self.postMessage(response);
   }
 };

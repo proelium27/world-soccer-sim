@@ -62,6 +62,7 @@ export interface GameEvents {
   seasons_jumped: { seasons: "1" | "2-5" | "6-10" | "11+" };
   /** The user played a staged international stage (one stage, or through the rest). */
   intl_stage_played: { mode: "stage" | "through" };
+  playoff_stage_played: { mode: "stage" | "through" };
   /** The user made a transfer bid for another club's player. */
   transfer_offer_made: Record<string, never>;
   /** The user accepted an AI club's offer for one of their players. */

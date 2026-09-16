@@ -38,6 +38,28 @@ export interface CupTie {
    * folded into homeGoals/awayGoals, not into the leg lines.
    */
   legs?: { homeGoals: number; awayGoals: number }[];
+  /**
+   * The tie finished level on aggregate and went to the better-placed club with
+   * no extra time or penalties — the Liguilla's quarter- and semi-final rule
+   * (see resolveTwoLeggedTie's `levelGoesTo`). Absent on every other tie.
+   */
+  decidedByTablePosition?: true;
+  /**
+   * A best-of-three SERIES rather than a tie: MLS's first round. Each game from
+   * `home`'s perspective, `at` the club that hosted it; a level game is decided
+   * on penalties. On a series `homeGoals`/`awayGoals` are GAMES WON, not goals.
+   * Absent on every other tie.
+   */
+  series?: SeriesGame[];
+}
+
+/** One game of a best-of-three series. See CupTie.series. */
+export interface SeriesGame {
+  at: number; // tid of the host
+  homeGoals: number;
+  awayGoals: number;
+  homePens?: number;
+  awayPens?: number;
 }
 
 /**

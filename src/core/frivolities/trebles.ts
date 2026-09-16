@@ -40,14 +40,20 @@ export function trebleCountByTid(league: LeagueStore): Map<number, number> {
 
     for (const [compId, table] of byComp) {
       if ((tierByCompId.get(compId) ?? 1) !== 1) continue;
-      const winner = [...table].sort(
+      // The recorded champion where there is one — a title playoff can crown a
+      // club that did not top the table — else the table leader.
+      const recorded = h.championTidByCompId?.[compId];
+      const winner = recorded ?? [...table].sort(
         (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.tid - b.tid,
-      )[0];
-      if (winner) markWin(tier1Titles, winner.tid, h.season);
+      )[0]?.tid;
+      if (winner !== undefined) markWin(tier1Titles, winner, h.season);
     }
   }
 
-  for (const cup of league.cupHistory ?? []) {
+  // A club's continental leg is its own continent's top competition, so an
+  // Americas Cup counts where a Continental Cup would. The two fields never
+  // share a club, so the same season cannot be counted twice.
+  for (const cup of [...(league.cupHistory ?? []), ...(league.americasCupHistory ?? [])]) {
     if (cup.championTid != null) markWin(continentalWins, cup.championTid, cup.season);
   }
   for (const cup of league.domesticCupHistory ?? []) {

@@ -25,6 +25,8 @@ import { computeStandings } from "../../core/standings.js";
 import { nextMatchday } from "../../core/transfers/window.js";
 import { SimTargetForm } from "../components/SimTargetForm.js";
 import { isIntlStagePending } from "../../core/international/index.js";
+import { playoffsPending } from "../../core/playoffStages.js";
+import { PlayoffStageCard } from "../components/PlayoffStageCard.js";
 import {
   intlStageButton,
   intlStageHeadline,
@@ -44,7 +46,7 @@ import { pointsDeductionMap } from "../../core/finance/debt.js";
 const STANDINGS_TOP_N = 8;
 
 export function SpectatorDashboard({ league }: { league: LeagueStore }) {
-  const { simAction, intlStageAction, simming } = useLeague();
+  const { simAction, intlStageAction, playoffStageAction, simming } = useLeague();
   const advanceOffseason = useOffseasonAdvance();
 
   // Which league's table to show. A view, not save state — a spectator has no
@@ -101,7 +103,14 @@ export function SpectatorDashboard({ league }: { league: LeagueStore }) {
         <div className={`card-body${league.phase === "offseason" ? "" : " sim-grid"}`}>
           <h5 className="card-title sim-grid-title">Simulation</h5>
           {league.phase === "offseason" ? (
-            isIntlStagePending(league.international) ? (
+            playoffsPending(league) ? (
+              <PlayoffStageCard
+                league={league}
+                simming={simming}
+                onStage={() => playoffStageAction("stage")}
+                onThrough={() => playoffStageAction("through")}
+              />
+            ) : isIntlStagePending(league.international) ? (
               <>
                 <p className="card-text">
                   {intlStageHeadline(
@@ -277,6 +286,11 @@ export function SpectatorDashboard({ league }: { league: LeagueStore }) {
         <div className="col-lg-4">
           <CupBracketPanel cup={league.shield} title="Continental Shield" href="/shield" />
         </div>
+        {(league.americasCup ?? null) !== null && (
+          <div className="col-lg-4">
+            <CupBracketPanel cup={league.americasCup ?? null} title="Americas Cup" href="/americas-cup" />
+          </div>
+        )}
       </div>
     </div>
   );

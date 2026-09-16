@@ -4,6 +4,7 @@ import type { WorldAwards } from "./worldAwards.js";
 import type { RetirementSummary } from "./players/retirements.js";
 import type { AwardWinner } from "./awardWinners.js";
 import type { PromotionPlayoff } from "./promotionPlayoff.js";
+import type { TitlePlayoff } from "./titlePlayoff.js";
 import type { SuperCupTie } from "./superCup/types.js";
 
 export interface MatchScore {
@@ -126,6 +127,15 @@ export interface SeasonHistoryEntry {
    * existed had no super cup, so absent is the truth about it rather than a gap.
    */
   superCups?: SuperCupTie[];
+  /**
+   * The title playoffs that decided this season's champions, for the top flights
+   * that hold one (see core/titlePlayoff.ts). `championTidByCompId` already
+   * carries the result; this is the bracket that produced it.
+   *
+   * Scorelines only, and optional and never backfilled for the reason
+   * `promotionPlayoffs` gives.
+   */
+  titlePlayoffs?: TitlePlayoff[];
 }
 
 /** Sum each club's box-score lines across a season's played matches. */

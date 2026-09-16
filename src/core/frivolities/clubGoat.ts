@@ -136,15 +136,20 @@ export function clubGoatRanking(
     hereIn.set(career.pid, new Set(stint.seasons.map((s) => s.season)));
   }
 
+  const sources = honourSourcesOf(league);
   const honours = computeHonours(
-    honourSourcesOf(league),
+    sources,
     stints.map((s) => s.stint),
     (pid, season) => hereIn.get(pid)?.has(season) === true,
   );
+  // The world board's discount applies here too, so a club board and the world
+  // board still agree about what the same season was worth. On a club in the
+  // Americas it scales every stint alike, so the order of its board is its own.
+  const americas = new Set(sources.americasTids ?? []);
 
   return stints
     .map(({ career, stint }) => {
-      const scored = scorePlayer(stint, honours.get(stint.pid) ?? emptyHonours());
+      const scored = scorePlayer(stint, honours.get(stint.pid) ?? emptyHonours(), americas);
       return { career, stint, honours: scored.honours, score: scored.score, components: scored.components };
     })
     .sort((a, b) => b.score - a.score || a.career.pid - b.career.pid)

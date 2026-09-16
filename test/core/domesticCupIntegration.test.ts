@@ -47,7 +47,7 @@ describe("domestic cups through simThrough", () => {
     let league = makeLeague(0, 1);
     const rng = mulberry32(4242);
 
-    expect(league.domesticCups).toHaveLength(12); // one per country
+    expect(league.domesticCups).toHaveLength(16); // one per country
 
     // Countries no longer all field 40 clubs, so their cups no longer all have
     // the same number of rounds — and a shorter cup takes the LAST n matchdays
@@ -64,12 +64,20 @@ describe("domestic cups through simThrough", () => {
       expect(pendingRound(cup)!.matchday).toBe(firstMatchday);
     }
 
-    // Matchdays 1-4: nothing is due in any country yet.
+    // Matchdays 1-4: nothing is due yet, except in a seven-round cup (Argentina's
+    // 70 clubs, the US's 66), which opens on matchday 1.
     league = simThrough(league, { matchday: 4 }, rng);
     for (const cup of league.domesticCups) {
-      expect(cup.rounds).toHaveLength(1);
-      expect(cup.rounds[0].ties).toHaveLength(0);
+      const first = DOMESTIC_CUP_MATCHDAYS[DOMESTIC_CUP_MATCHDAYS.length - cup.totalRounds];
+      if (first > 4) {
+        expect(cup.rounds).toHaveLength(1);
+        expect(cup.rounds[0].ties).toHaveLength(0);
+      } else {
+        expect(cup.rounds[0].ties.length).toBeGreaterThan(0);
+      }
     }
+    expect(league.domesticCups.filter((c) => c.totalRounds === 7).map((c) => c.country).sort())
+      .toEqual(["Argentina", "United States"]);
 
     // Through matchday 9 every cup has played at least its opening round — 9 is
     // the latest any of them starts.

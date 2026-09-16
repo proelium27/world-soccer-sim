@@ -10,6 +10,7 @@ import type { IntlTournamentSummary } from "./international/types.js";
 export type TrophyNewsKind =
   | "continentalCup"
   | "continentalShield"
+  | "americasCup"
   | "superCup"
   | "worldCup"
   | "confederationCup";
@@ -48,6 +49,9 @@ export interface TrophyRecords {
   cupHistory: CupState[];
   shield: CupState | null;
   shieldHistory: CupState[];
+  /** The Americas Cup. Optional for the same reason the super cups are. */
+  americasCup?: CupState | null;
+  americasCupHistory?: CupState[];
   /**
    * This preseason's super cups, plus every archived one. Both optional so a
    * caller written before they existed still typechecks and simply reports
@@ -101,6 +105,8 @@ export function trophyNewsBySeason(records: TrophyRecords): Map<number, TrophyNe
   for (const c of records.cupHistory) addCup(c, "continentalCup");
   addCup(records.shield, "continentalShield");
   for (const c of records.shieldHistory) addCup(c, "continentalShield");
+  addCup(records.americasCup ?? null, "americasCup");
+  for (const c of records.americasCupHistory ?? []) addCup(c, "americasCup");
 
   // A super cup files under the season it *opened*, which is the season it
   // carries. That is the same rule as everything else here — the season the

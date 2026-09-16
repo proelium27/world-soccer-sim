@@ -4,7 +4,7 @@ import type { CupCompetitionId, CupFormat } from "../constants.js";
 import {
   CUP_FORMATS, CONTINENTAL_CUP_FORMAT, CONTINENTAL_ORDER, largestValidCupField,
 } from "../constants.js";
-import { isWeakLeague } from "../competitions.js";
+import { isWeakLeague, competitionRegion } from "../competitions.js";
 
 /* ── Continental qualification ───────────────────────────────────────────────
  *
@@ -62,7 +62,9 @@ export function cupPlan(
   competitions: Competition[],
   format: CupFormat = CONTINENTAL_CUP_FORMAT,
 ): CupPlan | null {
-  const tier1 = competitions.filter((c) => c.tier === 1);
+  // Only this competition's own continent: a league elsewhere earns no places
+  // in it, so it must not count toward the plan's strong/weak split either.
+  const tier1 = competitions.filter((c) => c.tier === 1 && competitionRegion(c) === format.region);
   const strong = tier1.filter((c) => !isWeakLeague(c));
   const weak = tier1.filter((c) => isWeakLeague(c));
   // Summed per league rather than counted by class, because a league can carry
@@ -108,6 +110,10 @@ export function cupSlotsForCompetition(
   format: CupFormat = CONTINENTAL_CUP_FORMAT,
   overrides?: SlotOverrides,
 ): number {
+  // Checked before every override, including a league's own continentalSlots:
+  // a region is a hard boundary, not a default. Without it a hand-set slot count
+  // could put a Brazilian club in the Continental Cup.
+  if (competitionRegion(comp) !== format.region) return 0;
   const override = overrides?.get(comp.id)?.[format.id];
   if (override !== undefined) return Math.max(0, Math.floor(override));
   const own = comp.continentalSlots?.[format.id];
@@ -330,6 +336,14 @@ export function allocateContinentalPlaces(
       }
       // 2. The domestic cup winner's Shield place.
       if (id === "shield") claim(routes.domesticCupWinners?.get(league.country), "domestic-cup");
+      // The Americas have a single competition, so it takes both routes the
+      // European pair splits between them: its holder keeps his place, and a
+      // country's cup winner takes one — the way the Copa do Brasil and Copa
+      // Argentina winners go to the Libertadores.
+      if (id === "americas") {
+        claim(routes.holders?.americas, "holder");
+        claim(routes.domesticCupWinners?.get(league.country), "domestic-cup");
+      }
 
       // 3. League position fills whatever is left, skipping anyone already
       //    placed — in this competition or in a better one.

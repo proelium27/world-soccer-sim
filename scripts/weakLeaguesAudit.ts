@@ -103,8 +103,15 @@ const USER_TID = 0;
  * the big four are equal siblings by design, so their mutual order is noise.
  */
 const BIG_FOUR = ["England", "Spain", "Italy", "Germany"];
+// The American leagues sit on the same ladder, merged in by strength offset.
+// Where one shares an offset with a European neighbour (Mexico with Belgium, the
+// US with Turkey) the pair is 0 points apart, which isConvergedRung reads as
+// converged — gated on the cross-seed mean only, exactly like the one-point
+// rungs. KEEP THIS IN OFFSET ORDER: a rung compares each league with the one
+// above it.
 const WEAK_LADDER = [
-  "France", "Netherlands", "Portugal", "Belgium", "Turkey", "Greece", "Scotland", "Serbia",
+  "France", "Brazil", "Netherlands", "Argentina", "Portugal", "Belgium", "Mexico",
+  "Turkey", "United States", "Greece", "Scotland", "Serbia",
 ];
 
 /**
