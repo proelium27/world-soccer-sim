@@ -122,6 +122,16 @@ export const LEAGUE_RULES: LeagueRule[] = [
   // belong to Denmark and Slovakia, so only the closed-up and qualified forms
   // are listed.
   { competition: "Serbian Division 1", patterns: ["superliga_srbije", "serbian_superliga", "mozzart_bet_superliga", "linglong_superliga"] },
+  // The Americas' top flights (2026-09-14), each reached by a verified id in
+  // LEAGUE_IDS; these names are the qualified fallbacks only. Bare "serie_a" is
+  // Italy's rule above and must not be widened for Brazil (accents are not folded,
+  // so "Série A" normalizes to `s_rie_a` and stays apart). Bare "liga_profesional"
+  // is absent because Ecuador's LigaPro and several others share the words, and
+  // bare "mls" is a substring hazard. Their second tiers carry no rule: no export
+  // checked holds any of them.
+  { competition: "Brazilian Division 1", patterns: ["brasileir", "campeonato_brasileiro"] },
+  { competition: "Argentine Division 1", patterns: ["liga_profesional_de_f", "argentina_primera", "torneo_betano"] },
+  { competition: "US Division 1", patterns: ["major_league_soccer"] },
 ];
 
 /**
@@ -221,6 +231,14 @@ export const LEAGUE_IDS: Record<string, string> = {
   "50": "Scottish Division 1",  // Premiership (NOT Northern Ireland's NIFL Premiership)
   "63": "Greek Division 1",     // Super League (NOT 2012 China / 189 Switzerland / 2149 India)
   "10": "Dutch Division 1",     // Eredivisie
+  // Verified against the FC26 export on 2026-09-14 by the clubs each holds: 353
+  // holds Boca Juniors, River Plate, Racing Club and Independiente (30 clubs); 39
+  // holds Inter Miami, LAFC, Seattle and Toronto (30); 7 holds Flamengo,
+  // Palmeiras, Corinthians and São Paulo (14 of the 20, the clubs EA licenses).
+  // 7 is also why accents are not folded: folded, "Série A" is Italy's.
+  "353": "Argentine Division 1", // Liga Profesional de Fútbol
+  "39": "US Division 1",        // Major League Soccer
+  "7": "Brazilian Division 1",  // Série A (NOT 31 Italy / 2018 Ecuador)
 };
 
 /**

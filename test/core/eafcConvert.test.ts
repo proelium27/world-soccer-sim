@@ -23,6 +23,8 @@ import { convert } from "../../scripts/eafc/convert.js";
 import { parseRosterFile, type RosterFile } from "../../src/core/teams/rosterFile.js";
 import { applyRosterFile } from "../../src/core/teams/rosterImport.js";
 import { mergeRosterFiles } from "../../scripts/eafc/mergeRosterFiles.js";
+import { orderByConference, FIRST_HALF_CLUBS } from "../../scripts/eafc/conferences.js";
+import { competitionConferences } from "../../src/core/competitions.js";
 import { computeOvr } from "../../src/core/players/ovr.js";
 import { OVR_SCALE_SHIFT } from "../../src/core/constants.js";
 import { mulberry32 } from "../../src/engine/rng.js";
@@ -190,8 +192,10 @@ describe("league mapping", () => {
   });
 
   it("skips leagues the game does not model", () => {
-    expect(mapLeague("Major League Soccer")).toBeNull();
+    // MLS is modelled now (US Division 1); Mexico is, but no export carries it,
+    // so it has no rule to match.
     expect(mapLeague("Liga MX")).toBeNull();
+    expect(mapLeague("K League 1")).toBeNull();
   });
 
   it("matches Greece and Serbia", () => {
@@ -248,16 +252,28 @@ describe("league mapping", () => {
   });
 
   it("covers every European first and second division in the shipped world", () => {
-    // The American leagues are deliberately uncovered for now, for the reason the
-    // third divisions are: no rule may be written without an export to verify its
-    // league ids against, and none has been checked for Brazil, Argentina, Mexico
-    // or the United States yet. Their clubs keep their generated identities.
     const AMERICAS = ["Brazil", "Argentina", "Mexico", "United States"];
     const uncovered = worldCompetitions()
       .filter((c) => c.tier <= 2 && !AMERICAS.includes(c.country))
       .map((c) => c.name)
       .filter((n) => !COVERED_COMPETITIONS.includes(n));
     expect(uncovered).toEqual([]);
+  });
+
+  it("covers the American top flights an export holds, and nothing below them", () => {
+    // Brazil, Argentina and the US were verified against FC26 by the clubs their
+    // ids hold (2026-09-14). Mexico is in no export checked, and no American
+    // second tier is either, so those keep generated identities unless a names
+    // file fills them — the same rule the third divisions follow.
+    for (const name of ["Brazilian Division 1", "Argentine Division 1", "US Division 1"]) {
+      expect(COVERED_COMPETITIONS).toContain(name);
+    }
+    const unverified = worldCompetitions()
+      .filter((c) => ["Brazil", "Argentina", "Mexico", "United States"].includes(c.country))
+      .filter((c) => c.tier >= 2 || c.country === "Mexico")
+      .map((c) => c.name);
+    expect(unverified.length).toBeGreaterThan(0);
+    for (const name of unverified) expect(COVERED_COMPETITIONS).not.toContain(name);
   });
 
   it("deliberately does not cover any third division", () => {
@@ -324,6 +340,32 @@ describe("league mapping", () => {
   });
 });
 
+describe("conference order", () => {
+  // Slots are seated positionally and a split division's first conference is its
+  // lower tids, so a converted MLS in strength order would scatter East and West.
+  it("lists MLS's Eastern Conference first, keeping strength order within each half", () => {
+    const east = FIRST_HALF_CLUBS["US Division 1"]!;
+    expect(east).toHaveLength(15);
+    const byStrength = [
+      { clubName: "Sounders FC" }, { clubName: "Inter Miami CF" },
+      { clubName: "LAFC" }, { clubName: "FC Cincinnati" },
+    ];
+    expect(orderByConference("US Division 1", byStrength).map((c) => c.clubName))
+      .toEqual(["Inter Miami CF", "FC Cincinnati", "Sounders FC", "LAFC"]);
+  });
+
+  it("only tables divisions that really are split, and leaves the rest alone", () => {
+    const comps = worldCompetitions();
+    for (const name of Object.keys(FIRST_HALF_CLUBS)) {
+      const comp = comps.find((c) => c.name === name);
+      expect(comp && competitionConferences(comp)).toBeTruthy();
+      expect(FIRST_HALF_CLUBS[name]!.length).toBe(Math.ceil(competitionTeamCount(comp!) / 2));
+    }
+    const clubs = [{ clubName: "b" }, { clubName: "a" }];
+    expect(orderByConference("English Division 1", clubs)).toEqual(clubs);
+  });
+});
+
 describe("league resolution by id", () => {
   // Mirrors the real FC26 dataset: several federations share a league name and
   // the export has dropped the country prefix that would separate them.
@@ -365,6 +407,20 @@ describe("league resolution by id", () => {
     expect(r.resolve("Super League", "189")).toBeNull();
     expect(r.resolve("Super League", "2149")).toBeNull();
     expect(r.resolve("Superliga", "1")).toBeNull();
+  });
+
+  it("reaches the American top flights by id, and keeps Brazil's Série A apart from Italy's", () => {
+    const r = buildLeagueResolver([
+      ...rows,
+      { name: "Série A", id: "7" },
+      { name: "Liga Profesional de Fútbol", id: "353" },
+      { name: "Major League Soccer", id: "39" },
+    ]);
+    expect(r.resolve("Série A", "7")).toBe("Brazilian Division 1");
+    expect(r.resolve("Serie A", "31")).toBe("Italian Division 1");
+    expect(r.resolve("Serie A", "2018")).toBeNull();
+    expect(r.resolve("Liga Profesional de Fútbol", "353")).toBe("Argentine Division 1");
+    expect(r.resolve("Major League Soccer", "39")).toBe("US Division 1");
   });
 
   it("separates Belgium from the two other 'Pro League's by id alone", () => {
@@ -752,6 +808,82 @@ describe("mergeRosterFiles — filling uncovered slots from a names file", () =>
       "Jahn Regensburg",
     ]);
     expect(filled.map((f) => f.club)).toEqual(["SSV Ulm 1846", "Jahn Regensburg"]);
+  });
+
+  it("puts a filled club back into its real zone rather than leaving it appended", () => {
+    // Filled clubs arrive after the converted ones, and a split division seats
+    // its first half from its first slots — so without re-ordering, a Zone A club
+    // the export lacks would play in Zone B.
+    const base = roster([{ match: "Argentine Division 1", clubs: ["River Plate", "Boca Juniors", "Gimnasia y Esgrima La Plata"] }]);
+    const names = roster([
+      {
+        match: "Argentine Division 1",
+        clubs: ["River Plate", "Boca Juniors", "Gimnasia y Esgrima La Plata", "Gimnasia y Esgrima de Mendoza"],
+      },
+    ]);
+    const { file } = mergeRosterFiles(base, names);
+    expect(clubNames(file, "Argentine Division 1")).toEqual([
+      "Boca Juniors", "Gimnasia y Esgrima de Mendoza", "River Plate", "Gimnasia y Esgrima La Plata",
+    ]);
+  });
+
+  it("only treats clubs as duplicates within one country", () => {
+    // Mexico's Santos Laguna is not Brazil's Santos, and Birmingham Legion is
+    // not Birmingham City. Across countries the containment rule only misfires.
+    const base = roster([
+      { match: "Brazilian Division 1", clubs: ["Santos"] },
+      { match: "English Division 2", clubs: ["Birmingham City"] },
+    ]);
+    const names = roster([
+      { match: "Mexican Division 1", clubs: ["Santos Laguna"] },
+      { match: "US Division 2", clubs: ["Birmingham Legion FC"] },
+    ]);
+    const { file, rejected } = mergeRosterFiles(base, names);
+    expect(clubNames(file, "Mexican Division 1")).toEqual(["Santos Laguna"]);
+    expect(clubNames(file, "US Division 2")).toEqual(["Birmingham Legion FC"]);
+    expect(rejected).toEqual([]);
+  });
+
+  it("still rejects a same-country duplicate, but not a known distinct pair", () => {
+    const base = roster([{ match: "Brazilian Division 1", clubs: ["Botafogo", "Atlético Mineiro"] }]);
+    const names = roster([
+      // The top-flight entries are spent recoloring the base clubs, so the
+      // second-tier ones are genuine fill candidates.
+      { match: "Brazilian Division 1", clubs: ["Botafogo", "Atlético Mineiro"] },
+      { match: "Brazilian Division 2", clubs: ["Botafogo FR", "Botafogo-SP", "América Mineiro"] },
+    ]);
+    const { file, rejected } = mergeRosterFiles(base, names);
+    expect(clubNames(file, "Brazilian Division 2")).toEqual(["Botafogo-SP", "América Mineiro"]);
+    expect(rejected.map((r) => r.candidate)).toEqual(["Botafogo FR"]);
+  });
+
+  it("does not treat two names made only of noise words as the same club", () => {
+    // "Sport" and "Athletic" both strip to nothing; that is not a match.
+    const base = roster([{ match: "Brazilian Division 2", clubs: ["Athletic"] }]);
+    const names = roster([{ match: "Brazilian Division 2", clubs: ["Athletic", "Sport"] }]);
+    const { file, rejected } = mergeRosterFiles(base, names);
+    expect(clubNames(file, "Brazilian Division 2")).toEqual(["Athletic", "Sport"]);
+    expect(rejected).toEqual([]);
+  });
+
+  it("recolors by an exact name before a contained one", () => {
+    // By containment alone New York City FC takes the Red Bulls' colors, since its
+    // distinctive words all appear in "New York Red Bulls".
+    const base = roster([{ match: "US Division 1", clubs: ["New York Red Bulls", "New York City FC"] }]);
+    const names: RosterFile = {
+      ...roster([{ match: "US Division 1", clubs: [] }]),
+      competitions: [{
+        match: "US Division 1",
+        clubs: [
+          { name: "New York City FC", abbrev: "NYC", colors: ["#6cace4", "#041e42"] },
+          { name: "New York Red Bulls", abbrev: "NYR", colors: ["#ffffff", "#ed1e36"] },
+        ],
+      }],
+    };
+    const { file } = mergeRosterFiles(base, names);
+    const colorsOf = (n: string) => file.competitions[0]!.clubs.find((k) => k.name === n)!.colors;
+    expect(colorsOf("New York Red Bulls")).toEqual(["#ffffff", "#ed1e36"]);
+    expect(colorsOf("New York City FC")).toEqual(["#6cace4", "#041e42"]);
   });
 
   it("re-derives a filled club's abbrev when it collides inside the competition", () => {
