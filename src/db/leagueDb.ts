@@ -2,6 +2,7 @@ import type { LeagueStore } from "../core/leagueState.js";
 import type { Player } from "../core/players/types.js";
 import type { ArchivedPlayer } from "../core/players/archive.js";
 import type { PlayedMatch } from "../core/standings.js";
+import type { MatchEvent } from "../engine/attribution.js";
 import { getDb, type StoredLeague, type StoredPlayer, type PlayerCareer } from "./database.js";
 import { migrateLeague } from "./migrate.js";
 
@@ -28,6 +29,107 @@ function retireeRange(lid: number): IDBKeyRange {
  */
 function playedRange(lid: number): IDBKeyRange {
   return IDBKeyRange.bound([lid], [lid, []]);
+}
+
+/**
+ * How many played-match rows are pulled out of IndexedDB at a time.
+ *
+ * The read is chunked rather than one `getAll` because the point of eliding is
+ * to keep match events out of memory, and `getAll` over the whole range would
+ * materialise every one of them first — lowering the steady-state floor while
+ * leaving the peak, which is the half that actually runs a phone tab out of
+ * memory. A chunk is read, stripped, and dropped, so at most this many box
+ * scores' events are live at once.
+ *
+ * Chunked with `getAll(range, count)` and an advancing lower bound rather than
+ * a cursor: keys are dense (`[lid, 0..n-1]`, an invariant `saveLeague` keeps),
+ * so the next key after N rows is exactly `[lid, N]`. That is ~20 round trips
+ * on a full season against ~10,500 cursor advances.
+ */
+const PLAYED_READ_CHUNK = 512;
+
+/**
+ * Read one league's played matches with their event timelines dropped.
+ *
+ * Its own read-only transaction, deliberately not the one `loadLeague` uses for
+ * everything else: this issues a request per chunk with an await between, and a
+ * transaction that goes idle between requests is free to auto-commit. Nothing
+ * here needs atomicity with the player read — they are reads of a save the app's
+ * own action chain guarantees nobody is writing.
+ */
+async function readPlayedElided(lid: number): Promise<PlayedMatch[]> {
+  const db = await getDb();
+  const out: PlayedMatch[] = [];
+  for (;;) {
+    const store = db.transaction("played", "readonly").objectStore("played");
+    // Keys are dense, so everything already read sits below `[lid, out.length]`.
+    const from: IDBKeyRange = out.length === 0
+      ? playedRange(lid)
+      : IDBKeyRange.bound([lid, out.length], [lid, []]);
+    const batch = await store.getAll(from, PLAYED_READ_CHUNK);
+    for (const m of batch) out.push(elideEvents(m));
+    if (batch.length < PLAYED_READ_CHUNK) return out;
+  }
+}
+
+/**
+ * The event timeline of one played match, read back from disk.
+ *
+ * Returns undefined when there is no such row, which a caller must treat as
+ * "unknown" rather than as "no events": an index past the end of the season and
+ * a save that has never been written both land here.
+ */
+export async function loadMatchEvents(
+  lid: number,
+  index: number,
+): Promise<MatchEvent[] | undefined> {
+  const db = await getDb();
+  const row = await db.get("played", [lid, index]);
+  return row?.boxScore.events;
+}
+
+/**
+ * The same league with every elided event timeline read back off disk.
+ *
+ * For anything that takes a league OUT of the app — an export above all. A file
+ * is the one place the elision marker must never reach: it says "the real events
+ * are on disk at this key", which is a claim about THIS database, and a file
+ * carrying it would be imported into a save where the claim is false. `saveLeague`
+ * would then skip those rows forever and the imported dynasty would silently
+ * have no match timelines at all.
+ *
+ * So the flag is dropped whether or not the events were recovered. An export
+ * missing a timeline is a small loss; one carrying a marker aimed at somebody
+ * else's database is a permanent, silent one.
+ */
+export async function withMatchEvents(league: LeagueStore): Promise<LeagueStore> {
+  if (!league.played.some(isEventsElided)) return league;
+  const rows = league.lid ? await storedPlayedRows(league.lid) : [];
+  return {
+    ...league,
+    played: league.played.map((m, i) => {
+      if (!isEventsElided(m)) return m;
+      const { eventsElided: _dropped, ...boxScore } = m.boxScore;
+      return { ...m, boxScore: { ...boxScore, events: rows[i]?.boxScore.events ?? [] } };
+    }),
+  };
+}
+
+/** Whether this box score's events were dropped on load rather than never recorded. */
+export function isEventsElided(m: PlayedMatch): boolean {
+  return m.boxScore.eventsElided === true;
+}
+
+/**
+ * The same match with its event timeline dropped.
+ *
+ * A match that recorded no events is returned untouched and stays unmarked, so
+ * `isEventsElided` keeps meaning "there are events on disk that are not here"
+ * rather than "there may or may not be".
+ */
+function elideEvents(m: PlayedMatch): PlayedMatch {
+  if (m.boxScore.events.length === 0) return m;
+  return { ...m, boxScore: { ...m.boxScore, events: [], eventsElided: true } };
 }
 
 /** Every career row for one league. Same key shape again. */
@@ -305,14 +407,29 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
   const retirees = retireesToWrite(lid, archive, storedSeq);
   if (retirees.full) await retireeStore.delete(retireeRange(lid));
 
-  // Rows are keyed by position, so a full rewrite must clear the range first:
-  // without it a season that shrank (the rollover, or a save loaded from an
-  // export with fewer matches) would leave the tail of the old one behind, and
-  // `loadLeague` reads the range as a dense array.
+  // Rows are keyed by position, so a full rewrite must drop anything past the
+  // end: without it a season that shrank (the rollover, or a save loaded from
+  // an export with fewer matches) would leave the tail of the old one behind,
+  // and `loadLeague` reads the range as a dense array.
+  //
+  // Only the TAIL, never the whole range, and that is load-bearing rather than
+  // an optimisation. Clearing the range used to be equivalent, because every
+  // surviving index was written again immediately below — that stopped being
+  // true once rows could be skipped. An elided row is deliberately not
+  // rewritten, so clearing first would delete the real events and put nothing
+  // back, losing the timeline of every match played before this session.
   const playedWrite = playedToWrite(lid, played, storedSeq);
-  if (playedWrite.full) await playedStore.delete(playedRange(lid));
+  if (playedWrite.full) {
+    await playedStore.delete(IDBKeyRange.bound([lid, played.length], [lid, []]));
+  }
   const playedPuts: Promise<unknown>[] = [];
   for (let i = playedWrite.from; i < played.length; i++) {
+    // Never write a box score whose events were elided on load: the row already
+    // on disk holds them and this copy does not. Skipping is exact rather than
+    // best-effort — an elided row can only have come from `loadLeague`, at this
+    // same index, and `played` is only ever appended to or cleared wholesale,
+    // so the row sitting at this key IS this match.
+    if (isEventsElided(played[i])) continue;
     playedPuts.push(playedStore.put(played[i], [lid, i]));
   }
 
@@ -351,7 +468,7 @@ export async function loadLeague(
   const db = await getDb();
 
   const tx = db.transaction(
-    ["leagues", "players", "careers", "retirees", "played"],
+    ["leagues", "players", "careers", "retirees"],
     "readonly",
   );
   const stored = await tx.objectStore("leagues").get(lid);
@@ -360,11 +477,20 @@ export async function loadLeague(
   const careerKeys = await tx.objectStore("careers").getAllKeys(careerRange(lid));
   const careerRows = await tx.objectStore("careers").getAll(careerRange(lid));
   const retireeRows = await tx.objectStore("retirees").getAll(retireeRange(lid));
+  await tx.done;
+
   // In key order, which is index order: IDB compares array keys element-wise
   // and numbers numerically, so [lid, 2] sorts below [lid, 10]. Taken as a
   // dense array because `saveLeague` keeps it one — see playedToWrite.
-  const playedRows = await tx.objectStore("played").getAll(playedRange(lid));
-  await tx.done;
+  //
+  // Read WITHOUT its event timelines, which is most of what a mid-season save
+  // weighs; `loadMatchEvents` fetches a match's back when a screen needs it.
+  // A record still carrying `played` inline is pre-v6 and has not been split
+  // yet, and there its box scores are the only copy in existence — eliding them
+  // would destroy them, since the split write-back below is what first puts
+  // them in the store. So that case reads nothing here and keeps the inline
+  // array whole.
+  const playedRows = stored.played !== undefined ? [] : await readPlayedElided(lid);
 
   const careerByPid = new Map<number, PlayerCareer>();
   careerKeys.forEach((key, i) => careerByPid.set(key[1], careerRows[i]));

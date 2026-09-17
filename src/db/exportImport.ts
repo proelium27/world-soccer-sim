@@ -4,6 +4,7 @@ import {
   isImageDataUrl, MAX_LOGO_DATA_URL, MAX_LOGO_ENTRIES,
 } from "../core/teams/logoPack.js";
 import { migrateLeague } from "./migrate.js";
+import { withMatchEvents } from "./leagueDb.js";
 
 /**
  * The first two bytes of every gzip stream. Import sniffs for these rather than
@@ -70,7 +71,8 @@ export async function exportLeagueJSON(
   league: LeagueStore,
   crests?: ReadonlyMap<number, string>,
 ): Promise<void> {
-  const bytes = await encodeLeagueFile(league, crests);
+  // Never write an elided box score to a file — see `withMatchEvents`.
+  const bytes = await encodeLeagueFile(await withMatchEvents(league), crests);
   const blob = new Blob([bytes], { type: "application/gzip" });
   const url = URL.createObjectURL(blob);
 
@@ -190,8 +192,35 @@ export async function importLeagueJSON(file: File): Promise<ImportedLeague> {
   // — silently, and only for saves that had been through a file.
   const { crests: rawCrests, ...rest } = obj;
   return {
-    league: migrateLeague(rest as unknown as LeagueStore),
+    league: dropElisionMarkers(migrateLeague(rest as unknown as LeagueStore)),
     crests: parseExportedCrests(rawCrests),
+  };
+}
+
+/**
+ * Strip any `eventsElided` marker off a league that came out of a file.
+ *
+ * `exportLeagueJSON` rehydrates before writing, so a file this game produced
+ * carries none — this is for the ones it did not: a hand-edited file, or one
+ * written by a build where the rehydrate failed or did not exist. The marker
+ * means "the real events are on disk at this key", which is a claim about the
+ * database it was elided from, and it is false the moment the save lands
+ * anywhere else. Left in place, `saveLeague` would skip those rows for the life
+ * of the imported save and its matches would never have a timeline again.
+ *
+ * Deliberately here rather than in `migrateLeague`, which every load also goes
+ * through: `loadLeague` elides BEFORE migrating, so stripping there would
+ * undo the elision on the spot and put every event straight back in memory.
+ */
+function dropElisionMarkers(league: LeagueStore): LeagueStore {
+  if (!league.played.some((m) => m.boxScore.eventsElided)) return league;
+  return {
+    ...league,
+    played: league.played.map((m) => {
+      if (!m.boxScore.eventsElided) return m;
+      const { eventsElided: _dropped, ...boxScore } = m.boxScore;
+      return { ...m, boxScore };
+    }),
   };
 }
 

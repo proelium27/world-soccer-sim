@@ -166,6 +166,29 @@ export interface BoxScore {
    * football they recorded.
    */
   firstHalfStoppage?: number;
+  /**
+   * Set when `events` has been emptied to keep it out of memory, rather than
+   * because the match had none.
+   *
+   * Events are ~66% of a box score (181 of them at ~10.8 KB against 25 player
+   * lines at ~6.6 KB), and `league.played` is 83% of a mid-season save, so a
+   * loaded league that holds every event is most of what the tab is carrying.
+   * `loadLeague` therefore strips them and sets this; `loadMatchEvents` reads
+   * the one match back out of IndexedDB when a screen actually needs them.
+   *
+   * It is a marker rather than an absent array because the two cases have to be
+   * told apart: an unmarked empty `events` means the match genuinely recorded
+   * none, and a reader that refetched those would query for every goalless,
+   * cardless match forever.
+   *
+   * THE INVARIANT THAT MATTERS: `saveLeague` must never write a box score
+   * carrying this flag. The row on disk holds the real events, and writing an
+   * elided copy over it destroys them silently — no throw, no type error, the
+   * match simply loses its timeline. `test/db/lazyMatchEvents.test.ts` is the
+   * gate. For the same reason the flag must never reach a file: `exportLeagueJSON`
+   * rehydrates from the store before writing.
+   */
+  eventsElided?: true;
 }
 
 const SHOT_WEIGHTS: Record<MatchPosition, number> = {
