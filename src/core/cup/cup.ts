@@ -13,7 +13,12 @@ import type { QualificationContext } from "./qualification.js";
 import { cupPlan, qualifyCupTeams } from "./qualification.js";
 import {
   drawLeaguePhase, leaguePhaseTable, splitLeaguePhase, leaguePhaseComplete,
+  drawGroups, groupQualifiers,
 } from "./leaguePhase.js";
+import {
+  isDefaultContinentalFormat, resolveCupShape, buildCupCalendar, splitOf,
+  CUP_KO_MAX_SIZE_CUSTOM, type ContinentalFormatSettings,
+} from "./cupShape.js";
 
 /** Legacy straight-bracket size (2^CUP_ROUNDS = 16), used only by pre-Swiss saves. */
 export const CUP_BRACKET_SIZE = 2 ** CUP_ROUNDS;
@@ -64,6 +69,7 @@ export function koRoundsOf(cup: CupState): number {
  */
 export function koRoundMatchdays(cup: CupState): readonly number[] {
   if (!isSwissCup(cup)) return CUP_ROUND_MATCHDAYS;
+  if (cup.calendar) return cup.calendar.ko.map((legs) => legs[legs.length - 1]);
   return CUP_KO_ROUND_MATCHDAYS.slice(CUP_KO_ROUND_MATCHDAYS.length - koRoundsOf(cup));
 }
 
@@ -75,6 +81,8 @@ export function koRoundMatchdays(cup: CupState): readonly number[] {
  * here, so this table is the single source of truth for the knockout calendar.
  */
 export function koLegMatchdays(cup: CupState): readonly (readonly number[])[] {
+  // A custom format (God Mode) carries the calendar it was drawn with.
+  if (cup.calendar && isSwissCup(cup)) return cup.calendar.ko;
   if (isSwissCup(cup) && cup.twoLegged) {
     return CUP_KO_LEG_MATCHDAYS.slice(CUP_KO_LEG_MATCHDAYS.length - koRoundsOf(cup));
   }
@@ -90,6 +98,24 @@ export function isTwoLeggedRound(cup: CupState, round: number): boolean {
 export function koPrizeByRound(cup: CupState): readonly number[] {
   const { prizes } = cupFormat(cup);
   return isSwissCup(cup) ? prizes.koByRound : prizes.legacyKoByRound;
+}
+
+/**
+ * The prize for winning knockout round `round`.
+ *
+ * A custom-format cup (one with a stored `shape`) counts rounds back from the
+ * final, so its semi-final pays the semi-final prize however deep the bracket
+ * is, and a Round of 16 — deeper than any prize table — pays half a
+ * quarter-final. A shipped-format cup keeps the original indexing (0 = the
+ * first knockout round) so no existing save's prize money moves; that indexing
+ * only differs for a bracket shallower than the quarter-finals, which only a
+ * hand-built world with a tiny field reaches.
+ */
+export function koWinPrize(cup: CupState, round: number): number {
+  const byRound = koPrizeByRound(cup);
+  if (!cup.shape) return byRound[round] ?? 0;
+  const idx = byRound.length - 1 - (koFinalRound(cup) - round);
+  return idx >= 0 ? byRound[idx] ?? 0 : Math.round((byRound[0] ?? 0) / 2);
 }
 
 /** Round index of the final for this cup (the round the user's sim halts before). */
@@ -142,11 +168,17 @@ export function buildCupState(
   season: number,
   format: CupFormat = CONTINENTAL_CUP_FORMAT,
   routes: QualificationContext = {},
+  /** The save's format for this competition (God Mode). Absent or default → the shipped format, built exactly as before. */
+  settings?: ContinentalFormatSettings,
 ): CupState | null {
   const plan = cupPlan(competitions, format);
   if (!plan) return null;
-  const { field, drawGroups } = qualifyCupTeams(competitions, tablesByCompId, format, routes);
+  const { field, drawGroups: countryOf } = qualifyCupTeams(competitions, tablesByCompId, format, routes);
   if (field.length !== plan.total) return null;
+  if (settings && !isDefaultContinentalFormat(settings)) {
+    return buildCustomCupState(field, countryOf, season, format, settings);
+  }
+  const drawGroups = countryOf;
 
   const seeds: Record<number, number> = {};
   field.forEach((tid, i) => (seeds[tid] = i + 1));
@@ -169,7 +201,81 @@ export function buildCupState(
   };
 }
 
+/**
+ * Draw a cup in a custom format (see core/cup/cupShape.ts). The qualified field
+ * is the same one the shipped format would use — formats change how a
+ * competition is played, never who is in it — except that a straight knockout
+ * holds at most two full Round-of-16 brackets, so a bigger field loses its
+ * lowest seeds.
+ */
+function buildCustomCupState(
+  qualified: number[],
+  countryOf: Map<number, number>,
+  season: number,
+  format: CupFormat,
+  settings: ContinentalFormatSettings,
+): CupState {
+  const field = settings.opening === "knockout"
+    ? qualified.slice(0, 2 * CUP_KO_MAX_SIZE_CUSTOM)
+    : qualified;
+  const shape = resolveCupShape(field.length, settings);
+  const calendar = buildCupCalendar(shape, shape.playoffTeams > 0);
+  const seeds: Record<number, number> = {};
+  field.forEach((tid, i) => (seeds[tid] = i + 1));
+  const drawSeed = hashInts(season, format.drawSeed);
+
+  const leaguePhase = shape.opening === "groups"
+    ? { teams: field, ...drawGroups(field, countryOf, drawSeed, calendar.opening) }
+    : shape.opening === "league"
+      ? { teams: field, matches: drawLeaguePhase(field, countryOf, drawSeed, shape.openingGames, calendar.opening) }
+      : { teams: field, matches: [] };
+
+  const cup: CupState = {
+    competition: format.id,
+    season,
+    name: format.name,
+    teams: new Array<number>(shape.koSize).fill(-1),
+    seeds,
+    leaguePhase,
+    playoff: null,
+    playIn: null,
+    ties: [],
+    championTid: null,
+    twoLegged: shape.twoLegged,
+    koLegs: null,
+    statLines: null,
+    shape,
+    calendar,
+  };
+  // A straight knockout has no opening stage to wait for: seed it now, by seed.
+  return shape.opening === "knockout" ? seedBracket(cup, field, splitOf(shape)) : cup;
+}
+
 /* ── Swiss league phase → knockout seeding ───────────────────────────────────*/
+
+/* ── Naming a cup's stages ────────────────────────────────────────────────────
+ * One place for the words, so the cup page, the schedule, the dashboard panel
+ * and the live viewer can't call the same stage two different things. */
+
+/** "Group stage" for a groups-format cup, "League phase" otherwise. */
+export function openingStageName(cup: CupState): string {
+  return cup.leaguePhase?.groups ? "Group stage" : "League phase";
+}
+
+/** Whether a cup opens with a stage of games at all (a straight knockout doesn't). */
+export function hasOpeningStage(cup: CupState): boolean {
+  return (cup.leaguePhase?.matches.length ?? 0) > 0;
+}
+
+/** "Preliminary round" for a straight knockout, "Playoff Round" otherwise. */
+export function prelimRoundName(cup: CupState): string {
+  return cup.shape?.opening === "knockout" ? "Preliminary round" : cupRoundName(CUP_STAGE_PLAYOFF);
+}
+
+/** How this cup's Swiss table splits: the stored split for a custom format, else sized off the field as shipped. */
+export function cupSplitPlan(cup: CupState): { koSize: number; directQF: number; playoffTeams: number } {
+  return cup.shape ? splitOf(cup.shape) : cupKnockoutPlan(cup.leaguePhase?.teams.length ?? 0);
+}
 
 /** Whether the knockout bracket has been seeded from the league phase yet. */
 export function knockoutSeeded(cup: CupState): boolean {
@@ -191,8 +297,24 @@ export function knockoutSeeded(cup: CupState): boolean {
  */
 export function seedKnockoutFromLeaguePhase(cup: CupState): CupState {
   if (!cup.leaguePhase || knockoutSeeded(cup) || !leaguePhaseComplete(cup.leaguePhase)) return cup;
+  if (cup.leaguePhase.groups) return seedFromGroups(cup);
   const table = leaguePhaseTable(cup.leaguePhase, cup.seeds);
-  const { directQF, playoff } = splitLeaguePhase(table);
+  return seedBracket(cup, table.map((r) => r.tid), cup.shape ? splitOf(cup.shape) : undefined);
+}
+
+/**
+ * Seed the bracket (and any playoff) from a ranked list of clubs, best first:
+ * the direct places take the top seeds outright and the playoff pairs the next
+ * group highest-against-lowest, each winner taking the next seed down. Shared
+ * by the Swiss table and the straight-knockout opening (where the ranking is
+ * simply the qualification seeding).
+ */
+function seedBracket(
+  cup: CupState,
+  ranked: number[],
+  plan?: { koSize: number; directQF: number; playoffTeams: number },
+): CupState {
+  const { directQF, playoff } = splitLeaguePhase(ranked.map((tid) => ({ tid })), plan);
   const koSize = cup.teams.length;
 
   const order = seedOrder(koSize); // seed sitting at each bracket position
@@ -205,8 +327,38 @@ export function seedKnockoutFromLeaguePhase(cup: CupState): CupState {
   const slots: number[] = [];
   for (let s = directQF.length + 1; s <= koSize; s++) slots.push(order.indexOf(s));
 
-  const playoffRound: CupPlayoff = { teams: playoffTeams, slots, matchday: CUP_PLAYOFF_MATCHDAY, ties: [] };
+  const matchday = cup.calendar?.playoff ?? CUP_PLAYOFF_MATCHDAY;
+  const playoffRound: CupPlayoff = { teams: playoffTeams, slots, matchday, ties: [] };
   return { ...cup, teams, playoff: playoffRound };
+}
+
+/**
+ * Seed the bracket from a finished group stage. Qualifiers are ranked winners,
+ * then runners-up, then third-placed sides (see groupQualifiers) and placed by
+ * seedOrder, so the best group winners can only meet late. Seeding alone can
+ * pair two clubs from the same group in the first round — a rematch the group
+ * has just settled — so a repair pass swaps the lower-seeded side of any such
+ * pair with the lower-seeded side of another pair wherever that clears both.
+ */
+function seedFromGroups(cup: CupState): CupState {
+  const lp = cup.leaguePhase!;
+  const koSize = cup.teams.length;
+  const quals = groupQualifiers(lp, cup.seeds, koSize);
+  const order = seedOrder(koSize);
+  const slots = order.map((seed) => quals[seed - 1] ?? null);
+  const groupAt = (i: number): number => slots[i]?.group ?? -1 - i;
+  for (let p = 0; p < koSize; p += 2) {
+    if (groupAt(p) !== groupAt(p + 1)) continue;
+    for (let q = 0; q < koSize; q += 2) {
+      if (q === p) continue;
+      // Swap the lower-seeded side of each pair (the odd slot holds it by seedOrder).
+      if (groupAt(q + 1) !== groupAt(p) && groupAt(p + 1) !== groupAt(q)) {
+        [slots[p + 1], slots[q + 1]] = [slots[q + 1], slots[p + 1]];
+        break;
+      }
+    }
+  }
+  return { ...cup, teams: slots.map((x) => x?.tid ?? -1), playoff: null };
 }
 
 /** Whether the playoff is due to be played at `matchday` (seeded, and not yet played). */
@@ -404,7 +556,7 @@ export function cupRunSummary(
   const isChampion = run.round === finalRound && run.wonRound;
   const isRunnerUp = run.round === finalRound && !run.wonRound;
   const note =
-    run.round === CUP_STAGE_LEAGUE_PHASE ? "League phase"
+    run.round === CUP_STAGE_LEAGUE_PHASE ? (cup.leaguePhase?.groups ? "Group stage" : "League phase")
       : run.round === CUP_STAGE_PLAYOFF ? "Playoff"
         : isChampion ? "Winners"
           : isRunnerUp ? "Runners-up"

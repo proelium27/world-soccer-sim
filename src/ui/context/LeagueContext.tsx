@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import type { LeagueStore } from "../../core/leagueState.js";
 import type { ProgressionModel, WorldCupSize } from "../../core/constants.js";
 import { isCustomAwardFormula, resolveAwardFormula, type AwardFormula } from "../../core/awardFormula.js";
+import { isDefaultContinentalFormat, sanitizeContinentalFormat, type ContinentalFormatSettings } from "../../core/cup/cupShape.js";
+import type { CupCompetitionId } from "../../core/constants.js";
 import type { SimThrough, IntlMode, PlayoffMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
 import { saveLeague, loadLeague } from "../../db/leagueDb.js";
@@ -180,6 +182,7 @@ interface LeagueContextValue {
   godModeSetProgressionModelAction: (model: ProgressionModel) => Promise<void>;
   /** God Mode: set this save's award weights, or pass null to go back to the shipped ones. */
   godModeSetAwardFormulaAction: (formula: AwardFormula | null) => Promise<void>;
+  godModeSetContinentalFormatAction: (competition: CupCompetitionId, settings: ContinentalFormatSettings | null) => Promise<void>;
   /** Set how many nations the World Cup takes, from the next qualifying draw on. */
   setWorldCupSizeAction: (size: WorldCupSize) => Promise<void>;
   movePlayerToClubAction: (pid: number, tid: number) => Promise<void>;
@@ -1147,6 +1150,32 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * God Mode: how one club continental competition is played (see
+   * `LeagueStore.continentalFormats`). Sanitized on the way in, and a format
+   * identical to the shipped one is stored as no entry at all, so "absent means
+   * the shipped format" stays literally true. Read at the next offseason draw.
+   */
+  const godModeSetContinentalFormatAction = useCallback(
+    (competition: CupCompetitionId, settings: ContinentalFormatSettings | null) => mutate((l) => {
+      if (!l.godMode) return null;
+      const clean = settings === null ? null : sanitizeContinentalFormat(settings);
+      const rest = { ...(l.continentalFormats ?? {}) };
+      if (clean === null || isDefaultContinentalFormat(clean)) {
+        if (!(competition in rest)) return null;
+        delete rest[competition];
+      } else {
+        rest[competition] = clean;
+      }
+      if (Object.keys(rest).length === 0) {
+        const { continentalFormats: _dropped, ...without } = l;
+        return without;
+      }
+      return { ...l, continentalFormats: rest };
+    }),
+    [mutate],
+  );
+
+  /**
    * God Mode: edit the weights the end-of-season awards are scored with (see
    * `LeagueStore.awardFormula`).
    *
@@ -1341,6 +1370,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeTakeNationalJobAction,
     godModeSetProgressionModelAction,
     godModeSetAwardFormulaAction,
+    godModeSetContinentalFormatAction,
     setWorldCupSizeAction,
     releasePlayerGodModeAction,
     editPlayerAction,
@@ -1375,6 +1405,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeTakeNationalJobAction,
     godModeSetProgressionModelAction,
     godModeSetAwardFormulaAction,
+    godModeSetContinentalFormatAction,
     setWorldCupSizeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
     setClubInterestAction, setNationInterestAction,

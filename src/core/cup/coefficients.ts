@@ -125,7 +125,13 @@ function scoreCup(
     // Both sides of a tie reached that round, so both take its bonus. Winning
     // the competition pays its own bonus on top, kept separate so a finalist
     // and a champion are not accidentally scored the same.
-    const bonus = COEFFICIENT_ROUND_BONUS[tie.round] ?? 0;
+    // A custom-format cup (God Mode) counts back from the final so a deeper
+    // bracket's Round of 16 takes the first round's bonus rather than shifting
+    // every later round's; a shipped cup is indexed exactly as it always was.
+    const idx = cup.shape
+      ? Math.max(0, COEFFICIENT_ROUND_BONUS.length - 1 - (Math.round(Math.log2(cup.teams.length)) - 1 - tie.round))
+      : tie.round;
+    const bonus = COEFFICIENT_ROUND_BONUS[idx] ?? 0;
     add(tie.home, bonus);
     add(tie.away, bonus);
   }

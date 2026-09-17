@@ -1,6 +1,7 @@
 import type { BoxScore } from "../../engine/attribution.js";
 import type { CupPlayerLine } from "./cupStats.js";
 import type { CupCompetitionId } from "../constants.js";
+import type { ResolvedCupShape, CupCalendar } from "./cupShape.js";
 
 /**
  * One completed knockout tie. Scoreline is regulation + extra time; a shootout
@@ -110,6 +111,18 @@ export interface LeaguePhaseMatch {
 export interface CupLeaguePhase {
   teams: number[]; // CUP_LEAGUE_PHASE_SIZE tids
   matches: LeaguePhaseMatch[]; // CUP_LEAGUE_PHASE_SIZE * CUP_LEAGUE_PHASE_GAMES / 2 matches
+  /**
+   * A groups-format cup only (see ContinentalFormatSettings): the groups of four,
+   * each in seed-pot order. The opening stage is then a double round robin inside
+   * each group, stored in `matches` exactly like Swiss games, so every reader of
+   * league-phase matches (stats, prizes, coefficients, archiving, the schedule)
+   * handles it with no change. Absent on every Swiss cup.
+   *
+   * A straight-knockout cup also carries a league phase, with `matches` empty:
+   * it is what holds the field, and every reader that asks "who entered" reads
+   * `leaguePhase.teams`.
+   */
+  groups?: number[][];
 }
 
 /**
@@ -209,4 +222,14 @@ export interface CupState {
    * Null on pre-feature saves until migrate backfills it.
    */
   statLines: CupPlayerLine[] | null;
+  /**
+   * The format this cup was drawn with, when it isn't the shipped one (see
+   * core/cup/cupShape.ts). Absent on every default cup, so a save that never
+   * touches the God Mode setting builds exactly the state it always did.
+   * Recorded at the draw so a mid-season change to the setting can't reshape a
+   * competition already under way.
+   */
+  shape?: ResolvedCupShape;
+  /** Where this cup's stages are played, alongside `shape`. Absent → the shipped constants. */
+  calendar?: CupCalendar;
 }
