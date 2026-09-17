@@ -643,7 +643,7 @@ export function NewLeague() {
             </div>
             <p className="text-muted small mb-2">
               A ready-made file covering every league in the game. Save it, then load
-              it below. It was rebuilt from the EA FC 27 ratings on 30 August 2026.
+              it below. It was rebuilt on 14 September 2026 to cover the Americas too.
             </p>
             <a
               className="btn btn-outline-primary btn-sm"

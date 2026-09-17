@@ -167,10 +167,13 @@ export function Manual() {
             is the other way in — see just below.
           </p>
           <p>
-            Every club in it carries a real name, but not every one carries a real squad, because
-            the source data doesn't reach that far down. Serbia, the second tiers of Portugal,
-            Belgium, Turkey, the Netherlands, Scotland and Greece, and most of the Greek top flight
-            get real names with generated players. Everywhere else has both. The file is rebuilt
+            Third divisions stay fictional. Above them, every club carries a real name, but not every
+            one carries a real squad, because the source data doesn't reach that far down. Serbia,
+            Mexico, the second tiers of Portugal, Belgium, Turkey, the Netherlands, Scotland, Greece,
+            Brazil, Argentina and the United States, most of the Greek top flight, and seven Brazilian
+            and two Argentine top-flight clubs get real names with generated players. Everywhere else
+            has both. Brazil's squads come from the previous year's ratings, since the newest ones
+            don't include Brazilian clubs. The file is rebuilt
             when the ratings are, and the link never changes, so downloading it again is how you
             get a newer one.
           </p>
@@ -1143,6 +1146,12 @@ export function Manual() {
             puts ten through, and a 16-club one puts eight through with no playoff round at all,
             since eight is already a full quarter-final bracket. You'll only see this if you build
             your own world. The key under the league-phase table always names the actual numbers.
+          </p>
+          <p>
+            Everything in this section is the format the game ships with. <a href="#godmode">God Mode</a>{" "}
+            can play any of the continental competitions a different way (groups of four, a longer or
+            shorter league phase, a straight knockout, a Round of 16, one-off ties), and the
+            competition&apos;s own page says which format it&apos;s using.
           </p>
           <p>
             The <strong>quarter-finals and semi-finals are two-legged</strong>: each side hosts once,
@@ -3230,6 +3239,7 @@ export function Manual() {
             <li><strong>Build any club's roster.</strong> The same page lets you pick any club and add, move, or release its players directly.</li>
             <li><strong>Set club finances and identity.</strong> Set any club's budget and hype to whatever you want, and rename or recolor any club.</li>
             <li><strong>Rewrite the award formulas.</strong> The God Mode page has an Awards tab for changing what the end-of-season awards reward. The quick way is a style: <em>Goals win awards</em> doubles what goals and assists are worth, <em>Defenders get their due</em> doubles tackles, interceptions and save percentage for the Team of the Season and the defensive world awards, <em>Trophies decide it</em> triples titles and cup runs, and <em>Form only</em> stops a player's overall rating counting at all. Underneath, <em>Fine-tune the numbers</em> lists every weight: goals and assists by position, match rating, overall, tackles and interceptions per game, save percentage, the league games needed to qualify (19 out of the box), and everything the Ballon d&apos;Or adds for league strength, trophies, cup runs and international football. Each one is explained as what it's worth in goals by a forward. Before you save, the tab shows who would have won last season's Ballon d&apos;Or, Goalkeeper and Defender of the Year and your league's Player of the Season under your numbers, judged on the players still in the game. Save and your formula is used the next time awards are handed out. Seasons already played keep their winners, and picking <em>As shipped</em> puts the game's own formula back. Worth knowing: a Team of the Season place is part of what makes a big club refuse to sell a star, so changing that formula also changes who&apos;s on the market. Like a ratings lock, it stays in force if you switch God Mode off, and the Awards page says so.</li>
+            <li><strong>Change how the continental competitions are played.</strong> The God Mode page has a Cup Formats tab with a card for each club competition your world plays: the Continental Cup, the Continental Shield and the Americas Cup, each set on its own. Pick a style (<em>Groups and a Round of 16</em> is the old Champions League, <em>Long league phase</em> is eight games each and a Round of 16 like today's, <em>Straight knockout</em> skips the group games, <em>One-off ties</em> drops the second legs), or open <em>Fine-tune</em> and set it yourself: how it opens (one league phase, groups of four, or straight into the knockout), 4, 6 or 8 league-phase games, where the knockout starts (semi-finals, quarter-finals or a Round of 16), whether there's a playoff round, and one or two legs. The final is always one match. Under the styles, a line says in plain words what the competition will look like next season. Groups send the top two through, plus the best third-placed sides when the numbers need topping up, and a group's two qualifiers can't meet each other straight away. A straight knockout gives the top seeds a bye when the field is bigger than the bracket. A change starts with next season's draw, so anything already under way finishes the way it started. The same clubs qualify whatever you pick, and prize money is paid for the stages each format actually plays: a Round of 16 win is worth half a quarter-final win, and a straight knockout pays the entry fee on the first tie. The fixtures stay off the domestic cup matchdays. Like the award formulas, the setting stays in force if you switch God Mode off, and the competition's page says so.</li>
             <li><strong>See true potential.</strong> The scouting fog lifts while God Mode is on, so every player's exact potential shows everywhere, not an estimate.</li>
           </ul>
           <p>

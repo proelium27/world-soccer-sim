@@ -15,11 +15,11 @@ import type { IntlTournament } from "../../core/international/types.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { MiniBracket, type MiniBracketTie } from "../components/MiniBracket.js";
 import { computePowerRankingSnapshot } from "../../core/teams/powerRanking.js";
-import { koRoundsOf, cupRoundName, isCupComplete } from "../../core/cup/cup.js";
+import { koRoundsOf, cupRoundName, isCupComplete, cupSplitPlan, hasOpeningStage } from "../../core/cup/cup.js";
 import { leaguePhaseTable } from "../../core/cup/leaguePhase.js";
 import { koRoundName, NationName } from "./nationalTeams/shared.js";
 import {
-  isTournamentSeason, isConfederationCupSeason, cupKnockoutPlan,
+  isTournamentSeason, isConfederationCupSeason,
 } from "../../core/constants.js";
 
 /** How many clubs the power-ranking panel lists before pointing at the full board. */
@@ -112,7 +112,7 @@ function LeaguePhaseTop({ table, cup }: {
   table: ReturnType<typeof leaguePhaseTable>;
   cup: CupState;
 }) {
-  const { directQF, playoffTeams } = cupKnockoutPlan(table.length);
+  const { directQF, playoffTeams } = cupSplitPlan(cup);
   const advancing = directQF + playoffTeams;
   const opener = cupRoundName(0, koRoundsOf(cup)).toLowerCase();
 
@@ -257,7 +257,10 @@ export function CupBracketPanel({ cup, title, href }: {
 
   // Before the knockout, the story is the league-phase table. `leaguePhaseTable`
   // is derived rather than stored, so this is the same table the cup page draws.
-  const lp = ties.length === 0 && cup.leaguePhase
+  // A groups-format cup has no single table worth summarising here (the cup
+  // page draws each group), and a straight knockout has no opening stage.
+  const groups = !!cup.leaguePhase?.groups;
+  const lp = ties.length === 0 && cup.leaguePhase && hasOpeningStage(cup) && !groups
     ? leaguePhaseTable(cup.leaguePhase, cup.seeds)
     : null;
   const played = cup.leaguePhase?.matches.filter((m) => m.played).length ?? 0;
@@ -269,7 +272,11 @@ export function CupBracketPanel({ cup, title, href }: {
           <ClubLink tid={champion} crest /> <span className="text-muted">win it.</span>
         </p>
       )}
-      {lp ? (
+      {groups && ties.length === 0 ? (
+        <p className="text-muted small mb-0">
+          {played === 0 ? "Drawn. The group stage kicks off shortly." : "The group stage is under way."}
+        </p>
+      ) : lp ? (
         played === 0 ? (
           <p className="text-muted small mb-0">Drawn. The league phase kicks off shortly.</p>
         ) : (

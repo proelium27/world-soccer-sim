@@ -359,13 +359,16 @@ onto the full Greek band states that Panathinaikos are Greece's relegation
 fodder: measured, their top-11 comes out at 56.7 rather than 62.6, below every
 Belgian and Turkish club.
 
-A competition whose source covers less than `PARTIAL_LEAGUE_COVERAGE` (0.75) of
+A competition whose source covers less than `PARTIAL_LEAGUE_COVERAGE` (0.6) of
 its slots therefore takes the pooled-world curve instead, which places each
 player where his EA overall ranks against every imported league at once. The bar
-clears every league FC26 genuinely carries — England's second tier is the
-thinnest at 20 of 24 — so it only catches the fragmentary case, and the report
-says when it fires. Scotland and the Netherlands come out byte-identical either
-way.
+only catches the fragmentary case, and the report says when it fires.
+
+It was 0.75 until 2026-09-14. Brazil's Série A arrives as 13 of 20 clubs, the
+whole top of the league, and pooled it came out at a 68.2 XI OVR against 73.5
+for the generated league it replaces (best club 74.6 against 83.9), which put the
+Brasileirão below Portugal. On its own band it lands at 71.8 (best 78.5). Greece
+at 4 of 14 is still caught either way.
 
 Note the pooled curve only protects because the pool holds *other* leagues. A
 one-league conversion is its own pool, and rank-matching spreads it across the
@@ -378,3 +381,46 @@ Greece, 12 in Scotland, 10 in Scotland's second tier), so `--clubs` now defaults
 to whatever the competition fields rather than a flat 20. It matters for which
 clubs survive: the converter cuts an over-full league by squad strength, whereas
 the importer would drop the overflow by slot order.
+
+## The Americas (2026-09-14, release `rosters-2026-09`)
+
+What the data holds: FC27 (EA's public ratings pull) carries Argentina's Liga
+Profesional as "LPF" and MLS as domestic leagues, and **no Brazilian or Mexican
+club at all** (its Libertadores and Sudamericana listings are other countries'
+clubs). FC26 carries Brazil's Série A for 14 licensed clubs. Ids 353, 39 and 7
+were verified against FC26 by the clubs they hold and are in `LEAGUE_IDS`.
+
+`~/Downloads/fc27-tooling/americas.py` appends them to `fc27-merged.csv`:
+
+- Argentina from FC27, league_id 353. The 63 players FC27 lists with no club
+  are dropped: all were at Godoy Cruz and San Martín de San Juan in FC26, both
+  relegated, so recovering them would seat two relegated clubs in the top flight.
+- MLS from FC27, league_id 39.
+- Brazil from FC26, league_id 7, minus relegated Fortaleza, ages +1. A year
+  older than every other rating in the file.
+
+Mexico and every American second tier are names only, from a names file whose
+club lists were checked against the 2026 season pages (colours were not).
+
+**A split division is seated by slot order.** The importer hands clubs to a
+competition's tids in order, and MLS's Eastern Conference and Argentina's Zone A
+are the lower half of those tids. Strength order scattered both conferences, so
+`scripts/eafc/conferences.ts` lists each first half's clubs (under every name
+they go by) and both the converter and `mergeRosterFiles` order by it. The merge
+needs it too because it appends names-only clubs after converted ones.
+Argentina's zones are redrawn every season, so that list wants updating with the
+ratings. Divisions filled entirely from a names file keep that file's order.
+
+**`mergeRosterFiles` compares clubs within one country.** World-wide, the
+containment rule rejected Mexico's Santos Laguna as Brazil's Santos (and a guest
+club took its Liga MX slot), Birmingham Legion as Birmingham City, and Sport as
+Athletic Club. Cross-division duplicates are always same-country, so nothing is
+lost. Recoloring also tries an exact name before containment, since "New York
+City FC" is contained in "New York Red Bulls" and the two swapped colors. The
+`DISTINCT` table holds real same-country near-names (Botafogo-SP, América
+Mineiro, Miami FC and others), and a name made only of noise words ("Sport") no
+longer counts as the same club as another one ("Athletic").
+
+Result: 614 clubs, 349 with real squads, 8,244 players. Imported into the
+898-club world every league's mean XI sits within about 2 OVR of the generated
+one except Brazil at 71.8 against 73.5.

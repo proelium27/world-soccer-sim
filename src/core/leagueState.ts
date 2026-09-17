@@ -36,6 +36,7 @@ import {
 } from "./constants.js";
 import { isSpectatorTid } from "./spectator.js";
 import type { AwardFormula } from "./awardFormula.js";
+import type { ContinentalFormats } from "./cup/cupShape.js";
 
 export type { StoredTeam } from "./teams/clubs.js";
 export type { ScheduleGame } from "./schedule.js";
@@ -415,6 +416,17 @@ export interface LeagueStore {
    * God Mode is switched back off, like a ratings lock.
    */
   awardFormula?: AwardFormula;
+
+  /**
+   * How each club continental competition is played, when God Mode has changed
+   * it (see core/cup/cupShape.ts): the opening stage, league-phase length,
+   * bracket size, playoff round and legs. A missing competition plays the
+   * shipped format. Read only at the offseason draw, and the cup records the
+   * shape it was drawn with, so a change takes effect next season and never
+   * reshapes a competition in progress. Optional with no migration: no save
+   * written before this had a custom format.
+   */
+  continentalFormats?: ContinentalFormats;
 
   /**
    * How many nations the World Cup takes: 16, 24, 32 or 48, or "auto" to size

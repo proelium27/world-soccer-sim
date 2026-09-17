@@ -4,6 +4,9 @@ import { mulberry32 } from "../../src/engine/rng.js";
 import { simThrough } from "../../src/core/simThrough.js";
 import { simOffseason, simOffseasonReporting } from "../../src/core/offseason.js";
 import {
+  playoffsPending, playPlayoffStage, simThroughPlayoffs,
+} from "../../src/core/playoffStages.js";
+import {
   detachArchive, reattachArchive, detachPlayed, reattachPlayed,
   detachCareer, reattachCareer, detachNews, reattachNews,
   detachTransfers, reattachTransfers,
@@ -435,5 +438,112 @@ describe("simArchive transfer window", () => {
   it("holds back none of a save younger than the window", () => {
     const young = createLeagueState(0, mulberry32(97), 0, "normal", englandCompetitions());
     expect(detachTransfers(young).transfers).toEqual([]);
+  });
+});
+
+/**
+ * The gate for the worker's `{type: "playoffs"}` command.
+ *
+ * It was the one command crossing this boundary with no equivalence test, and
+ * it is the one that runs at the seam between a season ending and the offseason
+ * starting: the brackets are drawn when the league season ends and played a
+ * block at a time afterwards, each block its own worker round trip.
+ *
+ * It is also the only one of the four that hands `reviewSeason` the whole
+ * league, which is the shape that reads a held-back field by accident — the
+ * board reads `played`, whose box scores are stubbed on the way out, and the
+ * squads, whose careers go as a window. Nothing in the playoff call graph reads
+ * a detached field today, so what these guard is the next thing added to it: a
+ * read would see an empty array and judge the season on it rather than fail.
+ */
+describe("simArchive staged playoffs", () => {
+  /**
+   * A season that ended the way the game ends one — every playoff drawn, no
+   * round played — after three ordinary seasons.
+   *
+   * Three first because that is the floor at which the career window cuts
+   * anything (see the career fixture above): on a shallower league the worker
+   * would be handed whole careers and the round trip would prove nothing about
+   * them.
+   *
+   * `options` is simThrough's FIFTH parameter — the fourth is the matchday
+   * callback — so staging has to be reached past an explicit `undefined`. In
+   * the fourth slot it is read as a callback instead, `stagePlayoffs` stays
+   * false, the playoffs are played in one pass the way every headless caller
+   * plays them, and everything below still passes while testing nothing. The
+   * pending assertion in the first case is what catches that.
+   */
+  let pending: LeagueStore;
+  beforeAll(() => {
+    const rng = mulberry32(53);
+    let l = createLeagueState(0, rng, 0, "normal", englandCompetitions());
+    for (let i = 0; i < 3; i++) {
+      l = playSeason(l, rng);
+      l = simOffseason(l, rng);
+    }
+    // The same loop playSeason runs, for the same reason: simThrough halts
+    // before the user's own cup final rather than playing it.
+    for (let i = 0; i < 4 && l.phase !== "offseason"; i++) {
+      l = simThrough(l, "season", rng, undefined, { stagePlayoffs: true });
+    }
+    pending = l;
+  }, 900_000);
+
+  /**
+   * One trip through the worker boundary, modelling useSimWorker's `post()`:
+   * every detach a non-`jump` command applies, in its order, then the
+   * reattaches in reverse. The culled set is empty because only an offseason
+   * culls, and a playoffs command never runs one.
+   */
+  const roundTrip = (
+    league: LeagueStore,
+    play: (l: LeagueStore) => LeagueStore,
+  ): LeagueStore => {
+    const none = new Set<number>();
+    const a = detachArchive(league);
+    const b = detachPlayed(a.payload);
+    const c = detachCareer(b.payload);
+    const d = detachNews(c.payload);
+    const e = detachTransfers(d.payload);
+
+    let out = play(e.payload);
+    out = reattachNews(out, d.news, none);
+    out = reattachTransfers(out, e.transfers, none);
+    out = reattachCareer(out, c.careers);
+    out = reattachPlayed(out, b.played);
+    out = reattachArchive(out, a.archive);
+    return out;
+  };
+
+  it("playing every block on a detached league lands where an undetached run does", () => {
+    // Non-vacuous on both counts, or this passes by doing nothing: there has to
+    // be a playoff left to play, and the chain has to be holding something back
+    // while it is played.
+    expect(playoffsPending(pending)).toBe(true);
+    expect(detachPlayed(pending).played.length).toBeGreaterThan(0);
+    expect(detachCareer(pending).careers.size).toBeGreaterThan(0);
+
+    const whole = simThroughPlayoffs(pending);
+    expect(playoffsPending(whole)).toBe(false); // they really were played
+
+    expect(roundTrip(pending, simThroughPlayoffs)).toEqual(whole);
+  });
+
+  it("a block at a time through the boundary lands in the same place", () => {
+    // What the game actually does: one worker command per block, so every block
+    // but the first runs on a league that has already been round-tripped once.
+    const whole = simThroughPlayoffs(pending);
+
+    let staged = pending;
+    let blocks = 0;
+    // Same bound simThroughPlayoffs puts on its own loop.
+    while (playoffsPending(staged) && blocks < 16) {
+      staged = roundTrip(staged, playPlayoffStage);
+      blocks++;
+    }
+
+    // More than one, or this asserts nothing the case above didn't.
+    expect(blocks).toBeGreaterThan(1);
+    expect(staged).toEqual(whole);
   });
 });

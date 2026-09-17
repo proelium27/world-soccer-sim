@@ -382,9 +382,9 @@ export function Leagues() {
           <>
             {" "}
             Download Real Rosters gets you one covering every league to start with. It was
-            rebuilt on 30 August 2026 from the EA FC 27 ratings, so it now covers all
-            twelve countries instead of the first eight. If you grabbed it before then,
-            download it again for the newer squads.
+            rebuilt on 14 September 2026 and now covers Brazil, Argentina, Mexico and the
+            United States as well as Europe. If you grabbed it before then, download it
+            again, since the old one leaves the Americas fictional.
           </>
         )}{" "}
         To make your own instead, "Copy AI Prompt to Customize" gives you a prompt to

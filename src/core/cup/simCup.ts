@@ -7,7 +7,7 @@ import { pickShooter, pickAssister, emptyLine } from "../../engine/attribution.j
 import { mulberry32, hashInts } from "../../engine/rng.js";
 import {
   matchupsForRound, applyPlayIn, applyPlayoff, cupFormat,
-  isSwissCup, koPrizeByRound, koFinalRound, seedKnockoutFromLeaguePhase, dueCupLeg,
+  isSwissCup, koWinPrize, koFinalRound, seedKnockoutFromLeaguePhase, dueCupLeg,
 } from "./cup.js";
 import {
   CUP_ET_CHANCES_PER_SIDE, CUP_PEN_BEST_OF, CUP_PEN_BASE_CONVERSION,
@@ -161,6 +161,20 @@ function playShootout(
     if (rng() < pAway) away++;
   }
   return { homePens: home, awayPens: away };
+}
+
+/**
+ * A straight-knockout cup (a God Mode format) has no opening stage, so the
+ * entry fee every other format pays on league-phase round 0 is paid on the
+ * first stage it does play: the preliminary round if there is one, otherwise
+ * the first leg of the opening knockout round. Byes collect it too.
+ */
+function isKnockoutOpening(cup: CupState): boolean {
+  return cup.shape?.opening === "knockout";
+}
+
+function payKnockoutOpeningEntry(cup: CupState, addPrize: (tid: number, amount: number) => void): void {
+  for (const tid of cup.leaguePhase?.teams ?? []) addPrize(tid, cupFormat(cup).prizes.participation);
 }
 
 /**
@@ -349,8 +363,13 @@ export function playKnockoutLeg(
   if (!due) return { cup, prizes: new Map() };
   const { round, leg, twoLeg } = due;
 
+  // A straight knockout with no preliminary round pays its entry fee on its first leg.
+  const entryDue = isKnockoutOpening(cup) && !cup.playoff && round === 0 && leg === 0;
+
   // First leg of a two-legged round: play and hold, no prizes yet.
   if (twoLeg && leg === 0) {
+    const entry = new Map<number, number>();
+    if (entryDue) payKnockoutOpeningEntry(cup, (tid, amount) => entry.set(tid, (entry.get(tid) ?? 0) + amount));
     const rng = mulberry32(hashInts(lid, cup.season, round, streamTag(cup), 1));
     const koLegs: KnockoutLeg[] = [];
     for (const [home, away] of matchupsForRound(cup, round)) {
@@ -359,15 +378,15 @@ export function playKnockoutLeg(
       if (!hd || !ad) continue; // defensive: a qualifier should always be in matchData
       koLegs.push(playFirstLeg(rng, home, away, hd, ad, round));
     }
-    return { cup: { ...cup, koLegs }, prizes: new Map() };
+    return { cup: { ...cup, koLegs }, prizes: entry };
   }
 
   const finalRound = koFinalRound(cup);
-  const winPrize = koPrizeByRound(cup);
   const prizes = new Map<number, number>();
   const addPrize = (tid: number, amount: number): void => {
     prizes.set(tid, (prizes.get(tid) ?? 0) + amount);
   };
+  if (entryDue) payKnockoutOpeningEntry(cup, addPrize);
 
   // Legacy cups credit the participation fee once as the first bracket round is
   // played (the two play-in winners already collected it in the play-in). Swiss
@@ -381,7 +400,7 @@ export function playKnockoutLeg(
   let championTid = cup.championTid;
   const finalizeTie = (tie: CupTie, home: number, away: number): void => {
     newTies.push(tie);
-    addPrize(tie.winner, winPrize[round]);
+    addPrize(tie.winner, koWinPrize(cup, round));
     if (round === finalRound) {
       championTid = tie.winner;
       const runnerUp = tie.winner === home ? away : home;
@@ -483,6 +502,8 @@ export function playPlayoff(
   const addPrize = (tid: number, amount: number): void => {
     prizes.set(tid, (prizes.get(tid) ?? 0) + amount);
   };
+
+  if (isKnockoutOpening(cup)) payKnockoutOpeningEntry(cup, addPrize);
 
   const ties: CupTie[] = [];
   for (let i = 0; i + 1 < po.teams.length; i += 2) {

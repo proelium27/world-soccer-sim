@@ -5,6 +5,8 @@ import {
   isValidCupFieldSize,
 } from "../constants.js";
 import type { CupLeaguePhase, LeaguePhaseMatch } from "./types.js";
+import type { CupKnockoutPlan } from "../constants.js";
+import { isValidLeaguePhaseField } from "./cupShape.js";
 
 /**
  * The Swiss league-phase draw.
@@ -30,15 +32,23 @@ export function drawLeaguePhase(
   teams: number[],
   compOf: Map<number, number>,
   seed: number,
+  /**
+   * Rounds and their matchdays. The defaults are the shipped six; a custom
+   * format (God Mode) passes 4 or 8 with its own calendar. The rng draws for the
+   * default are unchanged, so a shipped cup is drawn exactly as before.
+   */
+  games: number = CUP_LEAGUE_PHASE_GAMES,
+  matchdays: readonly number[] = CUP_LEAGUE_PHASE_MATCHDAYS,
 ): LeaguePhaseMatch[] {
   const size = teams.length;
-  const perPot = CUP_LEAGUE_PHASE_GAMES / CUP_LEAGUE_PHASE_POTS;
+  const perPot = games / CUP_LEAGUE_PHASE_POTS;
   const potSize = size / CUP_LEAGUE_PHASE_POTS;
   // isValidCupFieldSize additionally requires an EVEN pot, which this guard used
   // to omit: the intra-pot rounds are perfect matchings *within* a pot, so an odd
   // pot leaves a club unpaired. Unreachable while every field was 24 or 16;
   // reachable the moment a league can carry its own slot count.
-  if (CUP_LEAGUE_PHASE_POTS !== 2 || !isValidCupFieldSize(size)) {
+  const valid = games === CUP_LEAGUE_PHASE_GAMES ? isValidCupFieldSize(size) : isValidLeaguePhaseField(size, games);
+  if (CUP_LEAGUE_PHASE_POTS !== 2 || !valid || matchdays.length < games) {
     throw new Error(`league-phase draw: ${size} teams don't split into ${CUP_LEAGUE_PHASE_POTS} pots of ${perPot} games`);
   }
   const rng = mulberry32(hashInts(seed, 0xc0ffee));
@@ -71,7 +81,7 @@ export function drawLeaguePhase(
       const [home, away] = dir.get(edgeKey(a, b))!;
       matches.push({
         round,
-        matchday: CUP_LEAGUE_PHASE_MATCHDAYS[round],
+        matchday: matchdays[round],
         home,
         away,
         played: false,
@@ -312,10 +322,12 @@ export function leaguePhaseTable(
  * empty (see cupKnockoutPlan).
  */
 export function splitLeaguePhase(
-  table: LeaguePhaseStanding[],
+  table: readonly { tid: number }[],
+  /** A custom format's stored split (CupState.shape). Absent → sized off the table, as shipped. */
+  plan?: CupKnockoutPlan,
 ): { directQF: number[]; playoff: number[]; out: number[] } {
   const tids = table.map((r) => r.tid);
-  const { directQF, playoffTeams } = cupKnockoutPlan(table.length);
+  const { directQF, playoffTeams } = plan ?? cupKnockoutPlan(table.length);
   return {
     directQF: tids.slice(0, directQF),
     playoff: tids.slice(directQF, directQF + playoffTeams),
@@ -336,4 +348,120 @@ export function leaguePhaseMatchesDue(lp: CupLeaguePhase, matchday: number): Lea
 /** Whether any league-phase match is due (unplayed) on `matchday`. */
 export function leaguePhaseDue(lp: CupLeaguePhase, matchday: number): boolean {
   return lp.matches.some((m) => !m.played && m.matchday === matchday);
+}
+
+/* ── Groups of four (a God Mode format) ─────────────────────────────────────
+ * The old Champions League shape: the seeded field is cut into four pots, each
+ * group takes one club from each pot, and a group plays a double round robin
+ * over six matchdays. No two clubs from the same draw group (country) share a
+ * group where the draw can avoid it. The games are ordinary LeaguePhaseMatch
+ * rows on the league phase, so everything that reads league-phase games works
+ * on them unchanged; only the table and the split are per group.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** Pairings for a group of four, by round, each club playing once a round; rounds 3-5 mirror 0-2 with venues swapped. */
+const GROUP_ROUNDS: [number, number][][] = [
+  [[0, 3], [1, 2]],
+  [[2, 0], [3, 1]],
+  [[0, 1], [2, 3]],
+];
+
+/**
+ * Draw `teams` (seed order, a multiple of four) into groups of four and schedule
+ * them. Seeded, so the same season always draws the same groups.
+ */
+export function drawGroups(
+  teams: number[],
+  compOf: Map<number, number>,
+  seed: number,
+  matchdays: readonly number[],
+): { groups: number[][]; matches: LeaguePhaseMatch[] } {
+  const groupCount = Math.floor(teams.length / 4);
+  if (groupCount < 2 || teams.length % 4 !== 0 || matchdays.length < 6) {
+    throw new Error(`group draw: ${teams.length} clubs don't make groups of four`);
+  }
+  const rng = mulberry32(hashInts(seed, 0x6770));
+  const pots = [0, 1, 2, 3].map((p) => teams.slice(p * groupCount, (p + 1) * groupCount));
+
+  let groups: number[][] = [];
+  for (let attempt = 0; attempt < 400; attempt++) {
+    // Keeping countries apart is a preference, never a reason to fail the draw.
+    const relax = attempt >= 200;
+    groups = Array.from({ length: groupCount }, () => [] as number[]);
+    let ok = true;
+    for (const pot of pots) {
+      const open = new Set(groups.map((_, i) => i));
+      for (const tid of shuffle([...pot], rng)) {
+        const choices = [...open].filter((g) =>
+          relax || !groups[g].some((o) => compOf.get(o) === compOf.get(tid)));
+        if (choices.length === 0) { ok = false; break; }
+        const g = choices[Math.floor(rng() * choices.length)];
+        groups[g].push(tid);
+        open.delete(g);
+      }
+      if (!ok) break;
+    }
+    if (ok) break;
+  }
+
+  const matches: LeaguePhaseMatch[] = [];
+  for (let leg = 0; leg < 2; leg++) {
+    GROUP_ROUNDS.forEach((pairs, r) => {
+      const round = leg * 3 + r;
+      for (const group of groups) {
+        for (const [a, b] of pairs) {
+          const [home, away] = leg === 0 ? [group[a], group[b]] : [group[b], group[a]];
+          matches.push({
+            round, matchday: matchdays[round], home, away,
+            played: false, homeGoals: -1, awayGoals: -1, boxScore: null,
+          });
+        }
+      }
+    });
+  }
+  return { groups, matches };
+}
+
+/** One group's table (same ordering rules as the Swiss table). */
+export function groupTable(
+  lp: CupLeaguePhase,
+  group: number[],
+  seeds: Record<number, number>,
+): LeaguePhaseStanding[] {
+  const members = new Set(group);
+  return leaguePhaseTable(
+    { teams: group, matches: lp.matches.filter((m) => members.has(m.home) && members.has(m.away)) },
+    seeds,
+  );
+}
+
+/** Rank rows from different groups against each other: points, goal difference, goals, wins, seed. */
+function crossGroupOrder(a: LeaguePhaseStanding, b: LeaguePhaseStanding): number {
+  return b.points - a.points || b.gd - a.gd || b.gf - a.gf || b.won - a.won || a.seed - b.seed;
+}
+
+/**
+ * Who goes through from a completed group stage, best first, with each
+ * qualifier's group index. Group winners come first, then runners-up, then
+ * third-placed sides, each block ranked across the groups, and the first
+ * `koSize` go through.
+ */
+export function groupQualifiers(
+  lp: CupLeaguePhase,
+  seeds: Record<number, number>,
+  koSize: number,
+): { tid: number; group: number }[] {
+  const tables = (lp.groups ?? []).map((g) => groupTable(lp, g, seeds));
+  const out: { tid: number; group: number }[] = [];
+  for (let place = 0; place < 4 && out.length < koSize; place++) {
+    const block = tables
+      .map((t, group) => ({ row: t[place], group }))
+      .filter((x) => x.row)
+      .sort((x, y) => crossGroupOrder(x.row, y.row));
+    for (const { row, group } of block) {
+      if (out.length >= koSize) break;
+      out.push({ tid: row.tid, group });
+    }
+  }
+  return out;
 }

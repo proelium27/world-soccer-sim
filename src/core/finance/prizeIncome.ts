@@ -14,7 +14,7 @@
  * these rules are a restatement of `cup/simCup.ts` and `domesticCup/simCup.ts`,
  * so a change to what the sim pays would leave this quietly reporting the old
  * number. Two things hold them together. Every *amount* comes from the sim's
- * own helpers (`cupFormat().prizes`, `koPrizeByRound`, `domesticPrizeForRound`,
+ * own helpers (`cupFormat().prizes`, `koWinPrize`, `domesticPrizeForRound`,
  * `domesticCupScaleFor`) rather than being re-read from constants here, so no
  * retune of a prize can pass this by. And `prizeIncome.test.ts` plays real cups
  * and asserts these totals equal the sum of what the sim actually credited,
@@ -29,7 +29,7 @@ import type { LeagueStore } from "../leagueState.js";
 import type { CupState } from "../cup/types.js";
 import type { DomesticCupState } from "../domesticCup/types.js";
 import type { Competition } from "../competitions.js";
-import { cupFormat, koPrizeByRound, koFinalRound } from "../cup/cup.js";
+import { cupFormat, koWinPrize, koFinalRound } from "../cup/cup.js";
 import { domesticPrizeForRound, roundsFromFinal } from "../domesticCup/cup.js";
 import { domesticCupScaleFor } from "./budget.js";
 import { competitionOf } from "../competitions.js";
@@ -94,8 +94,12 @@ export function continentalPrizeIncome(cup: CupState | null, tid: number): Prize
   const lp = cup.leaguePhase;
   if (lp?.teams.includes(tid)) {
     // Participation is credited when round 0 is played, not at the draw, so a
-    // club that has qualified but not yet kicked off has banked nothing.
-    if (lp.matches.some((m) => m.played && m.round === 0)) {
+    // club that has qualified but not yet kicked off has banked nothing. A
+    // straight-knockout cup has no round 0 and pays it on its first tie or leg.
+    const started = cup.shape?.opening === "knockout"
+      ? (cup.playoff?.ties.length ?? 0) > 0 || cup.ties.length > 0 || (cup.koLegs?.length ?? 0) > 0
+      : lp.matches.some((m) => m.played && m.round === 0);
+    if (started) {
       raw.push({ label: "Reaching the league phase", amount: participation });
     }
     for (const m of lp.matches) {
@@ -113,12 +117,11 @@ export function continentalPrizeIncome(cup: CupState | null, tid: number): Prize
     if (tie.winner === tid) raw.push({ label: "Winning the playoff", amount: playoffWin });
   }
 
-  const byRound = koPrizeByRound(cup);
   const finalRound = koFinalRound(cup);
   for (const tie of cup.ties) {
     if (tie.home !== tid && tie.away !== tid) continue;
     if (tie.winner === tid) {
-      raw.push({ label: knockoutLabel(tie.round, finalRound), amount: byRound[tie.round] ?? 0 });
+      raw.push({ label: knockoutLabel(tie.round, finalRound), amount: koWinPrize(cup, tie.round) });
     } else if (tie.round === finalRound) {
       raw.push({ label: "Runner-up", amount: runnerUp });
     }

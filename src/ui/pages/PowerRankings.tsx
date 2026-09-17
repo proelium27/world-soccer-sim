@@ -23,10 +23,11 @@ import { CompetitionSelect } from "../components/CompetitionSelect.js";
 import { DivisionBadge } from "../components/DivisionBadge.js";
 import { sortByPosThenOvr } from "./Roster.js";
 import { shortName } from "../playerName.js";
-import type { ContinentalRegion } from "../../core/constants.js";
 import { competitionRegion } from "../../core/competitions.js";
 import { americasTids, inRegion } from "../../core/americasClubs.js";
-import { RegionSwitch, defaultRegion, worldHasAmericas } from "../components/RegionSwitch.js";
+import {
+  RegionSwitch, defaultRegion, worldHasAmericas, regionFilter, type RegionView,
+} from "../components/RegionSwitch.js";
 import { REGION_LABELS } from "../continents.js";
 
 /** The stored snapshot immediately preceding `snapshot` within the same season, for rank-movement arrows. */
@@ -47,7 +48,7 @@ export function PowerRankings() {
   const playerByPid = usePlayerMap(league?.players);
   const [expandedTid, setExpandedTid] = useState<number | null>(null);
   const [compId, setCompId] = useState<number | "all">("all");
-  const [regionSel, setRegionSel] = useState<ContinentalRegion | null>(null);
+  const [regionSel, setRegionSel] = useState<RegionView | null>(null);
   // -1 = the live "Current" view; otherwise an index into powerRankingHistory.
   const [viewIndex, setViewIndex] = useState(-1);
 
@@ -72,13 +73,22 @@ export function PowerRankings() {
 
   const teamByTid = new Map(league.teams.map((t) => [t.tid, t]));
 
-  // One continent at a time in a world with leagues on both: the two never meet
-  // in a club competition, so one ranking of both reads as a ladder that isn't
-  // there. A world with no league in the Americas shows everyone, as before.
-  const region = worldHasAmericas(league) ? (regionSel ?? defaultRegion(league)) : null;
+  // One continent at a time in a world with leagues on both, since the two
+  // never meet in a club competition and a club's place among the clubs it
+  // actually plays is the reading that needs no explaining. "Both" ranks the
+  // world on one list, which is honest here in a way it would not be on a
+  // trophy-weighted board: the Power score is squad OVR (absolute — the
+  // per-competition z-normalisation lives in the match sim, not in
+  // computeTeamRating) plus a form bonus scored against the OVR gap to each
+  // specific opponent, so neither half is scaled to a club's league. A world
+  // with no league in the Americas shows everyone, as before.
+  const view: RegionView | undefined = worldHasAmericas(league)
+    ? (regionSel ?? defaultRegion(league))
+    : undefined;
+  const region = regionFilter(view);
   const americas = new Set(americasTids(league.teams, league.competitions));
-  const inShownRegion = (tid: number) => region === null || inRegion(tid, region, americas);
-  const regionCompetitions = region === null
+  const inShownRegion = (tid: number) => region === undefined || inRegion(tid, region, americas);
+  const regionCompetitions = region === undefined
     ? league.competitions
     : league.competitions.filter((c) => competitionRegion(c) === region);
   // A competition picked on the other continent falls back to all of this one.
@@ -112,10 +122,11 @@ export function PowerRankings() {
   // score. snapshot.rows is the full, globally-sorted list (before the
   // competition filter), so its index order is exactly that.
   const worldRankByTid = new Map<number, number>();
-  // With the continent switch, "world" means the continent being shown.
+  // With one continent shown, "world" means that continent; on "Both" it is
+  // the world again, which is what regionRows already holds.
   regionRows.forEach((r, i) => worldRankByTid.set(r.tid, i + 1));
   const worldTotal = regionRows.length;
-  const rankScope = region === null ? "World" : REGION_LABELS[region];
+  const rankScope = region === undefined ? "World" : REGION_LABELS[region];
 
   // When a single competition is selected, everyone shares a division, so the
   // "Div" badge just mirrors the # column — show each club's world rank there
@@ -160,7 +171,7 @@ export function PowerRankings() {
             </optgroup>
           ))}
         </select>
-        {region !== null && <RegionSwitch value={region} onChange={setRegionSel} />}
+        {view && <RegionSwitch value={view} onChange={setRegionSel} includeBoth />}
         <CompetitionSelect
           competitions={regionCompetitions}
           value={shownCompId}
