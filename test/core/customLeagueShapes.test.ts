@@ -58,6 +58,19 @@ describe("division size limits come from the calendar", () => {
     // The shipped MLS: halves of 15 play 30 with the rival, leaving 8.
     expect(maxCrossRounds(30)).toBe(8);
   });
+
+  it("takes odd sizes: byes in a table, unequal halves (and no cross games) when split", () => {
+    expect(maxCrossRounds(39)).toBe(0);
+    for (const [n, split] of [[19, false], [39, true], [25, true]] as const) {
+      const spec: LeagueSpec = {
+        country: "X", divisions: 1, d1Teams: n,
+        d1Conferences: split ? { names: ["A", "B"], crossRounds: 0 } : null,
+      };
+      expect(normalizeLeagueSpec(spec).d1Teams).toBe(n);
+      const games = buildCompetitionSchedule(clubsOf([spec]), buildCompetitions([spec]));
+      expect(Math.max(...games.map((g) => g.matchday))).toBeLessThanOrEqual(SEASON_MATCHDAYS);
+    }
+  });
 });
 
 describe("a spec can say how every division is played", () => {

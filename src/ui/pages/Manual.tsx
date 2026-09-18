@@ -503,7 +503,7 @@ export function Manual() {
             <li><strong>Power Rankings</strong>. Every club in the world ranked by a blended Power score: squad OVR (Starting XI plus bench, depth-weighted, same formula as Standings' OVR column) plus a current-season form bonus or penalty. Form isn't just your record. Beating a strong side counts for more than beating a weak one (and losing to a weak side hurts more than losing to a strong one), and goal difference factors in too, so a club can rank above or below its raw OVR depending on how it's actually playing. Record, goal difference, OVR, and the blended Power score all sit side by side, with a badge showing each club's competition and its rank within it. Click a team to expand its full roster in place. In a world with leagues in the Americas, a Europe / Americas switch shows one continent at a time, and the rank column counts within that continent, since the two never meet in a club competition. The rankings also get snapshotted every 10 matchdays (plus once after the final matchday), so four times a season, and a dropdown lets you browse any past snapshot from any season, with arrows showing how far each club rose or fell since the last one. Snapshots taken before this cadence changed are kept, so an older save has a denser dropdown for its early seasons. Historical views can't expand rosters, since past squads aren't stored, and snapshots only start piling up from the point this feature shipped.</li>
             <li><strong>Schedule</strong>. Every matchday's fixtures and results. Click a played match for its box score.</li>
             <li><strong>Stat Leaders</strong>. A Players tab (league-wide leaderboards for one season at a time: goals, assists, shots, shots on target, xG, tackles, interceptions, passes, crosses, fouls, yellow cards, red cards, saves, minutes, and average match rating, with a season dropdown covering the current season and every completed one) and a Teams tab (the same stats plus possession, goals against, and xG against, totaled per club, with its own season dropdown). Match rating is an average rather than a running total, so to keep a one-off cameo from topping the chart a player needs to have appeared in at least half of the games played so far before he shows up on the match-rating board (a threshold that scales as the season goes, so it works ten games in as well as at the end). A <strong>Totals / Per 90</strong> switch sits next to the stat dropdown: Per 90 divides each stat by the number of full matches the player's minutes add up to, which is how you find the squad player outproducing a starter rather than just the one who played most. Per-90 mode has a playing-time floor of its own &mdash; 30% of the minutes available so far, quoted above the table &mdash; because a rate is far easier to fluke than a total: score in a twelve-minute cameo and you've "scored" 7.5 per 90. It's counted in minutes rather than appearances, since twenty run-outs off the bench is exactly the case an appearance count would wave through. Appearances, minutes and match rating stay as totals either way (the first two are what the rate divides by, and a match rating is already an average). For career totals and all-time bests across every season at once, see <a href="#frivolities">Frivolities</a>' All-Time Leaders.</li>
-            <li><strong>Database</strong>. Every player in the world in one sortable table. Click any heading to sort by it, and a column-set switch swaps between four sets: <strong>Overview</strong> (rating, potential, market value, wage, contract length), <strong>Attributes</strong>, which puts all fourteen ratings side by side, <strong>Season</strong> (appearances, minutes, goals, assists, shots, xG, tackles, interceptions, saves, passes, crosses, fouls, cards and average match rating, with a dropdown for any season on record), and <strong>Career</strong>, the same stats totalled across a whole career. So "who is the fastest player in the world", "the best finisher in the second division" and "who has scored the most goals of anyone still playing" are each one click. The Season view lists the players that season has a record of and shows the club they played for <em>then</em>, not the one they're at now; cards don't appear on the Career view, because they're kept per season and never totalled, and a column of zeros pretending to be a career figure would be worse than no column. The filters narrow the whole world before anything is ranked, so what you see really is the top of what you asked for: position, nationality, age, overall, potential, value, wage, contract length, name, whether he's at a club or a free agent, and where to look. That last one is a single dropdown covering everything from one division up to the whole world, with presets for the top divisions only and for the top 5 leagues &mdash; and "top 5" means the five strongest countries in <em>your</em> world, worked out from the leagues themselves, so it still means something if you've added or retuned leagues in World setup. The table shows 100 players at a time with the full count beside the page buttons; that cap is deliberate, since a page trying to draw fifteen thousand rows at once is what makes a browser hang. One thing to know about the potential column: it's your scouts' estimate, exactly as it is everywhere else, and sorting and filtering both use the <strong>top</strong> of that estimate rather than the real number &mdash; otherwise ordering the table would quietly tell you something your scouts haven't found out yet. The top end rather than the middle because it's the number you can see: sort by potential and the right-hand figure in each band counts down the column, so the order explains itself. Market value is worked out from the <em>middle</em> of the band instead, since a price is what he's worth on balance rather than at his best. Whatever you've filtered and sorted goes into the page's address, so a view is a link you can bookmark or hand to someone else, and only the things you actually changed show up in it. A <strong>Clubs</strong> tab does the same for all 626 clubs, on three column sets: <strong>Overview</strong> (squad rating and potential, power score, squad size, average age, hype), <strong>Finance</strong> (budget, how full its savings ceiling is, wage bill, and what it has spent and taken in on transfers this season), and <strong>Season</strong> (played, won, drawn, lost, goals for and against, goal difference, points, then shots, shots on target, xG, xG against, saves, tackles, possession and average match rating). So "who has the biggest wage bill in Europe", "which second-division club has scored the most" and "who is running closest to their savings cap" are all a click. Its strength columns are the same numbers the Power Rankings page shows and its money columns the same ones Finance shows, so no two screens disagree about the same club.</li>
+            <li><strong>Database</strong>. Every player in the world in one sortable table. Click any heading to sort by it, and a column-set switch swaps between four sets: <strong>Overview</strong> (rating, potential, market value, wage, contract length), <strong>Attributes</strong>, which puts all fourteen ratings side by side, <strong>Season</strong> (appearances, minutes, goals, assists, shots, xG, tackles, interceptions, saves, passes, crosses, fouls, cards and average match rating, with a dropdown for any season on record), and <strong>Career</strong>, the same stats totalled across a whole career. So "who is the fastest player in the world", "the best finisher in the second division" and "who has scored the most goals of anyone still playing" are each one click. The Season view lists the players that season has a record of and shows the club they played for <em>then</em>, not the one they're at now; cards don't appear on the Career view, because they're kept per season and never totalled, and a column of zeros pretending to be a career figure would be worse than no column. The filters narrow the whole world before anything is ranked, so what you see really is the top of what you asked for: position, nationality, age, overall, potential, value, wage, contract length, name, whether he's at a club or a free agent, and where to look. That last one is a single dropdown covering everything from one division up to the whole world, with presets for the top divisions only and for the top 5 leagues &mdash; and "top 5" means the five strongest countries in <em>your</em> world, worked out from the leagues themselves, so it still means something if you've added or retuned leagues in World setup. The table shows 100 players at a time with the full count beside the page buttons; that cap is deliberate, since a page trying to draw fifteen thousand rows at once is what makes a browser hang. One thing to know about the potential column: it's your scouts' estimate, exactly as it is everywhere else, and sorting and filtering both use the <strong>top</strong> of that estimate rather than the real number &mdash; otherwise ordering the table would quietly tell you something your scouts haven't found out yet. The top end rather than the middle because it's the number you can see: sort by potential and the right-hand figure in each band counts down the column, so the order explains itself. Market value is worked out from the <em>middle</em> of the band instead, since a price is what he's worth on balance rather than at his best. Whatever you've filtered and sorted goes into the page's address, so a view is a link you can bookmark or hand to someone else, and only the things you actually changed show up in it. A <strong>Clubs</strong> tab does the same for every club in the world, on three column sets: <strong>Overview</strong> (squad rating and potential, power score, squad size, average age, hype), <strong>Finance</strong> (budget, how full its savings ceiling is, wage bill, and what it has spent and taken in on transfers this season), and <strong>Season</strong> (played, won, drawn, lost, goals for and against, goal difference, points, then shots, shots on target, xG, xG against, saves, tackles, possession and average match rating). So "who has the biggest wage bill in Europe", "which second-division club has scored the most" and "who is running closest to their savings cap" are all a click. Its strength columns are the same numbers the Power Rankings page shows and its money columns the same ones Finance shows, so no two screens disagree about the same club.</li>
             <li><strong>Awards</strong>. World gives the Ballon d'Or for the best player in the world that season (with a top-10 shortlist and a breakdown of where his points came from), a Goalkeeper and a Defender of the Year judged on the defensive work the Ballon d'Or can't see, and a World Team of the Year pitch view. Americas, in a world with leagues there, gives the same four honours for the Americas alone: a Player, Goalkeeper, Defender and Team of the Year. By league gives Player of the Season, the Golden Boot, and a Team of the Season pitch view for one competition. Both have a dropdown to browse past years.</li>
             <li><strong>Season History</strong>. Who won what, one line per season, newest first &mdash; so you can read a twenty-year dynasty in one screen instead of clicking through twenty seasons. It&apos;s also where you land after <a href="#season">jumping ahead</a>, since that&apos;s the moment you most want it. Each line gives the Continental Cup and Continental Shield winners, whoever won the World Cup or their confederation&apos;s championship in the offseason that followed, and then one column per country holding that country&apos;s champion. A toggle swaps those country columns between <strong>league champions</strong> and <strong>domestic cup winners</strong>. The country columns use three-letter club codes to keep the whole world on one line &mdash; hover one for the full name, or click through to what that club did that year. Your own club&apos;s titles are shaded. Two things worth knowing: the continental finals are played before a season rolls over, so the season you&apos;re in appears as soon as one of them is decided, marked &quot;(now)&quot; and with its league columns still empty; and an international tournament is played in the offseason <em>after</em> a season, so it sits on that season&apos;s line. It&apos;s all read straight off the records your save already keeps, so a dynasty that started long before this page existed shows its whole back catalogue.</li>
             <li><strong>Club History</strong>. A per-club honours page (yours by default, with a dropdown for any club in the world): a trophy case (league titles, second-tier titles, Continental Cups, domestic cups, any trebles, promotions and relegations), individual honours won by the club's players (Player of the Season, Golden Boot, Team of the Season selections, and they stay on the list after the player retires), franchise records (best finish, most points and wins in a season, all-time record), and a season-by-season table of every completed season (each season's note also shows how far the club got in that year's Continental Cup and domestic cup). It also ranks the club's greatest players &mdash; see <a href="#frivolities">Frivolities</a> for how that score is worked out.</li>
@@ -710,7 +710,7 @@ export function Manual() {
             <strong>Greece</strong>, <strong>Scotland</strong> and <strong>Serbia</strong>) and
             four are in the Americas (<strong>Brazil</strong>, <strong>Argentina</strong>,{" "}
             <strong>Mexico</strong> and the <strong>United States</strong>). Each has its own league
-            pyramid, for 48 leagues and 872 clubs total. You pick any club in any country and
+            pyramid, for 48 leagues and 884 clubs total. You pick any club in any country and
             division when you start.
           </p>
           <p>
@@ -732,7 +732,13 @@ export function Manual() {
             zone. Each half gets its own table on the Standings page, but the overall table is the
             one that counts for prize money, continental places and relegation. Their second
             divisions are split the same way: Argentina&apos;s has its real 36 clubs in two zones
-            of 18, playing 34 games, and the US has 30 in two conferences of 15, playing 30.
+            of 18, playing 34 games. The US lower divisions copy the USL: a second division of 25
+            in an Eastern Conference of 13 and a Western Conference of 12, each club playing its own
+            conference twice (24 games in the East, 22 in the West), and a third division of 17 in
+            one table, playing 32 with a bye on the rounds a club sits out. Both finish with a
+            playoff of their own: the top eight of each conference in the second division, one-off
+            games through each conference and then a final, and the top eight of the table in the
+            third.
           </p>
           <p>
             <strong>Every country runs three divisions.</strong> Sizes vary — England, Spain and
@@ -746,27 +752,50 @@ export function Manual() {
           </p>
           <p>
             <strong>Leagues are the size they are in real life</strong>, not all the same. England,
-            Spain and Italy field 20 clubs; Germany, France, Portugal, Turkey and the Netherlands
-            18; Belgium and Serbia 16; Greece 14; and Scotland 12. Second divisions vary the same
-            way, down to Scotland's 10. Twenty is the ceiling for a single table, because a division
-            of that size already fills every matchday in the season (a division split in two halves,
-            like the American ones, can go bigger), and a smaller league spreads its games
-            across the same calendar rather than finishing early — so the transfer windows and the
-            run-in still fall where you'd expect. A smaller league also plays fewer games, so its
-            points totals are lower; don't read a 12-club champion's tally against a 20-club one.
+            Spain and Italy field 20 clubs; Germany, France, Portugal, Turkey, Belgium and the
+            Netherlands 18; Greece 14; and Scotland and Serbia 12. Second divisions vary the same
+            way, down to Scotland's 10. Twenty is the ceiling for a single table playing each other
+            twice, because a division of that size already fills every matchday in the season, which
+            is why England's and Spain's second divisions are 20 here rather than 24 and 22 (a
+            division split in two halves, like the American ones, can go bigger). A
+            smaller league spreads its games across the same calendar rather than finishing early,
+            so the transfer windows and the run-in still fall where you'd expect. A smaller league
+            also plays fewer games, so its points totals are lower; don't read a 12-club champion's
+            tally against a 20-club one.
           </p>
           <p>
-            <strong>Promotion and relegation scale with that.</strong> Most countries swap three
-            clubs each way, but Portugal, Belgium, the Netherlands, Greece and Serbia swap two, and
-            Scotland only one — three up out of a 10-club second division would turn over a third
-            of it every season. Where there's a third division the same count applies to both
-            links, and each is settled on its own final table, so you can only ever move one
-            division a season.
+            <strong>Scotland and Greece split their tables</strong>, the way their real leagues do.
+            Scotland's top flight plays each other three times, 33 games, and then the table splits
+            in half: the top six play each other once more for the title and the European places,
+            and the bottom six do the same to stay up, for 38 in all. Greece plays everyone twice, 26
+            games, and then splits three ways: the top four play each other twice more for the title,
+            the next four do the same for the European places, and the bottom six play each other
+            twice to stay up. Points carry over, but once the split happens you finish inside your
+            group whatever your points, so the club sixth in Scotland can't drop below sixth even if
+            seventh overtakes it, and seventh can't climb above it. The Standings page labels each
+            group, and the second half of the season's fixtures appear on your schedule the moment
+            the split happens. Scotland's second and third divisions, at ten clubs each, play each
+            other four times, 36 games.
           </p>
           <p>
-            <strong>The last promotion place is a playoff, and there are two systems.</strong>{" "}
-            Each country runs the one it runs in real life, and you can change any of them in
-            World setup when you start a save.
+            <strong>Promotion and relegation follow each country&apos;s real rules, step by
+            step.</strong> Each step of a pyramid has its own count and its own playoff, and each is
+            settled on its own final table, so you can only ever move one division a season.
+          </p>
+          <ul>
+            <li><strong>England and Turkey</strong>: three up and three down at every step, the last place up by the English playoff.</li>
+            <li><strong>Spain and Italy</strong>: the same three between the top two divisions, but four between the second and third, so the second division&apos;s bottom four go down.</li>
+            <li><strong>Germany, Portugal and the Netherlands</strong>: two up and two down automatically, and a third place by the German playoff.</li>
+            <li><strong>France</strong>: two up and two down automatically between the top two divisions, and the third by the French playoff; three between the second and third, with an English playoff.</li>
+            <li><strong>Scotland</strong>: one up and one down automatically at each step, and a second by the German playoff, the lower division&apos;s runner-up against the one above&apos;s second-bottom club.</li>
+            <li><strong>Belgium, Greece and Serbia</strong>: two straight up and two straight down, no playoff in Belgium or Greece. In Greece that&apos;s the bottom two of the relegation group.</li>
+            <li><strong>Brazil</strong>: four straight up and four straight down.</li>
+            <li><strong>The Netherlands and Belgium</strong> have no promotion out of their third divisions at all, because the real ones are semi-professional with no way up. A club down there stays down there.</li>
+          </ul>
+          <p>
+            <strong>The last promotion place is a playoff, and there are three systems.</strong>{" "}
+            Each country runs the one it runs in real life, and you can change any of them, step by
+            step, in World setup when you start a save.
           </p>
           <p>
             It happens at <em>every</em> step of a country&apos;s pyramid, not just the top one, so
@@ -798,10 +827,16 @@ export function Manual() {
             your own division's stragglers.
           </p>
           <p>
-            Scotland promotes only one club and so runs no playoff at either step by default: its
-            champions go up and that's that. You can give it either system in World setup, though
-            the English bracket needs at least two promotion places to sit below, so at one place
-            only the German one is offered.
+            The <strong>French</strong> system is Ligue 2&apos;s: a ladder that ends in the German
+            tie. In a country swapping three, the first two go up and the bottom two go down
+            automatically. Then 4th hosts 5th in a one-off game, the winner goes to 3rd for another,
+            and whoever survives that plays the top flight&apos;s third-bottom club home and away for
+            the last place. It&apos;s the longest road up in the game: finish fifth and you have to
+            win three rounds, the last of them against a club from the division above.
+          </p>
+          <p>
+            The English bracket needs at least two promotion places to sit below, so a step with
+            only one place is offered the German or French systems, or none.
           </p>
           <p>
             It's played after the last matchday, before anyone retires or moves clubs, so a
@@ -1456,6 +1491,16 @@ export function Manual() {
             conference finals, and the two conference champions meet in the final, at the ground of
             whichever finished higher in the overall table. From the conference semi-finals on, a level
             game gets extra time before penalties.
+          </p>
+          <p>
+            The <strong>US second and third divisions</strong> have playoffs of their own, since
+            nobody is promoted out of them and the title is all there is to play for. The second
+            division takes the <strong>top eight in each conference</strong> through one-off games at
+            the better-placed club&apos;s ground (1st v 8th, 4th v 5th, 2nd v 7th, 3rd v 6th, then
+            conference semi-finals and a conference final), and the two conference winners meet in
+            the final. The third division takes the <strong>top eight in its table</strong> through
+            one-off quarter-finals, semi-finals and a final. A level game gets extra time and then
+            penalties.
           </p>
           <p>
             <strong>Argentina</strong> takes the <strong>top eight in each zone</strong>. The round of

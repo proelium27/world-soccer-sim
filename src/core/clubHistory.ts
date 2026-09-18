@@ -1,5 +1,6 @@
 import type { LeagueStore } from "./leagueState.js";
 import type { StandingsRow } from "./standings.js";
+import { recordedChampion } from "./standings.js";
 import { tierOf } from "./competitions.js";
 import { cupRunSummary } from "./cup/cup.js";
 import { clubDomesticRun, clubDomesticRunLabel } from "./domesticCup/cup.js";
@@ -293,8 +294,8 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
     // leader everywhere except a league with a title playoff. Falls back to the
     // table for a lower division (its title is not recorded) and for any season
     // entry without the record.
-    const recordedChampion = tier === 1 ? entry.championTidByCompId?.[compId] : undefined;
-    const champion = recordedChampion !== undefined ? recordedChampion === tid : position === 1;
+    const recorded = recordedChampion(entry, compId, tier);
+    const champion = recorded !== undefined ? recorded === tid : position === 1;
 
     return {
       season: entry.season,

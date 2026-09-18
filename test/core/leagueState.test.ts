@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { makeLeague } from "../helpers/league.js";
 import {
-  worldCompetitions, competitionTeamCount, competitionConferences,
+  worldCompetitions, competitionTeamCount,
 } from "../../src/core/competitions.js";
 
 describe("createLeagueState", () => {
@@ -19,9 +19,9 @@ describe("createLeagueState", () => {
     expect(state).toHaveProperty("competitions");
   });
 
-  it("has 48 competitions (sixteen countries, three divisions each) and 898 teams, each division its own size", () => {
+  it("has 48 competitions (sixteen countries, three divisions each) and 884 teams, each division its own size", () => {
     expect(state.competitions).toHaveLength(48);
-    expect(state.teams).toHaveLength(898);
+    expect(state.teams).toHaveLength(884);
     const validCompIds = new Set(state.competitions.map((c) => c.id));
     for (const t of state.teams) {
       expect(typeof t.name).toBe("string");
@@ -40,26 +40,22 @@ describe("createLeagueState", () => {
     }
   });
 
-  it("has 22450 players (898 teams x 25 players)", () => {
-    expect(state.players).toHaveLength(22450);
+  it("has 22100 players (884 teams x 25 players)", () => {
+    expect(state.players).toHaveLength(22100);
   });
 
-  it("schedules n(n-1) games per competition, each within one competition", () => {
-    // Divisions are no longer all 20 clubs, so the total is the sum of each
-    // competition's own double round robin rather than 380 x 24.
-    // A split top flight (MLS, Argentina) plays its own half twice plus games
-    // across, rather than everyone twice.
-    expect(state.schedule).toHaveLength(
-      worldCompetitions().reduce((n, c) => {
-        const size = competitionTeamCount(c);
-        const split = competitionConferences(c);
-        if (!split) return n + size * (size - 1);
-        const half = size / 2;
-        const perClub = (half % 2 === 1 ? 2 * half : 2 * (half - 1)) + split.crossRounds;
-        return n + (size * perClub) / 2;
-      }, 0),
-    );
-    expect(state.schedule).toHaveLength(15106);
+  it("schedules each competition's opening fixtures, each within one competition", () => {
+    // Divisions differ in size and shape: a double round robin for most, a
+    // split top flight (MLS, Argentina) its own half twice plus games across,
+    // Scotland's lower divisions four times over, and a table that splits
+    // (Scotland, Greece) only its first phase until that phase is played. So
+    // the count is each division's own opening schedule, summed.
+    const perComp = worldCompetitions().map((c) => {
+      const tids = state.teams.filter((t) => t.compId === c.id).map((t) => t.tid);
+      return state.schedule.filter((g) => tids.includes(g.home)).length;
+    });
+    expect(perComp.reduce((a, b) => a + b, 0)).toBe(state.schedule.length);
+    expect(state.schedule).toHaveLength(14964);
     const compByTid = new Map(state.teams.map((t) => [t.tid, t.compId]));
     for (const g of state.schedule) {
       expect(g).toHaveProperty("matchday");

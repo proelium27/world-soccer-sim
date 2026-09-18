@@ -2,7 +2,7 @@ import type { LeagueStore } from "./leagueState.js";
 import type { Position, SeasonStats } from "./players/types.js";
 import type { StandingsRow } from "./standings.js";
 import { computeStandings } from "./standings.js";
-import { tierOf } from "./competitions.js";
+import { tierOf, competitionSplit, competitionOf } from "./competitions.js";
 import { computeClubHistory, type ClubSeasonRecord } from "./clubHistory.js";
 import { cupRunSummary } from "./cup/cup.js";
 import { clubDomesticRun, clubDomesticRunLabel } from "./domesticCup/cup.js";
@@ -283,6 +283,7 @@ function currentSeason(league: LeagueStore, tid: number): ClubSeason | null {
     compTids,
     league.played.filter((m) => compTidSet.has(m.home)),
     pointsDeductionMap(league.debtSanctions, season),
+    competitionSplit(competitionOf(league.competitions, compId)),
   );
   const index = table.findIndex((r) => r.tid === tid);
 

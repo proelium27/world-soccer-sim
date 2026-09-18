@@ -396,6 +396,8 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Serpa Queijeiros",                  abbrev: "SER", colors: ["#154360", "#abebc6"] },
   { name: "Tavira Ilheus",                     abbrev: "TAI", colors: ["#6c3483", "#f4ecf7"] },
   { name: "Valenca Muralhas",                  abbrev: "VAM", colors: ["#784212", "#f6ddcc"] },
+  { name: "Nazare Surfistas",                  abbrev: "NAZ", colors: ["#2874a6", "#ffffff"] },
+  { name: "Sintra Palacianos",                 abbrev: "SIN", colors: ["#6c3483", "#f7dc6f"] },
   // Belgian clubs (tids 240-279): real Belgian cities/towns with invented
   // Dutch/French suffixes (Beiaardiers/Sangliers/Diamantairs/etc.), same
   // fictional styling. ASCII-only; deliberately avoids every real Pro League
@@ -418,6 +420,8 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Sint-Truiden Kanunniken", abbrev: "STT", colors: ["#7b241c", "#f4d03f"] },
   { name: "Waregem Vlasboeren",  abbrev: "WRG", colors: ["#0e6251", "#f8c471"] },
   { name: "Beveren Wasbeken",    abbrev: "BVR", colors: ["#2e86c1", "#ffffff"] },
+  { name: "Knokke Duinenvolk",   abbrev: "KNK", colors: ["#1f618d", "#f7dc6f"] },
+  { name: "Tongeren Ambiorixen", abbrev: "TNG", colors: ["#7b241c", "#ecf0f1"] },
   { name: "Doornik Tapijtwevers", abbrev: "DRN", colors: ["#154360", "#f4d03f"] },
   { name: "Verviers Lainiers",   abbrev: "VRV", colors: ["#7d6608", "#ffffff"] },
   { name: "Turnhout Kaartmakers", abbrev: "THT", colors: ["#c0392b", "#154360"] },
@@ -493,8 +497,6 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Usak Halicilar",      abbrev: "USK", colors: ["#7b241c", "#f0f3f4"] },
   { name: "Edirne Pehlivanlar",  abbrev: "EDR", colors: ["#145a32", "#b7950b"] },
   { name: "Canakkale Bogazcilar", abbrev: "CNK", colors: ["#1a1a1a", "#5dade2"] },
-  { name: "Amasya Elmacilar",    abbrev: "AMS", colors: ["#c0392b", "#196f3d"] },
-  { name: "Giresun Kirazcilar",  abbrev: "GRS", colors: ["#154360", "#f4d03f"] },
   // Turkish third-division clubs, same styling as the block above.
   { name: "Adiyaman Nemrutlular",              abbrev: "ADI", colors: ["#c0392b", "#ffffff"] },
   { name: "Aksaray Tuzcular",                  abbrev: "AKS", colors: ["#1b4f72", "#f4d03f"] },
@@ -684,10 +686,6 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Kraljevo Bedemi",     abbrev: "KJV", colors: ["#4a6741", "#ffffff"] },
   { name: "Novi Pazar Carsijci", abbrev: "NPZ", colors: ["#196f3d", "#f4d03f"] },
   { name: "Smederevo Kovaci",    abbrev: "SMD", colors: ["#1b2631", "#f39c12"] },
-  { name: "Leskovac Paprikari",  abbrev: "LSK", colors: ["#7d3c98", "#f0f3f4"] },
-  { name: "Valjevo Jablanovi",   abbrev: "VLJ", colors: ["#0b5345", "#5dade2"] },
-  { name: "Uzice Planinci",      abbrev: "UZC", colors: ["#5d4037", "#f5b041"] },
-  { name: "Vranje Grncari",      abbrev: "VRN", colors: ["#873600", "#ecf0f1"] },
   { name: "Zajecar Vinari",      abbrev: "ZJC", colors: ["#6c3483", "#f0f3f4"] },
   { name: "Kikinda Zetelci",     abbrev: "KKN", colors: ["#1e8449", "#f8c471"] },
   { name: "Sremska Mitrovica Legije", abbrev: "SRM", colors: ["#154360", "#e74c3c"] },
@@ -700,10 +698,6 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Backa Palanka Splavovi", abbrev: "BPL", colors: ["#196f3d", "#f7dc6f"] },
   { name: "Ruma Cardaci",        abbrev: "RUM", colors: ["#7d6608", "#ecf0f1"] },
   { name: "Aleksinac Ugljari",   abbrev: "ALE", colors: ["#1a1a1a", "#5dade2"] },
-  { name: "Negotin Podrumari",   abbrev: "NGT", colors: ["#7b241c", "#f8c471"] },
-  { name: "Paracin Staklari",    abbrev: "PRC", colors: ["#2874a6", "#ffffff"] },
-  { name: "Cuprija Mostari",     abbrev: "CPR", colors: ["#0b5345", "#f4d03f"] },
-  { name: "Apatin Pivari",       abbrev: "APT", colors: ["#b7950b", "#1b2631"] },
   // Serbian third-division clubs, same styling as the block above.
   { name: "Arandjelovac Banjari",              abbrev: "ABA", colors: ["#c0392b", "#ffffff"] },
   { name: "Becej Ribari",                      abbrev: "BEC", colors: ["#1b4f72", "#f4d03f"] },
@@ -717,10 +711,6 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Mladenovac Sumadinci",              abbrev: "MLA", colors: ["#2c3e50", "#f39c12"] },
   { name: "Obrenovac Savci",                   abbrev: "OBR", colors: ["#27ae60", "#ffffff"] },
   { name: "Pirot Cilimari",                    abbrev: "PIR", colors: ["#922b21", "#f7dc6f"] },
-  { name: "Pozarevac Konjanici",               abbrev: "POZ", colors: ["#4a235a", "#d7bde2"] },
-  { name: "Sabac Podrinjci",                   abbrev: "SAP", colors: ["#0e6251", "#f9e79f"] },
-  { name: "Sombor Ravnicari",                  abbrev: "SOM", colors: ["#873600", "#fdebd0"] },
-  { name: "Trstenik Vocari",                   abbrev: "TRV", colors: ["#154360", "#abebc6"] },
   // Brazilian clubs: real towns and cities with invented club nicknames, ASCII
   // only, following the same no-real-clubs rule as the rest of this table.
   { name: "Recife Jangadeiros", abbrev: "REI", colors: ["#c0392b", "#ffffff"] },
@@ -968,9 +958,10 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Sacramento Assayers", abbrev: "SAR", colors: ["#f1c40f", "#145a32"] },
   { name: "Modesto Blacksmiths", abbrev: "MDS", colors: ["#1a1a1a", "#f4d03f"] },
   { name: "Fresno Wheelwrights", abbrev: "FRS", colors: ["#ffffff", "#1b4f72"] },
-  // US division 2 clubs, same styling as the block above. 30 clubs, ORDERED BY
-  // GEOGRAPHY like the top flight: the first fifteen are the Eastern Conference,
-  // the last fifteen the Western (see core/conferences.ts).
+  // US division 2 clubs, same styling as the block above. 25 clubs, ORDERED BY
+  // GEOGRAPHY like the top flight: the first thirteen are the Eastern Conference,
+  // the last twelve the Western (see core/conferences.ts, which gives the odd
+  // club to the first half).
   // Eastern Conference
   { name: "Toledo Quarrymen", abbrev: "TOD", colors: ["#27ae60", "#ffffff"] },
   { name: "Grand Rapids Homesteaders", abbrev: "GRD", colors: ["#922b21", "#f7dc6f"] },
@@ -985,8 +976,6 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Columbia Printers", abbrev: "CMB", colors: ["#5b2c6f", "#ffffff"] },
   { name: "Huntsville Machinists", abbrev: "HSV", colors: ["#ffffff", "#1b4f72"] },
   { name: "Memphis Keelboats", abbrev: "MEM", colors: ["#873600", "#fdebd0"] },
-  { name: "Mobile Bargemen", abbrev: "MOB", colors: ["#154360", "#abebc6"] },
-  { name: "Baton Rouge Ropemakers", abbrev: "BAN", colors: ["#b03a2e", "#1b2631"] },
   // Western Conference
   { name: "Shreveport Riveters", abbrev: "SHR", colors: ["#1a1a1a", "#f4d03f"] },
   { name: "Corpus Christi Drovers", abbrev: "CCH", colors: ["#f1c40f", "#145a32"] },
@@ -1000,9 +989,6 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Reno Tinsmiths", abbrev: "RNO", colors: ["#1f618d", "#e74c3c"] },
   { name: "Bakersfield Flatboatmen", abbrev: "BAF", colors: ["#1b4f72", "#f4d03f"] },
   { name: "Visalia Growers", abbrev: "VSL", colors: ["#239b56", "#f7dc6f"] },
-  { name: "Stockton Canalmen", abbrev: "STO", colors: ["#145a32", "#ecf0f1"] },
-  { name: "Eugene Millwrights", abbrev: "EUG", colors: ["#239b56", "#f7dc6f"] },
-  { name: "Anchorage Ironmasters", abbrev: "ANH", colors: ["#c0392b", "#ffffff"] },
   // US division 3 clubs, same styling as the block above.
   { name: "Billings Lamplighters", abbrev: "BIG", colors: ["#e67e22", "#2c3e50"] },
   { name: "Cheyenne Sawyers", abbrev: "CHY", colors: ["#16a085", "#ecf0f1"] },
@@ -1020,6 +1006,7 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Flagstaff Cordwainers", abbrev: "FLA", colors: ["#117864", "#f5b041"] },
   { name: "Yakima Drovers", abbrev: "YAK", colors: ["#5b2c6f", "#ffffff"] },
   { name: "Macon Tanners", abbrev: "MAO", colors: ["#ffffff", "#1b4f72"] },
+  { name: "Casper Wildcatters", abbrev: "CPW", colors: ["#784212", "#f6ddcc"] },
 ];
 
 /**
