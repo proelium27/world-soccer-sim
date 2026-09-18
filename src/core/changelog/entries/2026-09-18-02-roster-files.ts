@@ -2,12 +2,13 @@ import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
   date: "2026-09-18",
-  title: "Real club names and badges on the Leagues page",
+  title: "Real club badges and a real-clubs-only file",
   items: [
-    "The Leagues page has a new **Roster files** section. It has three downloads where there used to be one \"Download Real Rosters\" button:",
-    "- **Real clubs and players** is the file that button gave you. It has real clubs in the top two divisions of every country, with real squads in most top flights.\n- **Real club names** gives every club in the game its real name and colours, third divisions included, and keeps the made-up players.\n- **Real club badges** puts real badges on close to 900 clubs.",
-    "You can pick all three in Import at once. Before, badges only loaded from the New League screen.",
-    "If you load a names-only file together with one that has real squads, the real squads stay whichever order you pick them in. The names file only fills in the clubs the other one leaves out, like the third divisions.",
+    "The \"Download Real Rosters\" button on the Leagues page is now a **Roster files** section with two downloads. Both give every club in the game its real name and colours, third divisions included, and most of them their real badge too.",
+    "- **Real clubs and players** also has real squads in most top flights. It's the old file with badges added and the rest of the clubs filled in.\n- **Real clubs** keeps the made-up players, if you want real clubs without real squads.",
+    "Pick one and load it with Import. It's all in the one file, so there's nothing to combine.",
+    "Import also takes a badge pack along with your roster files now, so you can load both in one go.",
+    "If you combine your own names-only file with one that has real squads, the real squads now stay whichever order you pick them in.",
   ],
 };
 

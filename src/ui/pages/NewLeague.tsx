@@ -50,7 +50,7 @@ import { trackEvent } from "../analytics.js";
 import {
   SEASON_START_YEAR, MIN_START_YEAR, MAX_START_YEAR, normalizeStartYear,
 } from "../format.js";
-import { ROSTER_DOWNLOAD_URL, ROSTER_FILES } from "../rosterDownload.js";
+import { ROSTER_DOWNLOAD_URL } from "../rosterDownload.js";
 import { createGate, yieldToPaint } from "../singleFlight.js";
 import { CopyAiPromptButton } from "../components/CopyAiPromptButton.js";
 import { SPECTATOR_TID, isSpectatorTid } from "../../core/spectator.js";
@@ -890,7 +890,6 @@ export function NewLeague() {
         preview={logoPreview}
         error={logoError}
         onPick={handleLogoFiles}
-        downloadHref={ROSTER_FILES.find((f) => f.id === "badges")?.href}
         onClear={() => {
           setLogoSources([]);
           setLogoError(null);

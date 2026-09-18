@@ -6,11 +6,8 @@ import type { RosterFileDownload } from "../rosterDownload.js";
  *
  * These are downloads rather than something built in, for the reason
  * `rosterDownload.ts` gives (no real club, player or badge enters the repo or a
- * build). The section's job is to make that one extra step obvious: download
- * what you want, then pick all of it in Import together. Import sorts roster
- * files from badge packs by their contents, and the combine step keeps real
- * squads whichever order the files arrive in, so there is no load order to
- * explain here.
+ * build). Each file is complete on its own, so the section only has to say
+ * which one to pick and where to load it.
  *
  * Renders nothing when the build has no files to offer, rather than an empty
  * heading: a missing section is a missing feature, a section of dead buttons is
@@ -30,11 +27,11 @@ export function RosterFilesSection({
         Roster files
       </h2>
       <p className="text-muted small mb-2">
-        Download any of these, then{" "}
+        Download one, then load it with{" "}
         <button type="button" className="btn btn-link btn-sm p-0 align-baseline" onClick={onImport}>
           Import
-        </button>{" "}
-        them together.
+        </button>
+        .
       </p>
       <ul className="list-group">
         {files.map((f) => (

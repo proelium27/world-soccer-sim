@@ -68,20 +68,19 @@ async function renderImportScreen(url?: string): Promise<string> {
 describe("Roster files section on the Leagues page", () => {
   const URL_ = "https://example.com/rel/real-clubs-and-players.json";
 
-  it("offers all three files, the two extras as siblings of the configured URL", async () => {
+  it("offers both files, the second as a sibling of the configured URL", async () => {
     const html = await renderLeaguesPage(URL_);
     expect(html).toContain("Roster files");
     expect(html).toContain('href="https://example.com/rel/real-clubs-and-players.json"');
-    expect(html).toContain('href="https://example.com/rel/real-club-names.json"');
-    expect(html).toContain('href="https://example.com/rel/real-club-badges.json"');
-    for (const title of ["Real clubs and players", "Real club names", "Real club badges"]) {
+    expect(html).toContain('href="https://example.com/rel/real-clubs.json"');
+    for (const title of ["Real clubs and players", "Real clubs"]) {
       expect(html).toContain(title);
     }
   });
 
   it("opens each download in a new tab without handing the opener over", async () => {
     const html = await renderLeaguesPage(URL_);
-    expect(html.match(/target="_blank"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(html.match(/target="_blank"/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html).toContain("noopener");
   });
 
@@ -90,7 +89,7 @@ describe("Roster files section on the Leagues page", () => {
   it("renders no section at all when the build has no URL", async () => {
     const html = await renderLeaguesPage();
     expect(html).not.toContain("Roster files");
-    expect(html).not.toContain("real-club-badges.json");
+    expect(html).not.toContain("real-clubs.json");
     expect(html).not.toContain("Real clubs and players");
   });
 

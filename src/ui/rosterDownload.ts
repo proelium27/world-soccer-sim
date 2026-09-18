@@ -70,21 +70,23 @@ export interface RosterFileDownload {
 }
 
 /**
- * The file names the three downloads are published under, in the same release
- * as each other. `real-clubs-and-players.json` is the one `VITE_ROSTER_DOWNLOAD_URL`
- * points at; the other two are its SIBLINGS in that release, found by resolving
- * their names against that URL.
+ * The file names the downloads are published under, in the same release as
+ * each other. `real-clubs-and-players.json` is the one `VITE_ROSTER_DOWNLOAD_URL`
+ * points at; the other is its SIBLING in that release, found by resolving its
+ * name against that URL.
  *
- * Siblings rather than three environment values, so the whole set still turns
- * on and off with the one setting that already existed (and stays off in the
- * CrazyGames build, which leaves it unset). The cost is that publishing a new
- * release means uploading all three under these names, since a missing one is a
+ * A sibling rather than a second environment value, so the whole set still
+ * turns on and off with the one setting that already existed (and stays off in
+ * the CrazyGames build, which leaves it unset). The cost is that publishing a
+ * new release means uploading both under these names, since a missing one is a
  * 404 behind its button.
+ *
+ * Each file is complete on its own (names, colours and badges for every club,
+ * plus squads in the first), so there is nothing to combine and no load order.
  */
 export const ROSTER_FILE_NAMES = {
   players: "real-clubs-and-players.json",
-  names: "real-club-names.json",
-  badges: "real-club-badges.json",
+  clubs: "real-clubs.json",
 } as const;
 
 /** Every download the section offers, or none when this build has no URL. */
@@ -94,22 +96,15 @@ export const ROSTER_FILES: RosterFileDownload[] = ROSTER_DOWNLOAD_URL === null
       {
         id: "players",
         title: "Real clubs and players",
-        description: "Real clubs, with real squads in most top flights.",
-        size: "6 MB",
+        description: "Real names, colours and badges, with real squads in most top flights.",
+        size: "13 MB",
         href: ROSTER_DOWNLOAD_URL,
       },
       {
-        id: "names",
-        title: "Real club names",
-        description: "Every club's real name and colours, with made-up players.",
-        size: "0.1 MB",
-        href: new URL(ROSTER_FILE_NAMES.names, ROSTER_DOWNLOAD_URL).href,
-      },
-      {
-        id: "badges",
-        title: "Real club badges",
-        description: "Badges for about 900 real clubs.",
-        size: "11 MB",
-        href: new URL(ROSTER_FILE_NAMES.badges, ROSTER_DOWNLOAD_URL).href,
+        id: "clubs",
+        title: "Real clubs",
+        description: "Real names, colours and badges, with made-up players.",
+        size: "10 MB",
+        href: new URL(ROSTER_FILE_NAMES.clubs, ROSTER_DOWNLOAD_URL).href,
       },
     ];
