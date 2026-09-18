@@ -201,6 +201,27 @@ export function Manual() {
             and colors change, exactly like Customize Teams.
           </p>
           <p>
+            One file can hold a club's badge too, so a whole world (names, colors, squads and
+            badges) can travel as a single file. When you load one, a checklist shows up above the
+            club picker. Tick or untick <strong>club names</strong>, <strong>colors</strong>,{" "}
+            <strong>squads</strong> and <strong>badges</strong>, and tick or untick each league in the
+            file on its own. Only what the file actually contains gets a box. Untick names and the
+            clubs keep their fictional names, and everything else you import lands on those; keep
+            squads and drop the rest and you get real players in the fictional clubs. A league your
+            world hasn't got is listed but can't be ticked until you add it in World setup. The club
+            picker updates as you click, so what you see there is what you'll start with.
+          </p>
+          <p>
+            To make one of these files from a save, go to the Leagues screen and press{" "}
+            <strong>Export League File</strong> on that save. Club names and colors always go in, and
+            you choose whether to include squads (as they stand right now, exact ratings and all) and
+            any badges you loaded yourself. None of the save's history goes with it: the file starts
+            a brand new league when someone imports it, which makes it the thing to send a friend who
+            wants to play your world. Squads for every club make it a few megabytes. It's plain JSON,
+            so you can open it and edit it before you pass it on. Export Save is still the one to use
+            for a backup.
+          </p>
+          <p>
             Writing all that JSON by hand is tedious, so the easiest route is to let an AI build it.
             The "Copy AI Prompt to Customize" button copies a ready-made prompt to your clipboard,
             already filled in with your world's exact league names and sizes. It sits on the Leagues
@@ -234,8 +255,10 @@ export function Manual() {
             England's and Spain's clubs all have real crest art that shows up wherever the club's
             name does. Every club without one yet (Italy, Germany, France, Portugal, Belgium and
             Turkey) just shows a two-color swatch until it gets a crest of its own. Clubs that came
-            in from a roster file always show their colors rather than a crest: the artwork belongs
-            to the club that shipped in that slot, not to the one you imported over it.
+            in from a roster file show their colors rather than a crest, unless the file brought a
+            badge of its own: the artwork belongs to the club that shipped in that slot, not to the
+            one you imported over it. (Untick names on the import checklist and the slot keeps both
+            its fictional name and its crest.)
           </p>
           <p>
             You can bring your own badges, though. On the New League screen there's a{" "}

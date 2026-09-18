@@ -38,6 +38,16 @@ import {
   type LogoTargetClub,
   type NamedLogoPack,
 } from "../../core/teams/logoPack.js";
+import {
+  DEFAULT_IMPORT_SELECTION,
+  clubLogosByTid,
+  describeRosterContents,
+  identityOptions,
+  selectFromRosterFile,
+  unplaceableCompetitions,
+  type ImportSelection,
+} from "../../core/teams/leagueFile.js";
+import { ImportChecklist } from "../components/ImportChecklist.js";
 import { loadLogoFiles } from "../logoImages.js";
 import { LogoSetup } from "../components/LogoSetup.js";
 import { takePendingRoster } from "../pendingRoster.js";
@@ -91,9 +101,25 @@ interface LoadedRoster {
   file: RosterFile;
   /** Which club each slot becomes, so the picker can show real names. */
   byTid: Map<number, RosterFileClub>;
+  /** Badges the file itself carries, by the slot they land on. */
+  logos: Map<number, string>;
   clubs: number;
   squads: number;
   warnings: string[];
+}
+
+/**
+ * Two maps as one, the second winning where both place a badge. Returns the
+ * first untouched when the second is empty, so the crest context only gets a
+ * new value when something really changed.
+ */
+function mergeCrests(
+  a: ReadonlyMap<number, string>,
+  b: ReadonlyMap<number, string>,
+): ReadonlyMap<number, string> {
+  if (b.size === 0) return a;
+  if (a.size === 0) return b;
+  return new Map([...a, ...b]);
 }
 
 /**
@@ -105,13 +131,19 @@ interface LoadedRoster {
 function describeRoster(
   sources: NamedRosterFile[],
   slotWorld: ReturnType<typeof describeWorld>["slotWorld"],
+  selection: ImportSelection,
 ): LoadedRoster {
-  const { file, warnings: combineWarnings } = combineRosterFiles(sources);
+  const { file: combined, warnings: combineWarnings } = combineRosterFiles(sources);
+  // The checklist is applied here, before anything is resolved, so every
+  // preview on the page (the club list, the badges, the counts) and the import
+  // itself all read the same trimmed file.
+  const file = selectFromRosterFile(combined, selection);
   const { slots, warnings } = resolveRosterSlots(slotWorld, file);
   return {
     sources,
     file,
     byTid: new Map(slots.map((s) => [s.tid, s.club])),
+    logos: clubLogosByTid(slots),
     clubs: slots.length,
     squads: slots.filter((s) => s.club.players && s.club.players.length > 0).length,
     warnings: [...combineWarnings, ...warnings],
@@ -224,6 +256,9 @@ export function NewLeague() {
   // up disagreeing about what the save will look like.
   const [logoSources, setLogoSources] = useState<NamedLogoPack[]>([]);
   const [logoError, setLogoError] = useState<string | null>(null);
+  // What the import checklist has ticked. Starts with everything, so loading a
+  // file and pressing Start does exactly what it did before the checklist.
+  const [importSelection, setImportSelection] = useState<ImportSelection>(DEFAULT_IMPORT_SELECTION);
   // Failures from "Import League" (a whole exported save), kept separate from
   // rosterError: they surface on different screens and mean different things.
   const [importError, setImportError] = useState<string | null>(null);
@@ -246,9 +281,25 @@ export function NewLeague() {
    * league.
    */
   const worldRoster = useMemo(
-    () => (rosterSources.length > 0 ? describeRoster(rosterSources, world.slotWorld) : null),
-    [rosterSources, world],
+    () => (rosterSources.length > 0
+      ? describeRoster(rosterSources, world.slotWorld, importSelection)
+      : null),
+    [rosterSources, world, importSelection],
   );
+
+  /**
+   * What the world-wide files hold before the checklist trims anything, which
+   * is what the checklist itself lists: a league you unticked must still be
+   * there to tick again.
+   */
+  const worldContents = useMemo(() => {
+    if (rosterSources.length === 0) return null;
+    const { file } = combineRosterFiles(rosterSources);
+    return {
+      contents: describeRosterContents(file),
+      unplaceable: unplaceableCompetitions(world.slotWorld, file),
+    };
+  }, [rosterSources, world]);
 
   /**
    * The roster actually applied: the world-wide files plus the ones attached to
@@ -262,9 +313,14 @@ export function NewLeague() {
     const { files, warnings } = leagueRosterFiles(worldEntries, world.competitions);
     const sources = [...rosterSources, ...files];
     if (sources.length === 0) return null;
-    const described = describeRoster(sources, world.slotWorld);
+    const described = describeRoster(sources, world.slotWorld, importSelection);
     return { ...described, warnings: [...warnings, ...described.warnings] };
-  }, [rosterSources, worldEntries, world]);
+  }, [rosterSources, worldEntries, world, importSelection]);
+
+  // Whether imported clubs take over a slot's name. Read by every preview that
+  // shows a club, so an unticked "names" box is visible before Start is pressed.
+  const takeNames = importSelection.names;
+  const takeColors = importSelection.colors;
 
   /** Every pack and picture batch loaded so far, folded into the one that gets applied. */
   const logoPack = useMemo(
@@ -289,7 +345,7 @@ export function NewLeague() {
       const ids = clubIdentitiesFor(r.country, r.end - r.start);
       ids.forEach((club, i) => {
         const tid = r.start + i;
-        const imported = activeRoster?.byTid.get(tid);
+        const imported = takeNames ? activeRoster?.byTid.get(tid) : undefined;
         out.push({
           tid,
           name: imported?.name ?? club.name,
@@ -298,7 +354,7 @@ export function NewLeague() {
       });
     }
     return out;
-  }, [world, activeRoster]);
+  }, [world, activeRoster, takeNames]);
 
   /**
    * Which clubs the loaded packs will badge, resolved against the world as it
@@ -320,6 +376,17 @@ export function NewLeague() {
       image,
     }));
   }, [logoMatch, prospectiveClubs]);
+
+  /**
+   * Every badge the save will start with: the ones carried inside the league
+   * file, then any loaded separately. A separately loaded pack wins a clash,
+   * because it is the more deliberate choice: someone who loads a pack on top
+   * of a file that already has badges is replacing some of them.
+   */
+  const previewCrests = useMemo(
+    () => mergeCrests(activeRoster?.logos ?? NO_CRESTS, logoMatch?.byTid ?? NO_CRESTS),
+    [activeRoster, logoMatch],
+  );
 
   /**
    * Reshaping the world can move, remove or re-letter the slot the chosen club
@@ -409,7 +476,9 @@ export function NewLeague() {
     // club's own slot alone where it matters, and a tid nobody owns is a tid it
     // never matches — the same way every other consumer treats it.
     const league = activeRoster
-      ? applyRosterFileToNewLeague(generated, activeRoster.file, tid).league
+      ? applyRosterFileToNewLeague(
+          generated, activeRoster.file, tid, identityOptions(importSelection),
+        ).league
       : generated;
     return {
       ...league,
@@ -448,8 +517,13 @@ export function NewLeague() {
    * gave the name you gave it.
    */
   function crestsFor(league: LeagueStore): ReadonlyMap<number, string> | undefined {
-    if (!logoPack) return undefined;
-    return resolveLogoPack(league.teams, logoPack.pack).byTid;
+    // A league file's own badges are keyed by slot, and a slot's tid is the
+    // same in the preview world and the generated one, so they need no second
+    // resolve. Only the name-matched packs do.
+    const fromFile = activeRoster?.logos ?? NO_CRESTS;
+    const fromPacks = logoPack ? resolveLogoPack(league.teams, logoPack.pack).byTid : NO_CRESTS;
+    const merged = mergeCrests(fromFile, fromPacks);
+    return merged.size > 0 ? merged : undefined;
   }
 
   /**
@@ -721,12 +795,13 @@ export function NewLeague() {
   const countryClubs = (range ? clubIdentitiesFor(activeCountry, range.end - range.start) : []).map((club, i) => {
     const tid = range!.start + i;
     const imported = activeRoster?.byTid.get(tid);
-    // An imported club takes over the slot's identity outright, so the picker
-    // shows what the club will actually be called once the save exists.
+    // An imported club takes over the slot's identity (whichever halves the
+    // import checklist left ticked), so the picker shows what the club will
+    // actually be called once the save exists.
     return {
       tid,
-      name: imported?.name ?? club.name,
-      colors: (imported?.colors ?? club.colors) as [string, string],
+      name: (takeNames ? imported?.name : undefined) ?? club.name,
+      colors: ((takeColors ? imported?.colors : undefined) ?? club.colors) as [string, string],
       squad: imported?.players?.length ?? 0,
     };
   });
@@ -768,8 +843,10 @@ export function NewLeague() {
     // is a preview of the save, so anything it shows a badge for has to be
     // something the save will too — including a custom badge outranking the
     // suppression an import turns on.
-    <CustomCrestProvider crests={logoMatch?.byTid ?? NO_CRESTS}>
-    <CrestArtProvider tids={activeRoster ? [...activeRoster.byTid.keys()] : []}>
+    <CustomCrestProvider crests={previewCrests}>
+    {/* Built-in art is only suppressed for a slot that takes an imported NAME,
+        the same rule applyRosterFile uses for importedIdentity. */}
+    <CrestArtProvider tids={activeRoster && takeNames ? [...activeRoster.byTid.keys()] : []}>
     {/* Wider than the prose screens either side of it: this one is a stack of
         controls and a club list, not something you read left to right, and at
         600 a desktop window was mostly empty either side of it. `.container`
@@ -801,8 +878,17 @@ export function NewLeague() {
           <div>
             Loaded <strong>{worldRoster.sources.map((s) => s.name).join(", ")}</strong> —{" "}
             {worldRoster.clubs} {worldRoster.clubs === 1 ? "club" : "clubs"},{" "}
-            {worldRoster.squads} with a full squad.
+            {worldRoster.squads} with a full squad
+            {worldRoster.logos.size > 0 && `, ${worldRoster.logos.size} with a badge`}.
           </div>
+          {worldContents && (
+            <ImportChecklist
+              contents={worldContents.contents}
+              selection={importSelection}
+              unplaceable={worldContents.unplaceable}
+              onChange={setImportSelection}
+            />
+          )}
           {worldRoster.warnings.map((w) => (
             <div key={w} className="small text-muted mt-1">
               {w}
@@ -835,6 +921,7 @@ export function NewLeague() {
                 setRosterSources([]);
                 setRosterError(null);
                 setSelectedTid(null);
+                setImportSelection(DEFAULT_IMPORT_SELECTION);
               }}
             >
               Start over

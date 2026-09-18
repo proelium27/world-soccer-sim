@@ -7,6 +7,7 @@ import { useLeague } from "../context/LeagueContext.js";
 import { useSportName } from "../sportName.js";
 import { TeamIdentityEditor, type EditableTeam } from "../components/TeamIdentityEditor.js";
 import { parseRosterFile, isRosterFileFormat } from "../../core/teams/rosterFile.js";
+import { buildLeagueFile, type LeagueFileExportOptions } from "../../core/teams/leagueFile.js";
 import { setPendingRoster } from "../pendingRoster.js";
 import { ROSTER_DOWNLOAD_URL } from "../rosterDownload.js";
 import { CopyAiPromptButton } from "../components/CopyAiPromptButton.js";
@@ -67,6 +68,12 @@ export function Leagues() {
   const [saving, setSaving] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  // Which save's "Export League File" options are open, if any. One at a time:
+  // the panel opens under its own row, and two open at once reads as one
+  // export covering both.
+  const [shareFor, setShareFor] = useState<number | null>(null);
+  const [shareOptions, setShareOptions] = useState<LeagueFileExportOptions>({ squads: true, logos: true });
+  const [sharing, setSharing] = useState(false);
   // Built once: it is a pure constant, and worldTeamSlots walks all 626 slots.
   const defaultWorld = useMemo(() => {
     const competitions = worldCompetitions();
@@ -127,6 +134,40 @@ export function Leagues() {
     // ANY save on the page, not the active one, so the badges in memory belong
     // to a different league as often as not.
     await exportLeagueJSON(league, await loadCrests(lid));
+  }
+
+  /**
+   * Download a save's clubs as a league file: names, colors and, if ticked,
+   * squads and custom badges, in the same format Import reads. Unlike Export
+   * Save this is a file to share or edit, not a backup: it starts a NEW league
+   * with these clubs, carrying none of the save's history.
+   *
+   * Written as plain JSON rather than gzipped like a save, because the point of
+   * the format is that a person (or an AI) can open it and edit it. Import
+   * reads either.
+   */
+  async function handleExportLeagueFile(lid: number) {
+    setSharing(true);
+    try {
+      const league = await loadLeague(lid);
+      if (!league) return;
+      const crests = shareOptions.logos ? await loadCrests(lid) : new Map<number, string>();
+      const file = buildLeagueFile(league, crests, shareOptions);
+      const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const slug = league.meta.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      a.download = `${slug || `league-${lid}`}-league-file.json`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShareFor(null);
+    } finally {
+      setSharing(false);
+    }
   }
 
   /**
@@ -259,7 +300,7 @@ export function Leagues() {
           {leagues.map((l) => (
             <div
               key={l.lid}
-              className="list-group-item d-flex align-items-center justify-content-between"
+              className="list-group-item d-flex flex-wrap align-items-center justify-content-between"
             >
               <div>
                 <div>{l.name}</div>
@@ -296,12 +337,62 @@ export function Leagues() {
                 </button>
                 <button
                   type="button"
+                  className={`btn btn-outline-secondary btn-sm${shareFor === l.lid ? " active" : ""}`}
+                  aria-expanded={shareFor === l.lid}
+                  onClick={() => setShareFor(shareFor === l.lid ? null : l.lid)}
+                  title="Download this save's clubs as a file someone can start a new league from"
+                >
+                  Export League File
+                </button>
+                <button
+                  type="button"
                   className="btn btn-outline-danger btn-sm"
                   onClick={() => handleDelete(l.lid)}
                 >
                   Delete
                 </button>
               </div>
+              {shareFor === l.lid && (
+                <div className="w-100 border-top mt-2 pt-2">
+                  <p className="small text-muted mb-2">
+                    A file of this save's clubs that anyone can load with Import to start a new
+                    league with them. Club names and colors always go in. None of the save's
+                    history does.
+                  </p>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id={`share-squads-${l.lid}`}
+                      checked={shareOptions.squads}
+                      onChange={(e) => setShareOptions({ ...shareOptions, squads: e.target.checked })}
+                    />
+                    <label className="form-check-label small" htmlFor={`share-squads-${l.lid}`}>
+                      Squads, as they stand now (makes the file much bigger)
+                    </label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id={`share-logos-${l.lid}`}
+                      checked={shareOptions.logos}
+                      onChange={(e) => setShareOptions({ ...shareOptions, logos: e.target.checked })}
+                    />
+                    <label className="form-check-label small" htmlFor={`share-logos-${l.lid}`}>
+                      Badges you loaded yourself
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={sharing}
+                    onClick={() => handleExportLeagueFile(l.lid)}
+                  >
+                    {sharing ? "Preparing..." : "Download"}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

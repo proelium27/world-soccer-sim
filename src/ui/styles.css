@@ -673,6 +673,15 @@ a:hover {
   max-width: 74ch;
 }
 
+/* The import checklist's league list. A whole-world file has 48 divisions, so
+   past a handful the list scrolls in its own box instead of pushing the club
+   picker a screen further down. */
+.import-checklist-leagues {
+  max-height: 14rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
 /* =========================================================================
    Cards & surfaces — flat, tonal, no drop shadow by default.
    ========================================================================= */

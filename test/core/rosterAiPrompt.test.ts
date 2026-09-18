@@ -146,8 +146,8 @@ describe("buildImportPromptText", () => {
     expect(parseRosterFile(JSON.stringify(file)).competitions[0].clubs).toHaveLength(1);
   });
 
-  it("tells the AI there is no logo field, and points at where badges really come from", () => {
-    expect(prompt).toMatch(/NO logo, crest or badge field/);
+  it("tells the AI not to write a logo field, and points at where badges really come from", () => {
+    expect(prompt).toMatch(/Don't add a logo, crest or badge field/);
     // The pointer matters as much as the prohibition: an AI told only "don't"
     // has nothing to tell the reader instead, and the reader is exactly the
     // person who wants badges.
