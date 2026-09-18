@@ -115,6 +115,38 @@ export async function withMatchEvents(league: LeagueStore): Promise<LeagueStore>
   };
 }
 
+/**
+ * The league just saved, with the event timelines it wrote dropped from memory.
+ *
+ * `loadLeague` elides on the way in, but a match simmed during the session
+ * arrives from the worker with its real events and would otherwise stay
+ * resident until the next load, so a season simmed in one sitting climbs back
+ * to the full weight. This closes that half.
+ *
+ * It only ever elides rows it can PROVE are on disk: the league's `played` must
+ * be the exact array the last `saveLeague` for this lid wrote (same reference),
+ * which is what `lastWritten` records. Anything else is returned untouched —
+ * a league that was never saved, a different save, or one edited since. Eliding
+ * a row that isn't on disk would lose it, which is the failure this whole
+ * mechanism exists to prevent.
+ *
+ * The write cache is pointed at the elided array too, so the next save still
+ * sees an unchanged prefix and takes the cheap append path rather than a full
+ * rewrite.
+ */
+export function elideWrittenEvents(league: LeagueStore): LeagueStore {
+  const cached = lastWritten;
+  if (!cached || !league.lid || cached.lid !== league.lid || cached.played !== league.played) {
+    return league;
+  }
+  if (!league.played.some((m) => m.boxScore.events.length > 0 && !isEventsElided(m))) {
+    return league;
+  }
+  const played = league.played.map(elideEvents);
+  lastWritten = { ...cached, played };
+  return { ...league, played };
+}
+
 /** Whether this box score's events were dropped on load rather than never recorded. */
 export function isEventsElided(m: PlayedMatch): boolean {
   return m.boxScore.eventsElided === true;

@@ -22,6 +22,7 @@ import { simThrough } from "../src/core/simThrough.js";
 import { mulberry32 } from "../src/engine/rng.js";
 import {
   saveLeague, loadLeague, resetWriteCache, withMatchEvents, isEventsElided,
+  elideWrittenEvents, storedPlayedRows,
 } from "../src/db/index.js";
 import type { LeagueStore } from "../src/core/leagueState.js";
 
@@ -72,6 +73,22 @@ async function main() {
 
   resetWriteCache();
   console.log(`\nloadLeague: ${await timed(() => loadLeague(lid))}`);
+
+  // The in-session half: what the app now does after every matchday it saves.
+  // A season simmed in one sitting should end up holding what a reloaded one
+  // does, with every timeline still on disk.
+  resetWriteCache();
+  let session = createLeagueState(1, mulberry32(7));
+  session = { ...session, lid: await saveLeague(session) };
+  for (let md = 1; md <= TARGET; md++) {
+    session = simThrough(session, { matchday: md }, mulberry32(1000 + md));
+    session = elideWrittenEvents({ ...session, lid: await saveLeague(session) });
+  }
+  const onDisk = (await storedPlayedRows(session.lid)).filter((m) => m.boxScore.events.length > 0);
+  console.log(`\nsimmed ${TARGET} matchdays in one session, saving and eliding each:`);
+  console.log(`  held in memory   ${mb(bytes(session))}`);
+  console.log(`  timelines held   ${session.played.filter((m) => m.boxScore.events.length > 0).length} of ${session.played.length}`);
+  console.log(`  timelines on disk ${onDisk.length} of ${session.played.length}`);
 }
 
 await main();

@@ -14,6 +14,7 @@ export {
   loadMatchEvents,
   isEventsElided,
   withMatchEvents,
+  elideWrittenEvents,
 } from "./leagueDb.js";
 
 export { loadCrests, saveCrests, deleteCrests } from "./crestDb.js";

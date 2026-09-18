@@ -6,6 +6,7 @@ import { mulberry32 } from "../../src/engine/rng.js";
 import {
   saveLeague, loadLeague, getDb, resetDb, resetWriteCache,
   storedPlayedRows, loadMatchEvents, isEventsElided, withMatchEvents,
+  elideWrittenEvents,
 } from "../../src/db/index.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 import type { PlayedMatch } from "../../src/core/standings.js";
@@ -188,5 +189,61 @@ describe("lazy match events", () => {
     // imported into a save where it is false, and `saveLeague` would then skip
     // those rows forever.
     expect(whole.played.some((m) => m.boxScore.eventsElided)).toBe(false);
+  });
+
+  /**
+   * Matches simmed during a session arrive with their real events. Eliding them
+   * after the save that wrote them is what stops a season simmed in one sitting
+   * from climbing back to holding every timeline.
+   */
+  describe("eliding what was just written", () => {
+    it("drops the timelines the last save wrote, and the disk keeps them", async () => {
+      const league = makeLeague();
+      league.played = [match(1, 10, 5), match(1, 11, 3)];
+      const lid = await saveLeague(league);
+
+      const lean = elideWrittenEvents({ ...league, lid });
+
+      expect(lean.played.every(isEventsElided)).toBe(true);
+      expect(lean.played[0].boxScore.home[0].rating).toBe(7.4);
+      expect(await storedEventCounts(lid)).toEqual([5, 3]);
+    });
+
+    it("leaves alone anything that is not exactly what was saved", async () => {
+      const league = makeLeague();
+      league.played = [match(1, 10, 5)];
+      const lid = await saveLeague(league);
+
+      // Same content, different array: it could have been edited since, so
+      // there is no proof it is what sits on disk.
+      const other = { ...league, lid, played: [...league.played] };
+      expect(elideWrittenEvents(other)).toBe(other);
+
+      // A league never saved in this session at all.
+      resetWriteCache();
+      const fresh = { ...league, lid };
+      expect(elideWrittenEvents(fresh)).toBe(fresh);
+    });
+
+    /**
+     * The next save must still see an unchanged prefix, or eliding would turn
+     * every matchday's save into a full rewrite. A row tampered with behind the
+     * save's back surviving proves it was not rewritten.
+     */
+    it("keeps the next save on the append path", async () => {
+      const league = makeLeague();
+      league.played = [match(1, 10, 5), match(1, 11, 3)];
+      const lid = await saveLeague(league);
+      const lean = elideWrittenEvents({ ...league, lid });
+
+      const db = await getDb();
+      await db.put("played", match(9, 99, 1), [lid, 0]);
+
+      await saveLeague({ ...lean, played: [...lean.played, match(2, 12, 4)] });
+
+      const rows = await storedPlayedRows(lid);
+      expect(rows.map((m) => m.possessionHome)).toEqual([99, 11, 12]);
+      expect(rows[2].boxScore.events).toHaveLength(4);
+    });
   });
 });
