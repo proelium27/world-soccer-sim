@@ -6,7 +6,9 @@ import { ClubLink } from "../components/ClubLink.js";
 import { seasonYear, ordinal } from "../format.js";
 import type { CupTie } from "../../core/cup/types.js";
 import type { PromotionPlayoff } from "../../core/promotionPlayoff.js";
-import { PLAYOFF_ROUND_FINAL } from "../../core/promotionPlayoff.js";
+import {
+  PLAYOFF_ROUND_FINAL, FRENCH_ROUND_FINAL, FRENCH_ROUND_FIRST, promotionPlayoffDecider,
+} from "../../core/promotionPlayoff.js";
 import { competitionOf } from "../../core/competitions.js";
 import { EmptyState } from "../components/EmptyState.js";
 
@@ -135,18 +137,29 @@ export function PromotionPlayoffs() {
   };
 
   const renderPlayoff = (playoff: PromotionPlayoff) => {
-    const semis = playoff.ties.filter((t) => t.round !== PLAYOFF_ROUND_FINAL);
-    const decider = playoff.ties.find((t) => t.round === PLAYOFF_ROUND_FINAL);
+    const french = playoff.format === "french";
+    const finalRound = french ? FRENCH_ROUND_FINAL : PLAYOFF_ROUND_FINAL;
+    const decider = promotionPlayoffDecider(playoff);
+    // Every round before the decider, in order: the English semi-finals, or the
+    // French ladder's first two rounds.
+    const earlyRounds = [...new Set(playoff.ties.filter((t) => t.round !== finalRound).map((t) => t.round))]
+      .sort((a, b) => a - b)
+      .map((round) => ({
+        round,
+        name: french ? (round === FRENCH_ROUND_FIRST ? "First round" : "Second round") : "Semi-finals",
+        ties: playoff.ties.filter((t) => t.round === round),
+      }));
     const d1 = competitionOf(league.competitions, playoff.d1CompId);
     const d2 = competitionOf(league.competitions, playoff.d2CompId);
     const userEntered = playoff.teams.includes(userTid);
-    const german = playoff.format === "german";
-    // German: teams[0] is the incumbent from above, so the challenger going up
-    // and the incumbent holding on are two different results, not one with a
-    // nicer name. Everything the card says about the outcome keys off this.
-    const challengerWon = german && playoff.winnerTid === playoff.teams[1];
+    // Both cross-division formats end against the club from above.
+    const german = playoff.format === "german" || french;
+    // teams[0] is the incumbent from above, so the challenger going up and the
+    // incumbent holding on are two different results, not one with a nicer
+    // name. Everything the card says about the outcome keys off this.
+    const challengerWon = german && playoff.winnerTid !== null && playoff.winnerTid !== playoff.teams[0];
     const promotedTid = german
-      ? (challengerWon ? playoff.teams[1] : null)
+      ? (challengerWon ? playoff.winnerTid : null)
       : playoff.winnerTid;
 
     return (
@@ -190,17 +203,17 @@ export function PromotionPlayoffs() {
         )}
 
         <div className="cup-bracket cup-bracket--rounds">
-          {semis.length > 0 && (
-            <div className="cup-round">
+          {earlyRounds.map(({ round, name, ties }) => (
+            <div className="cup-round" key={round}>
               <div className="cup-round-title">
-                <span>Semi-finals</span>
-                <span className="cup-round-count">{semis.length}</span>
+                <span>{name}</span>
+                <span className="cup-round-count">{ties.length}</span>
               </div>
               <div className="cup-round-body">
-                {semis.map((t, i) => <div className="cup-tie" key={i}>{renderTie(t)}</div>)}
+                {ties.map((t, i) => <div className="cup-tie" key={i}>{renderTie(t)}</div>)}
               </div>
             </div>
-          )}
+          ))}
           {decider && (
             <div className="cup-round">
               <div className="cup-round-title">

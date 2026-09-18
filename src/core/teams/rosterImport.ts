@@ -262,6 +262,18 @@ function realignAcademyBases(
   }
 }
 
+/**
+ * Which halves of a club's identity an import takes. Both default to true,
+ * which is what every caller did before the import checklist existed. Squads
+ * and badges need no flag here because the checklist strips them from the file
+ * itself (selectFromRosterFile in leagueFile.ts). A name or a colour can't be
+ * stripped that way, since `name`/`abbrev`/`colors` are required on a club.
+ */
+export interface RosterIdentityOptions {
+  names?: boolean;
+  colors?: boolean;
+}
+
 export interface RosterFileApplyResult {
   league: LeagueStore;
   warnings: string[];
@@ -285,13 +297,32 @@ export interface RosterFileApplyResult {
  * record survives. The club's saved starting XI is cleared (the old XI's pids
  * are gone) and stale scouting/transfer-list references are pruned.
  */
-export function applyRosterFile(league: LeagueStore, rawFile: RosterFile): RosterFileApplyResult {
+export function applyRosterFile(
+  league: LeagueStore,
+  rawFile: RosterFile,
+  identity: RosterIdentityOptions = {},
+): RosterFileApplyResult {
   const file = rescaleRosterFile(rawFile);
   const { slots, warnings } = resolveRosterSlots(league, file);
+  const takeNames = identity.names ?? true;
+  const takeColors = identity.colors ?? true;
 
+  // A half the import checklist left unticked keeps the slot's own value, so
+  // "real squads, fictional names" and "real names, generated squads" are the
+  // same file with different boxes cleared.
+  const current = new Map(league.teams.map((t) => [t.tid, t]));
   const withIdentities = applyTeamIdentities(
     league,
-    slots.map(({ tid, club }) => ({ tid, name: club.name, abbrev: club.abbrev, colors: club.colors })),
+    slots.flatMap(({ tid, club }) => {
+      const team = current.get(tid);
+      if (!team) return [];
+      return [{
+        tid,
+        name: takeNames ? club.name : team.name,
+        abbrev: takeNames ? club.abbrev : team.abbrev,
+        colors: takeColors ? club.colors : ([...team.colors] as [string, string]),
+      }];
+    }),
   );
 
   // Every slot the file named is flagged so the UI stops drawing the built-in
@@ -299,7 +330,10 @@ export function applyRosterFile(league: LeagueStore, rawFile: RosterFile): Roste
   // real club the badge belongs to somebody else entirely. Flagged on rename,
   // not on squad replacement — an identity-only entry is exactly the case where
   // the name changed and the crest went stale.
-  const renamedTids = new Set(slots.map((s) => s.tid));
+  // A slot that keeps its fictional name keeps that club's badge too: the art
+  // only goes stale once the NAME belongs to somebody else. New colours alone
+  // don't make it a different club.
+  const renamedTids = new Set(takeNames ? slots.map((s) => s.tid) : []);
   const teams = withIdentities.teams.map((t) =>
     renamedTids.has(t.tid) ? { ...t, importedIdentity: true } : { ...t },
   );
@@ -364,7 +398,7 @@ export function applyRosterFile(league: LeagueStore, rawFile: RosterFile): Roste
   return {
     league: { ...withIdentities, teams, players, nextPid },
     warnings,
-    clubsRenamed: slots.length,
+    clubsRenamed: takeNames ? slots.length : 0,
     squadsReplaced,
     playersAdded,
   };
@@ -394,8 +428,9 @@ export function applyRosterFileToNewLeague(
   league: LeagueStore,
   file: RosterFile,
   userTid: number,
+  identity: RosterIdentityOptions = {},
 ): RosterFileApplyResult {
-  const applied = applyRosterFile(league, file);
+  const applied = applyRosterFile(league, file, identity);
   const teams = assignAIFormations(applied.league.teams, applied.league.players, userTid);
   const userTeam = teams.find((t) => t.tid === userTid);
   if (userTeam) {

@@ -7,8 +7,11 @@ import { useLeague } from "../context/LeagueContext.js";
 import { useSportName } from "../sportName.js";
 import { TeamIdentityEditor, type EditableTeam } from "../components/TeamIdentityEditor.js";
 import { parseRosterFile, isRosterFileFormat } from "../../core/teams/rosterFile.js";
+import { parseLogoPack, isLogoPackFormat } from "../../core/teams/logoPack.js";
+import { buildLeagueFile, type LeagueFileExportOptions } from "../../core/teams/leagueFile.js";
 import { setPendingRoster } from "../pendingRoster.js";
-import { ROSTER_DOWNLOAD_URL } from "../rosterDownload.js";
+import { ROSTER_FILES } from "../rosterDownload.js";
+import { RosterFilesSection } from "../components/RosterFilesSection.js";
 import { CopyAiPromptButton } from "../components/CopyAiPromptButton.js";
 import { worldCompetitions, worldTeamSlots } from "../../core/competitions.js";
 
@@ -67,6 +70,12 @@ export function Leagues() {
   const [saving, setSaving] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  // Which save's "Export League File" options are open, if any. One at a time:
+  // the panel opens under its own row, and two open at once reads as one
+  // export covering both.
+  const [shareFor, setShareFor] = useState<number | null>(null);
+  const [shareOptions, setShareOptions] = useState<LeagueFileExportOptions>({ squads: true, logos: true });
+  const [sharing, setSharing] = useState(false);
   // Built once: it is a pure constant, and worldTeamSlots walks all 626 slots.
   const defaultWorld = useMemo(() => {
     const competitions = worldCompetitions();
@@ -130,6 +139,40 @@ export function Leagues() {
   }
 
   /**
+   * Download a save's clubs as a league file: names, colors and, if ticked,
+   * squads and custom badges, in the same format Import reads. Unlike Export
+   * Save this is a file to share or edit, not a backup: it starts a NEW league
+   * with these clubs, carrying none of the save's history.
+   *
+   * Written as plain JSON rather than gzipped like a save, because the point of
+   * the format is that a person (or an AI) can open it and edit it. Import
+   * reads either.
+   */
+  async function handleExportLeagueFile(lid: number) {
+    setSharing(true);
+    try {
+      const league = await loadLeague(lid);
+      if (!league) return;
+      const crests = shareOptions.logos ? await loadCrests(lid) : new Map<number, string>();
+      const file = buildLeagueFile(league, crests, shareOptions);
+      const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const slug = league.meta.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      a.download = `${slug || `league-${lid}`}-league-file.json`;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShareFor(null);
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  /**
    * One Import button for both kinds of file the game reads, because two
    * similarly-named import buttons is what made this confusing in the first
    * place. Which one it is is unambiguous from the contents: a roster file
@@ -166,18 +209,31 @@ export function Leagues() {
       texts.push({ file, text });
     }
 
-    const isRoster = ({ text }: { text: string }) =>
-      isRosterFileFormat((JSON.parse(text) as { format?: unknown })?.format);
-    const rosters = texts.filter(isRoster);
+    const formatOf = ({ text }: { text: string }) =>
+      (JSON.parse(text) as { format?: unknown })?.format;
+    const rosters = texts.filter((t) => isRosterFileFormat(formatOf(t)));
+    // A badge pack is accepted here too, so the three Roster files downloads
+    // can be picked in one go. It rides along to the New League screen, which
+    // is where it gets applied (it matches clubs by name, so they must exist).
+    const badgePacks = texts.filter((t) => isLogoPackFormat(formatOf(t)));
 
-    if (rosters.length > 0 && rosters.length < texts.length) {
+    if (rosters.length + badgePacks.length > 0 && rosters.length + badgePacks.length < texts.length) {
       setImportError(
-        "That selection mixes roster files with a save file. Import the save on its own.",
+        "That selection mixes roster or badge files with a save file. Import the save on its own.",
       );
       return;
     }
 
-    if (rosters.length > 0) {
+    if (rosters.length + badgePacks.length > 0) {
+      const logos = [];
+      for (const { file, text } of badgePacks) {
+        try {
+          logos.push({ name: file.name, pack: parseLogoPack(text) });
+        } catch (err) {
+          setImportError(`${file.name}: ${err instanceof Error ? err.message : String(err)}`);
+          return;
+        }
+      }
       // Re-read through the real parser so a malformed roster file reports
       // exactly which field is wrong, the same as it would on /new-league.
       // A bad file stops the whole batch here rather than being skipped: this
@@ -192,8 +248,10 @@ export function Leagues() {
           return;
         }
       }
-      setPendingRoster({ files });
-      navigate("/new-league?roster=1");
+      setPendingRoster({ files, logos });
+      // Badges alone start an ordinary league (the shipped clubs, badged by
+      // whatever names match); the roster screen is for when clubs came too.
+      navigate(files.length > 0 ? "/new-league?roster=1" : "/new-league");
       return;
     }
 
@@ -259,7 +317,7 @@ export function Leagues() {
           {leagues.map((l) => (
             <div
               key={l.lid}
-              className="list-group-item d-flex align-items-center justify-content-between"
+              className="list-group-item d-flex flex-wrap align-items-center justify-content-between"
             >
               <div>
                 <div>{l.name}</div>
@@ -296,12 +354,62 @@ export function Leagues() {
                 </button>
                 <button
                   type="button"
+                  className={`btn btn-outline-secondary btn-sm${shareFor === l.lid ? " active" : ""}`}
+                  aria-expanded={shareFor === l.lid}
+                  onClick={() => setShareFor(shareFor === l.lid ? null : l.lid)}
+                  title="Download this save's clubs as a file someone can start a new league from"
+                >
+                  Export League File
+                </button>
+                <button
+                  type="button"
                   className="btn btn-outline-danger btn-sm"
                   onClick={() => handleDelete(l.lid)}
                 >
                   Delete
                 </button>
               </div>
+              {shareFor === l.lid && (
+                <div className="w-100 border-top mt-2 pt-2">
+                  <p className="small text-muted mb-2">
+                    A file of this save's clubs that anyone can load with Import to start a new
+                    league with them. Club names and colors always go in. None of the save's
+                    history does.
+                  </p>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id={`share-squads-${l.lid}`}
+                      checked={shareOptions.squads}
+                      onChange={(e) => setShareOptions({ ...shareOptions, squads: e.target.checked })}
+                    />
+                    <label className="form-check-label small" htmlFor={`share-squads-${l.lid}`}>
+                      Squads, as they stand now (makes the file much bigger)
+                    </label>
+                  </div>
+                  <div className="form-check mb-2">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id={`share-logos-${l.lid}`}
+                      checked={shareOptions.logos}
+                      onChange={(e) => setShareOptions({ ...shareOptions, logos: e.target.checked })}
+                    />
+                    <label className="form-check-label small" htmlFor={`share-logos-${l.lid}`}>
+                      Badges you loaded yourself
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={sharing}
+                    onClick={() => handleExportLeagueFile(l.lid)}
+                  >
+                    {sharing ? "Preparing..." : "Download"}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -326,33 +434,10 @@ export function Leagues() {
           type="button"
           className="btn btn-outline-secondary"
           onClick={() => importInputRef.current?.click()}
-          title="Load roster files to start a league with real clubs, or a save file to restore a backup"
+          title="Load roster files and badges to start a league with real clubs, or a save file to restore a backup"
         >
           Import
         </button>
-        {ROSTER_DOWNLOAD_URL && (
-          // The button and its badge are ONE flex item, not two. The row is
-          // `flex-wrap`, and as two items the badge wraps onto the next line by
-          // itself and lands under the leftmost button, which reads as a label
-          // for that one instead. Wrapping them together means they wrap as a
-          // pair or not at all.
-          <span className="d-inline-flex align-items-center gap-2">
-            <a
-              className="btn btn-outline-secondary"
-              href={ROSTER_DOWNLOAD_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-              title="Get a roster file of real clubs and squads, then load it with Import"
-            >
-              Download Real Rosters
-            </a>
-            {/* States what the file IS rather than that it is new, so it doesn't
-                go stale sitting here. The URL never changes, so anyone who
-                downloaded the old one gets this by downloading again. */}
-            <span className="badge bg-success">Updated for EA FC 27</span>
-          </span>
-        )}
         {/* This screen has no world of its own — a roster file imported from
             here lands on a league that does not exist yet — so the prompt
             describes the DEFAULT world, which is the one most saves are. Anyone
@@ -373,24 +458,11 @@ export function Leagues() {
         />
       </div>
 
-      <p className="text-muted small mt-2 mb-0">
-        Import takes either roster files, which start a new league with real clubs and
-        squads, or a save file from Export Save, which loads that save back. You can pick as
-        many roster files as you like (one per league is the usual way) and they all go into
-        the same league.
-        {ROSTER_DOWNLOAD_URL && (
-          <>
-            {" "}
-            Download Real Rosters gets you one covering every league to start with. It was
-            rebuilt on 14 September 2026 and now covers Brazil, Argentina, Mexico and the
-            United States as well as Europe. If you grabbed it before then, download it
-            again, since the old one leaves the Americas fictional.
-          </>
-        )}{" "}
-        To make your own instead, "Copy AI Prompt to Customize" gives you a prompt to
-        paste into ChatGPT or Claude that spells out the format and the leagues it has to
-        fill. Files written without it usually import only partly, or not at all.
-      </p>
+
+      <RosterFilesSection
+        files={ROSTER_FILES}
+        onImport={() => importInputRef.current?.click()}
+      />
     </div>
   );
 }

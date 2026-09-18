@@ -257,27 +257,46 @@ export const PROMOTION_PLAYOFF_SEMI_FINALS = 2;
  *    club plays tier 1's lowest safe club over two legs for the remaining
  *    place. A top-flight club can save itself, and when it does, one fewer club
  *    goes up *and* one fewer goes down — so the divisions still balance.
+ *  - `french` — Ligue 2's ladder: N-1 go up and N-1 go down on the table, the
+ *    lower division's (N+1)th hosts its (N+2)th, the winner visits the Nth, and
+ *    whoever survives plays the upper division's lowest safe club over two legs.
+ *    The last round is the German tie, so the counts balance the same way.
  *  - `none` — the straight top-N/bottom-N swap, which is how the game worked
  *    before playoffs existed.
+ *
+ * Set per LINK: a division's own value describes the link to the division
+ * above it (see competitionPlayoffFormat), so France can play its ladder into
+ * the top flight and an English bracket out of its third tier.
  */
-export type PlayoffFormat = "english" | "german" | "none";
+export type PlayoffFormat = "english" | "german" | "french" | "none";
 
 /**
  * What each shipped country plays, absent a per-league override.
  *
- * These are the real systems: the Bundesliga settles its last place with a
- * relegation playoff against 2. Bundesliga's third, while the rest of the
- * shipped world runs the English four-club bracket. Anything not listed falls
- * back to `DEFAULT_PLAYOFF_FORMAT`, which covers every country a player invents.
+ * These are the real systems, per country, for the link between its top two
+ * divisions. A link further down that differs carries its own value on its
+ * lower division (see worldCompetitions). Anything not listed falls back to
+ * `DEFAULT_PLAYOFF_FORMAT`, which covers every country a player invents.
  *
  * A country promoting fewer than two clubs has no automatic place to sit below,
  * so `english` is not available to it and `promotionPlayoffFields` returns no
- * bracket — Scotland promotes one and is listed as `none` to say so plainly
- * rather than relying on that fallback.
+ * bracket.
  */
 export const COUNTRY_PLAYOFF_FORMAT: Record<string, PlayoffFormat> = {
   Germany: "german",
-  Scotland: "none",
+  // The Eredivisie, Primeira Liga and Scottish Premiership all settle a place
+  // between their top two divisions with a tie against the club above.
+  Netherlands: "german",
+  Portugal: "german",
+  Scotland: "german",
+  // Ligue 2's 3rd/4th/5th ladder into a tie with Ligue 1's 16th. Its third
+  // tier plays an English bracket, set on that division (worldCompetitions).
+  France: "french",
+  // Straight swaps: the Pro League, the Greek Super League (its split table
+  // decides who drops) and the Brasileirão's four up and four down.
+  Belgium: "none",
+  Greece: "none",
+  Brazil: "none",
   // Closed leagues: they promote nobody, so there is no place to play for. Said
   // outright rather than left to the zero-places guard, so World setup shows
   // what the league really does.
@@ -347,13 +366,88 @@ export const DEFAULT_CONTINENTAL_REGION: ContinentalRegion = "europe";
  * verdict still read the regular-season table, which is also what real leagues
  * with playoffs do (MLS qualifies for the Champions Cup partly on the table).
  */
-export type TitlePlayoffFormat = "none" | "single" | "two-legged" | "conference" | "zones";
+export type TitlePlayoffFormat =
+  | "none" | "single" | "two-legged" | "conference" | "zones" | "conference-single";
 
 /** How many clubs a title playoff seats. Eight: quarter-finals, semi-finals, final. */
 export const TITLE_PLAYOFF_TEAMS = 8;
 
 /** Clubs per conference in a `conference` title playoff: MLS's real nine. */
 export const CONFERENCE_PLAYOFF_TEAMS = 9;
+
+/**
+ * Clubs per conference in a `conference-single` title playoff: the USL
+ * Championship's eight, playing one-off games at the better seed's ground
+ * through each conference's bracket, then a final between the two winners.
+ */
+export const CONFERENCE_SINGLE_PLAYOFF_TEAMS = 8;
+
+/**
+ * Title playoffs below a top flight, keyed by country and then tier. Only a
+ * CLOSED division has one: where a lower division has promotion, its season
+ * ends in a promotion race and that already has its own playoff. The USL
+ * Championship and USL League One are the shipped cases.
+ */
+export const COUNTRY_LOWER_TITLE_PLAYOFF: Readonly<Record<string, Readonly<Record<number, TitlePlayoffFormat>>>> = {
+  "United States": { 2: "conference-single", 3: "single" },
+};
+
+/**
+ * How a division's league season is played, when it is not a plain double round
+ * robin.
+ *
+ * `legs` is how many times every club meets every other (Scotland's lower
+ * divisions play four times, its top flight three). `split`, when present,
+ * continues the season after that: the table is cut into `groups` (sizes, top
+ * first) and each group's clubs play each other `legs` more times, carrying
+ * their points in. A club then finishes inside its group whatever its points,
+ * so the top group's worst finishes above the next group's best — the Scottish
+ * Premiership's split, and Greece's three-way one.
+ *
+ * The whole season must fit the SEASON_MATCHDAYS grid: rounds in the first
+ * phase plus the longest group's rounds, where a round robin of n clubs takes
+ * n-1 rounds a leg (n with a bye when odd). A format that does not fit, or whose
+ * groups do not add up to the division, is ignored and the division plays a
+ * double round robin (see competitionSeasonFormat).
+ */
+export interface SeasonFormat {
+  legs: number;
+  split?: {
+    groups: readonly number[];
+    legs: readonly number[];
+    names: readonly string[];
+  };
+}
+
+/**
+ * The shipped divisions with a season format, keyed by country and then tier.
+ *
+ * Scotland's top flight is the real Premiership: 33 games, then a split into two
+ * sixes who each play five more, 38 in all, exactly the calendar. Its second and
+ * third tiers play each other four times, 36 games. Greece's top flight plays 26
+ * then splits three ways: the top four and the next four each play six more, the
+ * bottom six ten.
+ */
+export const COUNTRY_SEASON_FORMAT: Readonly<Record<string, Readonly<Record<number, SeasonFormat>>>> = {
+  Scotland: {
+    1: {
+      legs: 3,
+      split: { groups: [6, 6], legs: [1, 1], names: ["Championship group", "Relegation group"] },
+    },
+    2: { legs: 4 },
+    3: { legs: 4 },
+  },
+  Greece: {
+    1: {
+      legs: 2,
+      split: {
+        groups: [4, 4, 6],
+        legs: [2, 2, 2],
+        names: ["Championship group", "European group", "Relegation group"],
+      },
+    },
+  },
+};
 
 /** Clubs per zone in a `zones` title playoff: Argentina's real eight. */
 export const ZONE_PLAYOFF_TEAMS = 8;

@@ -9,7 +9,7 @@ import { budgetCap, financeScaleFor, wageBill } from "../core/finance/budget.js"
 import { pointsDeductionMap } from "../core/finance/debt.js";
 import { isFreeAgentTid } from "../core/transfers/negotiation.js";
 import type { CompetitionScope } from "../core/competitions.js";
-import { scopeCompIds } from "../core/competitions.js";
+import { scopeCompIds, competitionSplit } from "../core/competitions.js";
 
 /**
  * The club database's row model — the world's 626 clubs with their strength,
@@ -109,7 +109,7 @@ export function buildClubRows(league: LeagueStore): ClubDbRow[] {
   const rankByTid = new Map<number, { row: StandingsRow; rank: number }>();
   for (const comp of league.competitions) {
     const tids = league.teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
-    const rows = computeStandings(tids, playedByComp.get(comp.id) ?? [], deductions);
+    const rows = computeStandings(tids, playedByComp.get(comp.id) ?? [], deductions, competitionSplit(comp));
     // A table with nothing played is array order, not a ranking — see Finance,
     // which gates its "1st of 20" line on the same thing.
     const started = rows.some((r) => r.played > 0);

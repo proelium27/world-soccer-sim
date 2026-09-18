@@ -30,14 +30,29 @@ export const PLAYOFF_ROUND_SEMI = 0;
  */
 export const PLAYOFF_ROUND_FINAL = 1;
 
+/**
+ * The French ladder's rounds, in order: the lower division's two lowest
+ * entrants meet, the winner visits the highest, and the survivor plays the club
+ * from above over two legs. Its own indices because it has three rounds where
+ * the other formats have at most two.
+ */
+export const FRENCH_ROUND_FIRST = 0;
+export const FRENCH_ROUND_SECOND = 1;
+export const FRENCH_ROUND_FINAL = 2;
+
 /** The format a played record was decided under. `none` never produces a record. */
-export type PlayedPlayoffFormat = "english" | "german";
+export type PlayedPlayoffFormat = "english" | "german" | "french";
+
+/** The formats whose last round is a tie against a club from the division above. */
+function crossDivision(format: PlayedPlayoffFormat): boolean {
+  return format === "german" || format === "french";
+}
 
 /**
  * One country's promotion playoff for its last promotion place.
  *
  * One of these is seated at **every** promotion link, so a three-division
- * country decides two places this way each summer. Two shapes, by `format`:
+ * country decides two places this way each summer. Three shapes, by `format`:
  *  - **english** — the four clubs below the automatic places contest two-legged
  *    semi-finals and a neutral-ground final. Entirely within the lower
  *    division; no club from above is at risk, and exactly one extra goes up.
@@ -45,6 +60,10 @@ export type PlayedPlayoffFormat = "english" | "german";
  *    lowest safe club over two legs. Either the challenger goes up and the
  *    incumbent goes down, or neither moves and the country simply promotes and
  *    relegates one fewer.
+ *  - **french** — Ligue 2's ladder: the three lower-division clubs below the
+ *    automatic places play down to one (the lowest two meet, the winner visits
+ *    the highest), who then plays the German tie. Its first two rounds are
+ *    single games at the better-placed club's ground.
  *
  * Drawn when the season ends and played a round at a time (see
  * playoffStages.ts), on end-of-season squads, then stored on the season-history
@@ -72,7 +91,8 @@ export interface PromotionPlayoff {
   /**
    * The entrants. English: the four lower-division clubs, best league finish
    * first. German: exactly two, the **upper-division club first**, then the
-   * challenger from below.
+   * challenger from below. French: four, the upper-division club first and then
+   * the lower division's three ladder clubs in finishing order.
    */
   teams: number[];
   /** Each entrant's 1-based finishing position *in his own division's table*. */
@@ -89,7 +109,8 @@ export interface PromotionPlayoff {
   autoRelegated: number;
   /**
    * English: two semi-finals (round `PLAYOFF_ROUND_SEMI`) then the final.
-   * German: the single two-legged tie, at `PLAYOFF_ROUND_FINAL`. Only the
+   * German: the single two-legged tie, at `PLAYOFF_ROUND_FINAL`. French: one
+   * tie per round at `FRENCH_ROUND_FIRST`/`SECOND`/`FINAL`. Only the
    * rounds played so far; empty on a playoff drawn but unplayed.
    * `boxScore` is always null — see the interface note.
    */
@@ -156,6 +177,8 @@ function automaticSlices(
  *    smaller bracket, so the shape is identical everywhere it runs.
  *  - **german** works at any count from one upward, since it only needs one club
  *    on each side of the line.
+ *  - **french** works at any count too, but needs three lower-division clubs
+ *    below the automatic places to stage its ladder.
  *
  * In both cases the **number of clubs that can move is unchanged**. The playoff
  * redistributes the last place, it never creates one — which matters beyond
@@ -199,11 +222,26 @@ function seatField(
     };
   }
 
-  // German: one club either side of the line. The upper-division entrant is the
-  // lowest club NOT already relegated on the table — index `length - spots`,
-  // which sits exactly above the bottom `spots - 1`.
+  // German and French: one club either side of the line. The upper-division
+  // entrant is the lowest club NOT already relegated on the table — index
+  // `length - spots`, which sits exactly above the bottom `spots - 1`.
   const auto = spots - 1;
   const d1Index = d1Table.length - spots;
+  if (format === "french") {
+    // Ligue 2's ladder: the three clubs directly below the automatic places,
+    // so the same three who miss out on the table alone.
+    const ladder = d2Table.slice(auto, auto + 3);
+    if (d1Index < 0 || ladder.length < 3) return null;
+    return {
+      ...base,
+      format,
+      autoPromoted: auto,
+      autoRelegated: auto,
+      teams: [d1Table[d1Index].tid, ...ladder.map((r) => r.tid)],
+      positions: [d1Index + 1, ...ladder.map((_, i) => auto + 1 + i)],
+      tiers: [d1.tier, d2.tier, d2.tier, d2.tier],
+    };
+  }
   if (d1Index < 0 || auto >= d2Table.length) return null;
   return {
     ...base,
@@ -336,8 +374,19 @@ export function drawPromotionPlayoffs(
   return promotionPlayoffFields(competitions, tablesByCompId).map((f) => drawPromotionPlayoff(f, season));
 }
 
-/** How many rounds a playoff has: semi-finals and a final, or the German tie alone. */
+/**
+ * The tie that decided a playoff, or undefined while it is still to play. Its
+ * round index depends on the format, so read it through here rather than
+ * matching a round constant.
+ */
+export function promotionPlayoffDecider(playoff: PromotionPlayoff): CupTie | undefined {
+  const round = playoff.format === "french" ? FRENCH_ROUND_FINAL : PLAYOFF_ROUND_FINAL;
+  return playoff.ties.find((t) => t.round === round);
+}
+
+/** How many rounds a playoff has: semi-finals and a final, the German tie alone, or the French ladder's three. */
 export function promotionPlayoffRoundCount(playoff: { format: PlayedPlayoffFormat }): number {
+  if (playoff.format === "french") return 3;
   return playoff.format === "german" ? 1 : 2;
 }
 
@@ -345,6 +394,8 @@ export function promotionPlayoffRoundCount(playoff: { format: PlayedPlayoffForma
 export function promotionPlayoffRoundsLeft(playoff: PromotionPlayoff): number {
   if (playoff.winnerTid !== null) return 0;
   if (playoff.format === "german") return playoff.ties.length === 0 ? 1 : 0;
+  // One tie a round, so the ties played so far count the rounds.
+  if (playoff.format === "french") return Math.max(0, 3 - playoff.ties.length);
   if (playoff.ties.some((t) => t.round === PLAYOFF_ROUND_FINAL)) return 0;
   return playoff.ties.length === 0 ? 2 : 1;
 }
@@ -354,6 +405,9 @@ export function promotionPlayoffNextRoundName(playoff: PromotionPlayoff): string
   const left = promotionPlayoffRoundsLeft(playoff);
   if (left === 0) return null;
   if (playoff.format === "german") return "Playoff";
+  if (playoff.format === "french") {
+    return ["First round", "Second round", "Final, v the club above"][3 - left];
+  }
   return left === 2 ? "Semi-finals" : "Final";
 }
 
@@ -361,6 +415,12 @@ export function promotionPlayoffNextRoundName(playoff: PromotionPlayoff): string
 export function promotionPlayoffNextEntrants(playoff: PromotionPlayoff): Set<number> {
   const left = promotionPlayoffRoundsLeft(playoff);
   if (left === 0) return new Set();
+  if (playoff.format === "french") {
+    const [incumbent, third, fourth, fifth] = playoff.teams;
+    const lastWinner = playoff.ties[playoff.ties.length - 1]?.winner;
+    if (left === 3) return new Set([fourth, fifth]);
+    return new Set(left === 2 ? [third, lastWinner] : [incumbent, lastWinner]);
+  }
   if (playoff.format === "german" || left === 2) return new Set(playoff.teams);
   return new Set(playoff.ties.filter((t) => t.round === PLAYOFF_ROUND_SEMI).map((t) => t.winner));
 }
@@ -392,10 +452,38 @@ export function playPromotionPlayoffRound(
     // The incumbent keeps his place when the tie cannot be played, which for
     // the German format means nobody moves and for the English one hands the
     // place to the best-placed entrant who can field a side.
-    const fallback = playoff.format === "german"
+    const fallback = crossDivision(playoff.format)
       ? playoff.teams[0]
       : playoff.teams.find(canPlay) ?? playoff.teams[0];
     return { ...playoff, winnerTid: fallback };
+  }
+
+  if (playoff.format === "french") {
+    const [incumbent, third, fourth, fifth] = playoff.teams;
+    const round = 3 - left;
+    if (round < FRENCH_ROUND_FINAL) {
+      // One game at the better-placed club's ground: 4th hosts 5th, then 3rd
+      // hosts whoever came through. Extra time and penalties settle a draw.
+      const home = round === FRENCH_ROUND_FIRST ? fourth : third;
+      const away = round === FRENCH_ROUND_FIRST ? fifth : playoff.ties[0].winner;
+      const tie = resolveCupTie(
+        tieRng(lid, season, playoff.d2CompId, round, 0),
+        home, away, matchData.get(home)!, matchData.get(away)!, round, 0,
+      );
+      return { ...playoff, ties: [...playoff.ties, { ...tie, boxScore: null }] };
+    }
+    // The barrage: two legs against the club from above, who hosts the second.
+    const challenger = playoff.ties[FRENCH_ROUND_SECOND].winner;
+    const rng = tieRng(lid, season, playoff.d2CompId, FRENCH_ROUND_FINAL, 0);
+    const hd = matchData.get(challenger)!;
+    const ad = matchData.get(incumbent)!;
+    const leg1 = playFirstLeg(rng, challenger, incumbent, hd, ad, FRENCH_ROUND_FINAL);
+    const tie = resolveTwoLeggedTie(rng, leg1, hd, ad, 0);
+    return {
+      ...playoff,
+      ties: [...playoff.ties, { ...tie, boxScore: null }],
+      winnerTid: tie.winner,
+    };
   }
 
   if (playoff.format === "german") {
@@ -487,7 +575,11 @@ export function promotionPlayoffMatchData(
   players: Player[],
   lid: number,
 ): Map<number, TeamMatchData> {
-  const pool = playoff.format === "german"
+  // The French ladder's first two rounds are within the lower division, but its
+  // final is not, and the data is built once for the whole playoff — so it
+  // pools both, like the German tie. Two clubs from one division still meet as
+  // themselves in a pool that happens to be larger.
+  const pool = crossDivision(playoff.format)
     ? new Set([playoff.d1CompId, playoff.d2CompId])
     : new Set([playoff.d2CompId]);
   return playoffMatchData(teams, players, pool, lid, playoff.season);
@@ -572,12 +664,13 @@ export function playoffOutcomes(playoffs: PromotionPlayoff[]): Map<number, Playo
   const out = new Map<number, PlayoffOutcome>();
   for (const p of playoffs) {
     if (p.winnerTid === null) continue;
-    if (p.format === "german") {
-      // teams[0] is the incumbent from the division above, teams[1] the challenger.
-      const challengerWon = p.winnerTid === p.teams[1];
+    if (crossDivision(p.format)) {
+      // teams[0] is the incumbent from the division above; anyone else who won
+      // the last round came up from below.
+      const challengerWon = p.winnerTid !== p.teams[0];
       out.set(p.d2CompId, {
-        format: "german",
-        promotedTid: challengerWon ? p.teams[1] : null,
+        format: p.format,
+        promotedTid: challengerWon ? p.winnerTid : null,
         relegatedTid: challengerWon ? p.teams[0] : null,
       });
       continue;

@@ -120,10 +120,10 @@ describe("closed leagues", () => {
 describe("title playoffs", () => {
   const comps = worldCompetitions();
 
-  it("is held by Argentina, Mexico and the United States, and only in their top flights", () => {
+  it("is held by Argentina, Mexico and the United States, and below the top flight only in the closed US divisions", () => {
     const holders = comps.filter((c) => competitionTitlePlayoff(c) !== "none");
     expect(holders.map((c) => `${c.country}:${c.tier}`)).toEqual([
-      "Argentina:1", "Mexico:1", "United States:1",
+      "Argentina:1", "Mexico:1", "United States:1", "United States:2", "United States:3",
     ]);
     expect(competitionTitlePlayoff(holders.find((c) => c.country === "Mexico")!)).toBe("two-legged");
   });
@@ -132,7 +132,9 @@ describe("title playoffs", () => {
     // Real division sizes: MLS needs nine per conference out of its thirty.
     const tables = new Map(comps.map((c, i) => [c.id, table(i * 100, competitionTeamCount(c))]));
     const fields = titlePlayoffFields(comps, tables);
-    expect(fields.map((f) => f.country)).toEqual(["Argentina", "Mexico", "United States"]);
+    expect(fields.map((f) => f.country)).toEqual([
+      "Argentina", "Mexico", "United States", "United States", "United States",
+    ]);
     const mexico = comps.find((c) => c.country === "Mexico" && c.tier === 1)!;
     const field = fields.find((f) => f.country === "Mexico")!;
     expect(field.teams).toEqual(tables.get(mexico.id)!.slice(0, 8).map((r) => r.tid));

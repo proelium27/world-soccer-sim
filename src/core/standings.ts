@@ -12,6 +12,27 @@ export interface MatchScore {
   away: number;
   homeGoals: number;
   awayGoals: number;
+  /**
+   * The grid matchday it was played on. Optional because a live, in-progress
+   * score has none; only a split table reads it (see StandingsSplit), and a
+   * match without one never counts toward its first phase.
+   */
+  matchday?: number;
+}
+
+/**
+ * How a split division's table is ranked. Once every first-phase match has
+ * been played, the clubs are cut into groups by the first-phase table and each
+ * finishes inside its group: the top group's worst club ranks above the next
+ * group's best, whatever their points.
+ *
+ * Built by `competitionSplit` (competitions.ts). Kept structural here so this
+ * file needs nothing from the competition model.
+ */
+export interface StandingsSplit {
+  groups: readonly number[];
+  lastFirstPhaseMatchday: number;
+  firstPhaseMatches: number;
 }
 
 export interface PlayedMatch extends MatchScore {
@@ -41,6 +62,13 @@ export interface StandingsRow {
    * every surface that renders a table needs to be able to say why.
    */
   deducted?: number;
+  /**
+   * Which group of a split table this club finishes in, 0 being the top one.
+   * Present only once a split division's first phase is complete (see
+   * StandingsSplit), so every single table and every stored table from before
+   * splits existed carries none.
+   */
+  group?: number;
 }
 
 /** A club's aggregated box-score totals for one season, for the Team Stat Leaders history. */
@@ -77,6 +105,14 @@ export interface SeasonHistoryEntry {
   compsByTid: Record<number, number>;
   /** Each tier-1 competition's champion, keyed by compId. */
   championTidByCompId: Record<number, number>;
+  /**
+   * The champions a lower division's title playoff crowned, keyed by compId —
+   * only the closed divisions that hold one (see COUNTRY_LOWER_TITLE_PLAYOFF).
+   * Kept apart from `championTidByCompId`, which a dozen readers treat as the
+   * set of top-flight champions. Every other lower division's title is still
+   * its table leader. Optional and never backfilled.
+   */
+  lowerChampionTidByCompId?: Record<number, number>;
   /**
    * Who retired in the offseason that followed this season — a count plus the
    * notable names, snapshotted because retirement deletes the players.
@@ -136,6 +172,21 @@ export interface SeasonHistoryEntry {
    * `promotionPlayoffs` gives.
    */
   titlePlayoffs?: TitlePlayoff[];
+}
+
+/**
+ * The champion a season recorded for a division, or undefined where it recorded
+ * none and the table leader is the champion. A top flight always has one; a
+ * lower division only where a title playoff decided it.
+ */
+export function recordedChampion(
+  entry: Pick<SeasonHistoryEntry, "championTidByCompId" | "lowerChampionTidByCompId">,
+  compId: number,
+  tier: number,
+): number | undefined {
+  return tier === 1
+    ? entry.championTidByCompId?.[compId]
+    : entry.lowerChampionTidByCompId?.[compId];
 }
 
 /** Sum each club's box-score lines across a season's played matches. */
@@ -247,6 +298,37 @@ export function computeStandings(
   teamIds: number[],
   matches: MatchScore[],
   deductions?: ReadonlyMap<number, number>,
+  split?: StandingsSplit,
+): StandingsRow[] {
+  const table = plainStandings(teamIds, matches, deductions);
+  if (!split) return table;
+  // The split only exists once the first phase is over; until then it is one
+  // table like any other.
+  const firstPhase = matches.filter(
+    (m) => m.matchday !== undefined && m.matchday <= split.lastFirstPhaseMatchday,
+  );
+  if (firstPhase.length < split.firstPhaseMatches) return table;
+  if (split.groups.reduce((a, b) => a + b, 0) !== teamIds.length) return table;
+  // Groups are seeded by the first-phase table, deductions included: a docked
+  // club drops into the group its docked total puts it in.
+  const seeding = plainStandings(teamIds, firstPhase, deductions);
+  const groupOf = new Map<number, number>();
+  let cursor = 0;
+  split.groups.forEach((size, g) => {
+    for (const row of seeding.slice(cursor, cursor + size)) groupOf.set(row.tid, g);
+    cursor += size;
+  });
+  // The full table's own order within each group, groups in order.
+  return table
+    .map((r) => ({ ...r, group: groupOf.get(r.tid) ?? split.groups.length - 1 }))
+    .sort((a, b) => a.group - b.group);
+}
+
+/** The table on points alone, before any split. */
+function plainStandings(
+  teamIds: number[],
+  matches: MatchScore[],
+  deductions?: ReadonlyMap<number, number>,
 ): StandingsRow[] {
   const rows = new Map<number, StandingsRow>();
   for (const tid of teamIds)
@@ -282,7 +364,16 @@ export function computeStandings(
     }
   }
 
-  return [...rows.values()].sort(
-    (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.tid - b.tid,
-  );
+  return [...rows.values()].sort(compareStandingsRows);
+}
+
+/**
+ * The order a table is ranked in: group first (a split table's clubs finish
+ * inside their groups), then points, goal difference, goals scored and tid.
+ * Exported so anything re-sorting a stored table ranks it the way it was
+ * decided, rather than on points alone.
+ */
+export function compareStandingsRows(a: StandingsRow, b: StandingsRow): number {
+  return (a.group ?? 0) - (b.group ?? 0)
+    || b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.tid - b.tid;
 }
