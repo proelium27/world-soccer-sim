@@ -30,6 +30,8 @@ function formatSummary(format: TitlePlayoff["format"]): string {
       return "two legs a round; a level tie goes to the higher-placed club, except in the final";
     case "conference":
       return "top nine in each conference: a wild card, a best-of-three first round (games 1 and 3 at the higher seed), then one-off games to the final";
+    case "conference-single":
+      return "top eight in each conference, one-off games at the higher seed through each conference's bracket, then the two conference winners in a final";
     case "zones":
       return "top eight in each zone, first against eighth across the zones, one-off games and a neutral final";
     default:
@@ -243,7 +245,8 @@ export function TitlePlayoffs() {
   const userEntered = playoff.teams.includes(userTid);
   const nextRound = titlePlayoffNextRoundName(playoff);
 
-  const splitByConference = playoff.format === "conference" && !!playoff.conferences;
+  const splitByConference = (playoff.format === "conference" || playoff.format === "conference-single")
+    && !!playoff.conferences;
   const zoned = playoff.format === "zones" && !!playoff.conferences;
   const treeRounds = [...new Set(playoff.ties.map((t) => t.round))].sort((a, b) => a - b);
 
@@ -304,6 +307,23 @@ export function TitlePlayoffs() {
               by side: four columns each is wider than the page. */}
           {playoff.conferences!.map((_, half) => {
             const roundOne = tiesIn(1, half);
+            // Eight a conference with no wild card: three rounds to the
+            // conference final, first round unlinked.
+            if (playoff.format === "conference-single") {
+              return (
+                <section key={half} className="mb-4">
+                  <div className="page-eyebrow mb-2">
+                    {playoff.conferenceNames?.[half] ?? `Conference ${half + 1}`}
+                  </div>
+                  <div className="cup-bracket cup-bracket--tree">
+                    {[0, 1, 2].map((round) => bracketRound({
+                      key: round, title: roundName(round), ties: tiesIn(round, half),
+                      depth: round, linked: round > 0, isFinal: false, withHalf: false,
+                    }))}
+                  </div>
+                </section>
+              );
+            }
             return (
               <section key={half} className="mb-4">
                 <div className="page-eyebrow mb-2">

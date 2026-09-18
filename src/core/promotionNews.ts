@@ -1,5 +1,5 @@
 import type { PromotionPlayoff } from "./promotionPlayoff.js";
-import { PLAYOFF_ROUND_FINAL } from "./promotionPlayoff.js";
+import { promotionPlayoffDecider } from "./promotionPlayoff.js";
 
 /** One promotion playoff, reported as the news it is: who went up, and how. */
 export interface PromotionNews {
@@ -51,7 +51,7 @@ export interface PromotionNews {
 export function promotionNewsBySeason(playoffs: PromotionPlayoff[]): Map<number, PromotionNews[]> {
   const out = new Map<number, PromotionNews[]>();
   for (const p of playoffs) {
-    const decider = p.ties.find((t) => t.round === PLAYOFF_ROUND_FINAL);
+    const decider = promotionPlayoffDecider(p);
     if (!decider || p.winnerTid === null) continue;
     const won = decider.winner === decider.home;
     const pens = decider.wentToPens
@@ -62,10 +62,10 @@ export function promotionNewsBySeason(playoffs: PromotionPlayoff[]): Map<number,
       d1CompId: p.d1CompId,
       d2CompId: p.d2CompId,
       tid: p.winnerTid,
-      // A German tie is the one case where winning changes nothing: teams[0] is
-      // the incumbent from the division above, so his win keeps the place he
-      // already had. Every English winner is by construction a promotion.
-      promoted: p.format !== "german" || p.winnerTid === p.teams[1],
+      // A German or French final is the one case where winning changes nothing:
+      // teams[0] is the incumbent from the division above, so his win keeps the
+      // place he already had. Every English winner is by construction a promotion.
+      promoted: p.format === "english" || p.winnerTid !== p.teams[0],
       position: p.positions[p.teams.indexOf(p.winnerTid)] ?? 0,
       runnerUpTid: won ? decider.away : decider.home,
       score: won

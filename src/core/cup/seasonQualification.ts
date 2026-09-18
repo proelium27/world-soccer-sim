@@ -1,4 +1,5 @@
 import type { LeagueStore } from "../leagueState.js";
+import { competitionSplit } from "../competitions.js";
 import type { StandingsRow } from "../standings.js";
 import { computeStandings } from "../standings.js";
 import type { CupCompetitionId } from "../constants.js";
@@ -45,7 +46,7 @@ function tablesForCurrentSeason(league: LeagueStore): Map<number, StandingsRow[]
   for (const comp of league.competitions) {
     const tids = league.teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
     tables.set(comp.id, computeStandings(
-      tids, matchesByComp.get(comp.id) ?? [], deductions,
+      tids, matchesByComp.get(comp.id) ?? [], deductions, competitionSplit(comp),
     ));
   }
   return tables;

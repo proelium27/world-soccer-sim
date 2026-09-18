@@ -14,6 +14,7 @@
  * seeded stream (see jobOffers.ts), and nothing here touches a player rating, a
  * valuation or a club's money.
  */
+import { competitionSplit } from "../competitions.js";
 import type { LeagueStore } from "../leagueState.js";
 import type { StoredTeam } from "../teams/clubs.js";
 import type { Player } from "../players/types.js";
@@ -51,7 +52,9 @@ export function tablesByCompetition(
   for (const comp of competitions) {
     const tids = teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
     const tidSet = new Set(tids);
-    out.set(comp.id, computeStandings(tids, played.filter((m) => tidSet.has(m.home)), deductions));
+    out.set(comp.id, computeStandings(
+      tids, played.filter((m) => tidSet.has(m.home)), deductions, competitionSplit(comp),
+    ));
   }
   return out;
 }

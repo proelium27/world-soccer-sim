@@ -22,7 +22,7 @@ import { usePlayerMap } from "../usePlayerMap.js";
 import { BackLink } from "../components/BackLink.js";
 import { LiveMatchView } from "../components/LiveMatchView.js";
 import { LiveMatchPicker } from "../components/LiveMatchPicker.js";
-import { competitionOf } from "../../core/competitions.js";
+import { competitionOf, competitionSplit } from "../../core/competitions.js";
 import { liveTableRows, toLiveMatch } from "../live/liveMatch.js";
 import { matchLineups } from "../live/lineups.js";
 import { pointsDeductionMap } from "../../core/finance/debt.js";
@@ -113,6 +113,11 @@ function Rewatch({ matchIndex }: { matchIndex: number }) {
             // A club under a points deduction is under it in the replay too,
             // or the table beside the match disagrees with Standings.
             pointsDeductionMap(league.debtSanctions, league.season),
+            // And its split, so a group's table reads the way Standings does.
+            (() => {
+              const compId = league.teams.find((t) => t.tid === view.watched.home)?.compId;
+              return compId === undefined ? undefined : competitionSplit(competitionOf(league.competitions, compId));
+            })(),
           )
         }
         lineups={view.lineups}

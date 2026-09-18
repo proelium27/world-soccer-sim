@@ -15,6 +15,7 @@
  * competitions the world is playing for, leaning on the existing pages for the
  * rest rather than rebuilding them.
  */
+import { competitionSplit } from "../../core/competitions.js";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
@@ -65,6 +66,7 @@ export function SpectatorDashboard({ league }: { league: LeagueStore }) {
       divisionTids,
       league.played.filter((m) => tidSet.has(m.home)),
       pointsDeductionMap(league.debtSanctions, league.season),
+      competitionSplit(competition),
     );
   }, [league.teams, league.played, competition, league.debtSanctions, league.season]);
 

@@ -172,6 +172,80 @@ function promoSpotsOf(resolved: ResolvedLeagueSpec): number {
   return Math.min(resolved.promotionSpots, maxPromoSpots(resolved));
 }
 
+/** The second-to-third link's ceiling: the same rule, over the divisions it joins. */
+function maxLowerPromoSpots(resolved: ResolvedLeagueSpec): number {
+  const smallest = Math.min(resolved.d2Teams, resolved.d3Teams);
+  return Math.min(MAX_PROMOTION_SPOTS, Math.floor(smallest / 2));
+}
+
+function lowerPromoSpotsOf(resolved: ResolvedLeagueSpec): number {
+  return Math.min(resolved.d3PromotionSpots, maxLowerPromoSpots(resolved));
+}
+
+/**
+ * One promotion link's two controls: how many clubs swap, and how the last of
+ * those places is settled. The playoff picker only appears where there are
+ * places to settle, since a link swapping nobody has nothing to play for.
+ */
+function PromotionLinkControls({
+  label, spots, max, format, onSpots, onFormat,
+}: {
+  /** Which divisions the link joins, or null when the country only has one link. */
+  label: string | null;
+  spots: number;
+  max: number;
+  format: PlayoffFormat;
+  onSpots: (n: number) => void;
+  onFormat: (f: PlayoffFormat) => void;
+}) {
+  const suffix = label ? ` (divisions ${label})` : "";
+  return (
+    <>
+      <div className="col">
+        <label className="form-label small mb-1">Up and down{label ? `, ${label}` : ""}</label>
+        <select
+          className="form-select form-select-sm"
+          value={spots}
+          aria-label={`Clubs promoted and relegated each season${suffix}`}
+          onChange={(e) => onSpots(Number(e.target.value))}
+        >
+          {Array.from({ length: max + 1 }, (_, n) => (
+            <option key={n} value={n}>
+              {n === 0 ? "None" : `${n} up, ${n} down`}
+            </option>
+          ))}
+        </select>
+      </div>
+      {spots > 0 && (
+        <div className="col">
+          <label className="form-label small mb-1">Playoff{label ? `, ${label}` : ""}</label>
+          <select
+            className="form-select form-select-sm"
+            value={format}
+            aria-label={`How the last promotion place is decided${suffix}`}
+            onChange={(e) => onFormat(e.target.value as PlayoffFormat)}
+          >
+            <option value="none">None, straight swap</option>
+            {/* The English bracket sits BELOW the automatic places, so it
+                needs at least one of them to sit below. At a single place the
+                only bracket available would be positions 1-4, which takes
+                promotion off the champion. */}
+            <option value="english" disabled={spots < 2}>
+              English, four-club bracket
+            </option>
+            <option value="german">German, v the club above</option>
+            {/* The French ladder ends in the German tie and seats its first two
+                rounds below the automatic places, so it works at any count. */}
+            <option value="french">
+              French, ladder then v the club above
+            </option>
+          </select>
+        </div>
+      )}
+    </>
+  );
+}
+
 function newLeagueEntry(index: number): WorldEntry {
   const strengthOffset = 8;
   return {
@@ -257,6 +331,9 @@ export function WorldSetup({ entries, onChange, defaultOpen = false }: Props) {
     // the divisions got smaller.
     if (spec.promotionSpots !== undefined) {
       spec.promotionSpots = Math.min(spec.promotionSpots, maxPromoSpots(resolveLeagueSpec(spec)));
+    }
+    if (spec.d3PromotionSpots !== undefined) {
+      spec.d3PromotionSpots = Math.min(spec.d3PromotionSpots, maxLowerPromoSpots(resolveLeagueSpec(spec)));
     }
     update(index, { spec });
   }
@@ -828,51 +905,29 @@ export function LeagueSettings({
           </select>
         </div>
         {/* Nothing to size in a one-division league: it has no second tier to
-            swap with. Anything deeper does, and the count applies to every link
-            in the chain — so this is a depth test, not an equality one. */}
+            swap with. Each link in a deeper pyramid gets its own pair of
+            controls, because real countries run different rules at each step
+            (Spain sends three up from its second tier and four from its third,
+            and the Netherlands' third tier has no way up at all). */}
         {resolved.divisions >= 2 && (
-          <div className="col">
-            <label className="form-label small mb-1">Up and down</label>
-            <select
-              className="form-select form-select-sm"
-              value={promoSpotsOf(resolved)}
-              aria-label="Clubs promoted and relegated each season"
-              onChange={(e) => onSpec({ promotionSpots: Number(e.target.value) })}
-            >
-              {Array.from({ length: maxPromoSpots(resolved) + 1 }, (_, n) => (
-                <option key={n} value={n}>
-                  {n === 0 ? "None" : `${n} up, ${n} down`}
-                </option>
-              ))}
-            </select>
-          </div>
+          <PromotionLinkControls
+            label={resolved.divisions === 3 ? "1 and 2" : null}
+            spots={promoSpotsOf(resolved)}
+            max={maxPromoSpots(resolved)}
+            format={resolved.playoffFormat}
+            onSpots={(n) => onSpec({ promotionSpots: n })}
+            onFormat={(f) => onSpec({ playoffFormat: f })}
+          />
         )}
-        {/* How the last of those places is settled. Only worth asking about
-            where there are places to settle: a country swapping nobody has
-            nothing to play for. A depth test like the control above it, not an
-            equality one — promotionPlayoffFields seats a playoff at the TOP
-            link whatever the pyramid's depth, so `=== 2` hid the control for a
-            mechanic that was running anyway. */}
-        {resolved.divisions >= 2 && promoSpotsOf(resolved) > 0 && (
-          <div className="col">
-            <label className="form-label small mb-1">Playoff</label>
-            <select
-              className="form-select form-select-sm"
-              value={resolved.playoffFormat}
-              aria-label="How the last promotion place is decided"
-              onChange={(e) => onSpec({ playoffFormat: e.target.value as PlayoffFormat })}
-            >
-              <option value="none">None, straight swap</option>
-              {/* The English bracket sits BELOW the automatic places, so it
-                  needs at least one of them to sit below. At a single place the
-                  only bracket available would be positions 1-4, which takes
-                  promotion off the champion. */}
-              <option value="english" disabled={promoSpotsOf(resolved) < 2}>
-                English, four-club bracket
-              </option>
-              <option value="german">German, v the club above</option>
-            </select>
-          </div>
+        {resolved.divisions === 3 && (
+          <PromotionLinkControls
+            label="2 and 3"
+            spots={lowerPromoSpotsOf(resolved)}
+            max={maxLowerPromoSpots(resolved)}
+            format={resolved.d3PlayoffFormat}
+            onSpots={(n) => onSpec({ d3PromotionSpots: n })}
+            onFormat={(f) => onSpec({ d3PlayoffFormat: f })}
+          />
         )}
       </div>
       <div className="row g-2">
