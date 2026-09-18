@@ -11,7 +11,7 @@
  */
 import type { MatchEvent, MatchEventType } from "../../engine/attribution.js";
 import type { MatchScore, PlayedMatch, StandingsRow } from "../../core/standings.js";
-import { computeStandings } from "../../core/standings.js";
+import { computeStandings, type StandingsSplit } from "../../core/standings.js";
 import { eventMinute, REGULATION_MINUTES } from "../matchClock.js";
 
 export {
@@ -253,10 +253,11 @@ export function liveTableRows(
   todayMatches: LiveMatch[],
   minute: number,
   deductions?: ReadonlyMap<number, number>,
+  split?: StandingsSplit,
 ): StandingsRow[] {
   const inProgress: MatchScore[] = todayMatches.map((m) => {
     const score = scoreAtMinute(m.events, minute);
     return { home: m.home, away: m.away, homeGoals: score.home, awayGoals: score.away };
   });
-  return computeStandings(teamIds, [...priorMatches, ...inProgress], deductions);
+  return computeStandings(teamIds, [...priorMatches, ...inProgress], deductions, split);
 }

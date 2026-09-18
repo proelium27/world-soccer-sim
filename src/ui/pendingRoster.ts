@@ -1,4 +1,5 @@
 import type { NamedRosterFile } from "../core/teams/rosterFile.js";
+import type { NamedLogoPack } from "../core/teams/logoPack.js";
 
 /**
  * One-shot handoff of the parsed roster files from the Leagues page's Import
@@ -18,6 +19,14 @@ import type { NamedRosterFile } from "../core/teams/rosterFile.js";
 export interface PendingRoster {
   /** In load order — later files win a competition listed twice. */
   files: NamedRosterFile[];
+  /**
+   * Badge packs picked in the same Import. They are applied on the New League
+   * screen, once the clubs a roster file installs exist to be matched by name,
+   * but letting them ride along means a player can pick every file the Roster
+   * files section offers in one go rather than learning which screen wants
+   * which.
+   */
+  logos?: NamedLogoPack[];
 }
 
 let pending: PendingRoster | null = null;

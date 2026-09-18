@@ -1,3 +1,4 @@
+import { compareStandingsRows, recordedChampion } from "../standings.js";
 import type { LeagueStore } from "../leagueState.js";
 import { isFreeAgentTid } from "../transfers/negotiation.js";
 import { trebleCountByTid } from "./trebles.js";
@@ -134,11 +135,11 @@ export function computeClubTrivia(
       // Same ordering the standings page uses: points, then goal difference,
       // then goals scored.
       const sorted = [...table].sort(
-        (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.tid - b.tid,
+        compareStandingsRows,
       );
       // The recorded champion wins a top flight, not the table leader, because a
       // title playoff can crown a club that finished lower.
-      const recordedChampion = tier === 1 ? h.championTidByCompId?.[compId] : undefined;
+      const recorded = recordedChampion(h, compId, tier);
       sorted.forEach((row, i) => {
         const r = rowFor(row.tid);
         r.seasons += 1;
@@ -150,7 +151,7 @@ export function computeClubTrivia(
         r.gf += row.gf;
         r.ga += row.ga;
         r.points += row.points;
-        const wonIt = recordedChampion !== undefined ? recordedChampion === row.tid : i === 0;
+        const wonIt = recorded !== undefined ? recorded === row.tid : i === 0;
         if (wonIt) {
           if (tier === 1) {
             r.leagueTitles += 1;

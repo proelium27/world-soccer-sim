@@ -1,3 +1,4 @@
+import { compareStandingsRows } from "../standings.js";
 import type { LeagueStore } from "../leagueState.js";
 
 /**
@@ -44,7 +45,7 @@ export function trebleCountByTid(league: LeagueStore): Map<number, number> {
       // club that did not top the table — else the table leader.
       const recorded = h.championTidByCompId?.[compId];
       const winner = recorded ?? [...table].sort(
-        (a, b) => b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.tid - b.tid,
+        compareStandingsRows,
       )[0]?.tid;
       if (winner !== undefined) markWin(tier1Titles, winner, h.season);
     }

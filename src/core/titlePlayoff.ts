@@ -10,7 +10,7 @@ import { playFirstLeg, resolveTwoLeggedTie, resolveCupTie } from "./cup/simCup.j
 import { playoffMatchData } from "./playoffMatchData.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
 import {
-  TITLE_PLAYOFF_TEAMS, CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS,
+  TITLE_PLAYOFF_TEAMS, CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS, CONFERENCE_SINGLE_PLAYOFF_TEAMS,
 } from "./constants.js";
 
 /* ── Title playoffs ──────────────────────────────────────────────────────────
@@ -51,7 +51,12 @@ export const TITLE_ROUND_QF = 0;
 export const TITLE_ROUND_SF = 1;
 export const TITLE_ROUND_FINAL = 2;
 
-export type PlayedTitlePlayoffFormat = "single" | "two-legged" | "conference" | "zones";
+export type PlayedTitlePlayoffFormat = "single" | "two-legged" | "conference" | "zones" | "conference-single";
+
+/** The formats that seed each half of a split division separately. */
+function perHalfFormat(format: PlayedTitlePlayoffFormat): boolean {
+  return format === "conference" || format === "zones" || format === "conference-single";
+}
 
 /** One top flight's title playoff for one season. */
 export interface TitlePlayoff {
@@ -96,6 +101,9 @@ export function titlePlayoffRoundNames(format: PlayedTitlePlayoffFormat): string
     return ["Wild card", "Round one", "Conference semi-finals", "Conference finals", "Final"];
   }
   if (format === "zones") return ["Round of 16", "Quarter-finals", "Semi-finals", "Final"];
+  if (format === "conference-single") {
+    return ["Conference quarter-finals", "Conference semi-finals", "Conference finals", "Final"];
+  }
   return ["Quarter-finals", "Semi-finals", "Final"];
 }
 
@@ -122,14 +130,15 @@ export function titlePlayoffFields(
     const table = tablesByCompId.get(comp.id);
     if (!table) continue;
 
-    if (format === "conference" || format === "zones") {
+    if (perHalfFormat(format)) {
       const split = competitionConferences(comp)!;
       const halves = conferenceMembers(
         teams ?? table.map((r) => ({ tid: r.tid, compId: comp.id })),
         comp,
       );
       if (!halves) continue;
-      const perHalf = format === "conference" ? CONFERENCE_PLAYOFF_TEAMS : ZONE_PLAYOFF_TEAMS;
+      const perHalf = format === "conference" ? CONFERENCE_PLAYOFF_TEAMS
+        : format === "conference-single" ? CONFERENCE_SINGLE_PLAYOFF_TEAMS : ZONE_PLAYOFF_TEAMS;
       const seeded = halves.map((half) => {
         const inHalf = new Set(half);
         return table.filter((r) => inHalf.has(r.tid)).slice(0, perHalf).map((r) => r.tid);
@@ -391,6 +400,19 @@ export function playTitlePlayoffRound(
     } else {
       // Conference semi-finals and finals pair each conference's winners, first
       // conference first; the final pairs the two conference champions.
+      pairUp(previous).forEach(([a, b]) => single(a, b, { extraTime: true }));
+    }
+  } else if (playoff.format === "conference-single") {
+    const halves = playoff.conferences!;
+    if (round === 0) {
+      // Each conference's quarter-finals, one game at the better seed's ground:
+      // 1 v 8 and 4 v 5 in one half of its bracket, 2 v 7 and 3 v 6 in the other.
+      halves.forEach((c) => {
+        TITLE_PLAYOFF_QF_PAIRS.forEach(([x, y]) => single(c[x], c[y], { extraTime: true }));
+      });
+    } else {
+      // Then each conference's winners pair off, first conference first, and
+      // the final is the two conference champions at the better seed's ground.
       pairUp(previous).forEach(([a, b]) => single(a, b, { extraTime: true }));
     }
   } else if (playoff.format === "zones") {

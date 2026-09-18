@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   worldCompetitions, competitionConferences, competitionTeamCount, competitionTitlePlayoff,
-  competitionSeasonGames, type Competition,
+  competitionSeasonGames, competitionSplit, type Competition,
 } from "../../src/core/competitions.js";
 import { buildCompetitionSchedule, conferenceSchedule, type ScheduleGame } from "../../src/core/schedule.js";
 import { conferenceMembers, assignConferences, type ConferenceTeam } from "../../src/core/conferences.js";
@@ -63,26 +63,33 @@ describe("the shipped splits", () => {
   it("splits exactly the US and Argentine top two divisions, and nothing below them", () => {
     const split = comps.filter((c) => competitionConferences(c));
     expect(split.map((c) => `${c.country}:${c.tier}:${competitionTeamCount(c)}`)).toEqual([
-      "Argentina:1:30", "Argentina:2:36", "United States:1:30", "United States:2:30",
+      "Argentina:1:30", "Argentina:2:36", "United States:1:30", "United States:2:25",
     ]);
     const top = (country: string) => split.find((c) => c.country === country && c.tier === 1)!;
     expect(competitionTitlePlayoff(top("Argentina"))).toBe("zones");
     expect(competitionTitlePlayoff(top("United States"))).toBe("conference");
-    // A split second division is a promotion race, not a title playoff.
-    for (const c of split.filter((d) => d.tier === 2)) expect(competitionTitlePlayoff(c)).toBe("none");
+    // A split second division with promotion is a promotion race, not a title
+    // playoff. The US's is closed, and plays the USL's conference playoff.
+    const d2 = (country: string) => split.find((c) => c.country === country && c.tier === 2)!;
+    expect(competitionTitlePlayoff(d2("Argentina"))).toBe("none");
+    expect(competitionTitlePlayoff(d2("United States"))).toBe("conference-single");
   });
 
-  it("gives each split top flight at least one second-division club per top-flight club", () => {
+  it("gives each split top flight at least one lower-division club per top-flight club", () => {
+    // Counted across every division below, since the US's USL shape (25 then
+    // 17) is smaller than its 30-club top flight a division at a time.
     for (const country of ["Argentina", "United States"]) {
-      const [d1, d2] = [1, 2].map((tier) => comps.find((c) => c.country === country && c.tier === tier)!);
-      expect(competitionTeamCount(d2)).toBeGreaterThanOrEqual(competitionTeamCount(d1));
+      const chain = comps.filter((c) => c.country === country);
+      const top = competitionTeamCount(chain.find((c) => c.tier === 1)!);
+      const below = chain.filter((c) => c.tier > 1).reduce((n, c) => n + competitionTeamCount(c), 0);
+      expect(below).toBeGreaterThanOrEqual(top);
     }
   });
 
-  it("plays Argentina's second division as zones of 18 (34 games) and the US's as conferences of 15 (30)", () => {
+  it("plays Argentina's second division as zones of 18 (34 games) and the US's as conferences of 13 and 12 (up to 24)", () => {
     const d2 = (country: string) => comps.find((c) => c.country === country && c.tier === 2)!;
     expect(competitionSeasonGames(d2("Argentina"))).toBe(34);
-    expect(competitionSeasonGames(d2("United States"))).toBe(30);
+    expect(competitionSeasonGames(d2("United States"))).toBe(24);
   });
 
   it("puts the eastern US second-division clubs in the Eastern Conference", () => {
@@ -94,8 +101,10 @@ describe("the shipped splits", () => {
     const names = (tids: number[]) => tids.map((tid) => block[tid - blockStart].name);
     expect(names(east)).toContain("Charleston Shipwrights");
     expect(names(east)).toContain("Toledo Quarrymen");
+    expect(east).toHaveLength(13);
+    expect(west).toHaveLength(12);
     expect(names(west)).toContain("Visalia Growers");
-    expect(names(west)).toContain("Anchorage Ironmasters");
+    expect(names(west)).toContain("Bakersfield Flatboatmen");
   });
 
   it("plays a split format as a plain bracket in a league that isn't split", () => {
@@ -165,10 +174,31 @@ describe("buildCompetitionSchedule on the shipped world", () => {
   const teams = worldTeams(comps);
   const schedule = buildCompetitionSchedule(teams, comps);
 
+  // A split division's second phase is not on the schedule until its first is
+  // played (see splitSecondPhaseFixtures), so it is measured against the first.
+  const perClubGames = (compId: number): number[] => {
+    const count = new Map<number, number>();
+    for (const g of schedule) {
+      if (teams.find((t) => t.tid === g.home)!.compId !== compId) continue;
+      count.set(g.home, (count.get(g.home) ?? 0) + 1);
+      count.set(g.away, (count.get(g.away) ?? 0) + 1);
+    }
+    return [...count.values()];
+  };
+
   it("plays exactly the season length competitionSeasonGames reports, in every division", () => {
     for (const c of comps) {
-      const games = schedule.filter((g) => teams.find((t) => t.tid === g.home)!.compId === c.id);
-      expect(games.length * 2, c.name).toBe(competitionTeamCount(c) * competitionSeasonGames(c));
+      const games = perClubGames(c.id);
+      const split = competitionSplit(c);
+      if (split) {
+        const n = competitionTeamCount(c);
+        expect(games.reduce((a, b) => a + b, 0) / 2, c.name).toBe(split.firstPhaseMatches);
+        expect(Math.max(...games), c.name).toBe((2 * split.firstPhaseMatches) / n);
+        continue;
+      }
+      // A division split into two unequal halves plays its larger half's count.
+      expect(Math.max(...games), c.name).toBe(competitionSeasonGames(c));
+      if (competitionTeamCount(c) % 2 === 0) expect(Math.min(...games), c.name).toBe(competitionSeasonGames(c));
     }
     const us = comps.find((c) => c.country === "United States" && c.tier === 1)!;
     const arg = comps.find((c) => c.country === "Argentina" && c.tier === 1)!;
@@ -180,9 +210,9 @@ describe("buildCompetitionSchedule on the shipped world", () => {
     for (const c of comps) {
       const games = schedule.filter((g) => teams.find((t) => t.tid === g.home)!.compId === c.id);
       noClubTwiceAMatchday(games);
-      expect(Math.max(...games.map((g) => g.matchday)), c.name).toBe(SEASON_MATCHDAYS);
-      const n = competitionTeamCount(c);
-      expect(games).toHaveLength((n * competitionSeasonGames(c)) / 2);
+      // A split division's first phase ends where its second begins.
+      const last = competitionSplit(c)?.lastFirstPhaseMatchday ?? SEASON_MATCHDAYS;
+      expect(Math.max(...games.map((g) => g.matchday)), c.name).toBe(last);
     }
   });
 });

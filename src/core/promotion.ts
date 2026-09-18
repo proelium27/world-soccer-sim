@@ -89,7 +89,9 @@ export function computeCountrySwaps(
     // keeps the two lists the same length even if the two ever disagreed about
     // how many places the country gives out.
     const autoPromoted = n - 1;
-    const autoRelegated = outcome.format === "german" ? n - 1 : n;
+    // The French ladder ends in the German tie, so it holds back a relegation
+    // place the same way.
+    const autoRelegated = outcome.format === "english" ? n : n - 1;
     // Both playoff entrants come from *outside* the automatic slices by
     // construction (see promotionPlayoffFields), so neither list can end up
     // holding a club twice. The `> 0` guards are the `slice(-0)` trap again:

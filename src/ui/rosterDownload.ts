@@ -56,3 +56,55 @@ export const ROSTER_DOWNLOAD_URL: string | null = (() => {
     return null;
   }
 })();
+
+/** One downloadable file in the Leagues page's "Roster files" section. */
+export interface RosterFileDownload {
+  id: keyof typeof ROSTER_FILE_NAMES;
+  /** What the section calls it. Plain words, not the file name. */
+  title: string;
+  /** One short line on what it gives you. */
+  description: string;
+  /** Rough size, so a phone user knows before tapping. */
+  size: string;
+  href: string;
+}
+
+/**
+ * The file names the downloads are published under, in the same release as
+ * each other. `real-clubs-and-players.json` is the one `VITE_ROSTER_DOWNLOAD_URL`
+ * points at; the other is its SIBLING in that release, found by resolving its
+ * name against that URL.
+ *
+ * A sibling rather than a second environment value, so the whole set still
+ * turns on and off with the one setting that already existed (and stays off in
+ * the CrazyGames build, which leaves it unset). The cost is that publishing a
+ * new release means uploading both under these names, since a missing one is a
+ * 404 behind its button.
+ *
+ * Each file is complete on its own (names, colours and badges for every club,
+ * plus squads in the first), so there is nothing to combine and no load order.
+ */
+export const ROSTER_FILE_NAMES = {
+  players: "real-clubs-and-players.json",
+  clubs: "real-clubs.json",
+} as const;
+
+/** Every download the section offers, or none when this build has no URL. */
+export const ROSTER_FILES: RosterFileDownload[] = ROSTER_DOWNLOAD_URL === null
+  ? []
+  : [
+      {
+        id: "players",
+        title: "Real clubs and players",
+        description: "Real names, colours and badges, with real squads in most top flights.",
+        size: "13 MB",
+        href: ROSTER_DOWNLOAD_URL,
+      },
+      {
+        id: "clubs",
+        title: "Real clubs",
+        description: "Real names, colours and badges, with made-up players.",
+        size: "10 MB",
+        href: new URL(ROSTER_FILE_NAMES.clubs, ROSTER_DOWNLOAD_URL).href,
+      },
+    ];

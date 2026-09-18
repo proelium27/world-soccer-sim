@@ -6,7 +6,7 @@ import {
 import { computeCountrySwaps } from "../../src/core/promotion.js";
 import {
   englandCompetitions, buildCompetitions, competitionPlayoffFormat, worldCompetitions,
-  countryDivisions, competitionTeamCount,
+  countryDivisions, competitionTeamCount, competitionPromotionSpots,
 } from "../../src/core/competitions.js";
 import type { StandingsRow } from "../../src/core/standings.js";
 import type { CupTie } from "../../src/core/cup/types.js";
@@ -41,12 +41,45 @@ describe("competitionPlayoffFormat", () => {
       countryDivisions(worldCompetitions())
         .map(({ country, divisions }) => [country, competitionPlayoffFormat(divisions[0], divisions[1] ?? null)]),
     );
-    // The Bundesliga settles its last place against 2. Bundesliga's third.
-    expect(byCountry.get("Germany")).toBe("german");
-    // Scotland promotes one club, so there is no spare place to play for.
-    expect(byCountry.get("Scotland")).toBe("none");
-    for (const c of ["England", "Spain", "Italy", "France", "Portugal", "Serbia"]) {
+    // The Bundesliga, Eredivisie, Primeira Liga and Premiership settle their
+    // last place against the club above.
+    for (const c of ["Germany", "Netherlands", "Portugal", "Scotland"]) {
+      expect(byCountry.get(c)).toBe("german");
+    }
+    // Ligue 2's ladder into a tie with Ligue 1's sixteenth.
+    expect(byCountry.get("France")).toBe("french");
+    // Straight swaps.
+    for (const c of ["Belgium", "Greece", "Brazil"]) expect(byCountry.get(c)).toBe("none");
+    for (const c of ["England", "Spain", "Italy", "Turkey", "Serbia"]) {
       expect(byCountry.get(c)).toBe("english");
+    }
+  });
+
+  it("reads each link's own rules off its lower division", () => {
+    const world = worldCompetitions();
+    const link = (country: string, tier: number) => {
+      const chain = world.filter((c) => c.country === country).sort((a, b) => a.tier - b.tier);
+      return { upper: chain[tier - 1], lower: chain[tier] };
+    };
+    // France plays its ladder into the top flight and an English bracket below.
+    const fr1 = link("France", 1);
+    const fr2 = link("France", 2);
+    expect(competitionPlayoffFormat(fr1.upper, fr1.lower)).toBe("french");
+    expect(competitionPlayoffFormat(fr2.upper, fr2.lower)).toBe("english");
+    // Argument order does not matter: the lower division is found by tier.
+    expect(competitionPlayoffFormat(fr2.lower, fr2.upper)).toBe("english");
+    // Spain sends three up from its second tier and four from its third.
+    const es1 = link("Spain", 1);
+    const es2 = link("Spain", 2);
+    expect(competitionPromotionSpots(es1.upper, es1.lower)).toBe(3);
+    expect(competitionPromotionSpots(es2.upper, es2.lower)).toBe(4);
+    expect(competitionPromotionSpots(es2.lower, es2.upper)).toBe(4);
+    // The Dutch and Belgian third divisions are closed.
+    for (const country of ["Netherlands", "Belgium"]) {
+      const l = link(country, 2);
+      expect(competitionPromotionSpots(l.upper, l.lower)).toBe(0);
+      const top = link(country, 1);
+      expect(competitionPromotionSpots(top.upper, top.lower)).toBeGreaterThan(0);
     }
   });
 
@@ -208,13 +241,14 @@ describe("promotionPlayoffFields — a deeper pyramid", () => {
       held.set(f.country, (held.get(f.country) ?? 0) + 1);
     }
     for (const { country, divisions } of countryDivisions(world)) {
-      // Scotland gives out one place, so there is no spare one to play for and
-      // it holds none at either step. Mexico and the United States are closed —
-      // no places at all — so they hold none either.
-      const closed = divisions[0].promotionSpots === 0;
-      const want = closed || competitionPlayoffFormat(divisions[0], divisions[1]) === "none"
-        ? 0
-        : divisions.length - 1;
+      // A link holds one exactly when it gives out places and plays a format:
+      // closed links (Mexico, the United States, the Dutch and Belgian third
+      // tiers) and straight swaps (Belgium, Greece, Brazil) hold none.
+      const want = divisions.slice(0, -1).filter((upper, i) => {
+        const lower = divisions[i + 1];
+        return competitionPromotionSpots(upper, lower) > 0
+          && competitionPlayoffFormat(upper, lower) !== "none";
+      }).length;
       expect([country, held.get(country) ?? 0]).toEqual([country, want]);
     }
   });
