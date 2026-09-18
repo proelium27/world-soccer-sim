@@ -65,48 +65,38 @@ async function renderImportScreen(url?: string): Promise<string> {
  * import screen (which is only reached once a file has been parsed). A missing
  * link here is the whole feature missing, which is why it gets its own cases.
  */
-describe("roster download link on the Leagues page", () => {
-  it("renders a button to the configured URL beside Import", async () => {
-    const html = await renderLeaguesPage("https://example.com/real-players-teams.json");
-    expect(html).toContain('href="https://example.com/real-players-teams.json"');
-    expect(html).toContain("Download Real Rosters");
+describe("Roster files section on the Leagues page", () => {
+  const URL_ = "https://example.com/rel/real-clubs-and-players.json";
+
+  it("offers all three files, the two extras as siblings of the configured URL", async () => {
+    const html = await renderLeaguesPage(URL_);
+    expect(html).toContain("Roster files");
+    expect(html).toContain('href="https://example.com/rel/real-clubs-and-players.json"');
+    expect(html).toContain('href="https://example.com/rel/real-club-names.json"');
+    expect(html).toContain('href="https://example.com/rel/real-club-badges.json"');
+    for (const title of ["Real clubs and players", "Real club names", "Real club badges"]) {
+      expect(html).toContain(title);
+    }
   });
 
-  it("renders no button at all when the build has no URL", async () => {
+  it("opens each download in a new tab without handing the opener over", async () => {
+    const html = await renderLeaguesPage(URL_);
+    expect(html.match(/target="_blank"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(html).toContain("noopener");
+  });
+
+  // A section of buttons that 404 is worse than no section: a build with no
+  // URL (CrazyGames) must render none of it.
+  it("renders no section at all when the build has no URL", async () => {
     const html = await renderLeaguesPage();
-    expect(html).not.toContain("Download Real Rosters");
+    expect(html).not.toContain("Roster files");
+    expect(html).not.toContain("real-club-badges.json");
+    expect(html).not.toContain("Real clubs and players");
   });
 
   it("keeps the Import button either way", async () => {
     expect(await renderLeaguesPage()).toContain("Import");
-    expect(await renderLeaguesPage("https://example.com/r.json")).toContain("Import");
-  });
-
-  // The file behind the link is rebuilt in place rather than versioned, so the
-  // only way someone holding an old copy learns there is a newer one is this
-  // note. It rides the same `&&` as the link, or a build with no download would
-  // advertise a file it cannot offer.
-  it("says what the file is built from, beside the button", async () => {
-    const html = await renderLeaguesPage("https://example.com/r.json");
-    expect(html).toContain("Updated for EA FC 27");
-    expect(html).toContain("download it again");
-  });
-
-  it("says nothing about the file when the build has no URL", async () => {
-    const html = await renderLeaguesPage();
-    expect(html).not.toContain("Updated for EA FC 27");
-    expect(html).not.toContain("download it again");
-  });
-
-  // Found in the browser, not here: the button row is `flex-wrap`, so as two
-  // separate flex items the badge wrapped onto the next line on its own and
-  // landed under the LEFTMOST button, reading as a label for that one. Every
-  // assertion above still passed, because the string was present either way.
-  // Keeping them in one inline-flex item is what makes them wrap as a pair, so
-  // pin the adjacency rather than the mere presence.
-  it("keeps the badge welded to the button rather than loose in the row", async () => {
-    const html = await renderLeaguesPage("https://example.com/r.json");
-    expect(html).toMatch(/Download Real Rosters<\/a><span class="badge[^"]*">Updated for EA FC 27/);
+    expect(await renderLeaguesPage(URL_)).toContain("Import");
   });
 });
 

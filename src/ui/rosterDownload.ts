@@ -56,3 +56,67 @@ export const ROSTER_DOWNLOAD_URL: string | null = (() => {
     return null;
   }
 })();
+
+/** One downloadable file in the Leagues page's "Roster files" section. */
+export interface RosterFileDownload {
+  id: keyof typeof ROSTER_FILE_NAMES;
+  /** What the section calls it. Plain words, not the file name. */
+  title: string;
+  /** One or two sentences on what it gives you. */
+  description: string;
+  /** Rough size, so a phone user knows before tapping. */
+  size: string;
+  href: string;
+}
+
+/**
+ * The file names the three downloads are published under, in the same release
+ * as each other. `real-clubs-and-players.json` is the one `VITE_ROSTER_DOWNLOAD_URL`
+ * points at; the other two are its SIBLINGS in that release, found by resolving
+ * their names against that URL.
+ *
+ * Siblings rather than three environment values, so the whole set still turns
+ * on and off with the one setting that already existed (and stays off in the
+ * CrazyGames build, which leaves it unset). The cost is that publishing a new
+ * release means uploading all three under these names, since a missing one is a
+ * 404 behind its button.
+ */
+export const ROSTER_FILE_NAMES = {
+  players: "real-clubs-and-players.json",
+  names: "real-club-names.json",
+  badges: "real-club-badges.json",
+} as const;
+
+/** Every download the section offers, or none when this build has no URL. */
+export const ROSTER_FILES: RosterFileDownload[] = ROSTER_DOWNLOAD_URL === null
+  ? []
+  : [
+      {
+        id: "players",
+        title: "Real clubs and players",
+        description:
+          "Real clubs in the top two divisions of every country, with real squads from EA FC "
+          + "in most top flights and a few second divisions. The third divisions stay made-up.",
+        size: "6 MB",
+        href: ROSTER_DOWNLOAD_URL,
+      },
+      {
+        id: "names",
+        title: "Real club names",
+        description:
+          "Real names and colours for every club in the game, third divisions included, with "
+          + "made-up players. Use it alone, or load it with the file above to name the third "
+          + "divisions too. Either order works, and the real squads always stay.",
+        size: "0.1 MB",
+        href: new URL(ROSTER_FILE_NAMES.names, ROSTER_DOWNLOAD_URL).href,
+      },
+      {
+        id: "badges",
+        title: "Real club badges",
+        description:
+          "Badges for close to 900 real clubs. They go on whichever clubs have a matching "
+          + "name, so load one of the files above with it.",
+        size: "11 MB",
+        href: new URL(ROSTER_FILE_NAMES.badges, ROSTER_DOWNLOAD_URL).href,
+      },
+    ];

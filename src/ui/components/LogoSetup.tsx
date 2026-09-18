@@ -35,13 +35,15 @@ export interface LogoSetupProps {
   error: string | null;
   onPick: (files: File[]) => void;
   onClear: () => void;
+  /** Where to download the real-club badge pack, when this build offers one. */
+  downloadHref?: string;
 }
 
 /** How many badges the card shows. Enough to recognise, not enough to fill the page. */
 const PREVIEW_LIMIT = 12;
 
 export function LogoSetup({
-  sources, matched, unmatched, preview, error, onPick, onClear,
+  sources, matched, unmatched, preview, error, onPick, onClear, downloadHref,
 }: LogoSetupProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const loaded = sources.length > 0;
@@ -56,6 +58,17 @@ export function LogoSetup({
         >
           {loaded ? "Add more logos" : "Load club logos"}
         </button>
+        {!loaded && downloadHref && (
+          <a
+            className="btn btn-link btn-sm p-0"
+            href={downloadHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            download
+          >
+            Download real club badges
+          </a>
+        )}
         {loaded && (
           <button type="button" className="btn btn-link btn-sm p-0" onClick={onClear}>
             Start over

@@ -50,7 +50,7 @@ import { trackEvent } from "../analytics.js";
 import {
   SEASON_START_YEAR, MIN_START_YEAR, MAX_START_YEAR, normalizeStartYear,
 } from "../format.js";
-import { ROSTER_DOWNLOAD_URL } from "../rosterDownload.js";
+import { ROSTER_DOWNLOAD_URL, ROSTER_FILES } from "../rosterDownload.js";
 import { createGate, yieldToPaint } from "../singleFlight.js";
 import { CopyAiPromptButton } from "../components/CopyAiPromptButton.js";
 import { SPECTATOR_TID, isSpectatorTid } from "../../core/spectator.js";
@@ -214,15 +214,16 @@ export function NewLeague() {
   // reshaped after they are loaded, and a stored resolution would go stale the
   // moment it was — which is precisely why the world editor used to be hidden
   // on this path.
+  const [handoff] = useState(() => takePendingRoster());
   const [rosterSources, setRosterSources] = useState<NamedRosterFile[]>(
-    () => takePendingRoster()?.files ?? [],
+    () => handoff?.files ?? [],
   );
   const [rosterError, setRosterError] = useState<string | null>(null);
   // Held beside the roster sources rather than inside a component, for the same
   // reason those are: the club picker previews them, the Start handlers apply
   // them, and a second copy of "what has the user loaded" is how those two end
   // up disagreeing about what the save will look like.
-  const [logoSources, setLogoSources] = useState<NamedLogoPack[]>([]);
+  const [logoSources, setLogoSources] = useState<NamedLogoPack[]>(() => handoff?.logos ?? []);
   const [logoError, setLogoError] = useState<string | null>(null);
   // Failures from "Import League" (a whole exported save), kept separate from
   // rosterError: they surface on different screens and mean different things.
@@ -889,6 +890,7 @@ export function NewLeague() {
         preview={logoPreview}
         error={logoError}
         onPick={handleLogoFiles}
+        downloadHref={ROSTER_FILES.find((f) => f.id === "badges")?.href}
         onClear={() => {
           setLogoSources([]);
           setLogoError(null);
