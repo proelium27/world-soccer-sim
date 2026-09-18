@@ -46,9 +46,10 @@ import {
   COUNTRY_REGION, DEFAULT_CONTINENTAL_REGION, type ContinentalRegion,
   COUNTRY_TITLE_PLAYOFF, type TitlePlayoffFormat, AMERICAS_CUP_LEAGUE_SLOTS,
   COUNTRY_CONFERENCES, type ConferenceFormat,
+  CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS,
   COUNTRY_LOWER_TITLE_PLAYOFF, COUNTRY_SEASON_FORMAT, type SeasonFormat,
 } from "./constants.js";
-import { SEASON_MATCHDAYS } from "./calendar.js";
+import { MAX_DIVISION_TEAMS, MIN_DIVISION_TEAMS, SEASON_MATCHDAYS } from "./calendar.js";
 import {
   LEAGUE_NATIONALITY_WEIGHTS, sanitizeNationalityWeights, type NationalityWeights,
 } from "./players/nationalities.js";
@@ -126,11 +127,13 @@ export interface Competition {
    */
   teamCount?: number;
   /**
-   * The two halves this top flight plays its schedule in. Absent →
-   * `COUNTRY_CONFERENCES`, else one table. Resolve through
-   * `competitionConferences`, never the field.
+   * The two halves this division plays its schedule in. Absent →
+   * `COUNTRY_CONFERENCES`, else one table; `null` is an explicit single table,
+   * which is how the world editor un-splits a shipped division that the table
+   * would otherwise split. Resolve through `competitionConferences`, never the
+   * field.
    */
-  conferences?: ConferenceFormat;
+  conferences?: ConferenceFormat | null;
   /**
    * How the league season is played when it is not a plain double round robin:
    * how many times clubs meet, and whether the table then splits into groups.
@@ -378,9 +381,61 @@ export function competitionTitlePlayoff(comp: Competition): TitlePlayoffFormat {
  * whichever half has room.
  */
 export function competitionConferences(comp: Competition): ConferenceFormat | null {
-  const format = comp.conferences ?? COUNTRY_CONFERENCES[comp.country]?.[comp.tier] ?? null;
+  const format = comp.conferences !== undefined
+    ? comp.conferences
+    : COUNTRY_CONFERENCES[comp.country]?.[comp.tier] ?? null;
   if (!format || competitionTeamCount(comp) < 4) return null;
   return format;
+}
+
+/**
+ * Rounds a division of `n` clubs split into two equal halves plays before any
+ * cross-over games: its own half twice, plus the fixed cross-half rival home and
+ * away when the halves are odd (see conferenceSchedule).
+ */
+function splitOwnRounds(n: number): number {
+  const half = Math.floor(n / 2);
+  return half % 2 === 1 ? 2 * half : 2 * (half - 1);
+}
+
+/**
+ * The most cross-over games a split division of `n` clubs can take on top of
+ * its own half's schedule: bounded by distinct opponents in the other half (an
+ * odd half already spent one on the rival) and by the room left in the season
+ * calendar. Zero for an odd division, whose unequal halves play no cross games
+ * (see unequalConferenceSchedule), and for one too small to split at all.
+ */
+export function maxCrossRounds(n: number): number {
+  const half = Math.floor(n / 2);
+  if (half < 2 || n % 2 === 1) return 0;
+  const odd = half % 2 === 1;
+  return Math.max(0, Math.min(half - (odd ? 1 : 0), SEASON_MATCHDAYS - splitOwnRounds(n)));
+}
+
+/**
+ * Rounds a division of `n` clubs takes before any cross-over games: a double
+ * round robin for one table (byes when odd), or the longer half's own schedule
+ * when split. Mirrors buildCompetitionSchedule's choice of generator.
+ */
+function divisionRounds(n: number, split: boolean): number {
+  if (!split) return roundRobinRounds(n, 2);
+  if (n % 2 === 0) return splitOwnRounds(n);
+  return roundRobinRounds(Math.ceil(n / 2), 2);
+}
+
+/**
+ * The most clubs a division can hold: a single table stops at
+ * MAX_DIVISION_TEAMS (a double round robin must fit the calendar), a division
+ * split in two can go further because each club only plays its own half twice.
+ * Derived from the calendar rather than written down, so the two can't drift:
+ * the largest size whose season still fits SEASON_MATCHDAYS. Every size below
+ * it fits too, odd ones included (they play with byes, or in unequal halves).
+ */
+export function maxDivisionTeams(split: boolean): number {
+  if (!split) return MAX_DIVISION_TEAMS;
+  let n = MAX_DIVISION_TEAMS;
+  while (divisionRounds(n + 1, true) <= SEASON_MATCHDAYS) n += 1;
+  return n;
 }
 
 /**
@@ -409,8 +464,7 @@ export function competitionSeasonGames(comp: Competition): number {
   if (n % 2 === 1) return 2 * (Math.ceil(n / 2) - 1);
   const half = Math.floor(n / 2);
   const odd = half % 2 === 1;
-  const own = odd ? 2 * half : 2 * (half - 1);
-  return own + Math.min(split.crossRounds, half - (odd ? 1 : 0));
+  return splitOwnRounds(n) + Math.min(split.crossRounds, half - (odd ? 1 : 0));
 }
 
 /** Rounds a round robin of `n` clubs takes to play `legs` times: n-1 a leg, or n with a bye when odd. */
@@ -689,11 +743,23 @@ export interface LeagueSpec {
   divisions?: 1 | 2 | 3;
   /** Three-letter country code, used where a flag would go. See Competition.abbrev. */
   abbrev?: string;
-  /** Clubs per division. Even, and at most MAX_DIVISION_TEAMS. */
+  /**
+   * Clubs per division. Even, and at most `maxDivisionTeams(split)`: 20 for a
+   * single table, more for a division split in two (see `d1Conferences`).
+   */
   d1Teams?: number;
   d2Teams?: number;
   /** Ignored unless `divisions` is 3. */
   d3Teams?: number;
+  /**
+   * Whether each division plays in two halves (MLS's conferences, Argentina's
+   * zones) and how. Absent → the shipped table for this country and tier, else
+   * one table; `null` → one table even where the shipped table splits it.
+   */
+  d1Conferences?: ConferenceFormat | null;
+  d2Conferences?: ConferenceFormat | null;
+  /** Ignored unless `divisions` is 3. */
+  d3Conferences?: ConferenceFormat | null;
   /** Defaults to "<country> Division 1" / "... 2" / "... 3". */
   d1Name?: string;
   d2Name?: string;
@@ -781,6 +847,7 @@ export function buildCompetitions(specs: LeagueSpec[]): Competition[] {
     // returns however many there are rather than assuming a pair.
     const names = [spec.d1Name, spec.d2Name, spec.d3Name];
     const counts = [spec.d1Teams, spec.d2Teams, spec.d3Teams];
+    const splits = [spec.d1Conferences, spec.d2Conferences, spec.d3Conferences];
     for (let tier = 1; tier <= (spec.divisions ?? 2); tier++) {
       out.push({
         id: out.length,
@@ -791,7 +858,7 @@ export function buildCompetitions(specs: LeagueSpec[]): Competition[] {
         // a broken game rather than as a choice.
         name: names[tier - 1]?.trim() || `${spec.country} Division ${tier}`,
         ...shared,
-        ...withDefined({ teamCount: counts[tier - 1] }),
+        ...withDefined({ teamCount: counts[tier - 1], conferences: splits[tier - 1] }),
         // The third division carries the link above it, so its own override
         // replaces the shared value there and nowhere else.
         ...(tier === 3 ? withDefined({
@@ -837,9 +904,25 @@ export interface ResolvedLeagueSpec {
   shieldSlots: number;
   nationalities: NationalityWeights;
   region: ContinentalRegion;
+  /**
+   * Each division's split, top flight first, one entry per division the league
+   * HAS — read off the built competitions through `competitionConferences`, so
+   * it is exactly what the schedule will do (a shipped US division reads its
+   * conferences from the country table, an unsplit one reads null).
+   */
+  conferences: (ConferenceFormat | null)[];
+  /**
+   * How the champion is decided, as the engine will actually play it — a split
+   * format on an unsplit top flight reads `single`, which is what
+   * `competitionTitlePlayoff` falls back to.
+   */
+  titlePlayoff: TitlePlayoffFormat;
 }
 
 export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
+  // One country's competitions, built the way the world will build them, so
+  // the shape fields below read through the engine's own accessors.
+  const built = buildCompetitions([spec]);
   const strengthOffset = spec.strengthOffset ?? COUNTRY_STRENGTH_OFFSET[spec.country] ?? 0;
   // The same test isWeakLeague applies to a built competition, and kept on the
   // RESOLVED offset rather than on whether the country appears in a table — so a
@@ -877,7 +960,73 @@ export function resolveLeagueSpec(spec: LeagueSpec): ResolvedLeagueSpec {
     nationalities: spec.nationalities
       ?? LEAGUE_NATIONALITY_WEIGHTS[spec.country]
       ?? LEAGUE_NATIONALITY_WEIGHTS.England,
+    conferences: built.map(competitionConferences),
+    titlePlayoff: built.length > 0 ? competitionTitlePlayoff(built[0]) : "none",
   };
+}
+
+/**
+ * Clubs a split top flight needs in EACH half for a title-playoff format that
+ * seeds per half, or 0 for a format that doesn't care. The playoff builder
+ * quietly skips a league whose halves are too short, so the editor offers these
+ * only where they would actually be played.
+ */
+export function titlePlayoffHalfNeed(format: TitlePlayoffFormat): number {
+  if (format === "conference") return CONFERENCE_PLAYOFF_TEAMS;
+  if (format === "zones") return ZONE_PLAYOFF_TEAMS;
+  return 0;
+}
+
+/**
+ * Pull a spec back inside what the engine can build, after the world editor has
+ * changed one knob. Every rule here stops a failure that would otherwise only
+ * surface when the save is generated (or seasons later):
+ *
+ * - a division bigger than its shape allows would not fit the 38-matchday
+ *   calendar, and `buildCompetitionSchedule` THROWS on that — un-splitting a
+ *   30-club division therefore brings it down to 20;
+ * - sizes are whole numbers and at least MIN_DIVISION_TEAMS (odd sizes are
+ *   fine: a single table plays with byes, a split one in unequal halves);
+ * - cross-over games past what the calendar or the other half can seat;
+ * - a per-half title playoff on a top flight too small (or no longer split) to
+ *   seat it, which the playoff builder skips silently, crowning the table
+ *   leader with no playoff — so it steps down to a plain bracket instead.
+ *
+ * Only fields that are already present, or that must be written to express the
+ * correction, are touched: an untouched shipped league comes back unchanged,
+ * which is what keeps `buildCompetitions(worldLeagueSpecs())` byte-identical.
+ */
+export function normalizeLeagueSpec(spec: LeagueSpec): LeagueSpec {
+  const out: LeagueSpec = { ...spec };
+  const resolved = resolveLeagueSpec(out);
+  const sizeKeys = ["d1Teams", "d2Teams", "d3Teams"] as const;
+  const splitKeys = ["d1Conferences", "d2Conferences", "d3Conferences"] as const;
+  const sizes = [resolved.d1Teams, resolved.d2Teams, resolved.d3Teams];
+  for (let i = 0; i < resolved.divisions; i++) {
+    const split = resolved.conferences[i];
+    const max = maxDivisionTeams(!!split);
+    const n = sizes[i];
+    const fixed = Math.min(max, Math.max(MIN_DIVISION_TEAMS, Math.round(n)));
+    if (fixed !== n) out[sizeKeys[i]] = fixed;
+    const size = fixed;
+    const stored = out[splitKeys[i]];
+    if (split) {
+      const cross = Math.min(split.crossRounds, maxCrossRounds(size));
+      if (cross !== split.crossRounds) out[splitKeys[i]] = { ...split, crossRounds: cross };
+    } else if (stored) {
+      // A split that the size makes impossible reads as null from the resolver;
+      // store that, rather than keeping a split that silently does nothing.
+      out[splitKeys[i]] = null;
+    }
+  }
+  const after = resolveLeagueSpec(out);
+  const top = after.conferences[0];
+  const need = titlePlayoffHalfNeed(out.titlePlayoff
+    ?? COUNTRY_TITLE_PLAYOFF[out.country] ?? "none");
+  if (need > 0 && (!top || Math.floor(after.d1Teams / 2) < need)) {
+    out.titlePlayoff = "single";
+  }
+  return out;
 }
 
 /**

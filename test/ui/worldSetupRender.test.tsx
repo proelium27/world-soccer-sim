@@ -450,7 +450,7 @@ describe("a shipped league's settings panel", () => {
     // shipped default.
     const spain = panel("Spain");
     expect(shown(spain, "Divisions")).toBe("3");
-    expect(shown(spain, "Clubs per division")).toBe("20");
+    expect(shown(spain, "Clubs in the top division")).toBe("20");
     expect(shown(spain, "Clubs promoted and relegated each season (divisions 1 and 2)"))
       .toBe(String(PROMOTION_RELEGATION_COUNT));
     // Spain sends four up from its third tier, and the panel says so.
@@ -460,7 +460,7 @@ describe("a shipped league's settings panel", () => {
 
     const turkey = panel("Turkey");
     expect(shown(turkey, "Divisions")).toBe("3");
-    expect(shown(turkey, "Clubs per division")).toBe("18");
+    expect(shown(turkey, "Clubs in the top division")).toBe("18");
   });
 
   it("shows the country's own nationality mix rather than the rest-of-world bucket", () => {
@@ -525,5 +525,66 @@ describe("the card can be collapsed", () => {
 
   it("says nothing about warnings when there are none", () => {
     expect(renderShut(defaultWorldEntries())).not.toContain("badge text-bg-warning");
+  });
+});
+
+describe("World setup can build a league shaped like the Americas' (2026-09-18)", () => {
+  function settings(spec: WorldEntry["spec"]): string {
+    const entry: WorldEntry = { id: "added:shape", spec, included: true, shipped: false, linkMoney: true };
+    return renderToStaticMarkup(
+      createElement(LeagueSettings, { entry, onEntry: () => {}, onSpec: () => {} }),
+    );
+  }
+  function options(html: string, label: string): string {
+    return new RegExp(`<select[^>]*aria-label="${label}"[^>]*>(.*?)</select>`, "s").exec(html)?.[1] ?? "";
+  }
+
+  it("offers sizes past 20 only to a division split in two", () => {
+    const flat = settings({ country: "Atlantis", divisions: 1, d1Teams: 20 });
+    expect(options(flat, "Clubs in the league")).not.toContain('value="22"');
+    const split = settings({
+      country: "Atlantis", divisions: 1, d1Teams: 30,
+      d1Conferences: { names: ["East", "West"], crossRounds: 4 },
+    });
+    expect(options(split, "Clubs in the league")).toContain('value="40"');
+    expect(split).toContain('aria-label="First half of the league" value="East"');
+    expect(split).toContain('aria-label="Extra games against the other half of the league"');
+  });
+
+  it("lets every division of a pyramid be split on its own", () => {
+    const html = settings({ country: "Atlantis", divisions: 3 });
+    expect(html).toContain('aria-label="How the top division is played"');
+    expect(html).toContain('aria-label="How the second division is played"');
+    expect(html).toContain('aria-label="How the third division is played"');
+  });
+
+  it("offers closed divisions", () => {
+    expect(settings({ country: "Atlantis" })).toContain("None, closed divisions");
+  });
+
+  it("offers a per-half title playoff only where the halves can seat it", () => {
+    const flat = options(settings({ country: "Atlantis" }), "How the champion is decided");
+    expect(flat).toMatch(/value="conference" disabled=""/);
+    expect(flat).not.toMatch(/value="two-legged" disabled=""/);
+    const split = options(settings({
+      country: "Atlantis", d1Teams: 30, d1Conferences: { names: ["A", "B"], crossRounds: 0 },
+    }), "How the champion is decided");
+    expect(split).not.toMatch(/value="conference" disabled=""/);
+  });
+
+  it("swaps the European places for the Americas Cup when the league moves continent", () => {
+    const html = settings({ country: "Atlantis", region: "americas" });
+    expect(html).toContain("Americas Cup");
+    expect(html).not.toContain('aria-label="Continental Cup places"');
+  });
+
+  it("shows a shipped split league as split", () => {
+    const us = defaultWorldEntries().find((e) => e.spec.country === "United States")!;
+    const html = renderToStaticMarkup(
+      createElement(LeagueSettings, { entry: us, onEntry: () => {}, onSpec: () => {} }),
+    );
+    expect(options(html, "How the top division is played")).toMatch(/value="split" selected=""/);
+    expect(options(html, "Clubs in the top division")).toMatch(/value="30" selected=""/);
+    expect(options(html, "How the champion is decided")).toMatch(/value="conference" selected=""/);
   });
 });

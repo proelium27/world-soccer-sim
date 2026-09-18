@@ -756,7 +756,8 @@ export function Manual() {
             Netherlands 18; Greece 14; and Scotland and Serbia 12. Second divisions vary the same
             way, down to Scotland's 10. Twenty is the ceiling for a single table playing each other
             twice, because a division of that size already fills every matchday in the season, which
-            is why England's and Spain's second divisions are 20 here rather than 24 and 22. A
+            is why England's and Spain's second divisions are 20 here rather than 24 and 22 (a
+            division split in two halves, like the American ones, can go bigger). A
             smaller league spreads its games across the same calendar rather than finishing early,
             so the transfer windows and the run-in still fall where you'd expect. A smaller league
             also plays fewer games, so its points totals are lower; don't read a 12-club champion's
@@ -925,10 +926,30 @@ export function Manual() {
             game doesn't have, switch one off and add your own — that's what adding is for.
           </p>
           <p>
+            <strong>Building a league like the American ones.</strong> Everything that makes MLS,
+            Argentina and Mexico different is yours to set on any league. Each division has its own
+            size and its own shape: <strong>one table</strong>, or <strong>two halves</strong> that
+            each play their own schedule. One table stops at 20 clubs, because that already fills
+            every matchday. Split into two halves, a division can go up to 40, since a club only
+            plays its own half home and away. With an odd number in each half, every club also gets
+            a fixed rival from the other half home and away, and you can add a few extra games
+            across the halves on top if the calendar has room. You name the halves yourself. The
+            overall table still decides promotion, relegation and prize money. Set{" "}
+            <strong>Up and down</strong> to <strong>None</strong> and the divisions are closed, the
+            way Liga MX and MLS run: nobody goes up or down, whatever they finish. The{" "}
+            <strong>Champion</strong> picker decides how the title is won: top of the table, a top-8
+            playoff (one game a round, or home and away like the Liguilla), or playoffs within each
+            half, top 9 of each conference like MLS or top 8 of each zone like Argentina. The per-half
+            ones only appear once the top flight is split with enough clubs in each half to fill
+            them. And <strong>Continent</strong> puts a league in Europe or the Americas: a European
+            league plays for the Continental Cup and Shield, an American one sends four clubs a
+            season to the Americas Cup.
+          </p>
+          <p>
             <strong>Naming the leagues.</strong> Every league has a name of its own, and you can
-            change it. There's a box per division — three of them for the countries that ship with
-            three — and they're the first thing in the panel, on shipped countries and added ones
-            alike. Leave one empty and it goes back to following the country's name.
+            change it. There's a box per division, three of them for the countries that ship with
+            three, sitting beside that division's size and shape, on shipped countries and added
+            ones alike. Leave one empty and it goes back to following the country's name.
           </p>
           <p>
             <strong>Renaming won't break a roster file.</strong> A world-wide roster file names the
