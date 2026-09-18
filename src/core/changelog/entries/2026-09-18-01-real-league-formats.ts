@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-16",
+  date: "2026-09-18",
   title: "Leagues that play by their real rules",
   items: [
     "A lot of countries were running the same generic setup, so I went through them one by one and gave each its real league format.",
