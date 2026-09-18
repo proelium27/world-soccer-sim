@@ -204,6 +204,27 @@ export function Manual() {
             and colors change, exactly like Customize Teams.
           </p>
           <p>
+            One file can hold a club's badge too, so a whole world (names, colors, squads and
+            badges) can travel as a single file. When you load one, a checklist shows up above the
+            club picker. Tick or untick <strong>club names</strong>, <strong>colors</strong>,{" "}
+            <strong>squads</strong> and <strong>badges</strong>, and tick or untick each league in the
+            file on its own. Only what the file actually contains gets a box. Untick names and the
+            clubs keep their fictional names, and everything else you import lands on those; keep
+            squads and drop the rest and you get real players in the fictional clubs. A league your
+            world hasn't got is listed but can't be ticked until you add it in World setup. The club
+            picker updates as you click, so what you see there is what you'll start with.
+          </p>
+          <p>
+            To make one of these files from a save, go to the Leagues screen and press{" "}
+            <strong>Export League File</strong> on that save. Club names and colors always go in, and
+            you choose whether to include squads (as they stand right now, exact ratings and all) and
+            any badges you loaded yourself. None of the save's history goes with it: the file starts
+            a brand new league when someone imports it, which makes it the thing to send a friend who
+            wants to play your world. Squads for every club make it a few megabytes. It's plain JSON,
+            so you can open it and edit it before you pass it on. Export Save is still the one to use
+            for a backup.
+          </p>
+          <p>
             Writing all that JSON by hand is tedious, so the easiest route is to let an AI build it.
             The "Copy AI Prompt to Customize" button copies a ready-made prompt to your clipboard,
             already filled in with your world's exact league names and sizes. It sits on the Leagues
@@ -237,8 +258,10 @@ export function Manual() {
             England's and Spain's clubs all have real crest art that shows up wherever the club's
             name does. Every club without one yet (Italy, Germany, France, Portugal, Belgium and
             Turkey) just shows a two-color swatch until it gets a crest of its own. Clubs that came
-            in from a roster file always show their colors rather than a crest: the artwork belongs
-            to the club that shipped in that slot, not to the one you imported over it.
+            in from a roster file show their colors rather than a crest, unless the file brought a
+            badge of its own: the artwork belongs to the club that shipped in that slot, not to the
+            one you imported over it. (Untick names on the import checklist and the slot keeps both
+            its fictional name and its crest.)
           </p>
           <p>
             You can bring your own badges, though. On the New League screen there's a{" "}
@@ -507,7 +530,7 @@ export function Manual() {
             <li><strong>Schedule</strong>. Every matchday's fixtures and results. Click a played match for its box score.</li>
             <li><strong>Stat Leaders</strong>. A Players tab (league-wide leaderboards for one season at a time: goals, assists, shots, shots on target, xG, tackles, interceptions, passes, crosses, fouls, yellow cards, red cards, saves, minutes, and average match rating, with a season dropdown covering the current season and every completed one) and a Teams tab (the same stats plus possession, goals against, and xG against, totaled per club, with its own season dropdown). Match rating is an average rather than a running total, so to keep a one-off cameo from topping the chart a player needs to have appeared in at least half of the games played so far before he shows up on the match-rating board (a threshold that scales as the season goes, so it works ten games in as well as at the end). A <strong>Totals / Per 90</strong> switch sits next to the stat dropdown: Per 90 divides each stat by the number of full matches the player's minutes add up to, which is how you find the squad player outproducing a starter rather than just the one who played most. Per-90 mode has a playing-time floor of its own &mdash; 30% of the minutes available so far, quoted above the table &mdash; because a rate is far easier to fluke than a total: score in a twelve-minute cameo and you've "scored" 7.5 per 90. It's counted in minutes rather than appearances, since twenty run-outs off the bench is exactly the case an appearance count would wave through. Appearances, minutes and match rating stay as totals either way (the first two are what the rate divides by, and a match rating is already an average). For career totals and all-time bests across every season at once, see <a href="#frivolities">Frivolities</a>' All-Time Leaders.</li>
             <li><strong>Database</strong>. Every player in the world in one sortable table. Click any heading to sort by it, and a column-set switch swaps between four sets: <strong>Overview</strong> (rating, potential, market value, wage, contract length), <strong>Attributes</strong>, which puts all fourteen ratings side by side, <strong>Season</strong> (appearances, minutes, goals, assists, shots, xG, tackles, interceptions, saves, passes, crosses, fouls, cards and average match rating, with a dropdown for any season on record), and <strong>Career</strong>, the same stats totalled across a whole career. So "who is the fastest player in the world", "the best finisher in the second division" and "who has scored the most goals of anyone still playing" are each one click. The Season view lists the players that season has a record of and shows the club they played for <em>then</em>, not the one they're at now; cards don't appear on the Career view, because they're kept per season and never totalled, and a column of zeros pretending to be a career figure would be worse than no column. The filters narrow the whole world before anything is ranked, so what you see really is the top of what you asked for: position, nationality, age, overall, potential, value, wage, contract length, name, whether he's at a club or a free agent, and where to look. That last one is a single dropdown covering everything from one division up to the whole world, with presets for the top divisions only and for the top 5 leagues &mdash; and "top 5" means the five strongest countries in <em>your</em> world, worked out from the leagues themselves, so it still means something if you've added or retuned leagues in World setup. The table shows 100 players at a time with the full count beside the page buttons; that cap is deliberate, since a page trying to draw fifteen thousand rows at once is what makes a browser hang. One thing to know about the potential column: it's your scouts' estimate, exactly as it is everywhere else, and sorting and filtering both use the <strong>top</strong> of that estimate rather than the real number &mdash; otherwise ordering the table would quietly tell you something your scouts haven't found out yet. The top end rather than the middle because it's the number you can see: sort by potential and the right-hand figure in each band counts down the column, so the order explains itself. Market value is worked out from the <em>middle</em> of the band instead, since a price is what he's worth on balance rather than at his best. Whatever you've filtered and sorted goes into the page's address, so a view is a link you can bookmark or hand to someone else, and only the things you actually changed show up in it. A <strong>Clubs</strong> tab does the same for every club in the world, on three column sets: <strong>Overview</strong> (squad rating and potential, power score, squad size, average age, hype), <strong>Finance</strong> (budget, how full its savings ceiling is, wage bill, and what it has spent and taken in on transfers this season), and <strong>Season</strong> (played, won, drawn, lost, goals for and against, goal difference, points, then shots, shots on target, xG, xG against, saves, tackles, possession and average match rating). So "who has the biggest wage bill in Europe", "which second-division club has scored the most" and "who is running closest to their savings cap" are all a click. Its strength columns are the same numbers the Power Rankings page shows and its money columns the same ones Finance shows, so no two screens disagree about the same club.</li>
-            <li><strong>Awards</strong>. World gives the Ballon d'Or for the best player in the world that season (with a top-10 shortlist and a breakdown of where his points came from), a Goalkeeper and a Defender of the Year judged on the defensive work the Ballon d'Or can't see, and a World Team of the Year pitch view. Americas, in a world with leagues there, gives the same four honours for the Americas alone: a Player, Goalkeeper, Defender and Team of the Year. By league gives Player of the Season, the Golden Boot, and a Team of the Season pitch view for one competition. Both have a dropdown to browse past years.</li>
+            <li><strong>Awards</strong>. World gives the Ballon d'Or for the best player in the world that season (with a top-10 shortlist and a breakdown of where his points came from), a Goalkeeper and a Defender of the Year judged on the defensive work the Ballon d'Or can't see (side by side, each showing the stat it's decided on and a table of where the winner's points came from next to the runner-up's), and a World Team of the Year pitch view. Americas, in a world with leagues there, gives the same four honours for the Americas alone: a Player, Goalkeeper, Defender and Team of the Year. By league gives Player of the Season, the Golden Boot, and a Team of the Season pitch view for one competition. Both have a dropdown to browse past years.</li>
             <li><strong>Season History</strong>. Who won what, one line per season, newest first &mdash; so you can read a twenty-year dynasty in one screen instead of clicking through twenty seasons. It&apos;s also where you land after <a href="#season">jumping ahead</a>, since that&apos;s the moment you most want it. Each line gives the Continental Cup and Continental Shield winners, whoever won the World Cup or their confederation&apos;s championship in the offseason that followed, and then one column per country holding that country&apos;s champion. A toggle swaps those country columns between <strong>league champions</strong> and <strong>domestic cup winners</strong>. The country columns use three-letter club codes to keep the whole world on one line &mdash; hover one for the full name, or click through to what that club did that year. Your own club&apos;s titles are shaded. Two things worth knowing: the continental finals are played before a season rolls over, so the season you&apos;re in appears as soon as one of them is decided, marked &quot;(now)&quot; and with its league columns still empty; and an international tournament is played in the offseason <em>after</em> a season, so it sits on that season&apos;s line. It&apos;s all read straight off the records your save already keeps, so a dynasty that started long before this page existed shows its whole back catalogue.</li>
             <li><strong>Club History</strong>. A per-club honours page (yours by default, with a dropdown for any club in the world): a trophy case (league titles, second-tier titles, Continental Cups, domestic cups, any trebles, promotions and relegations), individual honours won by the club's players (Player of the Season, Golden Boot, Team of the Season selections, and they stay on the list after the player retires), franchise records (best finish, most points and wins in a season, all-time record), and a season-by-season table of every completed season (each season's note also shows how far the club got in that year's Continental Cup and domestic cup). It also ranks the club's greatest players &mdash; see <a href="#frivolities">Frivolities</a> for how that score is worked out.</li>
             <li><strong>A club in one season</strong>. Click any club anywhere in the game &mdash; a table, a transfer, the club beside a season on a player's profile &mdash; and you land on what that club did that year: the squad, where it finished and its record, how far it got in the domestic cup, the Continental Cup and the Continental Shield, and where the Power Rankings had it at the end. A dropdown walks you through the club's other seasons. Two things to know about an old squad. It's who <em>finished</em> the season there, so a player sold in January shows up at his new club and not his old one. And players who retired long ago may be missing altogether, because the game only keeps a permanent career record for the ones worth remembering &mdash; the rest are gone for good. Retirees who are still on record show their appearances and the rating they played at, but not their goals and assists for that year, which aren't kept.</li>
@@ -759,7 +782,8 @@ export function Manual() {
             Netherlands 18; Greece 14; and Scotland and Serbia 12. Second divisions vary the same
             way, down to Scotland's 10. Twenty is the ceiling for a single table playing each other
             twice, because a division of that size already fills every matchday in the season, which
-            is why England's and Spain's second divisions are 20 here rather than 24 and 22. A
+            is why England's and Spain's second divisions are 20 here rather than 24 and 22 (a
+            division split in two halves, like the American ones, can go bigger). A
             smaller league spreads its games across the same calendar rather than finishing early,
             so the transfer windows and the run-in still fall where you'd expect. A smaller league
             also plays fewer games, so its points totals are lower; don't read a 12-club champion's
@@ -928,10 +952,30 @@ export function Manual() {
             game doesn't have, switch one off and add your own — that's what adding is for.
           </p>
           <p>
+            <strong>Building a league like the American ones.</strong> Everything that makes MLS,
+            Argentina and Mexico different is yours to set on any league. Each division has its own
+            size and its own shape: <strong>one table</strong>, or <strong>two halves</strong> that
+            each play their own schedule. One table stops at 20 clubs, because that already fills
+            every matchday. Split into two halves, a division can go up to 40, since a club only
+            plays its own half home and away. With an odd number in each half, every club also gets
+            a fixed rival from the other half home and away, and you can add a few extra games
+            across the halves on top if the calendar has room. You name the halves yourself. The
+            overall table still decides promotion, relegation and prize money. Set{" "}
+            <strong>Up and down</strong> to <strong>None</strong> and the divisions are closed, the
+            way Liga MX and MLS run: nobody goes up or down, whatever they finish. The{" "}
+            <strong>Champion</strong> picker decides how the title is won: top of the table, a top-8
+            playoff (one game a round, or home and away like the Liguilla), or playoffs within each
+            half, top 9 of each conference like MLS or top 8 of each zone like Argentina. The per-half
+            ones only appear once the top flight is split with enough clubs in each half to fill
+            them. And <strong>Continent</strong> puts a league in Europe or the Americas: a European
+            league plays for the Continental Cup and Shield, an American one sends four clubs a
+            season to the Americas Cup.
+          </p>
+          <p>
             <strong>Naming the leagues.</strong> Every league has a name of its own, and you can
-            change it. There's a box per division — three of them for the countries that ship with
-            three — and they're the first thing in the panel, on shipped countries and added ones
-            alike. Leave one empty and it goes back to following the country's name.
+            change it. There's a box per division, three of them for the countries that ship with
+            three, sitting beside that division's size and shape, on shipped countries and added
+            ones alike. Leave one empty and it goes back to following the country's name.
           </p>
           <p>
             <strong>Renaming won't break a roster file.</strong> A world-wide roster file names the

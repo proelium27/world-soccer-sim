@@ -314,6 +314,27 @@ describe("combineRosterFiles", () => {
     expect(warnings).toHaveLength(1);
   });
 
+  it("keeps a badge only the losing side of a clash carried", () => {
+    const badge = "data:image/png;base64,iVBORw0KGgo=";
+    const squads = clubsFile("English Division 1", ["Alpha"], ["Alpha"]);
+    const names = parseRosterFile(JSON.stringify({
+      format: ROSTER_FILE_FORMAT,
+      formatVersion: 1,
+      competitions: [{
+        match: "English Division 1",
+        clubs: [{ name: "Alpha", abbrev: "ALP", colors: ["#000000", "#ffffff"], logo: badge }],
+      }],
+    }));
+    for (const files of [
+      [{ name: "squads.json", file: squads }, { name: "names.json", file: names }],
+      [{ name: "names.json", file: names }, { name: "squads.json", file: squads }],
+    ]) {
+      const club = combineRosterFiles(files).file.competitions[0].clubs[0];
+      expect(club.players).toHaveLength(1);
+      expect(club.logo).toBe(badge);
+    }
+  });
+
   it("treats two names-only lists as agreeing when one only runs longer", () => {
     const short = clubsFile("English Division 1", ["Alpha", "Beta"]);
     const long = clubsFile("English Division 1", ["Alpha", "Beta", "Gamma"]);

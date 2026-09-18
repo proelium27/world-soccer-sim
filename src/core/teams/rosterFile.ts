@@ -5,7 +5,7 @@ import { POSITIONS, SKILL_KEYS } from "../players/types.js";
 import { sanitizeNationalityWeights, type NationalityWeights } from "../players/nationalities.js";
 import { worldCompetitions, MAX_DIVISIONS } from "../competitions.js";
 import { OVR_SCALE_SHIFT, RATING_MIN, RATING_MAX } from "../constants.js";
-import { normalizeClubName } from "./logoPack.js";
+import { isImageDataUrl, MAX_LOGO_DATA_URL, normalizeClubName } from "./logoPack.js";
 
 /**
  * A compact, human/AI-authorable file describing clubs to overlay onto an
@@ -52,6 +52,20 @@ export interface RosterFileClub {
   colors: [string, string];
   /** Optional real squad. Omit to keep the club's existing auto-generated roster. */
   players?: RosterFilePlayer[];
+  /**
+   * Optional badge, as a `data:image/...` URL. This is what lets one file carry
+   * a whole world's look instead of needing a logo pack beside it.
+   *
+   * Attached to the CLUB rather than matched by name like a logo pack's
+   * entries, because here the club it belongs to is already known: it is the
+   * slot this entry lands on. Read leniently: anything that is not an image
+   * data URL within MAX_LOGO_DATA_URL is dropped rather than rejecting the
+   * file, the same call exportImport makes for a save's badges (a bad badge
+   * must never cost someone every squad in the file). That leniency is also
+   * what keeps an AI-invented `logo: "https://..."` harmless (see
+   * rosterAiPrompt).
+   */
+  logo?: string;
 }
 
 export interface RosterFileCompetition {
@@ -424,11 +438,18 @@ export function parseRosterFile(text: string): RosterFile {
         }
         players = club.players.map((pr, pi) => parsePlayer(pr, `${path}.players[${pi}]`));
       }
+      const logo =
+        typeof club.logo === "string"
+        && isImageDataUrl(club.logo)
+        && club.logo.length <= MAX_LOGO_DATA_URL
+          ? club.logo
+          : undefined;
       return {
         name: club.name,
         abbrev: club.abbrev,
         colors: [club.colors[0], club.colors[1]] as [string, string],
         players,
+        ...(logo ? { logo } : {}),
       };
     });
     return {
@@ -566,9 +587,36 @@ function topUpClubs(
   squads: RosterFileCompetition,
   names: RosterFileCompetition,
 ): RosterFileCompetition {
-  const listed = new Set(squads.clubs.map((club) => normalizeClubName(club.name)));
+  const badged = withBadgesFrom(squads, names);
+  const listed = new Set(badged.clubs.map((club) => normalizeClubName(club.name)));
   const extra = names.clubs.filter((club) => !listed.has(normalizeClubName(club.name)));
-  return extra.length === 0 ? squads : { ...squads, clubs: [...squads.clubs, ...extra] };
+  return extra.length === 0 ? badged : { ...badged, clubs: [...badged.clubs, ...extra] };
+}
+
+/**
+ * `target` with any club that has no `logo` given the badge `source` carries for
+ * the same-named club. Whichever side of a clash is kept, a badge only the
+ * other side had would otherwise be lost with it, since a club's badge rides on
+ * its roster entry. Returns `target` itself when there is nothing to add.
+ */
+function withBadgesFrom(
+  target: RosterFileCompetition,
+  source: RosterFileCompetition,
+): RosterFileCompetition {
+  const logos = new Map<string, string>();
+  for (const club of source.clubs) {
+    if (club.logo) logos.set(normalizeClubName(club.name), club.logo);
+  }
+  if (logos.size === 0) return target;
+  let changed = false;
+  const clubs = target.clubs.map((club) => {
+    if (club.logo) return club;
+    const logo = logos.get(normalizeClubName(club.name));
+    if (!logo) return club;
+    changed = true;
+    return { ...club, logo };
+  });
+  return changed ? { ...target, clubs } : target;
 }
 
 /**
@@ -695,7 +743,9 @@ export function combineRosterFiles(files: NamedRosterFile[]): CombinedRosterFile
         }
         const agreed = !oldSquads && !newSquads && extendsOther(existing.comp, comp);
         if (agreed) {
-          byMatch.set(key, agreed === existing.comp ? existing : { comp, from: name });
+          const other = agreed === existing.comp ? comp : existing.comp;
+          const from = agreed === existing.comp ? existing.from : name;
+          byMatch.set(key, { comp: withBadgesFrom(agreed, other), from });
           continue;
         }
         warnings.push(
