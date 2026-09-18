@@ -1769,6 +1769,17 @@ export function Manual() {
             with 82 points still finishes with 82 points. Only the number on his card changed.
           </p>
           <p>
+            <strong>Everything in OVR counts on the pitch.</strong> In a match, each player adds
+            to his side's attacking, defending, ball control and goalkeeping using the same mix
+            of ratings his OVR is built from, so a rating that lifts his OVR also makes his team
+            better. A full-back's pace and crossing help you attack down the flanks and his pace
+            helps you defend, a keeper's positioning helps him keep shots out, and a big
+            striker's strength and aerial ability make your attack more dangerous. How much each
+            position counts is set so that one extra point of OVR is worth about the same to your
+            results wherever the player stands. Keepers are the exception and count for more,
+            because one player does the whole job.
+          </p>
+          <p>
             One consequence worth knowing: the lower you go, the further the game runs below what
             those games cover. A third division here sits in the 30s and 40s, because this world
             has sixteen countries and three divisions each &mdash; a lot of football that a game
