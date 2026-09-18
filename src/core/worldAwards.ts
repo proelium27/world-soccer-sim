@@ -62,6 +62,35 @@ export interface WorldAwardEntry {
    * one of those stored entries fail to typecheck for no gain.
    */
   domesticCup?: number;
+  /**
+   * `league` split into where it came from, so the Awards page can say *why*
+   * someone won rather than printing one number that is most of the score for
+   * everybody. The four parts add up to `league` (to floating-point noise).
+   *
+   * **Optional, and never backfilled**: entries written before it existed don't
+   * have it, and the page falls back to the coarser league/cups/country split.
+   */
+  breakdown?: WorldAwardBreakdown;
+}
+
+/** See `WorldAwardEntry.breakdown`. Every part carries the same Americas scale `league` does. */
+export interface WorldAwardBreakdown {
+  /** His average match rating, times the formula's rating weight. */
+  rating: number;
+  /** His league goals and assists. */
+  scoring: number;
+  /**
+   * The work his position does beyond the scoreline: tackles and interceptions
+   * per game for a defender, save percentage for a keeper. Always 0 on a
+   * Ballon d'Or entry, which is scored without it.
+   */
+  work: number;
+  /**
+   * Everything left: both overall-rating terms plus the league-strength
+   * correction. Kept as one part because the strength correction only makes
+   * sense read together with the quality it adjusts.
+   */
+  quality: number;
 }
 
 /**
@@ -425,10 +454,22 @@ function worldAwardParts(
   ) * k;
   const title = titleComponent(e, s.ctx.championTidByCompId, f) * k;
   const domesticCup = domesticCupComponent(e, s.domesticChampions, s.domesticLines, f) * k;
+  // Display only: nothing ranks on these, so the score above is untouched.
+  // `quality` is taken as the remainder so the parts always add back to `league`.
+  const rating = e.stats.avgRating * f.ratingWeight;
+  const scoring = e.stats.goals * f.goalWeight[e.group] + e.stats.assists * f.assistWeight[e.group];
+  const work = base - potyScore(e.player, e.stats, s.season, f);
+  const breakdown: WorldAwardBreakdown = {
+    rating: rating * k,
+    scoring: scoring * k,
+    work: work * k,
+    quality: league - (rating + scoring + work) * k,
+  };
   return {
     pid: e.player.pid, tid: e.stats.tid,
     score: league + cup + intl + title + domesticCup,
     league, cup, intl, title, domesticCup,
+    breakdown,
   };
 }
 

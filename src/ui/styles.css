@@ -1332,6 +1332,30 @@ a:hover {
   vertical-align: middle;
 }
 
+/* Goalkeeper / Defender of the Year: the winner's headline numbers. The Finance
+   page's summary strip (.fin-stat tiles), narrowed so four fit across half the
+   page — the two awards sit side by side from xl up. */
+.award-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 1px;
+  background: var(--sg-border);
+  border: 1px solid var(--sg-border);
+  border-radius: var(--sg-radius);
+  overflow: hidden;
+}
+.award-strip .fin-stat-value {
+  font-size: var(--sg-text-md);
+}
+/* "How he won it": numbers only, so they align and read as a ledger. */
+.award-parts td,
+.award-parts th {
+  font-variant-numeric: tabular-nums;
+}
+.award-parts tfoot th {
+  border-top: 1px solid var(--sg-border-strong);
+}
+
 /* Nations already through to the tournament, on the Qualifying page. Same pill
    shape as the honours above, one size down because these render in bulk, and
    tinted with the pitch green so "qualified" reads as a result rather than a
