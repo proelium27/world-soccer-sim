@@ -62,7 +62,7 @@ export interface RosterFileDownload {
   id: keyof typeof ROSTER_FILE_NAMES;
   /** What the section calls it. Plain words, not the file name. */
   title: string;
-  /** One or two sentences on what it gives you. */
+  /** One short line on what it gives you. */
   description: string;
   /** Rough size, so a phone user knows before tapping. */
   size: string;
@@ -94,28 +94,21 @@ export const ROSTER_FILES: RosterFileDownload[] = ROSTER_DOWNLOAD_URL === null
       {
         id: "players",
         title: "Real clubs and players",
-        description:
-          "Real clubs in the top two divisions of every country, with real squads from EA FC "
-          + "in most top flights and a few second divisions. The third divisions stay made-up.",
+        description: "Real clubs, with real squads in most top flights.",
         size: "6 MB",
         href: ROSTER_DOWNLOAD_URL,
       },
       {
         id: "names",
         title: "Real club names",
-        description:
-          "Real names and colours for every club in the game, third divisions included, with "
-          + "made-up players. Use it alone, or load it with the file above to name the third "
-          + "divisions too. Either order works, and the real squads always stay.",
+        description: "Every club's real name and colours, with made-up players.",
         size: "0.1 MB",
         href: new URL(ROSTER_FILE_NAMES.names, ROSTER_DOWNLOAD_URL).href,
       },
       {
         id: "badges",
         title: "Real club badges",
-        description:
-          "Badges for close to 900 real clubs. They go on whichever clubs have a matching "
-          + "name, so load one of the files above with it.",
+        description: "Badges for about 900 real clubs.",
         size: "11 MB",
         href: new URL(ROSTER_FILE_NAMES.badges, ROSTER_DOWNLOAD_URL).href,
       },

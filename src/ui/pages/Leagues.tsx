@@ -367,14 +367,6 @@ export function Leagues() {
         />
       </div>
 
-      <p className="text-muted small mt-2 mb-0">
-        Import takes either roster files and badge packs, which start a new league with real
-        clubs, or a save file from Export Save, which loads that save back. You can pick as
-        many roster files as you like (one per league is the usual way) and they all go into
-        the same league. To make your own, "Copy AI Prompt to Customize" gives you a prompt to
-        paste into ChatGPT or Claude that spells out the format and the leagues it has to
-        fill. Files written without it usually import only partly, or not at all.
-      </p>
 
       <RosterFilesSection
         files={ROSTER_FILES}

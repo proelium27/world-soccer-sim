@@ -30,12 +30,11 @@ export function RosterFilesSection({
         Roster files
       </h2>
       <p className="text-muted small mb-2">
-        Free downloads that swap the game's made-up clubs for real ones. Download the ones
-        you want, press{" "}
+        Download any of these, then{" "}
         <button type="button" className="btn btn-link btn-sm p-0 align-baseline" onClick={onImport}>
           Import
-        </button>
-        , and pick them all at once. You'll choose your club on the next screen.
+        </button>{" "}
+        them together.
       </p>
       <ul className="list-group">
         {files.map((f) => (
