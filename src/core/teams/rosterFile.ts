@@ -5,6 +5,7 @@ import { POSITIONS, SKILL_KEYS } from "../players/types.js";
 import { sanitizeNationalityWeights, type NationalityWeights } from "../players/nationalities.js";
 import { worldCompetitions, MAX_DIVISIONS } from "../competitions.js";
 import { OVR_SCALE_SHIFT, RATING_MIN, RATING_MAX } from "../constants.js";
+import { isImageDataUrl, MAX_LOGO_DATA_URL } from "./logoPack.js";
 
 /**
  * A compact, human/AI-authorable file describing clubs to overlay onto an
@@ -51,6 +52,20 @@ export interface RosterFileClub {
   colors: [string, string];
   /** Optional real squad. Omit to keep the club's existing auto-generated roster. */
   players?: RosterFilePlayer[];
+  /**
+   * Optional badge, as a `data:image/...` URL. This is what lets one file carry
+   * a whole world's look instead of needing a logo pack beside it.
+   *
+   * Attached to the CLUB rather than matched by name like a logo pack's
+   * entries, because here the club it belongs to is already known: it is the
+   * slot this entry lands on. Read leniently: anything that is not an image
+   * data URL within MAX_LOGO_DATA_URL is dropped rather than rejecting the
+   * file, the same call exportImport makes for a save's badges (a bad badge
+   * must never cost someone every squad in the file). That leniency is also
+   * what keeps an AI-invented `logo: "https://..."` harmless (see
+   * rosterAiPrompt).
+   */
+  logo?: string;
 }
 
 export interface RosterFileCompetition {
@@ -423,11 +438,18 @@ export function parseRosterFile(text: string): RosterFile {
         }
         players = club.players.map((pr, pi) => parsePlayer(pr, `${path}.players[${pi}]`));
       }
+      const logo =
+        typeof club.logo === "string"
+        && isImageDataUrl(club.logo)
+        && club.logo.length <= MAX_LOGO_DATA_URL
+          ? club.logo
+          : undefined;
       return {
         name: club.name,
         abbrev: club.abbrev,
         colors: [club.colors[0], club.colors[1]] as [string, string],
         players,
+        ...(logo ? { logo } : {}),
       };
     });
     return {
