@@ -246,15 +246,16 @@ export function NewLeague() {
   // reshaped after they are loaded, and a stored resolution would go stale the
   // moment it was — which is precisely why the world editor used to be hidden
   // on this path.
+  const [handoff] = useState(() => takePendingRoster());
   const [rosterSources, setRosterSources] = useState<NamedRosterFile[]>(
-    () => takePendingRoster()?.files ?? [],
+    () => handoff?.files ?? [],
   );
   const [rosterError, setRosterError] = useState<string | null>(null);
   // Held beside the roster sources rather than inside a component, for the same
   // reason those are: the club picker previews them, the Start handlers apply
   // them, and a second copy of "what has the user loaded" is how those two end
   // up disagreeing about what the save will look like.
-  const [logoSources, setLogoSources] = useState<NamedLogoPack[]>([]);
+  const [logoSources, setLogoSources] = useState<NamedLogoPack[]>(() => handoff?.logos ?? []);
   const [logoError, setLogoError] = useState<string | null>(null);
   // What the import checklist has ticked. Starts with everything, so loading a
   // file and pressing Start does exactly what it did before the checklist.

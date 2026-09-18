@@ -153,10 +153,13 @@ export function Manual() {
             just start you in a different place.
           </p>
           <p>
-            If you don't have a roster file, the "Download Real Rosters" button next to Import gets
-            you one covering every league in the game. It's a separate download rather than part of
-            the game, which is why it's a button that fetches it instead of something already built
-            in. Two things worth knowing before you look at the squads: ratings are rescaled onto this
+            If you don't have a roster file, the Roster files section on the Leagues page has
+            two ready-made ones. Both give every club in the game its real name and colours, and
+            most of them their real badge. "Real clubs and players" also puts real squads in most top flights, and "Real
+            clubs" keeps the made-up players. Pick one and load it with Import. They're separate
+            downloads rather than part of the game, which is why you fetch them instead of
+            finding them already built in. Two things worth
+            knowing before you look at the squads: ratings are rescaled onto this
             game's own spread rather than copied across, so the ordering is what carries over and
             the exact numbers can shift &mdash; in a fully covered top division they now land very
             close to the ratings you'd expect, though a club in a division the file only partly

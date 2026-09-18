@@ -5,7 +5,7 @@ import { POSITIONS, SKILL_KEYS } from "../players/types.js";
 import { sanitizeNationalityWeights, type NationalityWeights } from "../players/nationalities.js";
 import { worldCompetitions, MAX_DIVISIONS } from "../competitions.js";
 import { OVR_SCALE_SHIFT, RATING_MIN, RATING_MAX } from "../constants.js";
-import { isImageDataUrl, MAX_LOGO_DATA_URL } from "./logoPack.js";
+import { isImageDataUrl, MAX_LOGO_DATA_URL, normalizeClubName } from "./logoPack.js";
 
 /**
  * A compact, human/AI-authorable file describing clubs to overlay onto an
@@ -571,6 +571,74 @@ function parseNationalities(raw: unknown): NationalityWeights | undefined {
   return sanitizeNationalityWeights(out) ?? undefined;
 }
 
+/** Whether any club in a competition brings a real squad with it. */
+function carriesSquads(comp: RosterFileCompetition): boolean {
+  return comp.clubs.some((club) => (club.players?.length ?? 0) > 0);
+}
+
+/**
+ * `squads` with `names`' extra clubs appended — the ones whose names `squads`
+ * doesn't already list. Only the TAIL is useful: slots are positional, so an
+ * appended club lands past the end of the squads list, i.e. on a slot the squads
+ * file never filled. Name-matched rather than index-matched so the same club
+ * can't be listed twice under one slot each.
+ */
+function topUpClubs(
+  squads: RosterFileCompetition,
+  names: RosterFileCompetition,
+): RosterFileCompetition {
+  const badged = withBadgesFrom(squads, names);
+  const listed = new Set(badged.clubs.map((club) => normalizeClubName(club.name)));
+  const extra = names.clubs.filter((club) => !listed.has(normalizeClubName(club.name)));
+  return extra.length === 0 ? badged : { ...badged, clubs: [...badged.clubs, ...extra] };
+}
+
+/**
+ * `target` with any club that has no `logo` given the badge `source` carries for
+ * the same-named club. Whichever side of a clash is kept, a badge only the
+ * other side had would otherwise be lost with it, since a club's badge rides on
+ * its roster entry. Returns `target` itself when there is nothing to add.
+ */
+function withBadgesFrom(
+  target: RosterFileCompetition,
+  source: RosterFileCompetition,
+): RosterFileCompetition {
+  const logos = new Map<string, string>();
+  for (const club of source.clubs) {
+    if (club.logo) logos.set(normalizeClubName(club.name), club.logo);
+  }
+  if (logos.size === 0) return target;
+  let changed = false;
+  const clubs = target.clubs.map((club) => {
+    if (club.logo) return club;
+    const logo = logos.get(normalizeClubName(club.name));
+    if (!logo) return club;
+    changed = true;
+    return { ...club, logo };
+  });
+  return changed ? { ...target, clubs } : target;
+}
+
+/**
+ * When two names-only lists name the same clubs in the same order and one just
+ * runs longer, they agree, and the longer one is returned. Otherwise null.
+ *
+ * Two copies of the same real-names data differ this way whenever one was
+ * trimmed to a division size the other wasn't, and reporting that as a
+ * collision ("the one from X was used") would tell the player something was
+ * thrown away when nothing was.
+ */
+function extendsOther(
+  a: RosterFileCompetition,
+  b: RosterFileCompetition,
+): RosterFileCompetition | null {
+  const [shorter, longer] = a.clubs.length <= b.clubs.length ? [a, b] : [b, a];
+  const same = shorter.clubs.every(
+    (club, i) => normalizeClubName(club.name) === normalizeClubName(longer.clubs[i].name),
+  );
+  return same ? longer : null;
+}
+
 /** A parsed roster file with the name the user picked it by. */
 export interface NamedRosterFile {
   name: string;
@@ -638,11 +706,22 @@ export function retargetRosterFile(
  * competitions are independent of each other, so combining them is just
  * concatenation in load order.
  *
- * The one ambiguous case is two files claiming the same competition: clubs map
+ * The ambiguous case is two files claiming the same competition: clubs map
  * *positionally* onto slots, so their club lists can't be interleaved into
  * anything meaningful. The later file wins outright (it is the one the user
  * picked most recently, so it is likely the redo) and the collision is reported
  * rather than silently resolved.
+ *
+ * **Except when exactly one side carries squads.** A names-only file (real club
+ * names and colours, no players) and a squads file are complements, not rival
+ * drafts — and the Leagues page offers one of each side by side. Under
+ * later-wins, loading them in the wrong order silently replaced every real
+ * squad with generated players, and the order files come out of a multi-file
+ * picker is not something a player controls. So squads beat names-only
+ * whichever came first, and any clubs the names-only side lists that the squads
+ * side doesn't (its tail past a short squads list) are appended, so they still
+ * fill the slots the squads file left empty. Nothing is reported: this is the
+ * combination working as intended, not a collision.
  */
 export function combineRosterFiles(files: NamedRosterFile[]): CombinedRosterFile {
   const byMatch = new Map<string, { comp: RosterFileCompetition; from: string }>();
@@ -654,6 +733,21 @@ export function combineRosterFiles(files: NamedRosterFile[]): CombinedRosterFile
       const key = comp.match.trim().toLowerCase();
       const existing = byMatch.get(key);
       if (existing) {
+        const oldSquads = carriesSquads(existing.comp);
+        const newSquads = carriesSquads(comp);
+        if (oldSquads !== newSquads) {
+          const squads = oldSquads ? existing : { comp, from: name };
+          const names = oldSquads ? comp : existing.comp;
+          byMatch.set(key, { comp: topUpClubs(squads.comp, names), from: squads.from });
+          continue;
+        }
+        const agreed = !oldSquads && !newSquads && extendsOther(existing.comp, comp);
+        if (agreed) {
+          const other = agreed === existing.comp ? comp : existing.comp;
+          const from = agreed === existing.comp ? existing.from : name;
+          byMatch.set(key, { comp: withBadgesFrom(agreed, other), from });
+          continue;
+        }
         warnings.push(
           `"${comp.match}" is listed in both ${existing.from} and ${name}, so the one from ${name} was used.`,
         );

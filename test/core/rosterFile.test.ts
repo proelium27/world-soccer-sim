@@ -254,6 +254,100 @@ describe("combineRosterFiles", () => {
     expect(file.competitions[0].clubs[0].name).toBe("Redo");
   });
 
+  /** One competition of several clubs; `squad` names the clubs that get a player. */
+  const clubsFile = (match: string, names: string[], squad: string[] = []) =>
+    parseRosterFile(
+      JSON.stringify({
+        format: ROSTER_FILE_FORMAT,
+        formatVersion: 1,
+        competitions: [
+          {
+            match,
+            clubs: names.map((n) => ({
+              name: n,
+              abbrev: n.slice(0, 3).toUpperCase(),
+              colors: ["#000000", "#ffffff"],
+              ...(squad.includes(n)
+                ? { players: [{ name: `${n} Star`, pos: "ST", age: 25, overall: 80 }] }
+                : {}),
+            })),
+          },
+        ],
+      }),
+    );
+
+  // The Leagues page offers a names-only file and a squads file side by side.
+  // Under plain later-wins, loading the names file second replaced every real
+  // squad with generated players, and a multi-file picker doesn't let the
+  // player choose the order.
+  it("keeps the squads whichever order a squads file and a names-only file come in", () => {
+    const squads = clubsFile("English Division 1", ["Alpha", "Beta"], ["Alpha", "Beta"]);
+    const names = clubsFile("English Division 1", ["Alpha", "Beta", "Gamma"]);
+    for (const files of [
+      [{ name: "squads.json", file: squads }, { name: "names.json", file: names }],
+      [{ name: "names.json", file: names }, { name: "squads.json", file: squads }],
+    ]) {
+      const { file, warnings } = combineRosterFiles(files);
+      const clubs = file.competitions[0].clubs;
+      expect(clubs.map((c) => c.name)).toEqual(["Alpha", "Beta", "Gamma"]);
+      expect(clubs[0].players).toHaveLength(1);
+      expect(clubs[1].players).toHaveLength(1);
+      expect(clubs[2].players).toBeUndefined();
+      expect(warnings).toEqual([]);
+    }
+  });
+
+  it("tops a squads list up only with clubs it doesn't already name", () => {
+    const { file } = combineRosterFiles([
+      { name: "squads.json", file: clubsFile("English Division 1", ["Alpha"], ["Alpha"]) },
+      { name: "names.json", file: clubsFile("English Division 1", ["Gamma", "ALPHA"]) },
+    ]);
+    expect(file.competitions[0].clubs.map((c) => c.name)).toEqual(["Alpha", "Gamma"]);
+  });
+
+  it("still lets the later of two squads files win, and says so", () => {
+    const { file, warnings } = combineRosterFiles([
+      { name: "old.json", file: clubsFile("English Division 1", ["Old"], ["Old"]) },
+      { name: "new.json", file: clubsFile("English Division 1", ["New"], ["New"]) },
+    ]);
+    expect(file.competitions[0].clubs.map((c) => c.name)).toEqual(["New"]);
+    expect(warnings).toHaveLength(1);
+  });
+
+  it("keeps a badge only the losing side of a clash carried", () => {
+    const badge = "data:image/png;base64,iVBORw0KGgo=";
+    const squads = clubsFile("English Division 1", ["Alpha"], ["Alpha"]);
+    const names = parseRosterFile(JSON.stringify({
+      format: ROSTER_FILE_FORMAT,
+      formatVersion: 1,
+      competitions: [{
+        match: "English Division 1",
+        clubs: [{ name: "Alpha", abbrev: "ALP", colors: ["#000000", "#ffffff"], logo: badge }],
+      }],
+    }));
+    for (const files of [
+      [{ name: "squads.json", file: squads }, { name: "names.json", file: names }],
+      [{ name: "names.json", file: names }, { name: "squads.json", file: squads }],
+    ]) {
+      const club = combineRosterFiles(files).file.competitions[0].clubs[0];
+      expect(club.players).toHaveLength(1);
+      expect(club.logo).toBe(badge);
+    }
+  });
+
+  it("treats two names-only lists as agreeing when one only runs longer", () => {
+    const short = clubsFile("English Division 1", ["Alpha", "Beta"]);
+    const long = clubsFile("English Division 1", ["Alpha", "Beta", "Gamma"]);
+    for (const files of [
+      [{ name: "short.json", file: short }, { name: "long.json", file: long }],
+      [{ name: "long.json", file: long }, { name: "short.json", file: short }],
+    ]) {
+      const { file, warnings } = combineRosterFiles(files);
+      expect(file.competitions[0].clubs.map((c) => c.name)).toEqual(["Alpha", "Beta", "Gamma"]);
+      expect(warnings).toEqual([]);
+    }
+  });
+
   it("combines to an empty (but valid) file when handed nothing", () => {
     const { file, warnings } = combineRosterFiles([]);
     expect(file.format).toBe(ROSTER_FILE_FORMAT);
