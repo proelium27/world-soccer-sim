@@ -4,7 +4,7 @@ import {
   isImageDataUrl, MAX_LOGO_DATA_URL, MAX_LOGO_ENTRIES,
 } from "../core/teams/logoPack.js";
 import { migrateLeague } from "./migrate.js";
-import { withMatchEvents } from "./leagueDb.js";
+import { withMatchDetail } from "./leagueDb.js";
 
 /**
  * The first two bytes of every gzip stream. Import sniffs for these rather than
@@ -71,8 +71,8 @@ export async function exportLeagueJSON(
   league: LeagueStore,
   crests?: ReadonlyMap<number, string>,
 ): Promise<void> {
-  // Never write an elided box score to a file — see `withMatchEvents`.
-  const bytes = await encodeLeagueFile(await withMatchEvents(league), crests);
+  // Never write an elided box score to a file — see `withMatchDetail`.
+  const bytes = await encodeLeagueFile(await withMatchDetail(league), crests);
   const blob = new Blob([bytes], { type: "application/gzip" });
   const url = URL.createObjectURL(blob);
 
@@ -198,7 +198,7 @@ export async function importLeagueJSON(file: File): Promise<ImportedLeague> {
 }
 
 /**
- * Strip any `eventsElided` marker off a league that came out of a file.
+ * Strip any `detailElided` marker off a league that came out of a file.
  *
  * `exportLeagueJSON` rehydrates before writing, so a file this game produced
  * carries none — this is for the ones it did not: a hand-edited file, or one
@@ -213,12 +213,12 @@ export async function importLeagueJSON(file: File): Promise<ImportedLeague> {
  * undo the elision on the spot and put every event straight back in memory.
  */
 function dropElisionMarkers(league: LeagueStore): LeagueStore {
-  if (!league.played.some((m) => m.boxScore.eventsElided)) return league;
+  if (!league.played.some((m) => m.boxScore.detailElided)) return league;
   return {
     ...league,
     played: league.played.map((m) => {
-      if (!m.boxScore.eventsElided) return m;
-      const { eventsElided: _dropped, ...boxScore } = m.boxScore;
+      if (!m.boxScore.detailElided) return m;
+      const { detailElided: _dropped, ...boxScore } = m.boxScore;
       return { ...m, boxScore };
     }),
   };

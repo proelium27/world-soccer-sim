@@ -4,7 +4,8 @@ import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import type { LeagueStore } from "../../core/leagueState.js";
 import type { Player, SeasonStats } from "../../core/players/types.js";
-import { computeTeamSeasonStats, type TeamSeasonStats } from "../../core/standings.js";
+import type { TeamSeasonStats } from "../../core/standings.js";
+import { teamSeasonStatsFor } from "../../db/leagueDb.js";
 import { Flag } from "../components/Flag.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { CompetitionSelect } from "../components/CompetitionSelect.js";
@@ -401,7 +402,7 @@ function TeamLeaders({ compId }: { compId: number }) {
 
   const teamIds = league.teams.filter((t) => t.compId === compId).map((t) => t.tid);
   const teamStats: TeamSeasonStats[] = season === "current"
-    ? computeTeamSeasonStats(teamIds, league.played)
+    ? teamSeasonStatsFor(league, teamIds)
     : (league.seasonHistory.find((h) => h.season === season)?.teamStats ?? [])
         .filter((s) => league.seasonHistory.find((h) => h.season === season)?.compsByTid[s.tid] === compId);
 

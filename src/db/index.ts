@@ -11,10 +11,11 @@ export {
   storedCareerRows,
   storedRetireeRows,
   storedPlayedRows,
-  loadMatchEvents,
-  isEventsElided,
-  withMatchEvents,
-  elideWrittenEvents,
+  loadMatchBoxScore,
+  isDetailElided,
+  withMatchDetail,
+  elideWrittenDetail,
+  teamSeasonStatsFor,
 } from "./leagueDb.js";
 
 export { loadCrests, saveCrests, deleteCrests } from "./crestDb.js";

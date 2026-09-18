@@ -10,8 +10,8 @@ import { ClubCrest } from "../components/ClubCrest.js";
 import { BackLink } from "../components/BackLink.js";
 import { KEY_EVENTS, TimelineRow, TimelineMarkerRow } from "../components/matchEvents.js";
 import { matchTimeline, periodMarkers } from "../matchClock.js";
-import { useMatchEvents, withEvents } from "../useMatchEvents.js";
-import { isEventsElided } from "../../db/index.js";
+import { useMatchDetail, withDetail } from "../useMatchDetail.js";
+import { isDetailElided } from "../../db/index.js";
 import { eventDetail } from "../matchNarration.js";
 
 
@@ -258,17 +258,23 @@ export function BoxScore() {
   const idx = matchIndex === undefined ? -1 : parseInt(matchIndex, 10);
   const stored: PlayedMatch | undefined = league?.played[idx];
   const wanted = useMemo(
-    () => (stored !== undefined && isEventsElided(stored) ? [idx] : []),
+    () => (stored !== undefined && isDetailElided(stored) ? [idx] : []),
     [stored, idx],
   );
-  const { events, loading: eventsLoading } = useMatchEvents(league?.lid, wanted);
+  const { boxScores, loading: detailLoading } = useMatchDetail(league?.lid, wanted);
 
   if (!league || matchIndex === undefined) {
     return <p className="p-3">Loading...</p>;
   }
 
   const match: PlayedMatch | undefined =
-    stored === undefined ? undefined : withEvents(stored, events.get(idx));
+    stored === undefined ? undefined : withDetail(stored, boxScores.get(idx));
+
+  // The whole page reads the box score, player tables included, so it waits for
+  // the fetch rather than drawing empty tables that say the match had no players.
+  if (match && detailLoading) {
+    return <p className="p-3">Loading the match...</p>;
+  }
 
   if (!match) {
     return (
@@ -434,12 +440,7 @@ export function BoxScore() {
       </div>
 
       <div className="bs-timeline">
-        {eventsLoading ? (
-          // Distinct from the empty state below on purpose: the timeline is
-          // read off disk, and showing "nothing happened" while it is still
-          // coming says something false about the match.
-          <p className="text-muted mb-0 p-3">Loading the timeline...</p>
-        ) : timeline.every((i) => i.kind === "marker") ? (
+        {timeline.every((i) => i.kind === "marker") ? (
           <p className="text-muted mb-0 p-3">Nothing worth reporting happened.</p>
         ) : (
           timeline.map((item, i) =>
