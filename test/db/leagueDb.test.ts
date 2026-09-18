@@ -645,3 +645,39 @@ describe("leagueDb history store", () => {
     expect((await storedPlayerRows(lid)).some((r) => r.pid === gone)).toBe(false);
   });
 });
+
+describe("leagueDb history store, full writes", () => {
+  /**
+   * A full write skips rows already on disk (the first save of every session
+   * would otherwise rewrite every resident row). The skip must never swallow a
+   * LIVE row that really differs from disk — the reason a full write exists is
+   * that disk cannot be trusted to match memory.
+   */
+  it("still writes a live-season row that differs from disk", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    const target = league.players[0];
+    const scored = {
+      ...target,
+      recentStats: target.recentStats.map((s) => (s.season === 8 ? { ...s, goals: 77 } : s)),
+    };
+    resetWriteCache();
+    await saveLeague({ ...league, lid, players: league.players.map((p) => (p === target ? scored : p)) });
+
+    const lines = await loadSeasonStats({ ...league, lid, players: [] } as LeagueStore, 8);
+    expect(lines.get(target.pid)!.goals).toBe(77);
+  });
+
+  it("writes an old-season row that is missing from disk, as a multi-season jump creates", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    const db = await getDb();
+    const target = league.players[0];
+    await db.delete("seasons", [lid, target.pid, 3, 0]);
+    resetWriteCache();
+    await saveLeague({ ...league, lid });
+
+    const lines = await loadSeasonStats({ ...league, lid, players: [] } as LeagueStore, 3);
+    expect(lines.get(target.pid)!.goals).toBe(3);
+  });
+});

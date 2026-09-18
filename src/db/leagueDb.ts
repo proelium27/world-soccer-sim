@@ -9,7 +9,7 @@ import {
 } from "../core/standings.js";
 import { getDb, type StoredLeague, type StoredPlayer, type PlayerCareer, type StoredSeasonRow } from "./database.js";
 import { migrateLeague } from "./migrate.js";
-import { changedRows, histRow, leagueSeasonRange, playerSeasonRange, statsRow } from "./careerDb.js";
+import { changedRows, histRow, leagueSeasonRange, playerSeasonRange, sameRow, statsRow } from "./careerDb.js";
 import { windowCareer } from "../core/simArchive.js";
 
 /**
@@ -542,7 +542,39 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
 
   const written = rowsToWrite(lid, players, storedSeq);
   let remove = written.remove;
+  let historyPuts = written.rows;
   if (written.full) {
+    // A full write holds every resident row, and nearly all of them are already
+    // on disk unchanged: the first save of every session rewrote ~2 history rows
+    // per player for nothing (measured 15x a new league's save under
+    // fake-indexeddb, whose index updates are slow; a real browser pays the puts
+    // too, ~56k of them on a 28k-player save). So a full write puts only the rows
+    // disk does not already hold, value for value:
+    //   - a row older than last season never changes once written (history is
+    //     append-only), so if its key is on disk it is skipped on the key alone;
+    //   - a row of the current or previous season can still move (the season's
+    //     line, the snapshot the offseason stamps), so it is compared with the
+    //     row on disk, read back through `bySeason` — reads are far cheaper
+    //     than puts, and straight after a load nothing has moved.
+    // Anything NOT on disk is always written, which is what keeps a multi-season
+    // jump, an import and a conversion whole: every row they create is missing.
+    const liveFrom = rest.season - 1;
+    const key = (pid: number, season: number, kind: number) => `${pid}:${season}:${kind}`;
+    const existing = new Set(
+      (await seasonStore.getAllKeys(leagueSeasonRange(lid))).map((k) => key(k[1], k[2], k[3])),
+    );
+    const liveOnDisk = new Map<string, object>();
+    for (const r of await seasonStore.index("bySeason").getAll(
+      IDBKeyRange.bound([lid, liveFrom], [lid, []]),
+    )) {
+      liveOnDisk.set(key(r.pid, r.season, r.kind), r.row);
+    }
+    historyPuts = written.rows.filter((r) => {
+      const k = key(r.pid, r.season, r.kind);
+      if (r.season < liveFrom) return !existing.has(k);
+      const disk = liveOnDisk.get(k);
+      return disk === undefined || !sameRow(disk, r.row);
+    });
     // A full write cannot diff against a cache, so it works out who went away
     // (retirement, the free-agent cull) from what is on disk: every player row
     // not in the pool. Deleting by pid rather than clearing the range, because
@@ -595,7 +627,7 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
     // the `players` store would hold those careers again and every load would
     // read them back. Everything older than the window is in `written.rows`.
     ...written.players.map((p) => playerStore.put(windowCareer(p), [lid, p.pid])),
-    ...written.rows.map((r) => seasonStore.put(r)),
+    ...historyPuts.map((r) => seasonStore.put(r)),
     ...retirees.remove.map((pid) => retireeStore.delete([lid, pid])),
     ...retirees.write.map((r) => retireeStore.put(r, [lid, r.pid])),
     ...playedPuts,

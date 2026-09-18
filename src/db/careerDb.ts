@@ -48,15 +48,16 @@ export function histRow(lid: number, pid: number, row: RatingsSnapshot): StoredS
  * By value rather than by reference because the sim clones every player's stat
  * lines on every matchday (`simThrough` copies the window before accumulating
  * into it), so a reference test would rewrite every resident row on every
- * matchday for nothing. One level deep: a snapshot's `ratings` compares by
- * reference, which is sound because the core replaces rather than edits it —
- * and a stray new object only costs a redundant write, never a missed one.
+ * matchday for nothing. Nested values (a snapshot's `ratings`) compare by value
+ * too, because a row read back from disk is a copy: by reference, every live row
+ * a full save compares against disk would read as changed and be rewritten.
  */
-function sameRow(a: object, b: object): boolean {
+export function sameRow(a: unknown, b: unknown): boolean {
   if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
   const ra = a as Record<string, unknown>;
   const rb = b as Record<string, unknown>;
-  for (const k in ra) if (ra[k] !== rb[k]) return false;
+  for (const k in ra) if (!sameRow(ra[k], rb[k])) return false;
   for (const k in rb) if (!(k in ra)) return false;
   return true;
 }
