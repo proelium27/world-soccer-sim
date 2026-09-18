@@ -46,12 +46,14 @@ export interface ValueHistoryPoint {
  */
 export function careerValueHistory(
   player: Player,
+  /** His WHOLE ratings history (`loadCareer`), not the resident window. */
+  hist: readonly RatingsSnapshot[],
   currentSeason: number,
   perceivedPotential: (snap: RatingsSnapshot) => number = (snap) => snap.potential,
 ): ValueHistoryPoint[] {
   const yearsRemaining = Math.max(0, player.contract.expiresSeason - currentSeason);
 
-  return [...player.hist]
+  return [...hist]
     .sort((a, b) => a.season - b.season)
     .map((snap) => {
       const season = snap.season + 1;

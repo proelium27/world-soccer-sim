@@ -128,7 +128,7 @@ function RosterTable({
       </thead>
       <tbody>
         {players.map((p) => {
-          const ss = p.stats.find((s) => s.season === season);
+          const ss = p.recentStats.find((s) => s.season === season);
           const prev = previousRatings(p);
           const borrowed = borrowedFrom.get(p.pid);
           return (

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
+import { useSeasonStats } from "../useSeasonStats.js";
 import { computeClubSeason, type ClubRun, type ClubSeasonPlayer } from "../../core/clubSeason.js";
 import { competitionOf, competitionRegion } from "../../core/competitions.js";
 import { POSITIONS } from "../../core/players/types.js";
@@ -66,12 +67,17 @@ export function ClubSeason() {
   const tid = Number(params.tid);
   const season = Number(params.season);
 
+  // The squad's full league lines for that season, read back from disk when the
+  // season is older than memory holds (useSeasonStats). Who was in the squad does
+  // not wait on it — that is in each player's career summary — only the stat
+  // columns do, and they read as a dash until it lands.
+  const lines = useSeasonStats(league, Number.isFinite(season) ? season : 0);
   const clubSeason = useMemo(
     () =>
       league && Number.isFinite(tid) && Number.isFinite(season)
-        ? computeClubSeason(league, tid, season)
+        ? computeClubSeason(league, tid, season, lines.lineOf)
         : null,
-    [league, tid, season],
+    [league, tid, season, lines],
   );
 
   if (!league) return <p className="p-3">Loading...</p>;

@@ -83,7 +83,7 @@ for (const scale of SCALES) {
     if (def >= 0) bestDef = Math.min(bestDef, def + 1);
     const tidByPid = new Map<number, number>();
     for (const p of league.players) {
-      const line = p.stats.find((st) => st.season === h.season);
+      const line = p.recentStats.find((st) => st.season === h.season);
       if (line) tidByPid.set(p.pid, line.tid);
     }
     for (const pid of awards.worldTeamOfYear) {

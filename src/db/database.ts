@@ -60,8 +60,20 @@ const DB_NAME = "soccer-gm";
  * Split out, that same record is 12.5 MB / 117 ms, and a mutation writes **no
  * played rows at all** — see `playedToWrite` in leagueDb.ts for why the diff is
  * an append rather than the identity comparison players need.
+ *
+ * 7 replaced `careers` (one row per player holding his whole history) with
+ * `seasons` (one row per player per season per kind), which is what lets a
+ * career stop being RESIDENT — `docs/lazy-career-plan.md` phase 3. The player
+ * row keeps a copy of the last few rows (`recentStats`/`recentHist`, the window
+ * the worker has always been handed), so a load reads the `players` store and
+ * nothing else; the rest is read back only by the screens that want it. A
+ * whole-career row could not do that: it is atomic, so reading the window meant
+ * reading the career, and adding a season meant rewriting it. Per-season rows
+ * are written while their season is live and never again, and the `bySeason`
+ * index turns "everyone's line for season N" — Leaders, the Database, a club's
+ * past squad — into one range read.
  */
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 /**
  * A league as it sits on disk.
@@ -72,16 +84,46 @@ const DB_VERSION = 6;
  * this — `loadLeague` reassembles a normal `LeagueStore` either way.
  */
 /**
- * A player as he sits in the `players` store: everything except his career.
+ * A player as he sits in the `players` store: identity plus the resident window
+ * of his history (`recentStats`/`recentHist`). Everything older is in `seasons`.
  *
- * `stats`/`hist` are optional rather than gone because both shapes exist on
- * disk — a v2/v3 row still carries them inline until `loadLeague` splits it, in
- * the same lazy way v1's inline pool was handled.
+ * Older shapes still exist on disk, which is why every history field is
+ * optional here; `loadLeague` reads each once and rewrites it in this one. A
+ * v2/v3 row carries the whole career inline as `stats`/`hist`; a v4-v6 row
+ * carries no history at all (it is in `careers`). A current row can also hold a
+ * window LONGER than the resident one — the session that wrote it had grown
+ * it — which load trims.
  */
-export type StoredPlayer = Omit<Player, "stats" | "hist"> & {
-  stats?: Player["stats"];
-  hist?: Player["hist"];
+export type StoredPlayer = Omit<Player, "recentStats" | "recentHist"> & {
+  recentStats?: Player["recentStats"];
+  recentHist?: Player["recentHist"];
+  /** A pre-v4 row's whole career, inline. */
+  stats?: Player["recentStats"];
+  hist?: Player["recentHist"];
 };
+
+/** Which half of a player's history a `seasons` row holds. */
+export const SEASON_ROW_STATS = 0;
+export const SEASON_ROW_HIST = 1;
+
+/**
+ * One row of one player's history, in the `seasons` store.
+ *
+ * `kind` keeps his stat line and his ratings snapshot apart rather than storing
+ * a season's pair together, and that is forced rather than tidy: the resident
+ * window keeps a different NUMBER of each, and a free agent's newest stat line
+ * can be years older than his newest snapshot. A combined row written from
+ * memory would then hold only one half and clobber the other on disk.
+ *
+ * `season` is unique per player per kind — `accumulateStats` looks a season's
+ * line up before opening one, and a snapshot is stamped once per offseason plus
+ * once at creation, the season before. Checked across five real saves (52,000
+ * players, seasons 11-101): no duplicates, no out-of-order seasons. A duplicate
+ * would not corrupt anything; the later row would simply win.
+ */
+export type StoredSeasonRow =
+  | { lid: number; pid: number; season: number; kind: typeof SEASON_ROW_STATS; row: Player["recentStats"][number] }
+  | { lid: number; pid: number; season: number; kind: typeof SEASON_ROW_HIST; row: Player["recentHist"][number] };
 
 /**
  * One club's custom badge: a row in `crests`, keyed `[lid, tid]`.
@@ -97,10 +139,10 @@ export interface StoredCrest {
   image: string;
 }
 
-/** The half of a player that grows without bound: one row in `careers`. */
+/** A v4-v6 `careers` row: one player's whole history. Read only to convert it. */
 export interface PlayerCareer {
-  stats: Player["stats"];
-  hist: Player["hist"];
+  stats: Player["recentStats"];
+  hist: Player["recentHist"];
 }
 
 export type StoredLeague = Omit<LeagueStore, "players" | "retiredPlayers" | "played"> & {
@@ -137,9 +179,8 @@ export interface SoccerGMDB extends DBSchema {
    * One record per player, keyed `[lid, pid]`. The compound key is what makes a
    * league's pool a single range query, so no secondary index is needed.
    *
-   * Since v4 this is identity only — `stats`/`hist` live in `careers`. They stay
-   * optional on the type because v2/v3 rows still carry them inline until
-   * `loadLeague` next rewrites them.
+   * Identity plus the resident window since v7; see `StoredPlayer` for the
+   * older shapes still on disk.
    */
   players: {
     key: [number, number];
@@ -158,6 +199,23 @@ export interface SoccerGMDB extends DBSchema {
   careers: {
     key: [number, number];
     value: PlayerCareer;
+  };
+  /**
+   * Every player's history, one row per season per kind (v7). The key is
+   * INLINE — `[lid, pid, season, kind]` read off the value — because an index
+   * can only be built over value fields, and `bySeason` needs `lid` and `season`
+   * on the row. Key order is player-major, so one career is one range read in
+   * season order; `bySeason` answers the other question.
+   *
+   * A row is put while its season is live and left alone after that. Rows are
+   * deleted only with the player they belong to (the free-agent cull,
+   * retirement, a league delete) — never because they are not in memory, which
+   * is the whole point of them.
+   */
+  seasons: {
+    key: [number, number, number, number];
+    value: StoredSeasonRow;
+    indexes: { bySeason: [number, number, number] };
   };
   /**
    * One record per archived retiree, keyed `[lid, pid]` exactly like `players`.
@@ -246,6 +304,13 @@ export function getDb(): Promise<IDBPDatabase<SoccerGMDB>> {
           // mid-season record carries ~10.5k matches and a versionchange
           // transaction is the worst possible place to move them.
           db.createObjectStore("played");
+        }
+        if (!db.objectStoreNames.contains("seasons")) {
+          // Filled from `careers` lazily in loadLeague, a league at a time, for
+          // the reason every store above gives: a mature save has several
+          // hundred thousand rows to move.
+          const seasons = db.createObjectStore("seasons", { keyPath: ["lid", "pid", "season", "kind"] });
+          seasons.createIndex("bySeason", ["lid", "season", "kind"]);
         }
         if (!db.objectStoreNames.contains("careers")) {
           // Same out-of-line `[lid, pid]` key again, and split out of the

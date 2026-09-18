@@ -26,7 +26,7 @@ function match(overrides: Partial<PlayedMatch>): PlayedMatch {
 function makePlayer(pid: number, statsBySeasonGoals: [season: number, goals: number][]): Player {
   return {
     pid,
-    stats: statsBySeasonGoals.map(([season, goals]) => ({
+    recentStats: statsBySeasonGoals.map(([season, goals]) => ({
       season, goals, appearances: 0, assists: 0, shots: 0, shotsOnTarget: 0, xg: 0,
       goalsAgainst: 0, xga: 0, saves: 0, tackles: 0, interceptions: 0,
       minutesPlayed: 0, ratingSum: 0, avgRating: 0,

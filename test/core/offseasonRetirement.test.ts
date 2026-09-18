@@ -102,7 +102,7 @@ describe("simOffseason — retirement, archive and awards", () => {
       expect(w.born).toBe(player.born);
       // The club he finished the season at, which is what the honours boards
       // credit the award to.
-      expect(w.tid).toBe(player.stats.find((st) => st.season === league.season)!.tid);
+      expect(w.tid).toBe(player.recentStats.find((st) => st.season === league.season)!.tid);
     }
 
     // The snapshot exists because a pid stops resolving once retirement deletes
@@ -138,8 +138,8 @@ describe("simOffseason — retirement, archive and awards", () => {
     // isArchiveWorthy, so this asserts the rule independently instead of
     // echoing the implementation.
     const expected = retirees.filter((p) => {
-      const apps = p.stats.reduce((sum, s) => sum + s.appearances, 0);
-      const peak = Math.max(p.ovr, ...p.hist.map((h) => h.ovr));
+      const apps = p.recentStats.reduce((sum, s) => sum + s.appearances, 0);
+      const peak = Math.max(p.ovr, ...p.recentHist.map((h) => h.ovr));
       return apps > 0
         && (peak >= RETIREE_ARCHIVE_MIN_PEAK_OVR || apps >= RETIREE_ARCHIVE_MIN_APPEARANCES);
     });

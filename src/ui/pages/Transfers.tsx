@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSeasonStats } from "../useSeasonStats.js";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { useDebounced } from "../useDebounced.js";
@@ -208,6 +209,9 @@ export function Transfers() {
   const perfSeason = pickedSeason !== null && seasonOptions.includes(pickedSeason)
     ? pickedSeason
     : defaultSeason;
+  // Lines for that season from memory, or read back from disk for an older
+  // one (see useSeasonStats) — never a two-line window read as the season.
+  const lines = useSeasonStats(league, perfSeason);
   // A view switch drops a sort whose column has no header in the new view,
   // back to the table's own default order.
   const changeTargetView = (next: PlayerView) => {
@@ -346,9 +350,9 @@ export function Transfers() {
       club: (r) => teamName(r.sellerTid),
       wage: (r) => r.player.contract.salary,
       value: (r) => r.scoutedValue,
-      ...viewSortAccessors((r: TargetRow) => r.player, perfSeason, baseTargets),
+      ...viewSortAccessors((r: TargetRow) => r.player, lines, baseTargets),
     });
-  }, [targets, pinnedBuys, sort, league?.season, teamName, potView, perfSeason]);
+  }, [targets, pinnedBuys, sort, league?.season, teamName, potView, perfSeason, lines]);
 
   // Same column sort for the search table. Its default "rank" key has no
   // accessor either, so until a header is clicked the rows stay in the order
@@ -366,10 +370,10 @@ export function Transfers() {
       wage: (r) => r.player.contract.salary,
       value: (r) => r.scoutedValue,
       ...viewSortAccessors(
-        (r: (typeof searchResults)[number]) => r.player, perfSeason, searchResults,
+        (r: (typeof searchResults)[number]) => r.player, lines, searchResults,
       ),
     });
-  }, [searchResults, searchSort.sort, league?.season, teamName, potView, perfSeason]);
+  }, [searchResults, searchSort.sort, league?.season, teamName, potView, perfSeason, lines]);
 
   if (!league) {
     return <p className="p-3">Loading...</p>;
@@ -473,6 +477,7 @@ export function Transfers() {
             />
             <PlayerViewSwitch
               value={targetView}
+              loading={lines.loading}
               onChange={changeTargetView}
               season={perfSeason}
               seasons={seasonOptions}
@@ -532,7 +537,7 @@ export function Transfers() {
                       {targetView !== "overview" ? (
                         <>
                           <td><ClubLink tid={sellerTid} /></td>
-                          <PlayerViewCells view={targetView} player={p} season={perfSeason} />
+                          <PlayerViewCells view={targetView} player={p} lines={lines} />
                         </>
                       ) : (
                         <>
@@ -611,6 +616,7 @@ export function Transfers() {
             </div>
             <PlayerViewSwitch
               value={searchView}
+              loading={lines.loading}
               onChange={changeSearchView}
               season={perfSeason}
               seasons={seasonOptions}
@@ -666,7 +672,7 @@ export function Transfers() {
                       {searchView !== "overview" ? (
                         <>
                           <td><ClubLink tid={sellerTid} /></td>
-                          <PlayerViewCells view={searchView} player={p} season={perfSeason} />
+                          <PlayerViewCells view={searchView} player={p} lines={lines} />
                         </>
                       ) : (
                         <>

@@ -34,7 +34,7 @@ for (let s = 1; s <= SEASONS; s++) {
   league = simThrough(league, "season", rng);
   league = simOffseason(league, rng);
 
-  const statLines = league.players.reduce((n, p) => n + p.stats.length, 0);
+  const statLines = league.players.reduce((n, p) => n + p.recentStats.length, 0);
   const bytes = JSON.stringify(league).length;
 
   // What postMessage to the sim worker costs on the main thread.

@@ -60,7 +60,7 @@ function rosteredPids(l: LeagueStore): Set<number> {
 function changesOf(p: Player): { season: number; from: Position; to: Position }[] {
   const out: { season: number; from: Position; to: Position }[] = [];
   let prev: Position | null = null;
-  for (const h of p.hist) {
+  for (const h of p.recentHist) {
     const at = (h as { pos?: Position }).pos ?? p.pos;
     if (prev !== null && at !== prev) out.push({ season: h.season, from: prev, to: at });
     prev = at;

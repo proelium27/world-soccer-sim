@@ -81,18 +81,18 @@ const activePids = new Set(league.teams.flatMap((t) => [...t.roster, ...t.academ
 let histBytes = 0, statsBytes = 0, histRows = 0, statRows = 0;
 let retiredHist = 0, retiredStats = 0;
 for (const p of players) {
-  const h = size(p.hist), st = size(p.stats);
+  const h = size(p.recentHist), st = size(p.recentStats);
   histBytes += h; statsBytes += st;
-  histRows += (p.hist ?? []).length; statRows += p.stats.length;
+  histRows += (p.recentHist ?? []).length; statRows += p.recentStats.length;
   if (!activePids.has(p.pid)) { retiredHist += h; retiredStats += st; }
 }
 console.log(`\nplayers: ${mb(size(players))} MB across ${players.length} players`);
 console.log(`  hist[]  ${mb(histBytes)} MB  ${histRows} rows  (~${Math.round(histBytes / Math.max(histRows, 1))} bytes/row)`);
 console.log(`  stats[] ${mb(statsBytes)} MB  ${statRows} rows  (~${Math.round(statsBytes / Math.max(statRows, 1))} bytes/row)`);
 if (players.length > 0) {
-  const sample = players.find((p) => (p.hist ?? []).length > 2);
-  if (sample?.hist?.[0]) {
-    console.log(`  one hist row has ${Object.keys(sample.hist[0]).length} keys: ${Object.keys(sample.hist[0]).join(",")}`);
+  const sample = players.find((p) => (p.recentHist ?? []).length > 2);
+  if (sample?.recentHist?.[0]) {
+    console.log(`  one hist row has ${Object.keys(sample.recentHist[0]).length} keys: ${Object.keys(sample.recentHist[0]).join(",")}`);
   }
 }
 

@@ -5,12 +5,14 @@ import { simOffseason } from "../../src/core/offseason.js";
 import { createLeagueState } from "../../src/core/leagueState.js";
 import { englandCompetitions } from "../../src/core/competitions.js";
 import {
-  summaryOf, withSeason, emptyCareerSummary, ovrLookup,
+  summaryOf, withSeason, emptyCareerSummary, ovrLookup, liveCareer,
 } from "../../src/core/players/careerSummary.js";
 import { totalsOf, bestSeasonsOf } from "../../src/core/frivolities/stats.js";
 import { migrateLeague } from "../../src/db/migrate.js";
 import { archivePlayer, isArchiveWorthy } from "../../src/core/players/archive.js";
 import type { Player } from "../../src/core/players/types.js";
+import { emptySeasonStats } from "../../src/core/players/types.js";
+import { seasonIsResident, windowCareer } from "../../src/core/simArchive.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 
 /**
@@ -38,12 +40,12 @@ describe("career summary", () => {
   it("stored + the current season equals folding the whole career", () => {
     let checked = 0;
     for (const p of league.players) {
-      const current = p.stats.find((s) => s.season === league.season);
-      const ovrFor = ovrLookup(p.hist, p.peakOvr ?? p.ovr);
+      const current = p.recentStats.find((s) => s.season === league.season);
+      const ovrFor = ovrLookup(p.recentHist, p.peakOvr ?? p.ovr);
       const live = current
         ? withSeason(p.career ?? emptyCareerSummary(), current, ovrFor(current.season))
         : (p.career ?? emptyCareerSummary());
-      const whole = summaryOf(p.stats, ovrFor);
+      const whole = summaryOf(p.recentStats, ovrFor);
 
       expect(live.totals).toEqual(whole.totals);
       expect(live.best).toEqual(whole.best);
@@ -57,28 +59,28 @@ describe("career summary", () => {
     // Someone has played this season; his stored summary must not contain it,
     // or the fold above would double-count.
     const active = league.players.filter((p) => {
-      const cur = p.stats.find((s) => s.season === league.season);
+      const cur = p.recentStats.find((s) => s.season === league.season);
       return cur !== undefined && cur.appearances > 0;
     });
     expect(active.length).toBeGreaterThan(100);
 
     for (const p of active.slice(0, 100)) {
-      const finished = p.stats.filter((s) => s.season !== league.season);
-      expect(p.career!.totals).toEqual(summaryOf(finished, ovrLookup(p.hist, p.peakOvr ?? p.ovr)).totals);
+      const finished = p.recentStats.filter((s) => s.season !== league.season);
+      expect(p.career!.totals).toEqual(summaryOf(finished, ovrLookup(p.recentHist, p.peakOvr ?? p.ovr)).totals);
     }
   });
 
   it("is actually maintained, not falling through to a default", () => {
-    const veterans = league.players.filter((p) => p.stats.some((s) => s.season < league.season));
+    const veterans = league.players.filter((p) => p.recentStats.some((s) => s.season < league.season));
     expect(veterans.length).toBeGreaterThan(500);
     expect(veterans.every((p) => p.career !== undefined)).toBe(true);
   });
 
   it("agrees with the functions it stands in for", () => {
     for (const p of league.players.slice(0, 300)) {
-      const s = summaryOf(p.stats, ovrLookup(p.hist, p.peakOvr ?? p.ovr));
-      expect(s.totals).toEqual(totalsOf(p.stats));
-      expect(s.best).toEqual(bestSeasonsOf(p.stats));
+      const s = summaryOf(p.recentStats, ovrLookup(p.recentHist, p.peakOvr ?? p.ovr));
+      expect(s.totals).toEqual(totalsOf(p.recentStats));
+      expect(s.best).toEqual(bestSeasonsOf(p.recentStats));
     }
   });
 
@@ -166,3 +168,39 @@ function emptyRow(season: number) {
     minutesPlayed: 0, ratingSum: 0, avgRating: 0,
   };
 }
+
+/**
+ * The two claims the resident window rests on (docs/lazy-career-plan.md phase
+ * 3), pinned rather than argued.
+ */
+describe("the resident window", () => {
+  const line = (season: number, apps = 10) => ({
+    ...emptySeasonStats(season, 1), appearances: apps, goals: season, ratingSum: apps * 7,
+  });
+
+  it("liveCareer is the whole career folded, with the season in progress added from the window", () => {
+    const all = [1, 2, 3, 4, 5, 6, 7, 8].map((s) => line(s));
+    const hist = [0, 1, 2, 3, 4, 5, 6, 7].map((season) => ({ season, ovr: 60 + season }));
+    const finished = summaryOf(all.slice(0, 7), ovrLookup(hist, 70));
+    const player = {
+      career: finished, recentStats: all.slice(-2), recentHist: hist.slice(-3), ovr: 70, peakOvr: 70,
+    };
+    expect(liveCareer(player, 8)).toEqual(summaryOf(all, ovrLookup(hist, 70)));
+    // And once the offseason has folded season 8 for good, nothing is added twice.
+    const folded = { ...player, career: summaryOf(all, ovrLookup(hist, 70)) };
+    expect(liveCareer(folded, 8)).toEqual(summaryOf(all, ovrLookup(hist, 70)));
+  });
+
+  it("holds every line for the current and previous season, whatever the gaps in a career", () => {
+    // Every pattern of which of ten seasons a player was on a squad.
+    for (let mask = 0; mask < 1 << 10; mask++) {
+      const seasons = [...Array(10).keys()].map((i) => i + 1).filter((s) => mask & (1 << (s - 1)));
+      const player = windowCareer({ recentStats: seasons.map((s) => line(s)), recentHist: [] });
+      for (const season of [9, 10]) {
+        expect(seasonIsResident(season, 10)).toBe(true);
+        const had = seasons.includes(season);
+        expect(player.recentStats.some((s) => s.season === season)).toBe(had);
+      }
+    }
+  });
+});

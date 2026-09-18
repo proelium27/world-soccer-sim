@@ -203,3 +203,28 @@ describe("OVR scale migration", () => {
     expect(over(migrated, GOAT_OVR_BASELINE)).toBe(over(fresh, GOAT_OVR_BASELINE));
   });
 });
+
+/**
+ * A file written before careers left memory — and every file this build writes,
+ * which keeps the old names on purpose (exportImport.ts) — carries history as
+ * `stats`/`hist`. The names must be adopted BEFORE the scale lift, which reads
+ * `recentHist`: the other way round, importing any pre-lift export crashed on
+ * `recentHist.map` of undefined (found by scripts/careerResidentProbe.ts on a
+ * real player save).
+ */
+describe("history under the names a file uses", () => {
+  it("lifts an old-scale save whose history is still called stats/hist", () => {
+    const league = makeLeague(0, 1);
+    const legacy = {
+      ...league,
+      meta: { ...league.meta, ovrScale: undefined },
+      players: league.players.map(({ recentStats, recentHist, ...p }) => ({ ...p, stats: recentStats, hist: recentHist })),
+    } as unknown as LeagueStore;
+
+    const migrated = migrateLeague(legacy);
+    const p = migrated.players[0];
+    expect(p.recentHist.length).toBe(league.players[0].recentHist.length);
+    expect((p as unknown as { hist?: unknown }).hist).toBeUndefined();
+    expect((p as unknown as { stats?: unknown }).stats).toBeUndefined();
+  });
+});

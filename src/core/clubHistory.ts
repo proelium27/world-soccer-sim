@@ -1,3 +1,4 @@
+import { squadTidInSeason } from "./players/careerSummary.js";
 import type { LeagueStore } from "./leagueState.js";
 import type { StandingsRow } from "./standings.js";
 import { tierOf } from "./competitions.js";
@@ -178,7 +179,7 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
     if (!playerSeasonTid.has(key)) {
       playerSeasonTid.set(
         key,
-        livePlayer.get(pid)?.stats.find((s) => s.season === season)?.tid
+        (livePlayer.has(pid) ? squadTidInSeason(livePlayer.get(pid)!, season) : undefined)
           ?? archived.get(pid)?.seasons.find((s) => s.season === season)?.tid
           ?? snapshotTid.get(key),
       );

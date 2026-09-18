@@ -31,7 +31,7 @@ describe("bonuses settle through a real offseason", () => {
       if (team.tid === league.meta.userTid) continue;
       for (const pid of team.roster) {
         const player = league.players.find((p) => p.pid === pid);
-        const line = player?.stats.find((st) => st.season === league.season);
+        const line = player?.recentStats.find((st) => st.season === league.season);
         if (line && line.appearances >= BONUS_APPEARANCE_THRESHOLD) {
           return { tid: team.tid, pid };
         }

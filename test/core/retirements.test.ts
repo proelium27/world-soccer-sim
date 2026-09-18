@@ -36,10 +36,10 @@ function makePlayer({ pid, ovr = 60, age = 34, lines = [], caps }: Over): Player
     pos: "ST",
     ovr,
     potential: ovr,
-    stats: lines.map(([season, appearances, goals, assists]) => ({
+    recentStats: lines.map(([season, appearances, goals, assists]) => ({
       ...emptySeasonStats(season), appearances, goals, assists,
     })),
-    hist: [],
+    recentHist: [],
     ...(caps === undefined ? {} : { intl: { caps, goals: 0, assists: 0, tournaments: 0, titles: 0, seasons: [] } }),
   } as unknown as Player;
 }
@@ -119,7 +119,7 @@ describe("summarizeRetirements", () => {
     // rating he'd have carried into a season he never plays. A veteran who
     // dropped 6 points in his final offseason should be remembered at 80.
     const player = makePlayer({ pid: 1, ovr: 74, age: 38 });
-    player.hist = [{
+    player.recentHist = [{
       season: SEASON - 1, ratings: player.ratings, ovr: 80, potential: 80, academy: false, pos: player.pos,
     }];
 

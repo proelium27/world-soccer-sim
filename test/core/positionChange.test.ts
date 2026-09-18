@@ -64,8 +64,8 @@ function player(over: Partial<Player> = {}): Player {
     potential: 70,
     contract: { salary: 1_000_000, expiresSeason: 10 },
     injury: null,
-    stats: [],
-    hist: [],
+    recentStats: [],
+    recentHist: [],
     ...over,
   };
 }
@@ -86,7 +86,7 @@ describe("changedPosition — the gates", () => {
   it("moves a player who has been clearly better elsewhere for the full window", () => {
     const p = player({
       ratings: FULLBACK_TILT,
-      hist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS - 1),
+      recentHist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS - 1),
     });
     // Precondition, so this can never pass because the fixture stopped tilting.
     const gap = computeOvr("FB", FULLBACK_TILT, 178) - computeOvr("W", FULLBACK_TILT, 178);
@@ -101,7 +101,7 @@ describe("changedPosition — the gates", () => {
     // change their best position every season are mostly this.
     const p = player({
       ratings: FULLBACK_TILT,
-      hist: history(WINGER_SHAPE, "W", POSITION_CHANGE_SEASONS - 1),
+      recentHist: history(WINGER_SHAPE, "W", POSITION_CHANGE_SEASONS - 1),
     });
     // Precondition: those recorded seasons really do show a settled winger.
     const past = computeOvr("FB", WINGER_SHAPE, 178) - computeOvr("W", WINGER_SHAPE, 178);
@@ -113,9 +113,9 @@ describe("changedPosition — the gates", () => {
   it("leaves a player alone without enough history to judge", () => {
     // A youth-intake player carries one seeded snapshot, so he cannot convert
     // in his first seasons however lopsided he looks.
-    const p = player({ ratings: FULLBACK_TILT, hist: [] });
+    const p = player({ ratings: FULLBACK_TILT, recentHist: [] });
     expect(changedPosition(p, FULLBACK_TILT)).toBeNull();
-    const one = player({ ratings: FULLBACK_TILT, hist: history(FULLBACK_TILT, "W", 1) });
+    const one = player({ ratings: FULLBACK_TILT, recentHist: history(FULLBACK_TILT, "W", 1) });
     expect(POSITION_CHANGE_SEASONS).toBeGreaterThan(2); // else the case below is empty
     expect(changedPosition(one, FULLBACK_TILT)).toBeNull();
   });
@@ -128,7 +128,7 @@ describe("changedPosition — the gates", () => {
     expect(gap).toBeGreaterThan(0);
     expect(gap).toBeLessThan(POSITION_CHANGE_MARGIN);
 
-    const p = player({ ratings: mild, hist: history(mild, "W", POSITION_CHANGE_SEASONS - 1) });
+    const p = player({ ratings: mild, recentHist: history(mild, "W", POSITION_CHANGE_SEASONS - 1) });
     expect(changedPosition(p, mild)).toBeNull();
   });
 });
@@ -141,7 +141,7 @@ describe("changedPosition — what it can never do", () => {
       pos: "GK",
       ratings: FULLBACK_TILT,
       heightCm: 192,
-      hist: history(FULLBACK_TILT, "GK", POSITION_CHANGE_SEASONS - 1, 192),
+      recentHist: history(FULLBACK_TILT, "GK", POSITION_CHANGE_SEASONS - 1, 192),
     });
     expect(changedPosition(gk, FULLBACK_TILT)).toBeNull();
 
@@ -150,7 +150,7 @@ describe("changedPosition — what it can never do", () => {
       const p = player({
         pos,
         ratings: keeperish,
-        hist: history(keeperish, pos, POSITION_CHANGE_SEASONS - 1),
+        recentHist: history(keeperish, pos, POSITION_CHANGE_SEASONS - 1),
       });
       expect(changedPosition(p, keeperish)).not.toBe("GK");
     }
@@ -171,7 +171,7 @@ describe("changedPosition — what it can never do", () => {
         const p = player({
           pos,
           ratings,
-          hist: history(ratings, pos, POSITION_CHANGE_SEASONS - 1),
+          recentHist: history(ratings, pos, POSITION_CHANGE_SEASONS - 1),
         });
         const to = changedPosition(p, ratings);
         if (to !== null) expect(COVERABLE[pos]).toContain(to);
@@ -190,7 +190,7 @@ describe("changedPosition — the cooldown", () => {
       pos: "FB",
       ratings: FULLBACK_TILT,
       // A full window of seasons, but all of them stamped at his OLD position.
-      hist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS + 2),
+      recentHist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS + 2),
     });
     expect(changedPosition(justConverted, FULLBACK_TILT)).toBeNull();
   });
@@ -203,7 +203,7 @@ describe("changedPosition — the cooldown", () => {
     const returned = player({
       pos: "W",
       ratings: FULLBACK_TILT,
-      hist: [
+      recentHist: [
         ...history(FULLBACK_TILT, "W", 4),
         ...history(FULLBACK_TILT, "AM", 3).map((h) => ({ ...h, season: h.season + 4 })),
         // A single season back at W — one short of the window on its own.
@@ -226,7 +226,7 @@ describe("changedPosition — the cooldown", () => {
     const settled = player({
       pos: "FB",
       ratings: winger,
-      hist: [
+      recentHist: [
         ...history(FLAT, "W", 3),
         ...history(winger, "FB", POSITION_CHANGE_SEASONS - 1),
       ],
@@ -237,18 +237,18 @@ describe("changedPosition — the cooldown", () => {
 
 describe("positionHistory", () => {
   it("reports each move, oldest first, and nothing for a settled player", () => {
-    const settled = player({ hist: history(FLAT, "W", 5) });
-    expect(positionHistory(settled)).toEqual([]);
+    const settled = player({ recentHist: history(FLAT, "W", 5) });
+    expect(positionHistory(settled.recentHist)).toEqual([]);
 
     const moved = player({
       pos: "AM",
-      hist: [
+      recentHist: [
         ...history(FLAT, "W", 3),
         ...history(FLAT, "FB", 2).map((h) => ({ ...h, season: h.season + 3 })),
         ...history(FLAT, "AM", 1).map((h) => ({ ...h, season: h.season + 5 })),
       ],
     });
-    expect(positionHistory(moved)).toEqual([
+    expect(positionHistory(moved.recentHist)).toEqual([
       { season: 4, from: "W", to: "FB" },
       { season: 6, from: "FB", to: "AM" },
     ]);
@@ -258,8 +258,8 @@ describe("positionHistory", () => {
     // migrate.ts stamps every old snapshot with the player's current position,
     // which is exact rather than a guess: nothing could change a position before
     // this existed. The note on his profile must therefore stay silent.
-    const migrated = player({ pos: "CM", hist: history(FLAT, "CM", 8) });
-    expect(positionHistory(migrated)).toEqual([]);
+    const migrated = player({ pos: "CM", recentHist: history(FLAT, "CM", 8) });
+    expect(positionHistory(migrated.recentHist)).toEqual([]);
   });
 });
 
@@ -294,7 +294,7 @@ describe("offseason wiring", () => {
       ...target,
       ratings: FULLBACK_TILT,
       ovr: computeOvr("W", FULLBACK_TILT, target.heightCm),
-      hist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS - 1, target.heightCm),
+      recentHist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS - 1, target.heightCm),
     };
     league = {
       ...league,
@@ -322,7 +322,7 @@ describe("progressPlayer integration", () => {
     const p = player({
       born: 1,
       ratings: FULLBACK_TILT,
-      hist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS - 1),
+      recentHist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS - 1),
     });
     const next = progressPlayer(mulberry32(3), p, 25);
 
@@ -330,7 +330,7 @@ describe("progressPlayer integration", () => {
     // His rating must be recomputed at the position he now holds, not carried
     // over from the old one.
     expect(next.ovr).toBe(computeOvr("FB", next.ratings, next.heightCm));
-    const last = next.hist[next.hist.length - 1];
+    const last = next.recentHist[next.recentHist.length - 1];
     expect(last.pos).toBe("FB");
     expect(last.ovr).toBe(next.ovr);
   });
@@ -350,11 +350,11 @@ describe("progressPlayer integration", () => {
 
     const converts = player({
       ratings: FULLBACK_TILT,
-      hist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS - 1),
+      recentHist: history(FULLBACK_TILT, "W", POSITION_CHANGE_SEASONS - 1),
     });
     const settles = player({
       ratings: WINGER_SHAPE,
-      hist: history(WINGER_SHAPE, "W", POSITION_CHANGE_SEASONS - 1),
+      recentHist: history(WINGER_SHAPE, "W", POSITION_CHANGE_SEASONS - 1),
     });
     // Guard that the two fixtures really do differ in outcome.
     expect(changedPosition(converts, converts.ratings)).toBe("FB");

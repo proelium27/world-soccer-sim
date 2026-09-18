@@ -313,7 +313,7 @@ export function generatePlayer(
     // youth intake, and free agency all set these differently).
     contract: { salary: seasonSalaryForOvr(ovr, pid, season), expiresSeason: 1 },
     injury: null,
-    stats: [],
+    recentStats: [],
     // Seeded with the player's generation-time ratings (stamped season - 1,
     // matching progressPlayer's "entry X = ratings entering season X + 1"
     // convention) so hist reaches length 2 — and the Roster page's
@@ -324,7 +324,7 @@ export function generatePlayer(
     // academy: false here is just the pre-career baseline snapshot — a
     // youth-intake player routed to the user's academy has his real academy
     // seasons recorded by progressPlayer each offseason from here on.
-    hist: [{ season: season - 1, ratings, ovr, potential, academy: false, pos }],
+    recentHist: [{ season: season - 1, ratings, ovr, potential, academy: false, pos }],
     // Seeded here, not left to the first progression, so *every* player carries
     // a career peak from the moment he exists. `progressPlayer` maintains it
     // afterwards. Without this a youth-intake player has a `hist` entry but no

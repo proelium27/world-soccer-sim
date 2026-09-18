@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSeasonStats } from "../useSeasonStats.js";
 import { useLeague } from "../context/LeagueContext.js";
 import { watchlistEntries } from "../../core/watchlist.js";
 import { competitionOf } from "../../core/competitions.js";
@@ -54,6 +55,9 @@ export function Watchlist() {
   const perfSeason = pickedSeason !== null && seasonOptions.includes(pickedSeason)
     ? pickedSeason
     : defaultSeason;
+  // Lines for that season from memory, or read back from disk for an older
+  // one (see useSeasonStats) — never a two-line window read as the season.
+  const lines = useSeasonStats(league, perfSeason);
   const changeView = (next: PlayerView) => {
     setView(next);
     if (!viewKeepsSort(sort.key, next, OVERVIEW_ONLY)) setSort({ key: "ovr", dir: "desc" });
@@ -72,7 +76,7 @@ export function Watchlist() {
         compName: team ? competitionOf(league.competitions, team.compId).name : null,
         // This season's line, if he has one yet. Absent in the offseason and
         // before a ball is kicked, which reads as blank rather than as zeroes.
-        season: e.player.stats.find((s) => s.season === league.season) ?? null,
+        season: e.player.recentStats.find((s) => s.season === league.season) ?? null,
       };
     });
     return sortRows(named, sort, {
@@ -88,9 +92,9 @@ export function Watchlist() {
       contract: (r) => r.player.contract.expiresSeason,
       value: (r) => r.value,
       apps: (r) => r.season?.appearances ?? -1,
-      ...viewSortAccessors((r: (typeof named)[number]) => r.player, perfSeason, named),
+      ...viewSortAccessors((r: (typeof named)[number]) => r.player, lines, named),
     });
-  }, [league, entries, sort, potView, perfSeason]);
+  }, [league, entries, sort, potView, perfSeason, lines]);
 
   if (!league) return null;
 
@@ -136,6 +140,7 @@ export function Watchlist() {
           </p>
           <PlayerViewSwitch
             value={view}
+            loading={lines.loading}
             onChange={changeView}
             season={perfSeason}
             seasons={seasonOptions}
@@ -204,7 +209,7 @@ export function Watchlist() {
                             ? <span className="text-muted">Free agent</span>
                             : <ClubLink tid={r.tid} />}
                         </td>
-                        <PlayerViewCells view={view} player={p} season={perfSeason} />
+                        <PlayerViewCells view={view} player={p} lines={lines} />
                       </>
                     ) : (
                       <>

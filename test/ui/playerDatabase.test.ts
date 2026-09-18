@@ -6,6 +6,7 @@ import {
   seasonsWithStats, sortKeysFor,
   type PlayerDbFilters,
 } from "../../src/ui/playerDatabase.js";
+import { residentSeasonLines } from "../../src/ui/useSeasonStats.js";
 import { scopeCompIds, worldCompetitions } from "../../src/core/competitions.js";
 import { emptySeasonStats, type Player, type SeasonStats } from "../../src/core/players/types.js";
 import { totalsOf } from "../../src/core/frivolities/stats.js";
@@ -164,12 +165,12 @@ describe("season and career views", () => {
   const withStats = {
     ...league,
     players: league.players.map((p) =>
-      p.pid === scorer.pid ? { ...p, stats: [line(12)] }
-        : p.pid === other.pid ? { ...p, stats: [line(3)] }
+      p.pid === scorer.pid ? { ...p, recentStats: [line(12)] }
+        : p.pid === other.pid ? { ...p, recentStats: [line(3)] }
         : p),
   };
   const statsRows = buildPlayerRows(withStats, exactBand, truePot);
-  const index = seasonStatsIndex(withStats.players, 3);
+  const index = seasonStatsIndex(withStats.players, residentSeasonLines(3));
 
   it("lists the seasons anyone has a line for, newest first", () => {
     expect(seasonsWithStats(withStats.players)).toEqual([3]);
@@ -205,12 +206,12 @@ describe("season and career views", () => {
   });
 
   it("sorts a career column by career totals, summed the way Frivolities sums them", () => {
-    const totals = careerTotalsIndex(withStats.players);
+    const totals = careerTotalsIndex(withStats.players, 3);
     const accessors = playerSortAccessors(() => "", () => "", undefined, totals);
     const row = statsRows.find((r) => r.player.pid === scorer.pid)!;
     expect(accessors.stat_goals(row)).toBe(12);
     expect(totals.get(scorer.pid)!.goals)
-      .toBe(totalsOf(withStats.players.find((p) => p.pid === scorer.pid)!.stats).goals);
+      .toBe(totalsOf(withStats.players.find((p) => p.pid === scorer.pid)!.recentStats).goals);
   });
 
   it("drops the card columns from the career view, which has no total for them", () => {

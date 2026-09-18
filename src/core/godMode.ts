@@ -199,8 +199,8 @@ export function createCustomPlayer(
     potential: spec.potential,
     contract: { ...spec.contract },
     injury: null,
-    stats: [],
-    hist: [
+    recentStats: [],
+    recentHist: [
       { season: league.season - 1, ratings: spec.ratings, ovr, potential: spec.potential, academy: false, pos: spec.pos },
     ],
     // Set alongside `hist` for the same reason as every other construction

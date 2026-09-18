@@ -202,3 +202,43 @@ Each phase ships on its own and is useful without the next.
 - The append-only histories `newsEvents` / cup histories (separate follow-up,
   needs the culled pid set out of `simOffseason`).
 - On-disk size. This changes what is resident, not what is stored.
+
+## Phase 3, as built (2026-09-18)
+
+Shipped as schema v7. It differs from the design above in one structural way,
+and the reason is worth keeping.
+
+**The store is per season, not per career.** The plan kept `careers` (one row
+per player holding his whole history). That row is atomic, which makes a window
+impossible to maintain cheaply: reading the window means reading the career, and
+adding a season means rewriting it. So `careers` was replaced by `seasons`, one
+row per player per season per kind (stat line or ratings snapshot), keyed
+`[lid, pid, season, kind]` with a `bySeason` index. A season's row is written
+while it is live and never again, and the index answers a question the plan's
+access table missed: **an arbitrary past season for everyone** (Leaders, the
+Database, the performance views' season pickers, the Awards page, a club's past
+squad). Those are one range read each.
+
+**The window is the worker's window.** Open question 3 is settled by reusing it:
+`RECENT_STATS_SEASONS` (2) stat lines and `RECENT_HIST_SEASONS` (3) snapshots, by
+count, already proven by `simArchive.test.ts` to run a season and an offseason
+with no difference. A count-based window of two lines always covers the current
+season and the one before (pinned over every gap pattern of a ten-season career),
+which is what lets most screens skip the disk entirely.
+
+**Measured** (`scripts/careerResidentProbe.ts`, live heap of the whole league):
+
+| save | whole careers | window | saved |
+| --- | --- | --- | --- |
+| season 47, mid-season | 297.9 MB | 266.5 MB | 31.4 MB (10.5%) |
+| season 101, offseason | 201.8 MB | 172.7 MB | 29.0 MB (14.4%) |
+
+Both 320-club saves. The saving is flat with save age (retirement caps the
+seasons a pool carries) and scales with world size.
+
+**Risks, as they turned out.** The truncated-read risk is what the rename was
+for, and it worked for reads. It did NOT cover object-literal keys in spreads
+with inferred types, where `tsc` stays silent: three of those were found by grep
+after a green compile, including the sim's working copy writing to a dead field.
+The async-screens risk is small: the Player Profile is the only screen that reads
+a whole career, and it caches per player.

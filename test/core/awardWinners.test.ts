@@ -20,9 +20,9 @@ function makePlayer(pid: number, over: Partial<Player> = {}, tid = 1): Player {
     born: SEASON - 27,
     pos: "ST",
     ovr: 70,
-    stats: [{ ...emptySeasonStats(SEASON, tid), appearances: 30, goals: 20 }],
+    recentStats: [{ ...emptySeasonStats(SEASON, tid), appearances: 30, goals: 20 }],
     // ovrDuringSeason reads the hist entry tagged `season - 1`.
-    hist: [{ season: SEASON - 1, ovr: 84, potential: 84, academy: false, ratings: {} }],
+    recentHist: [{ season: SEASON - 1, ovr: 84, potential: 84, academy: false, ratings: {} }],
     ...over,
   } as unknown as Player;
 }

@@ -44,8 +44,8 @@ function player(spec: Spec): Player {
     born: SEASON - 26,
     pos: spec.pos,
     ovr,
-    stats: [stats],
-    hist: [{ season: SEASON - 1, ovr, potential: ovr, academy: false, ratings: {} }],
+    recentStats: [stats],
+    recentHist: [{ season: SEASON - 1, ovr, potential: ovr, academy: false, ratings: {} }],
   } as unknown as Player;
 }
 
@@ -86,8 +86,8 @@ describe("the shipped award formula", () => {
       player({ pid: 3, pos: "GK", avgRating: 6.8 }),
     ];
     for (const p of players) {
-      expect(potyScore(p, p.stats[0], SEASON, DEFAULT_AWARD_FORMULA)).toBe(potyScore(p, p.stats[0], SEASON));
-      expect(totsScore(p, p.stats[0], SEASON, DEFAULT_AWARD_FORMULA)).toBe(totsScore(p, p.stats[0], SEASON));
+      expect(potyScore(p, p.recentStats[0], SEASON, DEFAULT_AWARD_FORMULA)).toBe(potyScore(p, p.recentStats[0], SEASON));
+      expect(totsScore(p, p.recentStats[0], SEASON, DEFAULT_AWARD_FORMULA)).toBe(totsScore(p, p.recentStats[0], SEASON));
     }
     expect(computeSeasonAwards(players, SEASON, DEFAULT_AWARD_FORMULA)).toEqual(computeSeasonAwards(players, SEASON));
   });

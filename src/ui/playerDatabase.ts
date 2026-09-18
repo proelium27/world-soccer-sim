@@ -3,7 +3,8 @@ import type { Player, SeasonStats, SkillKey } from "../core/players/types.js";
 import { SKILL_KEYS } from "../core/players/types.js";
 import type { AllTimeStatKey, StatTotals } from "../core/players/careerSummary.js";
 import { ALL_TIME_STAT_KEYS } from "../core/players/careerSummary.js";
-import { totalsOf } from "../core/frivolities/stats.js";
+import { liveCareer } from "../core/players/careerSummary.js";
+import type { SeasonLines } from "./useSeasonStats.js";
 import type { PlayerFieldFilters } from "../core/players/playerQuery.js";
 import { compIdMatchesFilters, playerMatchesFilters } from "../core/players/playerQuery.js";
 import { trueTransferValue } from "../core/finance/valuation.js";
@@ -186,10 +187,19 @@ export function filterPlayerRows(
   });
 }
 
-/** Every season any player has a stat line for, newest first. */
+/**
+ * Every season any player has a stat line for, newest first.
+ *
+ * From memory, without reading a single season back: every season a player has
+ * finished is a line in his career summary (squad seasons included, the same
+ * rule a stat line follows), and the season in progress is in his window.
+ */
 export function seasonsWithStats(players: readonly Player[]): number[] {
   const seen = new Set<number>();
-  for (const p of players) for (const s of p.stats) seen.add(s.season);
+  for (const p of players) {
+    for (const s of p.recentStats) seen.add(s.season);
+    for (const s of p.career?.seasons ?? []) seen.add(s.season);
+  }
   return [...seen].sort((a, b) => b - a);
 }
 
@@ -203,31 +213,25 @@ export function seasonsWithStats(players: readonly Player[]): number[] {
  */
 export function seasonStatsIndex(
   players: readonly Player[],
-  season: number,
+  lines: SeasonLines,
 ): Map<number, SeasonStats> {
   const index = new Map<number, SeasonStats>();
   for (const p of players) {
-    const line = p.stats.find((s) => s.season === season);
+    const line = lines.lineOf(p);
     if (line) index.set(p.pid, line);
   }
   return index;
 }
 
 /**
- * Career totals per player, summed the same way Frivolities' all-time boards
- * sum them — `totalsOf` over the seasons he actually appeared in, so the two
- * can't disagree about what a career total is.
- *
- * Built on demand rather than folded into `buildPlayerRows`, because it walks
- * every season line of every player in the world and only one column set reads
- * it. On a long dynasty that is the difference between a page that opens
- * instantly and one that pauses first.
+ * Career totals per player, the same numbers Frivolities' all-time boards rank
+ * on: his stored summary plus the season in progress (`liveCareer`), so the two
+ * can't disagree about what a career total is — and neither needs a season
+ * read back from disk.
  */
-export function careerTotalsIndex(players: readonly Player[]): Map<number, StatTotals> {
+export function careerTotalsIndex(players: readonly Player[], currentSeason: number): Map<number, StatTotals> {
   const index = new Map<number, StatTotals>();
-  for (const p of players) {
-    index.set(p.pid, totalsOf(p.stats.filter((s) => s.appearances > 0)));
-  }
+  for (const p of players) index.set(p.pid, liveCareer(p, currentSeason).totals);
   return index;
 }
 

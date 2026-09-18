@@ -29,8 +29,8 @@ function addFreeAgent(
     born: league.season - over.age,
     ovr: over.ovr,
     potential: over.potential,
-    stats: [],
-    hist: over.peakOvr === undefined
+    recentStats: [],
+    recentHist: over.peakOvr === undefined
       ? []
       : [{
           season: league.season - 1,

@@ -85,13 +85,13 @@ describe("Club season page render", () => {
       seasonHistory: [historyEntry(base, season)],
       players: base.players.map((p) =>
         roster.has(p.pid)
-          ? { ...p, stats: [...p.stats, {
+          ? { ...p, recentStats: [...p.recentStats, {
               season, tid, appearances: 30, goals: 4, assists: 3, shots: 40,
               shotsOnTarget: 15, xg: 4.4, goalsAgainst: 0, xga: 0, saves: 0,
               tackles: 20, interceptions: 12, passes: 900, passesCompleted: 700,
               crosses: 30, foulsCommitted: 20, yellowCards: 3, redCards: 0,
               minutesPlayed: 2600, ratingSum: 200, avgRating: 6.9,
-            } as (typeof p.stats)[number]] }
+            } as (typeof p.recentStats)[number]] }
           : p,
       ),
     };

@@ -1,9 +1,8 @@
 import type { LeagueStore } from "../leagueState.js";
 import type { Player, Position } from "../players/types.js";
 import type { ArchivedPlayer, ArchivedSeason } from "../players/archive.js";
-import {
-  totalsOf, bestSeasonsOf, type AllTimeStatKey, type StatTotals, type BestSeasons,
-} from "./stats.js";
+import type { AllTimeStatKey, StatTotals, BestSeasons } from "./stats.js";
+import { liveCareer } from "../players/careerSummary.js";
 
 /**
  * One career, whether or not the player is still playing.
@@ -93,18 +92,30 @@ function rowFromPlayer(
   tidOf: (pid: number) => number | null,
   currentSeason: number,
 ): CareerRow {
-  const played = p.stats.filter((s) => s.appearances > 0);
-  const totals = totalsOf(played);
+  // From his stored summary plus the season in progress — never by walking his
+  // seasons, which are not in memory (docs/lazy-career-plan.md).
+  const career = liveCareer(p, currentSeason);
+  const played = career.seasons.filter((s) => s.apps > 0);
 
-  // Peak ovr comes off `hist` (the ratings he actually played each season at).
-  // A player in his very first season has no snapshot yet, so his current ovr
-  // stands in — otherwise every newly generated youth would read as peak 0.
-  // The fallback season is the *current* one, never `p.born`: born is a season
-  // number too, so using it would render a real-looking but wrong year.
+  // Current ovr leads and a stored peak replaces it only when strictly higher —
+  // the rule `peakOf` (players/archive.ts) and the history scan this replaced
+  // both used. A player in his very first season has no peak behind him yet, so
+  // the fallback season is the CURRENT one, never `p.born`: born is a season
+  // number too, and would render as a real-looking but wrong year.
   let peakOvr = p.ovr;
   let peakSeason = currentSeason;
-  for (const h of p.hist) {
-    if (h.ovr > peakOvr) { peakOvr = h.ovr; peakSeason = h.season; }
+  if (p.peakOvr != null) {
+    if (p.peakOvr > peakOvr) {
+      peakOvr = p.peakOvr;
+      peakSeason = p.peakOvrSeason ?? currentSeason;
+    }
+  } else {
+    // A hand-built player with no stored peak, as `peakOf` allows for too. Every
+    // real one has the field (construction sites and migration set it), so this
+    // scan only ever sees what little history is resident.
+    for (const h of p.recentHist) {
+      if (h.ovr > peakOvr) { peakOvr = h.ovr; peakSeason = h.season; }
+    }
   }
 
   const clubs: number[] = [];
@@ -125,20 +136,15 @@ function rowFromPlayer(
     lastSeason: played.length ? played[played.length - 1].season : 0,
     peakOvr,
     peakSeason,
-    totals,
-    best: bestSeasonsOf(played),
+    totals: career.totals,
+    best: career.best,
     caps: p.intl?.caps ?? 0,
     intlGoals: p.intl?.goals ?? 0,
     intlTitles: p.intl?.titles ?? 0,
     clubs,
-    // Same rule archivePlayer uses, so a living and a retired player's season
-    // lines mean exactly the same thing: every stats row, appearances or not.
-    seasons: p.stats.map((s) => ({
-      season: s.season,
-      tid: s.tid,
-      ovr: p.hist.find((h) => h.season === s.season - 1)?.ovr ?? peakOvr,
-      apps: s.appearances,
-    })),
+    // Every season he was on a roster, appearances or not — the same line the
+    // archive keeps, so a living and a retired player's seasons mean the same.
+    seasons: career.seasons,
   };
 }
 

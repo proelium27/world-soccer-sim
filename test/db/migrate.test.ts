@@ -199,7 +199,7 @@ describe("migrateLeague", () => {
       ...league,
       players: league.players.map((p) => ({
         ...p,
-        stats: p.stats.map(({ minutesPlayed: _m, ratingSum: _r, avgRating: _a, ...rest }) => rest),
+        recentStats: p.recentStats.map(({ minutesPlayed: _m, ratingSum: _r, avgRating: _a, ...rest }) => rest),
       })),
       played: league.played.map((m) => ({
         ...m,
@@ -213,7 +213,7 @@ describe("migrateLeague", () => {
 
     const migrated = migrateLeague(preRating);
     for (const p of migrated.players) {
-      for (const ss of p.stats) {
+      for (const ss of p.recentStats) {
         expect(ss.minutesPlayed).toBe(0);
         expect(ss.ratingSum).toBe(0);
         expect(ss.avgRating).toBe(0);
@@ -233,7 +233,7 @@ describe("migrateLeague", () => {
       ...league,
       players: league.players.map((p) => ({
         ...p,
-        stats: p.stats.map(({ interceptions: _i, ...rest }) => rest),
+        recentStats: p.recentStats.map(({ interceptions: _i, ...rest }) => rest),
       })),
       played: league.played.map((m) => ({
         ...m,
@@ -247,7 +247,7 @@ describe("migrateLeague", () => {
 
     const migrated = migrateLeague(preInterceptions);
     for (const p of migrated.players) {
-      for (const ss of p.stats) {
+      for (const ss of p.recentStats) {
         expect(ss.interceptions).toBe(0);
       }
     }

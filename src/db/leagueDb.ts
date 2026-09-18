@@ -7,8 +7,10 @@ import {
   emptyTeamSeasonAcc, addToTeamSeasonAcc, teamSeasonStatsFromAcc, cloneTeamSeasonAcc,
   type TeamSeasonAcc, type TeamSeasonStats,
 } from "../core/standings.js";
-import { getDb, type StoredLeague, type StoredPlayer, type PlayerCareer } from "./database.js";
+import { getDb, type StoredLeague, type StoredPlayer, type PlayerCareer, type StoredSeasonRow } from "./database.js";
 import { migrateLeague } from "./migrate.js";
+import { changedRows, histRow, leagueSeasonRange, playerSeasonRange, statsRow } from "./careerDb.js";
+import { windowCareer } from "../core/simArchive.js";
 
 /**
  * Every player row for one league.
@@ -258,7 +260,10 @@ function elideDetail(m: PlayedMatch): PlayedMatch {
   };
 }
 
-/** Every career row for one league. Same key shape again. */
+/**
+ * Every row of one league in the v4-v6 `careers` store. Read only to convert a
+ * save onto `seasons`, and cleared by the full-write branch once it has.
+ */
 function careerRange(lid: number): IDBKeyRange {
   return IDBKeyRange.bound([lid], [lid, []]);
 }
@@ -270,12 +275,6 @@ function careerRange(lid: number): IDBKeyRange {
  */
 function crestRange(lid: number): IDBKeyRange {
   return IDBKeyRange.bound([lid], [lid, []]);
-}
-
-/** Identity and career, as they are stored: two rows from one in-memory player. */
-function splitPlayer(p: Player): { identity: StoredPlayer; career: PlayerCareer } {
-  const { stats, hist, ...identity } = p;
-  return { identity, career: { stats, hist } };
 }
 
 /**
@@ -325,14 +324,14 @@ export function resetWriteCache(): void {
 }
 
 /**
- * Does anything about this player *except his career* differ?
+ * Does anything about this player *except his history* differ?
  *
- * Object identity is no longer a fine enough question once the two halves are
- * stored apart. A simmed matchday hands back a new player object for everyone —
- * `accumulateStats` replaces `stats` — while leaving name, ratings, ovr and
- * contract exactly as they were, so identity-by-reference would rewrite ~11k
- * identity rows that are byte-for-byte what is already on disk. Measured, that
- * doubled the puts and took a matchday save from 622ms to 1459ms.
+ * Object identity is not a fine enough question on its own. A simmed matchday
+ * hands back a new player object for everyone — `simThrough` copies the stat
+ * lines before accumulating into them — while leaving name, ratings, ovr and
+ * contract exactly as they were, so identity-by-reference would rewrite every
+ * player row for nothing. Measured before careers left memory, that doubled the
+ * puts and took a matchday save from 622ms to 1459ms.
  *
  * A field compare is sound here for the same reason the reference diff is: the
  * core is purely functional, so a nested value (`ratings`, `contract`, `intl`)
@@ -341,7 +340,7 @@ export function resetWriteCache(): void {
  */
 function identityChanged(a: Player, b: Player): boolean {
   for (const k in a) {
-    if (k === "stats" || k === "hist") continue;
+    if (k === "recentStats" || k === "recentHist") continue;
     if ((a as unknown as Record<string, unknown>)[k] !== (b as unknown as Record<string, unknown>)[k]) {
       return true;
     }
@@ -352,50 +351,69 @@ function identityChanged(a: Player, b: Player): boolean {
   return false;
 }
 
+/** Every history row a player holds in memory, as `seasons` rows. */
+function allRows(lid: number, p: Player): StoredSeasonRow[] {
+  return [
+    ...p.recentStats.map((s) => statsRow(lid, p.pid, s)),
+    ...p.recentHist.map((h) => histRow(lid, p.pid, h)),
+  ];
+}
+
 /**
- * Which rows a save has to touch, for both stores in one pass.
+ * Which rows a save has to touch, in one pass over the pool.
  *
- * `full` forces a rewrite of everything, which is the safe answer whenever we
- * cannot prove what is on disk. Otherwise the two halves are asked separately:
- * a career row only when `stats`/`hist` actually moved (the core never mutates
- * them in place, so a reference compare answers it exactly), and an identity row
- * only when something else did. Most saves touch one or the other, never both —
- * a matchday moves every career and no identity, a contract extension the
- * reverse.
+ * `full` forces a write of everything in memory, the safe answer whenever we
+ * cannot prove what is on disk. Otherwise each player is asked two things: which
+ * of his history rows are new or changed (`changedRows`, by value — see there),
+ * and whether his player row moved, i.e. his identity or his window. A matchday
+ * touches the players who played and nobody else; a contract extension touches
+ * one player row and no history.
  *
- * One `Map` for both, deliberately: building a second one over ~11k players
- * cost ~50ms a save on its own, and two maps could in principle disagree about
- * what is on disk.
+ * **A full write never removes a history row a player still has.** The rows not
+ * in memory — every season older than the window — are only on disk, and a full
+ * write has nothing to put back in their place. The same lesson as `played`'s
+ * elided box scores (see `saveLeague`): anything that can be missing from memory
+ * must never be cleared on the strength of being missing. Rows go only with the
+ * player they belong to (`remove`).
+ *
+ * One `Map`, deliberately: building a second one over the pool cost ~50ms a save
+ * on its own, and two maps could in principle disagree about what is on disk.
  */
 function rowsToWrite(
   lid: number,
   players: Player[],
   storedSeq: number | undefined,
-): { identities: Player[]; careers: Player[]; remove: number[]; full: boolean } {
+): { players: Player[]; rows: StoredSeasonRow[]; remove: number[]; full: boolean } {
   const cached = lastWritten;
   // Only trust the cache if it describes this league and the record on disk is
   // still the one we wrote: a second tab saving in between makes our idea of the
   // pool stale, and an incremental write on top of that would merge two states
   // into one that never existed.
   if (!cached || cached.lid !== lid || storedSeq === undefined || cached.seq !== storedSeq) {
-    return { identities: players, careers: players, remove: [], full: true };
+    return { players, rows: players.flatMap((p) => allRows(lid, p)), remove: [], full: true };
   }
 
   const prev = new Map(cached.players.map((p) => [p.pid, p]));
-  const identities: Player[] = [];
-  const careers: Player[] = [];
+  const out: Player[] = [];
+  const rows: StoredSeasonRow[] = [];
   for (const p of players) {
     const old = prev.get(p.pid);
     if (old === undefined) {
-      identities.push(p);
-      careers.push(p);
+      out.push(p);
+      rows.push(...allRows(lid, p));
     } else if (old !== p) {
-      if (old.stats !== p.stats || old.hist !== p.hist) careers.push(p);
-      if (identityChanged(old, p)) identities.push(p);
+      const stats = changedRows(old.recentStats, p.recentStats);
+      const hist = changedRows(old.recentHist, p.recentHist);
+      for (const s of stats) rows.push(statsRow(lid, p.pid, s));
+      for (const h of hist) rows.push(histRow(lid, p.pid, h));
+      const windowMoved = stats.length > 0 || hist.length > 0
+        || old.recentStats.length !== p.recentStats.length
+        || old.recentHist.length !== p.recentHist.length;
+      if (windowMoved || identityChanged(old, p)) out.push(p);
     }
     prev.delete(p.pid);
   }
-  return { identities, careers, remove: [...prev.keys()], full: false };
+  return { players: out, rows, remove: [...prev.keys()], full: false };
 }
 
 /**
@@ -491,12 +509,13 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
   const { players, retiredPlayers, played, ...rest } = league;
 
   const tx = db.transaction(
-    ["leagues", "players", "careers", "retirees", "played"],
+    ["leagues", "players", "careers", "seasons", "retirees", "played"],
     "readwrite",
   );
   const leagues = tx.objectStore("leagues");
   const playerStore = tx.objectStore("players");
   const careerStore = tx.objectStore("careers");
+  const seasonStore = tx.objectStore("seasons");
   const retireeStore = tx.objectStore("retirees");
   const playedStore = tx.objectStore("played");
 
@@ -521,12 +540,19 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
     await leagues.put({ ...rest, writeSeq: seq } as StoredLeague);
   }
 
-  const { identities, careers, remove, full } = rowsToWrite(lid, players, storedSeq);
-  // A full write clears first, so players dropped since the last save
-  // (retirement, the free-agent cull) cannot linger as orphan rows in either
-  // store. An incremental one deletes exactly the pids that went away.
-  if (full) {
-    await playerStore.delete(playerRange(lid));
+  const written = rowsToWrite(lid, players, storedSeq);
+  let remove = written.remove;
+  if (written.full) {
+    // A full write cannot diff against a cache, so it works out who went away
+    // (retirement, the free-agent cull) from what is on disk: every player row
+    // not in the pool. Deleting by pid rather than clearing the range, because
+    // clearing would take the history rows with it — see `rowsToWrite`.
+    const inPool = new Set(players.map((p) => p.pid));
+    const onDisk = await playerStore.getAllKeys(playerRange(lid));
+    remove = onDisk.map((k) => k[1]).filter((pid) => !inPool.has(pid));
+    // The v4-v6 store, emptied once this save's history is in `seasons`. Only
+    // ever non-empty on the first write after `loadLeague` converted a save,
+    // and that write is always full (load seeds no cache).
     await careerStore.delete(careerRange(lid));
   }
 
@@ -562,9 +588,14 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
 
   await Promise.all([
     ...remove.map((pid) => playerStore.delete([lid, pid])),
-    ...remove.map((pid) => careerStore.delete([lid, pid])),
-    ...identities.map((p) => playerStore.put(splitPlayer(p).identity, [lid, p.pid])),
-    ...careers.map((p) => careerStore.put(splitPlayer(p).career, [lid, p.pid])),
+    ...remove.map((pid) => seasonStore.delete(playerSeasonRange(lid, pid))),
+    // Always the WINDOW, whatever memory holds. The window in memory is longer
+    // for a moment after a conversion (whole careers, cut once this lands) and
+    // for a while in play (a session appends a season a year); stored as-is,
+    // the `players` store would hold those careers again and every load would
+    // read them back. Everything older than the window is in `written.rows`.
+    ...written.players.map((p) => playerStore.put(windowCareer(p), [lid, p.pid])),
+    ...written.rows.map((r) => seasonStore.put(r)),
     ...retirees.remove.map((pid) => retireeStore.delete([lid, pid])),
     ...retirees.write.map((r) => retireeStore.put(r, [lid, r.pid])),
     ...playedPuts,
@@ -601,8 +632,12 @@ export async function loadLeague(
   const stored = await tx.objectStore("leagues").get(lid);
   if (!stored) return undefined;
   const rows = await tx.objectStore("players").getAll(playerRange(lid));
-  const careerKeys = await tx.objectStore("careers").getAllKeys(careerRange(lid));
-  const careerRows = await tx.objectStore("careers").getAll(careerRange(lid));
+  // A v4-v6 save keeps each whole career in `careers`, and this is the one load
+  // that reads them: to put them into `seasons` (the write-back below), after
+  // which the store is empty for this league and every later load skips it.
+  const unconverted = (await tx.objectStore("careers").count(careerRange(lid))) > 0;
+  const careerKeys = unconverted ? await tx.objectStore("careers").getAllKeys(careerRange(lid)) : [];
+  const careerRows = unconverted ? await tx.objectStore("careers").getAll(careerRange(lid)) : [];
   const retireeRows = await tx.objectStore("retirees").getAll(retireeRange(lid));
   await tx.done;
 
@@ -624,17 +659,23 @@ export async function loadLeague(
   const careerByPid = new Map<number, PlayerCareer>();
   careerKeys.forEach((key, i) => careerByPid.set(key[1], careerRows[i]));
 
-  // A row still carrying `stats` is pre-v4 and has not been split yet. Same
-  // lazy migration as v1's inline pool, and the same reason for the write-back
-  // below: without it every startup redoes this before first paint.
+  // A row still carrying `stats` is pre-v4 and holds its whole career inline.
+  // Same lazy migration as v1's inline pool, and the same reason for the
+  // write-back below: without it every startup redoes this before first paint.
+  //
+  // Either older shape arrives with the WHOLE career in the window fields, which
+  // is what the conversion needs: `migrateLeague` then brings every season up to
+  // date (the per-row migrations only ever run on what is in memory), the
+  // write-back puts every season into `seasons`, and only after that is the
+  // window cut. Cutting first would leave the older seasons nowhere.
   const inlineCareers = rows.some((r) => r.stats !== undefined);
   const joined: Player[] = rows.map((r) => {
-    const { stats, hist, ...identity } = r;
+    const { stats, hist, recentStats, recentHist, ...identity } = r;
     const career = careerByPid.get(r.pid);
     return {
       ...identity,
-      stats: stats ?? career?.stats ?? [],
-      hist: hist ?? career?.hist ?? [],
+      recentStats: recentStats ?? stats ?? career?.stats ?? [],
+      recentHist: recentHist ?? hist ?? career?.hist ?? [],
     } as Player;
   });
 
@@ -665,6 +706,7 @@ export async function loadLeague(
     || inlineRetirees !== undefined
     || inlinePlayed !== undefined
     || inlineCareers
+    || unconverted
     || shrankOnLoad(assembled, migrated)
     || namedAwardWinners(assembled, migrated)
     // A rating-scale lift, like the award-winner backfill above, has to be
@@ -676,8 +718,46 @@ export async function loadLeague(
     || assembled.meta.ovrScale !== migrated.meta.ovrScale
   ) {
     await saveLeague(migrated);
+    // Written, so the window can be cut: everything older is now in `seasons`.
+    return trimWrittenCareers(migrated);
   }
-  return migrated;
+  // Nothing needed writing: a current-shape save, whose player rows are stored
+  // cut to the window already (`saveLeague`). Cut again anyway, for free when it
+  // is a no-op, so a row written under a wider window than today's cannot make
+  // the resident pool bigger than intended.
+  return { ...migrated, players: migrated.players.map(windowCareer) };
+}
+
+/**
+ * The league with each player cut back to the resident window — but only once
+ * the save that wrote his history has provably landed.
+ *
+ * The window grows in play: every offseason appends a snapshot and every season
+ * opens a stat line, so a session that plays on for years would slowly hold
+ * careers again. Cutting is only safe for rows that are on disk, and the proof
+ * is the same one `elideWrittenDetail` uses: the pool is the exact array the
+ * last `saveLeague` for this league recorded, and that save put every row it
+ * held (`rowsToWrite`). Anything else — a pool not yet saved, another league —
+ * comes back untouched, and a later commit trims it.
+ *
+ * `lastWritten.players` is repointed at the cut pool so the next save diffs
+ * against what the app now holds. Cut players are new objects, but the rows in
+ * them are the same objects the save wrote, so `changedRows` finds nothing and
+ * the next save writes no history for them.
+ */
+export function trimWrittenCareers(league: LeagueStore): LeagueStore {
+  if (!lastWritten || lastWritten.lid !== league.lid || lastWritten.players !== league.players) {
+    return league;
+  }
+  let cut = false;
+  const players = league.players.map((p) => {
+    const w = windowCareer(p);
+    if (w !== p) cut = true;
+    return w;
+  });
+  if (!cut) return league;
+  lastWritten.players = players;
+  return { ...league, players };
 }
 
 /**
@@ -734,21 +814,22 @@ export async function listLeagues(): Promise<
 }
 
 /**
- * Delete a league by lid, along with all of its player, career, retiree, played
- * and crest rows.
+ * Delete a league by lid, along with all of its player, history, retiree,
+ * played and crest rows.
  */
 export async function deleteLeague(lid: number): Promise<void> {
   // A reused lid must not inherit this save's team-season fold.
   seasonFolds.delete(lid);
   const db = await getDb();
   const tx = db.transaction(
-    ["leagues", "players", "careers", "retirees", "crests", "played"],
+    ["leagues", "players", "careers", "seasons", "retirees", "crests", "played"],
     "readwrite",
   );
   await Promise.all([
     tx.objectStore("leagues").delete(lid),
     tx.objectStore("players").delete(playerRange(lid)),
     tx.objectStore("careers").delete(careerRange(lid)),
+    tx.objectStore("seasons").delete(leagueSeasonRange(lid)),
     tx.objectStore("retirees").delete(retireeRange(lid)),
     tx.objectStore("played").delete(playedRange(lid)),
     // In this transaction rather than through crestDb's own, so a deleted
@@ -768,7 +849,13 @@ export async function storedPlayerRows(lid: number): Promise<StoredPlayer[]> {
   return db.getAll("players", playerRange(lid));
 }
 
-/** Exported for tests: the career rows currently stored for a league. */
+/** Exported for tests: the history rows currently stored for a league. */
+export async function storedSeasonRows(lid: number): Promise<StoredSeasonRow[]> {
+  const db = await getDb();
+  return db.getAll("seasons", leagueSeasonRange(lid));
+}
+
+/** Exported for tests: the v4-v6 career rows still stored for a league. */
 export async function storedCareerRows(lid: number): Promise<PlayerCareer[]> {
   const db = await getDb();
   return db.getAll("careers", careerRange(lid));

@@ -32,7 +32,7 @@ function makePlayer(o: {
     heightCm: 180,
     ovr: 70,
     potential: 70,
-    stats: o.lines.map(([season, tid, appearances]) => ({
+    recentStats: o.lines.map(([season, tid, appearances]) => ({
       ...emptySeasonStats(season, tid),
       appearances,
       goals: appearances,
@@ -41,7 +41,7 @@ function makePlayer(o: {
       avgRating: 7,
       minutesPlayed: appearances * 90,
     })),
-    hist: o.lines.map(([season]) => ({
+    recentHist: o.lines.map(([season]) => ({
       season: season - 1, ovr: ovrOf(season), ratings: {}, potential: ovrOf(season), academy: false,
     })),
   } as unknown as Player;

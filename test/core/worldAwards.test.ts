@@ -73,9 +73,9 @@ function player(spec: PlayerSpec): Player {
     born: SEASON - 26,
     pos: spec.pos ?? "ST",
     ovr: spec.ovr,
-    stats: [stats],
+    recentStats: [stats],
     // ovrDuringSeason reads the hist entry tagged `season - 1`.
-    hist: [{ season: SEASON - 1, ovr: spec.ovr, potential: spec.ovr, academy: false, ratings: {} }],
+    recentHist: [{ season: SEASON - 1, ovr: spec.ovr, potential: spec.ovr, academy: false, ratings: {} }],
     intl: spec.intl,
   } as unknown as Player;
 }
@@ -634,7 +634,7 @@ describe("position awards", () => {
       defender(2, 1, 70, { tackles: 40 }),
     ].map((p) => ({
       ...p,
-      stats: [{ ...p.stats[0], appearances: AWARD_MIN_APPEARANCES - 1 }],
+      recentStats: [{ ...p.recentStats[0], appearances: AWARD_MIN_APPEARANCES - 1 }],
     })) as unknown as Player[];
     const { goalkeeperOfYear, defenderOfYear } = computeWorldAwards(players, SEASON, ctx());
     expect(goalkeeperOfYear![0].pid).toBe(1);
@@ -647,7 +647,7 @@ describe("position awards", () => {
     const parttime = keeper(1, 1, 90, { saves: 500, goalsAgainst: 0 });
     const fulltime = keeper(2, 1, 70, { saves: 50, goalsAgainst: 30, avgRating: 7.0 });
     const players = [
-      { ...parttime, stats: [{ ...parttime.stats[0], appearances: AWARD_MIN_APPEARANCES - 1 }] },
+      { ...parttime, recentStats: [{ ...parttime.recentStats[0], appearances: AWARD_MIN_APPEARANCES - 1 }] },
       fulltime,
       ...squad(100, 2, 55),
     ] as unknown as Player[];

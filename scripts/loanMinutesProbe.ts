@@ -66,9 +66,9 @@ league = playSeason(league);
 const season = league.season;
 const byPid = new Map(league.players.map((p) => [p.pid, p]));
 const appsOf = (pid: number) =>
-  byPid.get(pid)?.stats.find((s) => s.season === season)?.appearances ?? 0;
+  byPid.get(pid)?.recentStats.find((s) => s.season === season)?.appearances ?? 0;
 const minsOf = (pid: number) =>
-  byPid.get(pid)?.stats.find((s) => s.season === season)?.minutesPlayed ?? 0;
+  byPid.get(pid)?.recentStats.find((s) => s.season === season)?.minutesPlayed ?? 0;
 
 const xiCache = new Map<number, Player[]>();
 function xiOf(tid: number): Player[] {

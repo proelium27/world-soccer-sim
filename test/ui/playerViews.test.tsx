@@ -9,6 +9,7 @@ import { setWatched } from "../../src/core/watchlist.js";
 import { initInternationalCampaign } from "../../src/core/international/index.js";
 import { emptyNationalManagerState } from "../../src/core/nationalManager/index.js";
 import { sortRows } from "../../src/ui/components/SortableTable.js";
+import { residentSeasonLines } from "../../src/ui/useSeasonStats.js";
 import {
   PERFORMANCE_COLUMNS, performanceSeason, viewKeepsSort, viewSortAccessors, type PlayerView,
 } from "../../src/ui/playerViews.js";
@@ -53,7 +54,7 @@ const { NTMySquad } = await import("../../src/ui/pages/nationalTeams/MySquad.js"
 function withLine(p: Player): Player {
   return {
     ...p,
-    stats: [{
+    recentStats: [{
       ...emptySeasonStats(1, 0),
       appearances: 10 + (p.pid % 20),
       minutesPlayed: 900,
@@ -171,7 +172,7 @@ describe("what each view shows", () => {
     const html = render(Watchlist, l, "performance");
     for (const col of PERFORMANCE_COLUMNS) expect(html).toContain(`>${col.label}</abbr>`);
     const p = l.players.find((x) => x.pid === watched[0])!;
-    expect(html).toContain(`>${p.stats[0].avgRating.toFixed(2)}<`);
+    expect(html).toContain(`>${p.recentStats[0].avgRating.toFixed(2)}<`);
     expect(html).toContain("league stats");
   });
 
@@ -213,14 +214,14 @@ describe("viewKeepsSort", () => {
 describe("performanceSeason", () => {
   it("opens on the season being played once it has any stats", () => {
     const l = { ...base, season: 3, players: base.players.map((p) => ({
-      ...p, stats: [emptySeasonStats(2), emptySeasonStats(3)],
+      ...p, recentStats: [emptySeasonStats(2), emptySeasonStats(3)],
     })) };
     expect(performanceSeason(l)).toBe(3);
   });
 
   it("falls back to last season at the top of a new one", () => {
     const l = { ...base, season: 3, players: base.players.map((p) => ({
-      ...p, stats: [emptySeasonStats(2)],
+      ...p, recentStats: [emptySeasonStats(2)],
     })) };
     expect(performanceSeason(l)).toBe(2);
   });
@@ -231,11 +232,11 @@ describe("sorting by match rating", () => {
   const line = (apps: number, rating: number) => ({
     ...emptySeasonStats(1), appearances: apps, avgRating: rating,
   });
-  const regular = { ...a, stats: [line(30, 6.8)] };
-  const cameo = { ...b, stats: [line(2, 8.9)] };
-  const unused = { ...c, stats: [] };
+  const regular = { ...a, recentStats: [line(30, 6.8)] };
+  const cameo = { ...b, recentStats: [line(2, 8.9)] };
+  const unused = { ...c, recentStats: [] };
   const rows = [cameo, unused, regular];
-  const acc = viewSortAccessors((p: Player) => p, 1, rows);
+  const acc = viewSortAccessors((p: Player) => p, residentSeasonLines(1), rows);
 
   it("puts a regular above a one-off cameo, and a player with no line last", () => {
     const sorted = sortRows(rows, { key: "stat_avgRating", dir: "desc" }, acc);
@@ -243,7 +244,7 @@ describe("sorting by match rating", () => {
   });
 
   it("still ranks counting stats straight, with no line below zero", () => {
-    const goals = viewSortAccessors((p: Player) => p, 1, rows).stat_appearances;
+    const goals = viewSortAccessors((p: Player) => p, residentSeasonLines(1), rows).stat_appearances;
     expect(goals(regular)).toBe(30);
     expect(goals(unused)).toBeLessThan(0);
   });

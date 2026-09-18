@@ -8,6 +8,7 @@ import { getRatingColor } from "./utils/ratingColor.js";
 import { ColumnSetPills } from "./pages/databaseShared.js";
 import { STAT_COLUMNS, type StatSortKey } from "./playerDatabase.js";
 import { seasonYear } from "./format.js";
+import type { SeasonLines } from "./useSeasonStats.js";
 import { RATING_LEADER_QUALIFY_FRACTION } from "../core/constants.js";
 
 /**
@@ -118,7 +119,7 @@ export function viewKeepsSort(key: string, view: PlayerView, overviewOnly: reado
 export function performanceSeason(league: LeagueStore): number {
   const season = league.season;
   if (season <= 1) return season;
-  const started = league.players.some((p) => p.stats.some((s) => s.season === season));
+  const started = league.players.some((p) => p.recentStats.some((s) => s.season === season));
   return started ? season : season - 1;
 }
 
@@ -128,10 +129,6 @@ export function performanceSeasonOptions(league: LeagueStore): number[] {
   return [latest, latest - 1, latest - 2].filter((s) => s >= 1);
 }
 
-/** A player's league line for one season, if he has one. */
-export function statLineFor(player: Player, season: number): SeasonStats | undefined {
-  return player.stats.find((s) => s.season === season);
-}
 
 function statOf(line: SeasonStats, key: PerformanceKey): number {
   return line[key.slice("stat_".length) as keyof SeasonStats] as number;
@@ -154,24 +151,25 @@ function statOf(line: SeasonStats, key: PerformanceKey): number {
  */
 export function viewSortAccessors<T>(
   playerOf: (row: T) => Player,
-  season: number,
+  lines: SeasonLines,
   rows: readonly T[] = [],
 ): Record<ViewSortKey, (row: T) => number> {
+  const statLineFor = (p: Player) => lines.lineOf(p);
   const out = {} as Record<ViewSortKey, (row: T) => number>;
   for (const key of SKILL_KEYS) out[key] = (r) => playerOf(r).ratings[key];
   for (const key of PERFORMANCE_KEYS) {
     out[key] = (r) => {
-      const line = statLineFor(playerOf(r), season);
+      const line = statLineFor(playerOf(r));
       return line ? statOf(line, key) : -1;
     };
   }
   let mostApps = 0;
   for (const r of rows) {
-    mostApps = Math.max(mostApps, statLineFor(playerOf(r), season)?.appearances ?? 0);
+    mostApps = Math.max(mostApps, statLineFor(playerOf(r))?.appearances ?? 0);
   }
   const floor = Math.ceil(mostApps * RATING_LEADER_QUALIFY_FRACTION);
   out.stat_avgRating = (r) => {
-    const line = statLineFor(playerOf(r), season);
+    const line = statLineFor(playerOf(r));
     if (!line || line.appearances === 0) return -1000;
     return line.appearances >= floor ? line.avgRating : line.avgRating - 100;
   };
@@ -185,7 +183,7 @@ export function viewSortAccessors<T>(
  * and international matches keep their own tallies elsewhere.
  */
 export function PlayerViewSwitch({
-  value, onChange, season, seasons, onSeason,
+  value, onChange, season, seasons, onSeason, loading,
 }: {
   value: PlayerView;
   onChange: (next: PlayerView) => void;
@@ -193,6 +191,8 @@ export function PlayerViewSwitch({
   season?: number;
   seasons?: readonly number[];
   onSeason?: (next: number) => void;
+  /** An older season still being read back from disk (see `useSeasonStats`). */
+  loading?: boolean;
 }) {
   return (
     <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
@@ -212,6 +212,9 @@ export function PlayerViewSwitch({
         ) : (
           <span className="text-muted small">{seasonYear(season)} league stats</span>
         )
+      )}
+      {value === "performance" && loading && (
+        <span className="text-muted small" role="status">Loading that season...</span>
       )}
     </div>
   );
@@ -271,12 +274,12 @@ export function PlayerViewHeaders({
 
 /** One row's cells for an attributes or performance view, matching `PlayerViewHeaders`. */
 export function PlayerViewCells({
-  view, player, season,
+  view, player, lines,
 }: {
   view: Exclude<PlayerView, "overview">;
   player: Player;
-  /** The performance view's season; ignored by the attributes view. */
-  season: number;
+  /** The performance view's season lines; ignored by the attributes view. */
+  lines: SeasonLines;
 }) {
   const ovr = (
     <td className="text-end fw-semibold db-divide" style={{ color: getRatingColor(player.ovr) }}>
@@ -293,7 +296,7 @@ export function PlayerViewCells({
       </>
     );
   }
-  const line = statLineFor(player, season);
+  const line = lines.lineOf(player);
   return (
     <>
       {ovr}

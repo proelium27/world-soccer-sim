@@ -1,4 +1,4 @@
-import type { Player, Position } from "../../core/players/types.js";
+import type { Player, Position, RatingsSnapshot } from "../../core/players/types.js";
 import {
   positionHistory, positionLabel, positionRatings, secondaryPositions,
 } from "../../core/players/positions.js";
@@ -104,8 +104,8 @@ export function PositionStrip({ player }: { player: Player }) {
  * actually lines up at the new position is the one after the stamp. Using the
  * stamp itself would date the same move a year earlier here than on the feed.
  */
-export function PositionHistoryNote({ player }: { player: Player }) {
-  const moves = positionHistory(player);
+export function PositionHistoryNote({ hist }: { hist: readonly RatingsSnapshot[] }) {
+  const moves = positionHistory(hist);
   if (moves.length === 0) return null;
   return (
     <p className="mb-3 small text-muted">

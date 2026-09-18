@@ -1,5 +1,5 @@
 import type { LeagueStore } from "./leagueState.js";
-import type { Position, SeasonStats } from "./players/types.js";
+import type { Player, Position, SeasonStats } from "./players/types.js";
 import type { StandingsRow } from "./standings.js";
 import { computeStandings } from "./standings.js";
 import { tierOf } from "./competitions.js";
@@ -108,11 +108,18 @@ export interface ClubSeason {
 /**
  * Rebuild a club's squad for a past season.
  *
- * No per-season roster is persisted, so this reads the two records that survive.
- * `Player.stats` opens a row for every player on the matchday squad, appearance
- * or not (see accumulateStats in simThrough.ts), which makes it the game's only
- * squad-membership record; `ArchivedPlayer.seasons` is the same line kept for a
- * retiree after the player object is deleted.
+ * No per-season roster is persisted, so this reads the records that survive. A
+ * stat line is opened for every player on the matchday squad, appearance or not
+ * (see accumulateStats in simThrough.ts), which makes it the game's only
+ * squad-membership record, and every season a player finishes leaves the same
+ * line in his career summary (`career.seasons`: club, rating, appearances) —
+ * the line `ArchivedPlayer.seasons` keeps for a retiree. So who was in the squad,
+ * and at what rating, is answered from memory.
+ *
+ * The rest of a season's line (minutes, goals, rating) is NOT in memory once
+ * the season is older than the window, and comes from `lineOf` — the page reads
+ * it back from disk (useSeasonStats). Without it those columns show a dash, as
+ * they always have for a retiree; the squad itself is complete either way.
  *
  * Two limits are inherent and are stated on the page rather than papered over.
  * `SeasonStats.tid` is the club he *finished* the season at (open decision #4),
@@ -121,23 +128,31 @@ export interface ClubSeason {
  * quality-gated and hard-capped, so a squad from the distant past is missing
  * whoever fell out of it.
  */
-function historicSquad(league: LeagueStore, tid: number, season: number): ClubSeasonPlayer[] {
+function historicSquad(
+  league: LeagueStore,
+  tid: number,
+  season: number,
+  lineOf?: (player: Player) => SeasonStats | undefined,
+): ClubSeasonPlayer[] {
   const squad: ClubSeasonPlayer[] = [];
 
   for (const p of league.players) {
-    const stats = p.stats.find((s) => s.season === season && s.tid === tid);
-    if (!stats) continue;
+    const stats = lineOf?.(p) ?? p.recentStats.find((s) => s.season === season);
+    const summary = p.career?.seasons.find((s) => s.season === season);
+    const clubThen = stats?.tid ?? summary?.tid;
+    if (clubThen !== tid) continue;
     squad.push({
       pid: p.pid,
       name: p.name,
       nationality: p.nationality,
       pos: p.pos,
       // The snapshot stamped at the end of season N-1 is the rating he carried
-      // through N — the same offset ovrDuringSeason and ArchivedSeason use.
-      ovr: p.hist.find((h) => h.season === season - 1)?.ovr ?? p.ovr,
+      // through N — the same offset ovrDuringSeason and ArchivedSeason use, and
+      // the one the summary line was folded with.
+      ovr: p.recentHist.find((h) => h.season === season - 1)?.ovr ?? summary?.ovr ?? p.ovr,
       age: season - p.born,
-      appearances: stats.appearances,
-      stats,
+      appearances: stats?.appearances ?? summary?.apps ?? 0,
+      stats: stats ?? null,
       fromArchive: false,
     });
   }
@@ -170,7 +185,7 @@ function liveSquad(league: LeagueStore, tid: number, season: number): ClubSeason
   for (const pid of team.roster) {
     const p = byPid.get(pid);
     if (!p) continue;
-    const stats = p.stats.find((s) => s.season === season) ?? null;
+    const stats = p.recentStats.find((s) => s.season === season) ?? null;
     squad.push({
       pid: p.pid,
       name: p.name,
@@ -238,8 +253,9 @@ function fromRecord(
   league: LeagueStore,
   tid: number,
   record: ClubSeasonRecord,
+  lineOf?: (player: Player) => SeasonStats | undefined,
 ): ClubSeason {
-  const squad = historicSquad(league, tid, record.season);
+  const squad = historicSquad(league, tid, record.season, lineOf);
   return {
     tid,
     season: record.season,
@@ -353,8 +369,10 @@ export function computeClubSeason(
   league: LeagueStore,
   tid: number,
   season: number,
+  /** That season's league lines, for a season older than memory holds (see historicSquad). */
+  lineOf?: (player: Player) => SeasonStats | undefined,
 ): ClubSeason | null {
   if (season === league.season) return currentSeason(league, tid);
   const record = computeClubHistory(league, tid).seasons.find((s) => s.season === season);
-  return record ? fromRecord(league, tid, record) : null;
+  return record ? fromRecord(league, tid, record, lineOf) : null;
 }

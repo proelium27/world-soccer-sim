@@ -364,7 +364,7 @@ export function progressPlayer(
     // they're not eligible for.
     minutesFactor = MINUTES_FACTOR_MAX;
   } else {
-    const lastSeasonStats = player.stats.find((s) => s.season === season);
+    const lastSeasonStats = player.recentStats.find((s) => s.season === season);
     const appearances = lastSeasonStats?.appearances ?? 0;
     minutesFactor = MINUTES_FACTOR_MIN
       + (MINUTES_FACTOR_MAX - MINUTES_FACTOR_MIN)
@@ -440,7 +440,7 @@ export function progressPlayer(
     potential,
     peakOvr: beatsPeak ? ovr : priorPeak,
     peakOvrSeason: beatsPeak ? season : (player.peakOvrSeason ?? season),
-    hist: [...player.hist, { season, ratings, ovr, potential, academy: inAcademy, pos }],
+    recentHist: [...player.recentHist, { season, ratings, ovr, potential, academy: inAcademy, pos }],
   };
 }
 

@@ -170,7 +170,7 @@ for (const seed of SEEDS) {
   const playerById = new Map(league.players.map((p) => [p.pid, p]));
   const recBySeason = new Map(league.seasonHistory.map((h) => [h.season, h]));
   const histOvr = (p: (typeof league.players)[number], season: number) =>
-    p.hist.find((h) => h.season === season)?.ovr ?? p.ovr;
+    p.recentHist.find((h) => h.season === season)?.ovr ?? p.ovr;
   let protectedSales = 0;
   let eliteTop4PaidSales = 0;
   for (const tr of league.transfers) {

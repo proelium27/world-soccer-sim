@@ -7,7 +7,7 @@ import { isDefaultContinentalFormat, sanitizeContinentalFormat, type Continental
 import type { CupCompetitionId } from "../../core/constants.js";
 import type { SimThrough, IntlMode, PlayoffMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
-import { saveLeague, loadLeague, elideWrittenDetail } from "../../db/leagueDb.js";
+import { saveLeague, loadLeague, elideWrittenDetail, trimWrittenCareers } from "../../db/leagueDb.js";
 import { loadCrests, saveCrests } from "../../db/crestDb.js";
 import { getActiveLid, setActiveLid, clearActiveLid } from "../../db/activeLeague.js";
 import { setSeasonStartYear } from "../format.js";
@@ -312,8 +312,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     // season simmed in one sitting does not climb back to holding every one of
     // them. Here because every committed league passes through here; it is a
     // no-op for anything that was not the league just saved, so it cannot drop
-    // a timeline that is only in memory (see elideWrittenDetail).
-    const l = given && elideWrittenDetail(given);
+    // a timeline that is only in memory (see elideWrittenDetail). Careers are
+    // cut back to the recent window on the same proof, so a session that plays
+    // on for years does not slowly grow them back (see trimWrittenCareers).
+    const l = given && trimWrittenCareers(elideWrittenDetail(given));
     leagueRef.current = l;
     // Every league — loaded, created, imported, or switched away from — passes
     // through here, which is why the season→year display offset is set here

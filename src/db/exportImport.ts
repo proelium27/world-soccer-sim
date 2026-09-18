@@ -5,6 +5,7 @@ import {
 } from "../core/teams/logoPack.js";
 import { migrateLeague } from "./migrate.js";
 import { withMatchDetail } from "./leagueDb.js";
+import { withFullCareers } from "./careerDb.js";
 
 /**
  * The first two bytes of every gzip stream. Import sniffs for these rather than
@@ -71,8 +72,12 @@ export async function exportLeagueJSON(
   league: LeagueStore,
   crests?: ReadonlyMap<number, string>,
 ): Promise<void> {
-  // Never write an elided box score to a file — see `withMatchDetail`.
-  const bytes = await encodeLeagueFile(await withMatchDetail(league), crests);
+  // Never write an elided box score to a file — see `withMatchDetail` — and
+  // never a window where a career belongs: see `fileCareers`.
+  const bytes = await encodeLeagueFile(
+    fileCareers(await withFullCareers(await withMatchDetail(league))),
+    crests,
+  );
   const blob = new Blob([bytes], { type: "application/gzip" });
   const url = URL.createObjectURL(blob);
 
@@ -194,6 +199,24 @@ export async function importLeagueJSON(file: File): Promise<ImportedLeague> {
   return {
     league: dropElisionMarkers(migrateLeague(rest as unknown as LeagueStore)),
     crests: parseExportedCrests(rawCrests),
+  };
+}
+
+/**
+ * Each player's history under the names a FILE uses: `stats`/`hist`, whole.
+ *
+ * In memory a player holds only the last few seasons, under `recentStats`/
+ * `recentHist`; a file holds his whole career (`withFullCareers` reads the rest
+ * back first). The old names are kept on purpose: a file written by this build
+ * then reads correctly in a build from before careers left memory, and
+ * `migrateLeague` maps either name on the way in.
+ */
+function fileCareers(league: LeagueStore): LeagueStore {
+  return {
+    ...league,
+    players: league.players.map(({ recentStats, recentHist, ...p }) => (
+      { ...p, stats: recentStats, hist: recentHist } as unknown as LeagueStore["players"][number]
+    )),
   };
 }
 

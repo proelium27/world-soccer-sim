@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
+import { useSeasonStats } from "../useSeasonStats.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { Flag } from "../components/Flag.js";
 import { PotDisplay } from "../components/PotDisplay.js";
@@ -214,23 +215,31 @@ function PlayerDatabase() {
     ?? (league && seasons.includes(league.season) ? league.season : seasons[0])
     ?? league?.season ?? 0;
 
-  // Built only for the view that reads them. The season index is cheap; the
-  // career one walks every season line of every player in the world, which on a
-  // long dynasty is the difference between opening instantly and pausing first.
+  // A season older than the window is read back from disk (see
+  // useSeasonStats); until it lands the season columns stay empty rather than
+  // showing the window's two lines as though they were the season.
+  const lines = useSeasonStats(league, season);
+  // Built only for the view that reads them.
   const seasonStats = useMemo(
-    () => (columns === "season" ? seasonStatsIndex(league?.players ?? [], season) : undefined),
-    [league?.players, season, columns],
+    () => (columns === "season" && !lines.loading ? seasonStatsIndex(league?.players ?? [], lines) : undefined),
+    [league?.players, lines, columns],
   );
   const careerTotals = useMemo(
-    () => (columns === "career" ? careerTotalsIndex(league?.players ?? []) : undefined),
-    [league?.players, columns],
+    () => (columns === "career" ? careerTotalsIndex(league?.players ?? [], league?.season ?? 0) : undefined),
+    [league?.players, league?.season, columns],
   );
 
   // The season view has nothing to say about a player the season has no record
   // of, so it narrows the table rather than printing a row of dashes.
   const inView = useMemo(
-    () => (seasonStats ? filterToSeason(filtered, seasonStats) : filtered),
-    [filtered, seasonStats],
+    () => (
+      seasonStats ? filterToSeason(filtered, seasonStats)
+        // Still reading the season back: no rows, not every player with a blank
+        // line, which would read as a season nobody played.
+        : columns === "season" ? []
+          : filtered
+    ),
+    [filtered, seasonStats, columns],
   );
 
   const sorted = useMemo(
@@ -307,7 +316,9 @@ function PlayerDatabase() {
             ))}
           </select>
         )}
-        {hasAnyFilter(filters) || name !== "" || status !== "all" || columns === "season" ? (
+        {columns === "season" && lines.loading ? (
+          <span className="text-muted small" role="status">Loading that season...</span>
+        ) : hasAnyFilter(filters) || name !== "" || status !== "all" || columns === "season" ? (
           <span className="text-muted small">
             {sorted.length.toLocaleString()} of {rows.length.toLocaleString()} players match
           </span>

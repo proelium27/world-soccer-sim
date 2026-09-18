@@ -35,7 +35,7 @@ for (let s = 1; s <= SEASONS; s++) {
   const l = structuredClone(league);
   l.phase = "offseason";
 
-  const statLines = l.players.reduce((n, p) => n + p.stats.length, 0);
+  const statLines = l.players.reduce((n, p) => n + p.recentStats.length, 0);
   const user = l.teams.find((t) => t.tid === l.meta.userTid)!;
 
   const tProtected = ms(() => {

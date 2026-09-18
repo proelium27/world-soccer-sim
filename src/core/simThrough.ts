@@ -91,10 +91,10 @@ function accumulateStats(
     if (!relevantPids.has(p.pid)) continue;
     const tid = homeRoster.has(p.pid) ? homeTid : awayTid;
 
-    let ss = p.stats.find((s) => s.season === season);
+    let ss = p.recentStats.find((s) => s.season === season);
     if (!ss) {
       ss = emptySeasonStats(season, tid);
-      p.stats.push(ss);
+      p.recentStats.push(ss);
     } else {
       ss.tid = tid;
     }
@@ -268,7 +268,7 @@ export function simThrough(
 
   let currentPlayers = league.players.map((p) => ({
     ...p,
-    stats: [...p.stats.map((s) => ({ ...s }))],
+    recentStats: p.recentStats.map((s) => ({ ...s })),
   }));
 
   // All games share one RNG stream, so sim order defines the results:

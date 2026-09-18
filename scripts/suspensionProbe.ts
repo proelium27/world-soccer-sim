@@ -46,7 +46,7 @@ for (let s = 0; s < SEASONS; s++) {
   let reds = 0;
   let appearances = 0;
   for (const p of league.players) {
-    const line = p.stats.find((x) => x.season === league.season);
+    const line = p.recentStats.find((x) => x.season === league.season);
     if (!line) continue;
     yellows += line.yellowCards;
     reds += line.redCards;

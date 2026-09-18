@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSeasonStats } from "../../useSeasonStats.js";
 import { useLeague } from "../../context/LeagueContext.js";
 import type { Player } from "../../../core/players/types.js";
 import { FORMATIONS, FORMATION_IDS, type FormationId } from "../../../core/lineup/formations.js";
@@ -59,6 +60,9 @@ export function NTMySquad() {
   const season = pickedSeason !== null && seasonOptions.includes(pickedSeason)
     ? pickedSeason
     : defaultSeason;
+  // Lines for that season from memory, or read back from disk for an older
+  // one (see useSeasonStats) — never a two-line window read as the season.
+  const lines = useSeasonStats(league, season);
 
   const byPid = useMemo(
     () => new Map((league?.players ?? []).map((p) => [p.pid, p])),
@@ -220,7 +224,7 @@ export function NTMySquad() {
           <td className="text-end">{p.intl?.goals ?? 0}</td>
         </>
       ) : (
-        <PlayerViewCells view={view} player={p} season={season} />
+        <PlayerViewCells view={view} player={p} lines={lines} />
       )}
     </tr>
   );
@@ -324,6 +328,7 @@ export function NTMySquad() {
 
       <PlayerViewSwitch
         value={view}
+        loading={lines.loading}
         onChange={setView}
         season={season}
         seasons={seasonOptions}

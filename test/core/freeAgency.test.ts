@@ -576,7 +576,7 @@ describe("signFreeAgent player will", () => {
         // squad-strength band, so a 95 is beyond what any club in a fresh world
         // justifies and nobody could sign him — which is correct, and useless
         // as a positive control.
-        ? { ...p, ovr: 82, stats: [{ season: 1, tid: strong.tid } as never] }
+        ? { ...p, ovr: 82, recentStats: [{ season: 1, tid: strong.tid } as never] }
         : p,
     );
     return { league, teams, players, star, weak, strong };
@@ -636,7 +636,7 @@ describe("runAIFreeAgency player will", () => {
       pid,
       ovr: 88,
       // The stats line is how a free agent's last club is recovered at all.
-      stats: [{ season: 1, tid: strongest.tid } as never],
+      recentStats: [{ season: 1, tid: strongest.tid } as never],
     };
     const players = [...league.players, star];
 

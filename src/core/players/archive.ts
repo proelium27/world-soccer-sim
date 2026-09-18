@@ -143,7 +143,7 @@ function peakOf(player: Player, fallbackSeason: number): { ovr: number; season: 
     }
     return best;
   }
-  for (const h of player.hist) {
+  for (const h of player.recentHist) {
     if (h.ovr > best.ovr) best = { ovr: h.ovr, season: h.season };
   }
   return best;

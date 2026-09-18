@@ -42,8 +42,8 @@ const players = league.players;
 const activePids = new Set(league.teams.flatMap((t) => [...t.roster, ...t.academyRoster]));
 const active = players.filter((p) => activePids.has(p.pid));
 const inactive = players.filter((p) => !activePids.has(p.pid));
-const statsBytes = players.reduce((n, p) => n + JSON.stringify(p.stats).length, 0);
-const histBytes = players.reduce((n, p) => n + JSON.stringify(p.hist ?? null).length, 0);
+const statsBytes = players.reduce((n, p) => n + JSON.stringify(p.recentStats).length, 0);
+const histBytes = players.reduce((n, p) => n + JSON.stringify(p.recentHist ?? null).length, 0);
 
 console.log(`\nplayers: ${players.length} total`);
 console.log(`  on a roster:     ${String(active.length).padStart(6)}  ${mb(JSON.stringify(active).length)} MB`);

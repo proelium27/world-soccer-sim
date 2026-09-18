@@ -227,7 +227,7 @@ for (const deal of sales) {
     const later = snapAt(season + 1);
     if (!later) break;
     if (later.rosterOf.get(deal.pid) !== deal.toTid) break;
-    const line = live?.stats.find((st) => st.season === season && st.tid === deal.toTid);
+    const line = live?.recentStats.find((st) => st.season === season && st.tid === deal.toTid);
     bestApps = Math.max(bestApps, line?.appearances ?? 0);
     bestGoals = Math.max(bestGoals, line?.goals ?? 0);
     if (later.qualified.has(deal.toTid)) hitCont = true;
@@ -296,7 +296,7 @@ for (const deal of sales) {
     const later = snapAt(season + 1);
     if (!later) break;
     if (later.rosterOf.get(deal.pid) !== deal.toTid) break;
-    const line = live?.stats.find((st) => st.season === season && st.tid === deal.toTid);
+    const line = live?.recentStats.find((st) => st.season === season && st.tid === deal.toTid);
     obs.push({
       edge: player0.ovr - starter,
       pos: player0.pos,

@@ -1,4 +1,4 @@
-import type { Player, PlayerRatings, Position } from "./types.js";
+import type { Player, PlayerRatings, Position, RatingsSnapshot } from "./types.js";
 import { POSITIONS } from "./types.js";
 import { computeOvr } from "./ovr.js";
 import { COVERABLE, familiarityPenalty } from "../../engine/positionFit.js";
@@ -187,10 +187,10 @@ export interface PositionMove {
  * snapshots all carry his current position (see migrate.ts), which correctly
  * yields no moves.
  */
-export function positionHistory(p: Player): PositionMove[] {
+export function positionHistory(hist: readonly RatingsSnapshot[]): PositionMove[] {
   const out: PositionMove[] = [];
   let prev: Position | null = null;
-  for (const h of p.hist) {
+  for (const h of hist) {
     if (prev !== null && h.pos !== prev) out.push({ season: h.season, from: prev, to: h.pos });
     prev = h.pos;
   }
@@ -275,9 +275,9 @@ export function changedPosition(
   // converted — is not enough history to move him on.
   const need = seasons - 1;
   const spell = [];
-  for (let i = player.hist.length - 1; i >= 0 && spell.length < need; i--) {
-    if (player.hist[i].pos !== from) break;
-    spell.push(player.hist[i]);
+  for (let i = player.recentHist.length - 1; i >= 0 && spell.length < need; i--) {
+    if (player.recentHist[i].pos !== from) break;
+    spell.push(player.recentHist[i]);
   }
   if (spell.length < need) return null;
   for (const h of spell) {

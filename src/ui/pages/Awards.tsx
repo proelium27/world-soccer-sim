@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
+import { useSeasonStats } from "../useSeasonStats.js";
+import { squadTidInSeason } from "../../core/players/careerSummary.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { usePlayerMap } from "../usePlayerMap.js";
 import { HelpHint } from "../components/HelpHint.js";
@@ -92,7 +94,7 @@ function subjectResolver(
         // living player. A retiree has no present day, so his archived record
         // supplies the rating he played that season at instead.
         ovr: player.ovr,
-        tid: player.stats.find((s) => s.season === season)?.tid,
+        tid: squadTidInSeason(player, season),
         player,
         linkable: true,
       };
@@ -298,12 +300,15 @@ function WorldAwardTable({
   subjectOf,
   leagueName,
   season,
+  lineOf,
   columns = OUTFIELD_COLUMNS,
 }: {
   entries: WorldAwardEntry[];
   subjectOf: (pid: number) => AwardSubject | undefined;
   leagueName: (tid: number) => string;
   season: number;
+  /** That season's league line for a player, from memory or disk (useSeasonStats). */
+  lineOf: (player: Player) => SeasonStats | undefined;
   columns?: StatColumn[];
 }) {
   return (
@@ -329,7 +334,7 @@ function WorldAwardTable({
             // Only a live player keeps the season's own stat line; a retiree's
             // per-season rows are dropped when he's archived, so those columns
             // fall back to the same "—" an un-migrated old save shows.
-            const stats = subject?.player?.stats.find((s) => s.season === season);
+            const stats = subject?.player ? lineOf(subject.player) : undefined;
             return (
               <tr key={e.pid}>
                 <td className="text-muted">{i + 1}</td>
@@ -375,6 +380,7 @@ function PositionAward({
   subjectOf,
   leagueName,
   season,
+  lineOf,
   statLine,
 }: {
   title: string;
@@ -384,12 +390,13 @@ function PositionAward({
   subjectOf: (pid: number) => AwardSubject | undefined;
   leagueName: (tid: number) => string;
   season: number;
+  lineOf: (player: Player) => SeasonStats | undefined;
   statLine: (s: SeasonStats) => string;
 }) {
   if (entries.length === 0) return null;
   const winner = entries[0];
   const subject = subjectOf(winner.pid);
-  const stats = subject?.player?.stats.find((s) => s.season === season);
+  const stats = subject?.player ? lineOf(subject.player) : undefined;
   return (
     <>
       <h5 className="mt-4">
@@ -415,6 +422,7 @@ function PositionAward({
             subjectOf={subjectOf}
             leagueName={leagueName}
             season={season}
+            lineOf={lineOf}
             columns={columns}
           />
         </div>
@@ -482,6 +490,12 @@ export function Awards() {
   const [season, setSeason] = useState<number | null>(null);
   const [scope, setScope] = useState<"world" | "americas" | "league">("world");
   const [compIdOverride, setCompIdOverride] = useState<number | null>(null);
+  const seasonOptions = [...(league?.seasonHistory ?? []).map((h) => h.season)].sort((a, b) => b - a);
+  const activeSeason = season ?? seasonOptions[0] ?? 0;
+  // The winners' league lines for that season. Always a finished season, so
+  // usually read back from disk (useSeasonStats) — until then the stat columns
+  // stay blank rather than reading a player's recent window as that season.
+  const lines = useSeasonStats(league, activeSeason);
 
   if (!league) {
     return <p className="p-3">Loading...</p>;
@@ -499,8 +513,6 @@ export function Awards() {
   const userTeam = league.teams.find((t) => t.tid === league.meta.userTid);
   const compId = compIdOverride ?? userTeam?.compId ?? league.competitions[0].id;
 
-  const seasonOptions = [...league.seasonHistory.map((h) => h.season)].sort((a, b) => b - a);
-  const activeSeason = season ?? seasonOptions[0];
   const entry = league.seasonHistory.find((h) => h.season === activeSeason)!;
 
   // Winners resolve through the retiree archive and the season's own record of
@@ -512,8 +524,8 @@ export function Awards() {
   const potd = divisionAwards.playerOfSeasonPid !== null ? subjectOf(divisionAwards.playerOfSeasonPid) : undefined;
   const goldenBoot = divisionAwards.goldenBootPid !== null ? subjectOf(divisionAwards.goldenBootPid) : undefined;
 
-  const potdStats = potd?.player?.stats.find((s) => s.season === activeSeason);
-  const goldenBootStats = goldenBoot?.player?.stats.find((s) => s.season === activeSeason);
+  const potdStats = potd?.player ? lines.lineOf(potd.player) : undefined;
+  const goldenBootStats = goldenBoot?.player ? lines.lineOf(goldenBoot.player) : undefined;
 
   // Clubs are looked up by the competition they were in *that* season, so a
   // since-relegated or since-promoted club is still labelled with the league it
@@ -536,7 +548,7 @@ export function Awards() {
   const labels = shownScope === "americas" ? AMERICAS_LABELS : WORLD_LABELS;
   const winner = shown.ballonDOr[0];
   const winnerSubject = winner ? subjectOf(winner.pid) : undefined;
-  const winnerStats = winnerSubject?.player?.stats.find((s) => s.season === activeSeason);
+  const winnerStats = winnerSubject?.player ? lines.lineOf(winnerSubject.player) : undefined;
   // Both empty on a season played before these awards existed, which is every
   // season already on an existing save — they are never backfilled, so those
   // seasons show the Ballon d'Or and the World XI alone (see WorldAwards).
@@ -670,6 +682,7 @@ export function Awards() {
               subjectOf={subjectOf}
               leagueName={leagueName}
               season={activeSeason}
+              lineOf={lines.lineOf}
             />
 
             <PositionAward
@@ -680,6 +693,7 @@ export function Awards() {
               subjectOf={subjectOf}
               leagueName={leagueName}
               season={activeSeason}
+              lineOf={lines.lineOf}
               statLine={(st) => `${st.saves} saves · ${st.goalsAgainst} conceded`}
             />
 
@@ -691,6 +705,7 @@ export function Awards() {
               subjectOf={subjectOf}
               leagueName={leagueName}
               season={activeSeason}
+              lineOf={lines.lineOf}
               statLine={(st) => `${st.tackles} tackles · ${st.interceptions} interceptions`}
             />
 
