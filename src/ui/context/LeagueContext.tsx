@@ -7,7 +7,7 @@ import { isDefaultContinentalFormat, sanitizeContinentalFormat, type Continental
 import type { CupCompetitionId } from "../../core/constants.js";
 import type { SimThrough, IntlMode, PlayoffMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
-import { saveLeague, loadLeague } from "../../db/leagueDb.js";
+import { saveLeague, loadLeague, elideWrittenDetail } from "../../db/leagueDb.js";
 import { loadCrests, saveCrests } from "../../db/crestDb.js";
 import { getActiveLid, setActiveLid, clearActiveLid } from "../../db/activeLeague.js";
 import { setSeasonStartYear } from "../format.js";
@@ -43,7 +43,7 @@ import { switchClub } from "../../core/manager/switchClub.js";
 import { takeNationalJob, leaveNationalJob, setNationInterest } from "../../core/nationalManager/index.js";
 import { setClubInterest } from "../../core/manager/interests.js";
 import {
-  editableSquad, writeSquad, isValidNationSquad, squadRating, isEligibleNation,
+  editableSquad, writeSquad, isValidNationSquad, squadRating, confederationOf,
 } from "../../core/international/index.js";
 import { isSpectator } from "../../core/spectator.js";
 import { isManagerDecisionPending } from "../../core/manager/index.js";
@@ -307,7 +307,13 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const commitLeague = useCallback((l: LeagueStore | null, knownCrests?: ReadonlyMap<number, string>) => {
+  const commitLeague = useCallback((given: LeagueStore | null, knownCrests?: ReadonlyMap<number, string>) => {
+    // Drop the event timelines of matches this save just wrote to disk, so a
+    // season simmed in one sitting does not climb back to holding every one of
+    // them. Here because every committed league passes through here; it is a
+    // no-op for anything that was not the league just saved, so it cannot drop
+    // a timeline that is only in memory (see elideWrittenDetail).
+    const l = given && elideWrittenDetail(given);
     leagueRef.current = l;
     // Every league — loaded, created, imported, or switched away from — passes
     // through here, which is why the season→year display offset is set here
@@ -1226,10 +1232,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
    * the season, because a national team owns nothing that a mid-season handover
    * could strand.
    *
-   * Two things are still refused. A country that cannot field a squad in this
-   * world would be a job with no team attached, so it is checked with the very
-   * same `isEligibleNation` the picker builds its list from. And a spectator
-   * save is left alone: `reviewNationalCampaign` returns early for one, so a
+   * Two things are still refused. A country with no confederation has nothing
+   * to ever qualify through (a country that merely lacks players is fine: it
+   * joins the next campaign once it has them). And a spectator save is left
+   * alone: `reviewNationalCampaign` returns early for one, so a
    * country taken there would never be judged, never be offered another job and
    * never sack you — the whole federation career would be quietly inert. The
    * way in is the Switch Club tab, which ends spectating for good.
@@ -1239,7 +1245,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       if (!l.godMode) return null;
       if (isSpectator(l)) return null;
       if (l.nationalManager.nation === nation) return null;
-      if (!isEligibleNation(nation, l.players.filter((p) => p.nationality === nation))) return null;
+      // Only a confederation is required, not a squad: a country that can't
+      // field a team yet is a job you can hold, and it joins the next campaign
+      // once it has the players.
+      if (confederationOf(nation) === null) return null;
       return takeNationalJob(l, nation);
     }),
     [mutate],

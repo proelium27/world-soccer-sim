@@ -583,6 +583,22 @@ describe("suggestedBonuses", () => {
     expect(l).not.toContain("continental");
   });
 
+  it("offers no promotion bonus to a club in a closed division", () => {
+    const league = world();
+    const { player } = ctx(league, "CM");
+    // Mexico and the US run closed pyramids: their second tiers send nobody up.
+    const closed = league.competitions.find(
+      (c) => c.tier === 2 && (c.country === "Mexico" || c.country === "United States"),
+    )!;
+    expect(closed).toBeDefined();
+    const club = league.teams.find((t) => t.compId === closed.id)!;
+    const out = suggestedBonuses(player, club, league.competitions, 50, 10_000_000)
+      .map((b) => b.trigger);
+    expect(out).not.toContain("promotion");
+    expect(out).not.toContain("continental");
+    expect(out).toContain("appearances");
+  });
+
   it("asks more of a player who walks into the team than one who won't play", () => {
     const league = world();
     const { player, top } = ctx(league, "CM");

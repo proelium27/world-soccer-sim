@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { EmptyState } from "../components/EmptyState.js";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { HelpHint, PotHelp } from "../components/HelpHint.js";
@@ -188,7 +189,7 @@ function RosterTable({
                 {borrowed && (
                   <span
                     className="badge bg-secondary ms-1"
-                    title={`On loan from ${borrowed.club}. He plays for you until ${seasonYear(borrowed.returnSeason)}, then goes back — he isn't yours to sell, release or re-sign.`}
+                    title={`On loan from ${borrowed.club}. He plays for you until ${seasonYear(borrowed.returnSeason)}, then goes back. He isn't yours to sell, release or re-sign.`}
                   >
                     On loan
                   </span>
@@ -456,7 +457,9 @@ export function Roster() {
         </HelpHint>
       </h4>
       {players.length === 0 ? (
-        <p>No players on roster.</p>
+        <EmptyState headline="No players on roster.">
+          <p>Sign someone from Free Agents or Transfers, or promote a kid from your academy.</p>
+        </EmptyState>
       ) : (
         <>
           {(() => {

@@ -171,7 +171,7 @@ export function Loans() {
           or reject the flat-fee offers that come in. He comes back on his own when the loan ends,
           and his contract stays yours the whole time, so you can still extend him while he&apos;s
           away from the list further down this page. Or borrow someone else&apos;s young player the
-          same way &mdash; you pay the fee and his wages, he plays for you, and he goes home when
+          same way. You pay the fee and his wages, he plays for you, and he goes home when
           the loan runs out. He isn&apos;t yours, so you can&apos;t sell, release or re-sign him.
         </HelpHint>
       </h4>
@@ -186,7 +186,7 @@ export function Loans() {
       ) : (
         <p>
           Sending a player on loan gets him minutes elsewhere when he can&apos;t
-          get them at your club &mdash; the loanee club pays a flat fee up front
+          get them at your club. The loanee club pays a flat fee up front
           and covers his wages for the loan&apos;s length, and he returns to your
           roster automatically once it ends.
         </p>
@@ -255,7 +255,7 @@ export function Loans() {
           <h5 className="card-title">Loan a Player In</h5>
           <p className="card-text text-muted">
             Clubs will lend you a young player who isn&apos;t getting into their
-            starting eleven &mdash; {LOAN_AI_MAX_AGE} and under, on the bench, and
+            starting eleven: {LOAN_AI_MAX_AGE} and under, on the bench, and
             worth more to you than to them. That last part is what decides how
             good a loan you can get: a club near the top of the pyramid won&apos;t
             find much, while a side scrapping in a lower division can borrow
@@ -310,7 +310,7 @@ export function Loans() {
               onChange={(e) => setAvailableOnly(e.target.checked)}
             />
             <label className="form-check-label small" htmlFor="li-available">
-              Only show players you can take right now &mdash; turn this off to see
+              Only show players you can take right now. Turn this off to see
               who else you looked at and why they said no
             </label>
           </div>
@@ -344,8 +344,8 @@ export function Loans() {
           {ws.open && userTeam.budget <= 0 && (
             <div className="alert alert-warning">
               <strong>You&apos;re in the red.</strong> A loan still costs a fee and
-              his wages, so you can&apos;t take anyone on until the books are
-              back in order.
+              his wages, and your overdraft only covers buying and signing players,
+              so you can&apos;t take anyone on loan until the books are back in order.
             </div>
           )}
 

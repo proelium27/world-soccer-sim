@@ -142,7 +142,7 @@ export function PowerRankings() {
       <h4>Power Rankings</h4>
       <p className="text-muted small mb-3">
         Teams ranked by a blended Power score: squad OVR (Starting XI + bench, depth-weighted) plus
-        a current-season form bonus — results weighted by opponent quality (beating a strong side
+        a current-season form bonus: results weighted by opponent quality (beating a strong side
         counts for more than beating a weak one) and goal difference. Snapshots are kept every few
         matchdays, so you can look back at how the rankings moved through any season.
         {isCurrent && " Click a team to see its roster."}

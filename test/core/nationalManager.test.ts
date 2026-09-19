@@ -7,7 +7,7 @@ import type { IntlTournament, IntlQualifyingCampaign, NationSquad } from "../../
 import {
   initInternationalCampaign, buildSquads, nationMatchData, editableSquad,
   displaySquad, writeSquad, isValidNationSquad, selectSquad, nationPools,
-  isEligibleNation, manageableNations,
+  isEligibleNation, manageableNations, nationPoolStatus,
 } from "../../src/core/international/index.js";
 import { FORMATIONS } from "../../src/core/lineup/formations.js";
 import {
@@ -451,9 +451,64 @@ describe("national manager: taking and leaving a job", () => {
 });
 
 /**
- * The list God Mode's Switch Country tab offers, and the list its action gates
- * on. They have to be the same list: a picker that offers a country the gate
- * then silently refuses reads as a broken button.
+ * You can manage a country before it has the players to enter international
+ * football. It sits out every campaign until it does, and then joins the next
+ * one drawn with you still in charge.
+ */
+describe("national manager: a country that can't field a team yet", () => {
+  const DORMANT = "Bhutan";
+
+  it("reports how far off a country is, by the same rule the sim uses", () => {
+    const league = makeLeague(0, 1);
+    for (const nation of ["England", DORMANT]) {
+      const status = nationPoolStatus(nation, league.players);
+      const pool = league.players.filter((p) => p.nationality === nation);
+      expect(status.eligible).toBe(isEligibleNation(nation, pool));
+      expect(status.players).toBe(pool.length);
+      expect(status.keepers).toBe(pool.filter((p) => p.pos === "GK").length);
+    }
+    expect(nationPoolStatus(DORMANT, league.players).eligible).toBe(false);
+  });
+
+  it("keeps the job through a review with nothing to judge", () => {
+    const base = makeLeague(0, 1);
+    const league: LeagueStore = {
+      ...base,
+      nationalManager: emptyNationalManagerState(DORMANT, 1),
+      international: initInternationalCampaign(base.international, base.players, base.season, base.lid),
+    };
+    expect(league.international.qualifying!.squads.some((s) => s.nation === DORMANT)).toBe(false);
+    const after = reviewNationalCampaign(league).nationalManager;
+    expect(after.nation).toBe(DORMANT);
+    expect(after.confidence).toBe(NATIONAL_START_CONFIDENCE);
+    expect(currentNationalStint(after)?.campaigns).toBe(0);
+  });
+
+  it("joins the next campaign once it has the players, with you in charge", () => {
+    const base = makeLeague(0, 1);
+    // Hand the country a keeper and enough outfielders, as an academy full of
+    // its kids eventually would.
+    const keeper = base.players.find((p) => p.pos === "GK")!;
+    const outfield = base.players.filter((p) => p.pos !== "GK").slice(0, 25);
+    const recruits = new Set([keeper.pid, ...outfield.map((p) => p.pid)]);
+    const players = base.players.map((p) => (recruits.has(p.pid) ? { ...p, nationality: DORMANT } : p));
+    const league: LeagueStore = {
+      ...base,
+      players,
+      nationalManager: emptyNationalManagerState(DORMANT, 1),
+      international: initInternationalCampaign(base.international, players, base.season, base.lid),
+    };
+    expect(nationPoolStatus(DORMANT, players).eligible).toBe(true);
+    expect(league.international.qualifying!.squads.some((s) => s.nation === DORMANT)).toBe(true);
+    expect(league.nationalManager.nation).toBe(DORMANT);
+  });
+});
+
+/**
+ * The countries this world can field a team for. God Mode's Switch Country tab
+ * uses it to mark which listed countries are ready; the list itself is every
+ * appointable country, since one without the players is still a job you can
+ * hold.
  */
 describe("manageableNations", () => {
   const league = makeLeague(0, 1);

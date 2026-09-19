@@ -147,7 +147,8 @@ export interface OffseasonInputs {
   cupChampions?: Pick<HonourSources, "cup" | "shield" | "domestic" | "americas" | "americasTids">;
   /**
    * Next season's continental places per league, off the rolling country
-   * coefficient — `offseasonCoefficientSlots` (cup/coefficients.ts) on the full league. `null` means
+   * coefficient: `offseasonCoefficientSlots` (cup/coefficients.ts), run on the
+   * full league. `null` means
    * "worked out, and there is no reallocation" (too little record, or the save
    * has rolling coefficients off); absent means "read the cup histories here".
    *
@@ -161,7 +162,6 @@ export interface OffseasonInputs {
    */
   cupSlots?: SlotOverrides | null;
 }
-
 
 /** What the offseason did that the caller cannot work out from the league alone. */
 export interface OffseasonReport {

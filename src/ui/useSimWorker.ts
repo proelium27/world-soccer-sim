@@ -13,7 +13,7 @@ import {
 } from "../core/simArchive.js";
 import { referencedPids } from "../core/players/playerNames.js";
 import { honourSourcesOf } from "../core/frivolities/goat.js";
-import { computeTeamSeasonStats } from "../core/standings.js";
+import { teamSeasonStatsFor } from "../db/leagueDb.js";
 import { offseasonCoefficientSlots } from "../core/cup/coefficients.js";
 
 export type SimProgress = {
@@ -194,9 +194,11 @@ export function useSimWorker() {
             ? {
                 ...command,
                 league: payload,
-                teamStats: computeTeamSeasonStats(
+                // Off the running fold, not the matches: the league in memory
+                // no longer holds its player lines (db/leagueDb.ts).
+                teamStats: teamSeasonStatsFor(
+                  command.league,
                   command.league.teams.map((t) => t.tid),
-                  command.league.played,
                 ),
                 // extendPlayerNames walks the history we just held back, so the
                 // answer is worked out here instead. See detachNews.

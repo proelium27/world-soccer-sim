@@ -25,7 +25,7 @@ export function NTHistory() {
             to put on the roll of honour.
           </p>
           <p>
-            Qualifying for it is already under way, though — the standings are on the{" "}
+            Qualifying for it is already under way, though. The standings are on the{" "}
             <Link to="/national-teams/qualifying">Qualifying</Link> page.
           </p>
         </EmptyState>

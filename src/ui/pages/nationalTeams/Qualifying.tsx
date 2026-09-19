@@ -179,7 +179,7 @@ function QualifyingView({
       </div>
 
       <p className="text-muted small">
-        {entered} nations entered for {fieldSize} places. Groups are played home and away. Each
+        {entered} nations entered for {fieldSize} places. Everyone in a group plays everyone else three times, one round each summer. Each
         confederation gets a quota the way FIFA does it, based on the real World Cup of this size,
         trimmed so no confederation sends more than two thirds of its nations, and every group
         plays for at least its winner's place. That split, and the groups it's played in, are

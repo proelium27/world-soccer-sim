@@ -44,15 +44,19 @@ export function PromotionPlayoffs() {
   const intro = (
     <HelpHint>
       In most countries the last promotion place at each step of the pyramid is played for rather
-      than won in the table, and there are two ways of doing it. The <strong>English</strong> way
+      than won in the table, and there are three ways of doing it. The <strong>English</strong> way
       puts the four clubs below the automatic places into a bracket: two-legged semi-finals, then
       a one-off final at a neutral ground, and the winner goes up. Finishing higher only gets you
       the tie against the lowest-placed club, so it is close to a lottery on purpose.
       The <strong>German</strong> way is a straight shoot-out between the divisions: the club that
       just missed out below plays the lowest club that just survived above, home and away, and the
       winner has the place next season. Lose it from above and you go down; hold on and nobody
-      moves at all. Countries with a third division play one at each boundary, so there is a way
-      up whichever tier you are in. Either way it&apos;s played a round at a time once the season
+      moves at all. The <strong>French</strong> way is a ladder into that same tie: the next two
+      clubs down play off, the winner visits the club that just missed automatic promotion, and
+      whoever survives that meets the lowest safe club above over two legs.
+      Some countries skip playoffs and just swap clubs on the table, and the closed leagues in the
+      Americas don&apos;t promote anyone. Countries with a third division can play one at each
+      boundary, so there is often a way up whichever tier you are in. Whichever it is, it&apos;s played a round at a time once the season
       ends, from the Dashboard, before anyone retires or moves on, and you can set which one each
       country uses when you start a save.
     </HelpHint>
@@ -68,10 +72,11 @@ export function PromotionPlayoffs() {
             on, and they settle the last promotion place at each step of a country&apos;s pyramid.
           </p>
           <p>
-            Which shape a country uses is set when you start a save. Most play the English way,
-            where the four clubs below the automatic places contest two-legged semi-finals and a
-            final. Germany plays a one-off tie between the club above the line and the club below
-            it, so the incumbent can hold on.
+            Which shape a country uses is set when you start a save. The English way is the
+            commonest, where the four clubs below the automatic places contest two-legged
+            semi-finals and a final. Germany, the Netherlands, Portugal and Scotland play a
+            home-and-away tie between the club above the line and the club below it, so the
+            incumbent can hold on, and France climbs a ladder into that same tie.
           </p>
         </EmptyState>
       </div>
