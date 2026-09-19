@@ -32,6 +32,12 @@
  */
 import type { MatchEvent, MatchPosition } from "../engine/attribution.js";
 import { hashInts } from "../engine/rng.js";
+import {
+  SHOT_ZONES,
+  SHOT_ZONE_BY_OUTCOME,
+  SHOT_ZONE_BY_SLOT,
+  type ShotZone,
+} from "../engine/constants.js";
 
 /** Keeps these draws clear of every other hashed stream in the game. */
 const NARRATION_STREAM = 613;
@@ -196,59 +202,32 @@ export function cardContext(event: MatchEvent, events: MatchEvent[], lastClock: 
  * a card — an uncarded foul leaves no event behind, so its free kick reads as
  * open play).
  *
- * Every other shot gets a ZONE picked to fit the one real fact the stream holds
- * about it: how it ended. The engine's outcome mix already lands on real
- * football (measured from the constants: ~28% blocked, ~38% off target, ~23%
- * saved, ~11% scored, against a top flight's ~27/38/24/11), so real football's
- * "where do shots that end this way come from" can be borrowed directly. That is
- * what stops the old failure, where a label keyed on position alone had every
- * midfielder's goal arriving "from distance" when most real midfield goals are
- * scored inside the box. Position only SHADES the odds.
+ * Every other open-play shot carries the ZONE the engine rolled for it
+ * (`MatchEvent.zone`, 2026-09-19), and that zone is real: it set how likely the
+ * shot was to be blocked, to hit the target and to beat the keeper, and the xG
+ * beside it. The label just reads it.
  *
- * Still a label: the zone caused nothing, and the xG beside it does not move.
- * Making it real means rolling a zone inside the engine and letting it set
- * conversion — an engine change with an audit, not a display one.
+ * A box score written before that carries no zone, so its shots get one FITTED
+ * to the one fact the stream holds about them, how they ended, from the same
+ * real-football tables the engine rolls from (engine/constants.ts). The
+ * engine's outcome mix lands on real football, so "where do shots that end this
+ * way come from" can be borrowed directly, and position only shades the odds.
+ * On those old matches the zone is a label and caused nothing.
  *
  * Open-play shots are never called headers. The engine resolves them on the
  * shooter's `shooting` rating, so calling one a header would contradict it;
  * only the corner path resolves on `heading`.
  */
-export type ShotZone = "close" | "box" | "outside";
+export type { ShotZone };
 export type ShotOrigin = ShotZone | "penalty" | "corner" | "freeKick";
 
-type ZoneWeights = readonly [close: number, box: number, outside: number];
-
-/**
- * Real-football share of each outcome by zone: six-yard box, the rest of the
- * area, outside it. Built from typical top-flight figures (shots ~7/55/38 by
- * zone, converting ~32% / ~12.5% / ~3.5%, blocked ~15% / ~25% / ~34%) and
- * inverted, so goals come mostly from inside the box and blocks lean outside it.
- * `scripts/shotZoneProbe.ts` measures what these produce on real matches.
- */
-const ZONE_BY_OUTCOME: Record<string, ZoneWeights> = {
-  goal: [21, 66, 13],
-  shot_saved: [8, 57, 35],
-  shot_blocked: [4, 50, 46],
-  shot_off_target: [5, 55, 40],
+/** Event type to the outcome key the engine's zone table uses. */
+const OUTCOME_OF: Record<string, keyof typeof SHOT_ZONE_BY_OUTCOME> = {
+  goal: "goal",
+  shot_saved: "saved",
+  shot_blocked: "blocked",
+  shot_off_target: "off_target",
 };
-
-/**
- * How a position shades those odds. A striker lives in the six-yard box, a
- * holding midfielder shoots from outside it, a centre-back's open-play chances
- * are mostly knock-downs in the area. Missing (an old box score with no slot on
- * its lines) means no shading.
- */
-const ZONE_BY_SLOT: Partial<Record<MatchPosition, ZoneWeights>> = {
-  ST: [1.5, 1.15, 0.65],
-  W: [0.8, 1.0, 1.15],
-  AM: [0.7, 0.95, 1.35],
-  CM: [0.6, 0.85, 1.55],
-  DM: [0.5, 0.75, 1.8],
-  FB: [0.6, 1.0, 1.2],
-  CB: [1.6, 1.1, 0.6],
-};
-
-const ZONES: readonly ShotZone[] = ["close", "box", "outside"];
 
 const ZONE_LABELS: Record<ShotZone, readonly string[]> = {
   close: ["from close range", "from inside the six-yard box"],
@@ -264,16 +243,17 @@ function unitRoll(...seed: number[]): number {
   return hashInts(...seed, NARRATION_STREAM) / 4294967296;
 }
 
+/** A fitted zone for a shot the engine never stamped one on (an old box score). */
 function pickZone(outcome: string, slot: MatchPosition | undefined, seed: number[]): ShotZone {
-  const base = ZONE_BY_OUTCOME[outcome] ?? ZONE_BY_OUTCOME.shot_off_target;
-  const shade = (slot && ZONE_BY_SLOT[slot]) || [1, 1, 1];
+  const base = SHOT_ZONE_BY_OUTCOME[OUTCOME_OF[outcome] ?? "off_target"];
+  const shade = (slot && SHOT_ZONE_BY_SLOT[slot]) || [1, 1, 1];
   const weights = base.map((w, i) => w * shade[i]);
   let r = unitRoll(...seed, ZONE_ROLL) * weights.reduce((s, w) => s + w, 0);
-  for (let i = 0; i < ZONES.length; i++) {
+  for (let i = 0; i < SHOT_ZONES.length; i++) {
     r -= weights[i];
-    if (r < 0) return ZONES[i];
+    if (r < 0) return SHOT_ZONES[i];
   }
-  return ZONES[ZONES.length - 1];
+  return SHOT_ZONES[SHOT_ZONES.length - 1];
 }
 
 function zoneLabel(zone: ShotZone, outcome: string, slot: MatchPosition | undefined, seed: number[]): string {
@@ -291,6 +271,13 @@ export function shotLocation(
   slot: MatchPosition | undefined,
   afterCorner: boolean,
 ): { origin: ShotOrigin; label: string } {
+  const seed = [event.pids[0] ?? 0, Math.round(event.clock)];
+  // The engine stamps a zone on open-play shots only, so a stamped shot needs no
+  // set-piece check: it is where the shot really came from.
+  if (event.zone !== undefined) {
+    const zone = SHOT_ZONES[event.zone];
+    return { origin: zone, label: zoneLabel(zone, event.type, slot, seed) };
+  }
   if (sameTick.some((e) => e.type === "penalty" && e.side === event.side)) {
     return { origin: "penalty", label: "from the spot" };
   }
@@ -304,7 +291,6 @@ export function shotLocation(
   if (sameTick.some((e) => e.side !== event.side && (e.type === "yellow_card" || e.type === "red_card"))) {
     return { origin: "freeKick", label: "from a free kick" };
   }
-  const seed = [event.pids[0] ?? 0, Math.round(event.clock)];
   const zone = pickZone(event.type, slot, seed);
   return { origin: zone, label: zoneLabel(zone, event.type, slot, seed) };
 }

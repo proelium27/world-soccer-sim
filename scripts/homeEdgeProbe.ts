@@ -52,7 +52,7 @@ function aggregate(neutral: boolean, matches: number) {
 
 const share = (r: { home: number; away: number }) => r.home / (r.home + r.away);
 
-for (const matches of [400, 800, 1200, 2000]) {
+for (const matches of [400, 800, 1200, 2000, 6000]) {
   const normal = aggregate(false, matches);
   const neutral = aggregate(true, matches);
   console.log(

@@ -57,6 +57,11 @@ import {
   STOPPAGE_BOARD_MAX_SECONDS,
   GOAL_RESTART_MIN_SECONDS,
   GOAL_RESTART_MAX_SECONDS,
+  SHOT_ZONES,
+  SHOT_ZONE_DRAW_BASE,
+  SHOT_ZONE_BY_SLOT,
+  SHOT_ZONE_STAGE,
+  type ShotZone,
 } from "./constants.js";
 import type { Composites } from "./composites.js";
 import { familiarityPenalty } from "./positionFit.js";
@@ -196,16 +201,29 @@ export function resolveShot(
    * xG below (xG stays the "average attacker" baseline on purpose).
    */
   finishAdj: number = 0,
+  /**
+   * Where the shot is taken from (simMatchDetailed's open-play shots only). Each
+   * stage of the cascade is scaled by SHOT_ZONE_STAGE, so a six-yard chance is
+   * rarely blocked and hard to save while a long shot is the opposite. Absent
+   * means the pooled odds every shot used before zones existed, which is what
+   * corners, free kicks and the composite-only simMatch still take.
+   */
+  zone?: ShotZone,
 ): ShotResult {
+  const stage = zone ? SHOT_ZONE_STAGE[zone] : undefined;
   const effFinishing = clamp(off.finishing + finishAdj, 0.05, 0.95);
-  const blockP = clamp(BLOCK_BASE * (1 + 0.6 * (def.defense - 0.5)), 0.05, 0.6);
+  // A zoned shot gets wider block bounds (a six-yard chance is rarely blocked, a
+  // long shot often is); an unzoned one keeps exactly the bounds it always had.
+  const blockP = stage
+    ? clamp(BLOCK_BASE * (1 + 0.6 * (def.defense - 0.5)) * stage.block, 0.02, 0.7)
+    : clamp(BLOCK_BASE * (1 + 0.6 * (def.defense - 0.5)), 0.05, 0.6);
   const onTargetP = clamp(
-    ONTARGET_BASE * (1 + 0.5 * (effFinishing - 0.5)),
+    ONTARGET_BASE * (1 + 0.5 * (effFinishing - 0.5)) * (stage?.onTarget ?? 1),
     0.1,
     0.9,
   );
   const saveP = clamp(
-    SAVE_BASE * (1 + 0.5 * (def.keeping - 0.5)) - 0.3 * (effFinishing - 0.5),
+    (SAVE_BASE * (1 + 0.5 * (def.keeping - 0.5)) - 0.3 * (effFinishing - 0.5)) * (stage?.save ?? 1),
     0.2,
     0.95,
   );
@@ -215,14 +233,29 @@ export function resolveShot(
   // is centered on elsewhere in this file). These never drive the RNG rolls
   // below — only the real onTargetP/saveP (which do include off.finishing)
   // decide the actual outcome, so match balance/tuning is untouched.
-  const xgOnTargetP = clamp(ONTARGET_BASE, 0.1, 0.9);
-  const xgSaveP = clamp(SAVE_BASE * (1 + 0.5 * (def.keeping - 0.5)), 0.2, 0.95);
+  const xgOnTargetP = clamp(ONTARGET_BASE * (stage?.onTarget ?? 1), 0.1, 0.9);
+  const xgSaveP = clamp(SAVE_BASE * (1 + 0.5 * (def.keeping - 0.5)) * (stage?.save ?? 1), 0.2, 0.95);
   const xg = (1 - blockP) * xgOnTargetP * (1 - xgSaveP);
 
   if (rng() < blockP) return { outcome: "blocked", xg };
   if (rng() >= onTargetP) return { outcome: "off_target", xg };
   if (rng() < saveP) return { outcome: "saved", xg };
   return { outcome: "goal", xg };
+}
+
+/**
+ * Where an open-play shot is taken from: real football's zone split, shaded by
+ * the slot the shooter is filling. Exactly one rng draw.
+ */
+export function pickShotZone(rng: () => number, slot: MatchPosition): ShotZone {
+  const shade = SHOT_ZONE_BY_SLOT[slot] ?? [1, 1, 1];
+  const weights = SHOT_ZONE_DRAW_BASE.map((w, i) => w * shade[i]);
+  let r = rng() * weights.reduce((s, w) => s + w, 0);
+  for (let i = 0; i < SHOT_ZONES.length; i++) {
+    r -= weights[i];
+    if (r < 0) return SHOT_ZONES[i];
+  }
+  return SHOT_ZONES[SHOT_ZONES.length - 1];
 }
 
 /**
@@ -1185,8 +1218,9 @@ export function simMatchDetailed(
     stat[poss].shots++;
     shooterLine.shots++;
 
+    const zone = pickShotZone(rng, shooter.slot);
     const { outcome, xg } = resolveShot(
-      rng, off, def, finisherAdj(shooter, onPitch[poss], "shooting"),
+      rng, off, def, finisherAdj(shooter, onPitch[poss], "shooting"), zone,
     );
     shooterLine.xg += xg;
 
@@ -1201,6 +1235,7 @@ export function simMatchDetailed(
     }
 
     const evtType = eventTypeFromShot(outcome);
+    const zoneCode = SHOT_ZONES.indexOf(zone) as 0 | 1 | 2;
     const pids = [shooter.pid];
 
     if (outcome === "goal") {
@@ -1222,13 +1257,13 @@ export function simMatchDetailed(
         pids.push(assister.pid);
       }
 
-      events.push({ clock, type: evtType, side: poss, pids });
+      events.push({ clock, type: evtType, side: poss, pids, zone: zoneCode });
       celebrate();
       poss = defSide;
       continue;
     }
 
-    events.push({ clock, type: evtType, side: poss, pids });
+    events.push({ clock, type: evtType, side: poss, pids, zone: zoneCode });
 
     if (
       (outcome === "blocked" || outcome === "off_target") &&
