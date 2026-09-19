@@ -535,6 +535,55 @@ a:hover {
 .playoff-cut > td {
   border-bottom: 2px dashed var(--bs-border-color);
 }
+
+/* Promotion and relegation lines.
+
+   A rule between two rows rather than a bar or a wash, for the reason
+   .playoff-cut above is one: the row background already carries win/loss, your
+   club and the champion, and the leading-edge bar is spoken for by continental
+   places — which a relegated club can legitimately hold at the same time (win
+   your domestic cup and go down in the same season). A line between rows is the
+   one channel nothing else is using, and it is what a printed league table has
+   always done. Solid means decided on the table; dashed means a playoff still
+   has to settle it.
+
+   Qualified on `.table > tbody > tr`, which is not decoration: `.table > tbody
+   td` sets `border-bottom-color` a line above, and it out-specifies a bare
+   `.band-cut-up > td` — so the line lands at the right width and style in the
+   wrong colour, which looks like a ruled table rather than a broken rule.
+   `.playoff-cut` above never noticed because it asks for the border colour. */
+.table > tbody > tr.band-cut-up > td {
+  border-bottom: 2px solid var(--sg-win);
+}
+.table > tbody > tr.band-cut-up-playoff > td {
+  border-bottom: 2px dashed var(--sg-win);
+}
+.table > tbody > tr.band-cut-down-playoff > td {
+  border-bottom: 2px dashed var(--sg-loss);
+}
+.table > tbody > tr.band-cut-down > td {
+  border-bottom: 2px solid var(--sg-loss);
+}
+/* In the legend the same line has no row to sit under, so it is drawn as a
+   short rule in its own box — the .qual-key-swatch idea, one border instead of
+   a filled block so solid and dashed still read as themselves. */
+.band-key-swatch {
+  display: inline-block;
+  width: 1.1em;
+  vertical-align: 0.25em;
+}
+.band-key-up {
+  border-bottom: 2px solid var(--sg-win);
+}
+.band-key-up-playoff {
+  border-bottom: 2px dashed var(--sg-win);
+}
+.band-key-down-playoff {
+  border-bottom: 2px dashed var(--sg-loss);
+}
+.band-key-down {
+  border-bottom: 2px solid var(--sg-loss);
+}
 .row-win > td {
   box-shadow: inset 0 0 0 9999px var(--sg-win-wash);
 }
