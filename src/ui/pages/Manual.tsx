@@ -2508,7 +2508,8 @@ export function Manual() {
           <p>
             <strong>The bonuses on offer are picked for the player.</strong> You won't be offered a
             goals bonus for a goalkeeper, or a promotion bonus when the club buying him is already in
-            the top flight, because neither could ever pay. And the target moves with the player: a
+            the top flight or plays in a league with no promotion, because none of those could ever
+            pay. And the target moves with the player: a
             squad man might be offered a bonus at 14 league games where a first-choice signing gets
             one at 31. They're set so every bonus you're offered is about equally likely to pay,
             which is what makes the number itself worth reading. You can change the money, but not

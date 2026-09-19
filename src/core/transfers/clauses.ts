@@ -384,7 +384,8 @@ function thresholdNearestTarget(
  *   that falls out of the pricing rather than from a hardcoded list of who is
  *   allowed to score: a keeper's chance of reaching any sensible goal tally is
  *   nil, so no goal bonus is suggested for him. Promotion is dropped for a
- *   top-flight buyer and a continental place for anyone below it, for the same
+ *   top-flight buyer or a closed division, and a continental place for anyone
+ *   below the top flight (or a top flight with no places), for the same
  *   structural reason `triggerProbability` scores them zero.
  * - **The threshold.** Each is set where the payout is about as likely as any
  *   other suggestion (`BONUS_SUGGESTION_TARGET_P`), so a fringe signing is
@@ -422,9 +423,17 @@ export function suggestedBonuses(
     out.push({ trigger: "goals", threshold: goalTarget, amount });
   }
 
+  // Offered only where it can actually happen, read off the same pricing that
+  // values it: a top flight can't be promoted, a lower division can't qualify
+  // for Europe, and a closed division (Liga MX, MLS, the Dutch and Belgian
+  // third tiers) sends nobody up at all. Deciding by tier alone offered a
+  // promotion bonus to a club with no way to earn one.
   const tier = tierOf(competitions, obligor.compId);
-  if (tier === 1) out.push({ trigger: "continental", amount });
-  else out.push({ trigger: "promotion", amount });
+  const team: BonusTrigger = tier === 1 ? "continental" : "promotion";
+  const p = triggerProbability(
+    team, player, obligor, competitions, starterOvr, BONUS_CLAUSE_SEASONS,
+  );
+  if (p > 0) out.push({ trigger: team, amount });
 
   return out;
 }
