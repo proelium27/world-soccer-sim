@@ -48,6 +48,33 @@ export function manageableNations(players: Player[]): string[] {
   return out.sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * How close a nation is to fielding a team: its players, its keepers, and what
+ * the eligibility rule asks for.
+ *
+ * Exists because you can manage a country before it has the players to enter
+ * international football, so the pages have to say how far off it is. It reads
+ * the same numbers `isEligibleNation` checks rather than restating the rule.
+ */
+export interface NationPoolStatus {
+  players: number;
+  keepers: number;
+  playersNeeded: number;
+  keepersNeeded: number;
+  eligible: boolean;
+}
+
+export function nationPoolStatus(nation: string, players: Player[]): NationPoolStatus {
+  const pool = players.filter((p) => p.nationality === nation);
+  return {
+    players: pool.length,
+    keepers: pool.filter((p) => p.pos === "GK").length,
+    playersNeeded: INTL_MIN_POOL,
+    keepersNeeded: INTL_MIN_KEEPERS,
+    eligible: isEligibleNation(nation, pool),
+  };
+}
+
 /** Ovr descending, pid ascending — a total order, so squad picks are deterministic. */
 function byStrength(a: Player, b: Player): number {
   return b.ovr - a.ovr || a.pid - b.pid;

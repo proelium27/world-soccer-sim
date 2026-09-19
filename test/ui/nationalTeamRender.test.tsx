@@ -137,12 +137,36 @@ describe("My Squad page", () => {
   });
 
   it("copes with a country that never named a squad", () => {
+    // England can field a team; a fresh save just hasn't drawn a campaign yet.
     const league = makeLeague(0, 1);
     const html = render(NTMySquad, {
       ...league,
-      nationalManager: emptyNationalManagerState("Nowhere at all", 1),
+      nationalManager: emptyNationalManagerState("England", 1),
     });
     expect(html).toContain("haven&#x27;t named a squad yet");
+    expect(html).not.toContain("can&#x27;t field a team yet");
+  });
+
+  /**
+   * A country you manage before it has the players: every management page says
+   * how far off it is instead of promising a squad that isn't coming.
+   */
+  it("says how far off a country without the players is, on every page", () => {
+    const league = makeLeague(0, 1);
+    const dormant = {
+      ...league,
+      nationalManager: emptyNationalManagerState("Bhutan", 1),
+      international: initInternationalCampaign(
+        league.international, league.players, league.season, league.lid,
+      ),
+    };
+    for (const page of [NTMySquad, NTPlayerPool, NTFederation]) {
+      const html = render(page, dormant);
+      expect(html).toContain("Bhutan can&#x27;t field a team yet");
+      expect(html).toContain("You&#x27;re still their manager");
+      expect(html).toContain("nat=Bhutan");
+      expect(html).not.toContain("haven&#x27;t named a squad yet");
+    }
   });
 });
 

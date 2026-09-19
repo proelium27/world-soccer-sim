@@ -7,14 +7,14 @@ import { NATIONALITIES } from "../../core/players/nationalities.js";
 import { SKILL_LABELS } from "../components/PlayerRatingsTooltip.js";
 import { TeamIdentityEditor, type EditableTeam } from "../components/TeamIdentityEditor.js";
 import type { NewPlayerSpec } from "../../core/godMode.js";
-import { OVR_SCALE_SHIFT } from "../../core/constants.js";
+import { OVR_SCALE_SHIFT, INTL_MIN_POOL } from "../../core/constants.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 import { BackLink } from "../components/BackLink.js";
 import { ClubCrest } from "../components/ClubCrest.js";
 import { Flag } from "../components/Flag.js";
 import { manageableNations } from "../../core/international/index.js";
 import { isSpectator } from "../../core/spectator.js";
-import { NationName } from "./nationalTeams/shared.js";
+import { NationName, APPOINTABLE_NATIONS } from "./nationalTeams/shared.js";
 import { currencyCompact } from "../format.js";
 import { AwardFormulas } from "./GodModeAwards.js";
 import { ContinentalFormats } from "./GodModeContinental.js";
@@ -263,9 +263,10 @@ export function Development() {
  * that country's eleven back so the AI picks its own again, and opens a new
  * spell here. Your club job is untouched either way.
  *
- * The list is built from `manageableNations`, so it only ever offers countries
- * that can really field a squad in this world — the same call the action gates
- * on, rather than a second opinion about who exists.
+ * The list is every country with a confederation (`APPOINTABLE_NATIONS`, the
+ * same list New League offers). A country that can't field a squad yet is
+ * marked, not hidden: you can hold that job, and the country joins the next
+ * campaign once it has the players.
  */
 function SwitchCountry() {
   const { league, godModeTakeNationalJobAction, leaveNationalJobAction, simming } = useLeague();
@@ -273,13 +274,14 @@ function SwitchCountry() {
   const [filter, setFilter] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
 
-  // Every nation in the world with a deep enough pool, a keeper in it and a
-  // confederation to qualify through. Walks the whole player pool, so it is
-  // held behind a memo rather than recomputed as the search box is typed into.
-  const nations = useMemo(
-    () => (league ? manageableNations(league.players) : []),
+  // Which countries can field a team today. Walks the whole player pool, so it
+  // is held behind a memo rather than recomputed as the search box is typed
+  // into. Only used to mark rows; every appointable country is listed.
+  const ready = useMemo(
+    () => new Set(league ? manageableNations(league.players) : []),
     [league],
   );
+  const nations = APPOINTABLE_NATIONS;
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return q ? nations.filter((n) => n.toLowerCase().includes(q)) : nations;
@@ -310,16 +312,6 @@ function SwitchCountry() {
       <div className="text-muted small" style={{ maxWidth: 560 }}>
         You&apos;re spectating, so there&apos;s no manager here for a federation to appoint.
         Take a club on the Switch Club tab first and the countries will open up.
-      </div>
-    );
-  }
-
-  if (nations.length === 0) {
-    return (
-      <div className="text-muted small" style={{ maxWidth: 560 }}>
-        No country in this world has enough players born into it to field a squad, so
-        there&apos;s no national job to take. Worlds with more leagues in them generate
-        deeper pools.
       </div>
     );
   }
@@ -359,7 +351,9 @@ function SwitchCountry() {
           >
             <Flag nationality={n} tip={false} />
             {n}
-            {n === current && <span className="ms-auto small">current</span>}
+            {n === current
+              ? <span className="ms-auto small">current</span>
+              : !ready.has(n) && <span className="ms-auto small text-muted">not enough players yet</span>}
           </button>
         ))}
         {shown.length === 0 && (
@@ -387,6 +381,12 @@ function SwitchCountry() {
               A campaign already under way is inherited as it stands. You take over the squad
               they have, the way a real country changes manager mid-cycle.
             </li>
+            {!ready.has(picked) && (
+              <li>
+                {picked} can&apos;t field a team yet. You&apos;re their manager anyway, and they
+                join the next campaign once they have {INTL_MIN_POOL} players and a keeper.
+              </li>
+            )}
             <li>Nothing about your club job changes.</li>
           </ul>
           <button className="btn btn-sm btn-warning" disabled={simming} onClick={take}>
