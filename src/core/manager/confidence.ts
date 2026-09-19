@@ -16,6 +16,7 @@ import {
   MANAGER_TROPHY_CONFIDENCE,
   MANAGER_RELEGATION_CONFIDENCE,
   MANAGER_PROMOTION_CONFIDENCE,
+  MANAGER_MISSED_PLAYOFFS_CONFIDENCE,
   MANAGER_DEMAND_PENALTY_SCALE,
   MANAGER_DEMAND_REWARD_DAMPING,
   MANAGER_GRACE_SEASONS,
@@ -25,6 +26,7 @@ import {
   MANAGER_CONFIDENCE_RECOVERY,
   MANAGER_START_CONFIDENCE,
 } from "../constants.js";
+import type { PlayoffJudgement } from "./playoffExpectation.js";
 
 /** What the club achieved, and what the board made of it. */
 export interface SeasonVerdict {
@@ -49,6 +51,12 @@ export interface SeasonVerdict {
   confidence: number;
   /** The board has dismissed you. */
   sacked: boolean;
+  /**
+   * Set in a league whose title is decided by a playoff: the season was judged
+   * on the playoff run rather than the table (see playoffExpectation.ts).
+   * Optional, so a verdict stored before this reads as a table verdict.
+   */
+  playoff?: PlayoffJudgement;
 }
 
 export interface SeasonFacts {
@@ -60,6 +68,8 @@ export interface SeasonFacts {
   trophies: number;
   promoted: boolean;
   relegated: boolean;
+  /** A playoff league's run, which replaces the table as what the board judges. */
+  playoff?: PlayoffJudgement;
 }
 
 const clamp01to100 = (n: number): number => Math.min(100, Math.max(0, n));
@@ -79,8 +89,11 @@ export function judgeSeason(
   sackingEnabled: boolean,
   boardPatience: number,
 ): SeasonVerdict {
-  const { finish, expectedRank, clubs, demand } = facts;
-  const over = clubs > 1 ? (expectedRank - finish) / (clubs - 1) : 0;
+  const { finish, expectedRank, clubs, demand, playoff } = facts;
+  // In a playoff league both sides are playoff places rather than table places.
+  const expectedPlace = playoff ? playoff.expectedPlace : expectedRank;
+  const actualPlace = playoff ? playoff.actualPlace : finish;
+  const over = clubs > 1 ? (expectedPlace - actualPlace) / (clubs - 1) : 0;
 
   // Boards forget, in both directions. Applied before the verdict so a manager
   // who is merely meeting expectations slowly climbs out of a bad patch instead
@@ -106,6 +119,7 @@ export function judgeSeason(
   delta += facts.trophies * MANAGER_TROPHY_CONFIDENCE;
   if (facts.promoted) delta += MANAGER_PROMOTION_CONFIDENCE;
   if (facts.relegated) delta += MANAGER_RELEGATION_CONFIDENCE;
+  if (playoff?.missed) delta += MANAGER_MISSED_PLAYOFFS_CONFIDENCE;
 
   // The save's difficulty setting is the global patience knob: an easy board
   // banks your good seasons and shrugs off your bad ones, a brutal one does the
@@ -135,6 +149,7 @@ export function judgeSeason(
     delta,
     confidence: next,
     sacked,
+    ...(playoff ? { playoff } : {}),
   };
 }
 

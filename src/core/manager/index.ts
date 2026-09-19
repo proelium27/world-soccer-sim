@@ -32,6 +32,7 @@ import { deriveExpectations, actualFinish } from "./expectation.js";
 import { judgeSeason, type SeasonVerdict } from "./confidence.js";
 import { generateJobOffers, managerReputation, type OfferMoves } from "./jobOffers.js";
 import { currentStint, type ManagerState } from "./types.js";
+import { judgePlayoffSeason } from "./playoffExpectation.js";
 import { pointsDeductionMap } from "../finance/debt.js";
 
 export * from "./types.js";
@@ -39,6 +40,7 @@ export * from "./expectation.js";
 export * from "./confidence.js";
 export * from "./jobOffers.js";
 export * from "./interests.js";
+export * from "./playoffExpectation.js";
 export { switchClub } from "./switchClub.js";
 
 /** Final tables for every competition, keyed by compId. */
@@ -170,6 +172,11 @@ export function reviewSeason(input: ReviewInput): ManagerReview {
   const titlePlayoff = input.titlePlayoffs?.find((p) => p.compId === mine.compId);
   const wonTitle = titlePlayoff?.winnerTid != null ? titlePlayoff.winnerTid === userTid : finish === 1;
   const titles = wonTitle ? 1 : 0;
+  // A league that crowns its champion in a playoff is judged on the playoff run.
+  // Only once it is decided: an unfinished bracket falls back to the table.
+  const playoff = titlePlayoff?.winnerTid != null
+    ? judgePlayoffSeason(titlePlayoff, userTid, mine.expectedRank, finish)
+    : undefined;
   const verdict = judgeSeason(
     {
       finish,
@@ -180,6 +187,7 @@ export function reviewSeason(input: ReviewInput): ManagerReview {
       trophies,
       promoted,
       relegated,
+      ...(playoff ? { playoff } : {}),
     },
     manager.confidence,
     stint.seasons,

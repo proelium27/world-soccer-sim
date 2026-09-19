@@ -24,11 +24,20 @@ export function ExpectationPanel({
           <p className="text-muted mb-0">No expectation set yet.</p>
         ) : (
           <>
-            <p className="mb-2">
-              They expect a club like yours to finish around{" "}
-              <strong>{ordinal(expectation.expectedRank)}</strong> of {expectation.clubs} in{" "}
-              {competitionName}.
-            </p>
+            {expectation.playoffGoal ? (
+              <p className="mb-2">
+                {competitionName} crowns its champion in a playoff, so they judge you on
+                the playoffs, not the table. They want you to{" "}
+                <strong>{expectation.playoffGoal}</strong>.
+              </p>
+            ) : (
+              <p className="mb-2">
+                They expect a club like yours to finish around{" "}
+                <strong>{ordinal(expectation.expectedRank)}</strong> of {expectation.clubs} in{" "}
+                {competitionName}.
+                {expectation.playoffLeague && " Getting into the playoffs is still the least they ask."}
+              </p>
+            )}
             <p className="text-muted small mb-2">
               That comes from where you've recently finished and how well known the club is.
               It deliberately doesn't come from your squad or your bank balance, so nothing you
@@ -64,14 +73,28 @@ export function LastSeasonPanel({ verdict }: { verdict: ManagerVerdictRecord }) 
       <div className="card-body">
         <h6 className="card-title">How {seasonYear(verdict.season)} went down</h6>
         <p className="mb-2">
-          You finished <strong>{ordinal(verdict.finish)}</strong>; they'd have settled for{" "}
-          <strong>{ordinal(verdict.expectedRank)}</strong>. Confidence went{" "}
+          {verdict.playoff ? (
+            <>
+              You finished <strong>{ordinal(verdict.finish)}</strong> and{" "}
+              <strong>{verdict.playoff.result}</strong>
+              {verdict.playoff.goal
+                ? <>; they wanted you to <strong>{verdict.playoff.goal}</strong>.</>
+                : <>; they'd have settled for <strong>{ordinal(verdict.expectedRank)}</strong>.</>}
+            </>
+          ) : (
+            <>
+              You finished <strong>{ordinal(verdict.finish)}</strong>; they'd have settled for{" "}
+              <strong>{ordinal(verdict.expectedRank)}</strong>.
+            </>
+          )}{" "}
+          Confidence went{" "}
           {Math.round(verdict.previousConfidence)} →{" "}
           <strong>{Math.round(verdict.confidence)}</strong>.
         </p>
         <ul className="mb-0 small text-muted">
           <li>{finishNote}</li>
           {verdict.titles > 0 && <li>You won the league</li>}
+          {verdict.playoff?.missed && <li>Missed the playoffs</li>}
           {verdict.trophies > 0 && (
             <li>{verdict.trophies} cup{verdict.trophies === 1 ? "" : "s"} won</li>
           )}

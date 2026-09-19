@@ -5378,6 +5378,19 @@ export const MANAGER_RELEGATION_CONFIDENCE = -35;
 /** Promotion, on top of the finish (and on top of the tier-2 title, if you won it). */
 export const MANAGER_PROMOTION_CONFIDENCE = 20;
 /**
+ * Missing the playoffs in a league whose title is decided by one (MLS, Liga MX,
+ * Argentina), on top of the finish. Charged to every club, however small: making
+ * the playoffs is the minimum any board there asks for.
+ *
+ * Deliberately modest, because it is charged every season a club misses out and
+ * boards drift back toward `MANAGER_START_CONFIDENCE` by only 12% a year: a club
+ * that misses every year but otherwise does what's expected settles around
+ * 65 - 5 / 0.12 ≈ 23, i.e. under pressure but never sacked for it alone. A
+ * contender that misses loses far more through the finish term, which scores it
+ * against a playoff run (see core/manager/playoffExpectation.ts).
+ */
+export const MANAGER_MISSED_PLAYOFFS_CONFIDENCE = -5;
+/**
  * How much more harshly the most demanding board punishes a bad season: a
  * demand of 1.0 multiplies the drop by 1 + this. The reward side is damped
  * instead (below), because the asymmetry *is* the difficulty — a superclub

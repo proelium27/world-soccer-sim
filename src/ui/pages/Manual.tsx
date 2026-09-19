@@ -446,6 +446,19 @@ export function Manual() {
             you banked can carry you through. That's the point of a running balance rather than a
             "two bad seasons and you're out" rule.
           </p>
+          <p>
+            <strong>Leagues that crown their champion in a playoff</strong> (MLS, Liga MX and
+            Argentina) are judged on the playoffs instead of the table. If they expect you in the
+            playoff places, the target becomes a playoff run: the club expected to top the league
+            has to win the title, the next one to reach the final, the next two the semi-finals or
+            conference finals, and so on down the bracket. Top the table and go out in the first
+            round and that's a bad season; scrape in and win it and that's a great one. A smaller
+            club they expect to finish outside the places is still measured on the table, since
+            climbing it is a fair ask. <strong>Missing the playoffs costs you with every board
+            there</strong>, however small the club: it's a small fixed hit on top of whatever your
+            finish was worth, so a club that misses out every year sits under pressure without being
+            sacked for it alone.
+          </p>
           <h6>Not every board is as patient</h6>
           <p>
             Two things make a board harder to please. The first is <strong>how big a job it
@@ -1541,9 +1554,9 @@ export function Manual() {
           </p>
           <p>
             <strong>The table still counts for everything else.</strong> Prize money, hype,
-            continental places and what your board makes of your season all come from where you
-            finished, so topping the table and going out in the quarter-finals is still a good year,
-            just not a title-winning one. The board does give you credit for the title if you win it.
+            continental places all come from where you finished. <strong>Your board is the
+            exception</strong>: in a league like this it judges you on the playoffs rather than the
+            table (see <a href="#manager">Board confidence</a>).
           </p>
           <p>
             It&apos;s played after the last matchday, before anyone retires or moves clubs, with
