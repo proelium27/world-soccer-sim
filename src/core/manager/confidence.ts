@@ -17,6 +17,8 @@ import {
   MANAGER_RELEGATION_CONFIDENCE,
   MANAGER_PROMOTION_CONFIDENCE,
   MANAGER_MISSED_PLAYOFFS_CONFIDENCE,
+  MANAGER_CONTINENTAL_RUN_SWING,
+  MANAGER_CONTINENTAL_PLACE_CONFIDENCE,
   MANAGER_DEMAND_PENALTY_SCALE,
   MANAGER_DEMAND_REWARD_DAMPING,
   MANAGER_GRACE_SEASONS,
@@ -27,6 +29,7 @@ import {
   MANAGER_START_CONFIDENCE,
 } from "../constants.js";
 import type { PlayoffJudgement } from "./playoffExpectation.js";
+import type { ContinentalRunJudgement, QualificationJudgement } from "./continentalExpectation.js";
 
 /** What the club achieved, and what the board made of it. */
 export interface SeasonVerdict {
@@ -57,6 +60,10 @@ export interface SeasonVerdict {
    * Optional, so a verdict stored before this reads as a table verdict.
    */
   playoff?: PlayoffJudgement;
+  /** Continental qualification against what the board expected. Optional: absent on older verdicts. */
+  qualification?: QualificationJudgement;
+  /** This season's continental run against the club's seed, if it played in one. */
+  continentalRun?: ContinentalRunJudgement;
 }
 
 export interface SeasonFacts {
@@ -70,6 +77,8 @@ export interface SeasonFacts {
   relegated: boolean;
   /** A playoff league's run, which replaces the table as what the board judges. */
   playoff?: PlayoffJudgement;
+  qualification?: QualificationJudgement;
+  continentalRun?: ContinentalRunJudgement;
 }
 
 const clamp01to100 = (n: number): number => Math.min(100, Math.max(0, n));
@@ -106,11 +115,22 @@ export function judgeSeason(
   // treats success as the baseline (damped reward) and failure as a crisis
   // (amplified penalty). That asymmetry is the difficulty knob the user asked
   // to scale with the league.
-  const base = over * MANAGER_CONFIDENCE_SWING;
-  let delta =
-    base >= 0
-      ? base * (1 - demand * MANAGER_DEMAND_REWARD_DAMPING)
-      : base * (1 + demand * MANAGER_DEMAND_PENALTY_SCALE);
+  const withDemand = (v: number): number =>
+    v >= 0
+      ? v * (1 - demand * MANAGER_DEMAND_REWARD_DAMPING)
+      : v * (1 + demand * MANAGER_DEMAND_PENALTY_SCALE);
+  let delta = withDemand(over * MANAGER_CONFIDENCE_SWING);
+
+  // The continental run against the club's seed, with the same asymmetry: a
+  // big club going out early is a crisis, a small one going deep a bonus.
+  const run = facts.continentalRun;
+  if (run && run.field > 1) {
+    delta += withDemand(
+      ((run.expectedPlace - run.actualPlace) / (run.field - 1)) * MANAGER_CONTINENTAL_RUN_SWING,
+    );
+  }
+  // Qualifying, per rung above or below the ask. Flat, like trophies.
+  if (facts.qualification) delta += facts.qualification.rungs * MANAGER_CONTINENTAL_PLACE_CONFIDENCE;
 
   // Trophies and division changes are judged flat, not scaled by demand. A
   // trophy is a trophy: damping a superclub's cup win toward nothing would make
@@ -150,6 +170,8 @@ export function judgeSeason(
     confidence: next,
     sacked,
     ...(playoff ? { playoff } : {}),
+    ...(facts.qualification ? { qualification: facts.qualification } : {}),
+    ...(run ? { continentalRun: run } : {}),
   };
 }
 

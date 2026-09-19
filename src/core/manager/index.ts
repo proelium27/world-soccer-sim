@@ -33,6 +33,7 @@ import { judgeSeason, type SeasonVerdict } from "./confidence.js";
 import { generateJobOffers, managerReputation, type OfferMoves } from "./jobOffers.js";
 import { currentStint, type ManagerState } from "./types.js";
 import { judgePlayoffSeason } from "./playoffExpectation.js";
+import { judgeContinentalRun, judgeQualification } from "./continentalExpectation.js";
 import { pointsDeductionMap } from "../finance/debt.js";
 
 export * from "./types.js";
@@ -41,6 +42,7 @@ export * from "./confidence.js";
 export * from "./jobOffers.js";
 export * from "./interests.js";
 export * from "./playoffExpectation.js";
+export * from "./continentalExpectation.js";
 export { switchClub } from "./switchClub.js";
 
 /** Final tables for every competition, keyed by compId. */
@@ -177,6 +179,15 @@ export function reviewSeason(input: ReviewInput): ManagerReview {
   const playoff = titlePlayoff?.winnerTid != null
     ? judgePlayoffSeason(titlePlayoff, userTid, mine.expectedRank, finish)
     : undefined;
+  // Continental football: whether the club earned the place it was expected to,
+  // and how its run this season compared with its seed. Both read only the
+  // tables and this season's cups — the worker running this has no cup archive.
+  const comp = league.competitions.find((c) => c.id === mine.compId);
+  const qualification = comp
+    ? judgeQualification(league.competitions, tables, input, comp, userTid, mine.expectedRank)
+    : undefined;
+  const continentalRun =
+    judgeContinentalRun([input.cup, input.shield, input.americasCup], userTid) ?? undefined;
   const verdict = judgeSeason(
     {
       finish,
@@ -188,6 +199,8 @@ export function reviewSeason(input: ReviewInput): ManagerReview {
       promoted,
       relegated,
       ...(playoff ? { playoff } : {}),
+      ...(qualification ? { qualification } : {}),
+      ...(continentalRun ? { continentalRun } : {}),
     },
     manager.confidence,
     stint.seasons,

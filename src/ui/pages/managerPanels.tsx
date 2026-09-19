@@ -1,6 +1,8 @@
 import { ordinal, seasonYear } from "../format.js";
 import { demandLabel, type ClubExpectation } from "../../core/manager/expectation.js";
 import type { ManagerVerdictRecord } from "../../core/manager/types.js";
+import type { boardContinentalGoals } from "../../core/manager/continentalExpectation.js";
+import { CUP_FORMATS } from "../../core/constants.js";
 
 /**
  * The two panels that explain the confidence bar rather than just showing it:
@@ -12,9 +14,11 @@ import type { ManagerVerdictRecord } from "../../core/manager/types.js";
 export function ExpectationPanel({
   expectation,
   competitionName,
+  continental = null,
 }: {
   expectation: ClubExpectation | null;
   competitionName: string;
+  continental?: ReturnType<typeof boardContinentalGoals> | null;
 }) {
   return (
     <div className="card mb-4">
@@ -36,6 +40,19 @@ export function ExpectationPanel({
                 <strong>{ordinal(expectation.expectedRank)}</strong> of {expectation.clubs} in{" "}
                 {competitionName}.
                 {expectation.playoffLeague && " Getting into the playoffs is still the least they ask."}
+              </p>
+            )}
+            {continental?.qualify && (
+              <p className="mb-2">
+                They want you back in the <strong>{continental.qualify}</strong> next season.
+              </p>
+            )}
+            {continental?.run && (
+              <p className="mb-2">
+                You're seeded {ordinal(continental.run.seed)} in the {continental.run.name}
+                {continental.run.goal
+                  ? <>, so they want you to <strong>{continental.run.goal}</strong>.</>
+                  : ", so a decent showing is all they're asking."}
               </p>
             )}
             <p className="text-muted small mb-2">
@@ -95,6 +112,22 @@ export function LastSeasonPanel({ verdict }: { verdict: ManagerVerdictRecord }) 
           <li>{finishNote}</li>
           {verdict.titles > 0 && <li>You won the league</li>}
           {verdict.playoff?.missed && <li>Missed the playoffs</li>}
+          {verdict.continentalRun && (
+            <li>
+              {verdict.continentalRun.name}: {verdict.continentalRun.result}
+              {verdict.continentalRun.goal ? ` (they wanted you to ${verdict.continentalRun.goal})` : ""}
+            </li>
+          )}
+          {verdict.qualification && verdict.qualification.rungs !== 0 && (
+            <li>
+              {verdict.qualification.earned
+                ? `Qualified for the ${CUP_FORMATS[verdict.qualification.earned].name}`
+                : "Missed out on continental football"}
+              {verdict.qualification.expected
+                ? `, when they expected the ${CUP_FORMATS[verdict.qualification.expected].name}`
+                : ", which they weren't expecting"}
+            </li>
+          )}
           {verdict.trophies > 0 && (
             <li>{verdict.trophies} cup{verdict.trophies === 1 ? "" : "s"} won</li>
           )}

@@ -7,6 +7,7 @@ import { confidenceMood, confidenceLabel } from "../../core/manager/confidence.j
 import { managerReputation } from "../../core/manager/jobOffers.js";
 import { cachedExpectations } from "../../core/manager/expectation.js";
 import { boardPlayoffGoal } from "../../core/manager/playoffExpectation.js";
+import { boardContinentalGoals } from "../../core/manager/continentalExpectation.js";
 import { ExpectationPanel, LastSeasonPanel } from "./managerPanels.js";
 import { JobInterestsPanel } from "./JobInterestsPanel.js";
 import { difficultyProfile } from "../../core/constants.js";
@@ -212,6 +213,14 @@ export function Manager() {
       <ExpectationPanel
         expectation={expectation}
         competitionName={expectation ? compName(expectation.compId) : ""}
+        continental={expectation
+          ? boardContinentalGoals(
+            league.competitions.find((c) => c.id === expectation.compId),
+            expectation.expectedRank,
+            [league.cup, league.shield, league.americasCup],
+            league.meta.userTid,
+          )
+          : null}
       />
 
       {manager.lastVerdict && <LastSeasonPanel verdict={manager.lastVerdict} />}

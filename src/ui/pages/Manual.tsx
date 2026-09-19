@@ -459,6 +459,19 @@ export function Manual() {
             finish was worth, so a club that misses out every year sits under pressure without being
             sacked for it alone.
           </p>
+          <p>
+            <strong>Continental football counts too.</strong> Two things, every season. First,
+            qualifying: if they expect you to finish inside your league&apos;s continental places,
+            they expect the place that comes with it. The Continental Cup is worth two steps and the
+            Shield one (the Americas Cup counts as two), so a club expected in the Cup that only
+            makes the Shield loses a little, and missing out altogether loses twice that. Getting in
+            when they didn&apos;t expect it, from the table or by winning your domestic cup, earns the
+            same back. Second, your run: in the competition you&apos;re playing, they expect you to
+            go as far as your seed in the draw. The top seed has to win it, the next has to reach
+            the final, the next two the semi-finals, and so on, while a low seed only has to show
+            up. Beat your seed and you bank goodwill, fall short and you lose some, harder at a
+            big club. It&apos;s worth less than your league finish, because the league is the job.
+          </p>
           <h6>Not every board is as patient</h6>
           <p>
             Two things make a board harder to please. The first is <strong>how big a job it
