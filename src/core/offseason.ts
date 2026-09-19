@@ -43,9 +43,9 @@ import { resolveAwardFormula, type AwardFormula } from "./awardFormula.js";
 import { snapshotAwardWinners } from "./awardWinners.js";
 import { buildCupState } from "./cup/cup.js";
 import { continentalFormatFor } from "./cup/cupShape.js";
-import type { QualificationContext } from "./cup/qualification.js";
+import type { QualificationContext, SlotOverrides } from "./cup/qualification.js";
 import { domesticCupWinners, qualificationByTid } from "./cup/qualification.js";
-import { coefficientSlots } from "./cup/coefficients.js";
+import { offseasonCoefficientSlots } from "./cup/coefficients.js";
 import { buildDomesticCups } from "./domesticCup/cup.js";
 import { archiveDomesticCup } from "./domesticCup/archive.js";
 import { buildSuperCups } from "./superCup/superCup.js";
@@ -145,7 +145,23 @@ export interface OffseasonInputs {
    * and `jump`, which is exempt from detaching).
    */
   cupChampions?: Pick<HonourSources, "cup" | "shield" | "domestic" | "americas" | "americasTids">;
+  /**
+   * Next season's continental places per league, off the rolling country
+   * coefficient — `offseasonCoefficientSlots` (cup/coefficients.ts) on the full league. `null` means
+   * "worked out, and there is no reallocation" (too little record, or the save
+   * has rolling coefficients off); absent means "read the cup histories here".
+   *
+   * **This one had teeth.** The coefficient is computed from the cup archives,
+   * which `detachNews` empties on the way to the worker. Worked out there, every
+   * country had one season of record at most, never reached
+   * `COEFFICIENT_MIN_SEASONS`, and the allocation fell back to the fixed
+   * strength classes — so the rolling coefficient never took effect in real
+   * play, while every test and audit (which call the offseason directly) saw it
+   * working. Nothing threw.
+   */
+  cupSlots?: SlotOverrides | null;
 }
+
 
 /** What the offseason did that the caller cannot work out from the league alone. */
 export interface OffseasonReport {
@@ -185,6 +201,7 @@ export function simOffseasonReporting(
     teamStats: precomputedTeamStats,
     referencedPids: precomputedReferenced,
     cupChampions: precomputedChampions,
+    cupSlots: precomputedSlots,
   } = inputs;
   if (league.phase !== "offseason") {
     return { league, report: { culledPids: new Set<number>() } };
@@ -1173,23 +1190,14 @@ export function simOffseasonReporting(
     // before it. Zero-sum against the defaults, so the fields stay the size
     // they were (see cup/coefficients.ts); null before there is any record,
     // which leaves the shipped strength-class allocation in place.
-    slots: coefficientSlots(
-      league.competitions,
-      teams,
-      [
-        league.cupHistory ?? [],
-        league.shieldHistory ?? [],
-        // Only a competition with a champion counts, the same rule the live
-        // Standings projection uses (see cup/seasonQualification). Here they
-        // always have one, since the season is over; keeping the two callers on
-        // one rule is what stops them disagreeing about a country's record.
-        [league.cup, league.shield].filter(
-          (c): c is NonNullable<typeof c> => !!c && c.championTid !== null,
-        ),
-      ],
-      nextSeason,
-      league.rollingCoefficients ?? true,
-    ) ?? undefined,
+    //
+    // Read from the caller when supplied: the worker is handed empty cup
+    // histories (see `OffseasonInputs.cupSlots`), and worked out from those the
+    // coefficient never has enough seasons to rank on, so the rolling
+    // allocation silently never applied in real play.
+    slots: (precomputedSlots !== undefined
+      ? precomputedSlots
+      : offseasonCoefficientSlots(league)) ?? undefined,
   };
 
   // 6.7. Settle transfer bonuses earned by the season just played, then expire

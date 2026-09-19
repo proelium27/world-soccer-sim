@@ -14,6 +14,7 @@ import {
 import { referencedPids } from "../core/players/playerNames.js";
 import { honourSourcesOf } from "../core/frivolities/goat.js";
 import { computeTeamSeasonStats } from "../core/standings.js";
+import { offseasonCoefficientSlots } from "../core/cup/coefficients.js";
 
 export type SimProgress = {
   matchday: number;
@@ -203,6 +204,13 @@ export function useSimWorker() {
                 // Read off the full league, before `detachNews` empties the cup
                 // histories on the way to the worker.
                 cupChampions: honourSourcesOf(command.league),
+                // The coefficient reads the same held-back cup history, so it is
+                // worked out here too. Without it the worker saw at most one
+                // season of record and never reallocated a single place.
+                cupSlots: (() => {
+                  const slots = offseasonCoefficientSlots(command.league);
+                  return slots ? [...slots] : null;
+                })(),
               }
             : { ...command, league: payload };
 

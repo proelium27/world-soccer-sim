@@ -4,6 +4,7 @@ import type { PlayedMatch, TeamSeasonStats } from "../core/standings.js";
 import type { CupTie } from "../core/cup/types.js";
 import type { DomesticTieResult } from "../core/simThrough.js";
 import type { OffseasonInputs } from "../core/offseason.js";
+import type { CupCompetitionId } from "../core/constants.js";
 
 // Re-exported rather than redeclared: the two used to be separate unions and
 // could drift apart silently, since the worker boundary erases types.
@@ -44,6 +45,12 @@ export type WorkerCommand =
        * and a retiree scored against an empty one loses every trophy he won.
        */
       cupChampions?: OffseasonInputs["cupChampions"];
+      /**
+       * Next season's coefficient places, worked out off the full cup history
+       * (see `OffseasonInputs.cupSlots`). Entries rather than a Map, like the
+       * rest of this protocol; `null` means "no reallocation this season".
+       */
+      cupSlots?: [number, Partial<Record<CupCompetitionId, number>>][] | null;
     }
   | { type: "intl"; mode: IntlMode; league: LeagueStore }
   | { type: "playoffs"; mode: PlayoffMode; league: LeagueStore }

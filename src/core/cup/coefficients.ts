@@ -8,6 +8,8 @@ import {
 } from "../constants.js";
 import { cupSlotsForCompetition } from "./qualification.js";
 import { competitionRegion } from "../competitions.js";
+import type { LeagueStore } from "../leagueState.js";
+import type { SlotOverrides } from "./qualification.js";
 
 /**
  * The top flights the coefficient ranks: the Continental Cup's region only.
@@ -276,4 +278,33 @@ export function coefficientSlots(
     out.set(compId, { continental: slots });
   }
   return out;
+}
+
+/**
+ * Next season's coefficient-based continental places, as the offseason
+ * allocates them. Exported so the main thread can work it out off the full
+ * league before the worker is handed one without its cup history.
+ *
+ * Reads `league.teams` only for each club's country, which the offseason never
+ * changes (promotion moves a club between its own country's divisions), so the
+ * answer is the same before and after the offseason's own team changes.
+ */
+export function offseasonCoefficientSlots(league: LeagueStore): SlotOverrides | null {
+  return coefficientSlots(
+    league.competitions,
+    league.teams,
+    [
+      league.cupHistory ?? [],
+      league.shieldHistory ?? [],
+      // Only a competition with a champion counts, the same rule the live
+      // Standings projection uses (see cup/seasonQualification). Here they
+      // always have one, since the season is over; keeping the two callers on
+      // one rule is what stops them disagreeing about a country's record.
+      [league.cup, league.shield].filter(
+        (c): c is NonNullable<typeof c> => !!c && c.championTid !== null,
+      ),
+    ],
+    league.season + 1,
+    league.rollingCoefficients ?? true,
+  );
 }
