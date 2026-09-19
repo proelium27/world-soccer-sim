@@ -468,7 +468,9 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
                   note={league.manager.offers.length > 0
                     ? `${league.manager.offers.length} club${league.manager.offers.length === 1 ? "" : "s"} want you`
                     : boardExpectation
-                      ? `${confidenceLabel(boardMood)} · ${ordinal(boardExpectation.expectedRank)} of ${boardExpectation.clubs} expected`
+                      ? `${confidenceLabel(boardMood)} · ${boardExpectation.playoffGoal
+                        ? `wants you to ${boardExpectation.playoffGoal}`
+                        : `${ordinal(boardExpectation.expectedRank)} of ${boardExpectation.clubs} expected`}`
                       : confidenceLabel(boardMood)}
                 />
               </div>
