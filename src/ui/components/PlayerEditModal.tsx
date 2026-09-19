@@ -98,7 +98,7 @@ export function PlayerEditModal({ player, onClose }: { player: Player; onClose: 
             <input type="number" className="form-control form-control-sm" value={potential} onChange={(e) => setPotential(Number(e.target.value))} />
           </div>
           <div className="col-6 col-md-3">
-            <label className="form-label form-label-sm">Season wage (£)</label>
+            <label className="form-label form-label-sm">Season wage ($)</label>
             <input type="number" className="form-control form-control-sm" value={salary} onChange={(e) => setSalary(Number(e.target.value))} />
           </div>
           <div className="col-6 col-md-3">

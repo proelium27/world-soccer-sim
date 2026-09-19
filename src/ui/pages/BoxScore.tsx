@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { EmptyState } from "../components/EmptyState.js";
 import { useParams, Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -279,7 +280,12 @@ export function BoxScore() {
   if (!match) {
     return (
       <div className="container-fluid p-3">
-        <p>Match not found.</p>
+        <EmptyState headline="Match not found.">
+          <p>
+            Box scores are kept for the season being played, so a match from a finished season
+            isn&apos;t here any more. Its result is still in the standings and the club&apos;s history.
+          </p>
+        </EmptyState>
         <BackLink fallback="/schedule" />
       </div>
     );

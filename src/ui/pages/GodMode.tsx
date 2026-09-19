@@ -37,7 +37,7 @@ export function GodMode() {
         <BackLink fallback="/roster" className="small" />
       </div>
       <p className="text-secondary small">
-        Sandbox tools — edits ignore fees, budgets, roster caps, and depth floors.
+        Sandbox tools: edits ignore fees, budgets, roster caps, and depth floors.
       </p>
 
       <ul className="nav nav-tabs mb-3">
@@ -241,7 +241,7 @@ export function Development() {
       </div>
       <p className="text-secondary small mb-2">
         {steady
-          ? "Players follow their own arc: they improve through their early twenties, hold through their peak, and fall away from thirty, faster every year after that. How much they play still speeds it up or slows it down, and talent still separates them — but nobody goes from squad filler to superstar over one summer."
+          ? "Players follow their own arc: they improve through their early twenties, hold through their peak, and fall away from thirty, faster every year after that. How much they play still speeds it up or slows it down, and talent still separates them, but nobody goes from squad filler to superstar over one summer."
           : "Every summer is a roll of the dice. A squad player can add eight points out of nowhere, and a prospect can go backwards for no reason you'll ever see."}
       </p>
       <p className="text-secondary small mb-0">
@@ -488,7 +488,7 @@ function CreatePlayer() {
           <input type="number" className="form-control form-control-sm" value={potential} onChange={(e) => setPotential(Number(e.target.value))} />
         </div>
         <div className="col-6 col-md-3">
-          <label className="form-label form-label-sm">Season wage (£)</label>
+          <label className="form-label form-label-sm">Season wage ($)</label>
           <input type="number" className="form-control form-control-sm" value={salary} onChange={(e) => setSalary(Number(e.target.value))} />
         </div>
         <div className="col-6 col-md-3">
@@ -654,7 +654,7 @@ function RosterBuilder() {
           <option value="" disabled>Select a player to add…</option>
           {addable.map((p) => (
             <option key={p.pid} value={p.pid}>
-              {p.name} — {p.pos} {p.ovr}{rosteredPids.has(p.pid) ? "" : " (free agent)"}
+              {p.name}, {p.pos} {p.ovr}{rosteredPids.has(p.pid) ? "" : " (free agent)"}
             </option>
           ))}
         </select>
@@ -708,7 +708,7 @@ function ClubFinances() {
 
       <div className="row g-2 mb-2" style={{ maxWidth: 480 }}>
         <div className="col-6">
-          <label className="form-label form-label-sm">Budget (£)</label>
+          <label className="form-label form-label-sm">Budget ($)</label>
           <input type="number" className="form-control form-control-sm" value={budgetVal} onChange={(e) => { setBudget(Number(e.target.value)); setSaved(false); }} />
         </div>
         <div className="col-6">

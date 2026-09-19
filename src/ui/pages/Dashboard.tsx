@@ -876,8 +876,9 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
                 )}
                 {debt?.inDebt && debt.projected === "clear" && (
                   <div className="alert alert-secondary py-2 text-start" role="alert">
-                    You're in the red. That's allowed, and you can borrow up to{" "}
-                    {currency.format(debt.limit)}, but it costs interest every season and your
+                    You're in the red. That's allowed, and your overdraft lets you keep buying and
+                    signing players down to {currency.format(-debt.limit)}, but it costs interest
+                    every season, taking a player on loan still needs money in the bank, and your
                     scouting stays switched off while you're overdrawn.
                     {" "}<Link to="/finance">See the finances</Link>.
                   </div>

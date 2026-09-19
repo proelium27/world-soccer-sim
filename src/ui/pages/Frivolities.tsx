@@ -1279,7 +1279,7 @@ function ClubsTab({ region }: { region?: ContinentalRegion }) {
               headers={[
                 "Club", "Total Trophies", "D1 Championships", "Continental Cups",
                 "Continental Shields", "Americas Cups", "Domestic Cups", "Trebles",
-                "D2 Championships", "Seasons", "Top flight",
+                "Lower-div titles", "Seasons", "Top flight",
               ]}
               render={(r: ClubRecordRow) => [
                 <ClubCell tid={r.tid} />,

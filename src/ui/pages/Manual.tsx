@@ -117,7 +117,7 @@ export function Manual() {
           <p>
             Saves live in your browser, so they don't follow you to another browser or another
             computer on their own. Each save on the Leagues screen has "Export Save", which downloads
-            that whole save as a file — every club, player, stat and transfer, exactly as it stands —
+            that whole save as a file (every club, player, stat and transfer, exactly as it stands),
             and "Import" at the bottom of the same screen loads one back. An import always comes in
             as a new save alongside what you already have, so bringing in a file can't overwrite a
             league you're in the middle of; if you meant to replace one, delete the old one
@@ -126,7 +126,7 @@ export function Manual() {
           </p>
           <p>
             Exported saves are compressed, so they come out as a <code>.json.gz</code> file that's
-            roughly sixteen times smaller than it would otherwise be — an eight-season save lands
+            roughly sixteen times smaller than it would otherwise be: an eight-season save lands
             around 5 MB instead of 84 MB, which is the difference between a file you can send someone
             and one you can't. Nothing is left out to achieve that; compression is reversible, and
             importing gives you back every last detail. There's no need to unzip it yourself, and you
@@ -134,8 +134,8 @@ export function Manual() {
             versions of the game are plain <code>.json</code> and still import fine.
           </p>
           <p>
-            That same "Import" button also takes a roster file — a plain text (JSON) file listing
-            clubs by league — and works out which kind of file you gave it from the file itself. Give
+            That same "Import" button also takes a roster file (a plain-text JSON file listing
+            clubs by league) and works out which kind of file you gave it from the file itself. Give
             it one of those and it starts a brand new save with those clubs in place of the fictional
             ones. You pick your club from the imported teams, so you're choosing between the real
             names rather than guessing which fictional slot is about to become which. Clubs match to
@@ -146,7 +146,7 @@ export function Manual() {
           </p>
           <p>
             The same screen carries the <strong>World setup</strong> panel, so an import isn't stuck
-            with the eight countries the game ships. If your file covers a league this world hasn't
+            with the countries the game ships. If your file covers a league this world hasn't
             got, add it there and name it what the file calls it, and the file fills it. See{" "}
             <a href="#world">the world</a> for the whole panel. Roster files can also be loaded
             straight from the plain New League screen, so both ways in do the same things. They
@@ -161,13 +161,13 @@ export function Manual() {
             finding them already built in. Two things worth
             knowing before you look at the squads: ratings are rescaled onto this
             game's own spread rather than copied across, so the ordering is what carries over and
-            the exact numbers can shift &mdash; in a fully covered top division they now land very
+            the exact numbers can shift. In a fully covered top division they now land very
             close to the ratings you'd expect, though a club in a division the file only partly
             covers can read lower; and imported clubs
             don't show a crest, since a crest belongs to a team slot rather than a club name and
             would otherwise end up on the wrong team. Colors do carry over. If you'd rather have a
             file made to your own description, the "Copy AI Prompt to Customize" button beside it
-            is the other way in — see just below.
+            is the other way in (see just below).
           </p>
           <p>
             Third divisions stay fictional. Above them, every club carries a real name, but not every
@@ -199,7 +199,7 @@ export function Manual() {
             name. Each player needs a name, position, and age, plus either an <em>overall</em> (the
             game builds position-appropriate ratings to match it) or an exact <em>ratings</em> block
             if you want full control; nationality, height, and potential are optional. You don't have
-            to list a full 25 — whatever you leave short gets topped up with lower-rated reserves so
+            to list a full 25: whatever you leave short gets topped up with lower-rated reserves so
             the squad is always legal to field. Leave the players list off a club and only its name
             and colors change, exactly like Customize Teams.
           </p>
@@ -240,7 +240,7 @@ export function Manual() {
           <p>
             Press it on the New League screen rather than the Leagues screen if you've changed
             anything about your world, since that's the one that describes the world you're actually
-            building — the leagues you added, the ones you renamed, the sizes you set. The Leagues
+            building: the leagues you added, the ones you renamed, the sizes you set. The Leagues
             one describes the default world, which is what most saves are.
           </p>
           <p>
@@ -266,15 +266,15 @@ export function Manual() {
           <p>
             You can bring your own badges, though. On the New League screen there's a{" "}
             <strong>Load club logos</strong> button underneath the roster loader. Point it at a
-            folder of picture files named after the clubs &mdash; <code>Liverpool.png</code>,{" "}
-            <code>real-sociedad.webp</code> &mdash; and each one gets matched to the club of that
+            folder of picture files named after the clubs (<code>Liverpool.png</code>,{" "}
+            <code>real-sociedad.webp</code>), and each one gets matched to the club of that
             name and shows up everywhere that club does. PNG, JPG, WebP, GIF and SVG all work.
             Capitals, accents and punctuation don't matter, so <code>bayern-munchen.png</code> finds
             Bayern M&uuml;nchen; if a name doesn't match anything the screen tells you which ones
             were skipped rather than leaving you to notice a missing badge later.
           </p>
           <p>
-            Two things worth knowing. <strong>Load your roster file first</strong> &mdash; badges
+            Two things worth knowing. <strong>Load your roster file first</strong>: badges
             are matched by club name, so the clubs have to be called what you think they're called
             before the badges can find them. And the game <strong>shrinks every picture</strong> as
             it loads it, down to 160 pixels square, which is why a whole world's worth of badges
@@ -331,8 +331,8 @@ export function Manual() {
             take longer to sharpen up, so you're making decisions with worse information.
           </p>
           <p>
-            <strong>You can go broke.</strong> Nobody bails you out. You can borrow &mdash; see{" "}
-            <a href="#debt">Debt &amp; Sanctions</a> &mdash; but the overdraft scales with what your
+            <strong>You can go broke.</strong> Nobody bails you out. You can borrow (see{" "}
+            <a href="#debt">Debt &amp; Sanctions</a>), but the overdraft scales with what your
             club earns, so a harder level shrinks it along with everything else, and your scouting
             is stuck at zero while you're overdrawn, which makes potential even harder to read. It's
             recoverable, but you recover by selling. On Brutal that's less a warning than a
@@ -418,7 +418,7 @@ export function Manual() {
           <p>
             Your board keeps a running confidence in you, shown as a bar on the Dashboard and on the
             Manager page. It moves once a season, and what moves it is <strong>where you finished
-            against where a club like yours is expected to finish</strong> &mdash; not where you
+            against where a club like yours is expected to finish</strong>, not where you
             finished on its own. Finish 6th when they expected 12th and they're delighted. Finish
             6th when they expected 2nd and you're in trouble, even though 6th is the same 6th. The
             Manager page always tells you the number you're being measured against.
@@ -429,7 +429,7 @@ export function Manual() {
             Nothing you do in the transfer market feeds into it. If it did, you could sell every
             good player, finish next to last, and have the board congratulate you for beating a bar
             you'd just lowered yourself. Building the squad is your job, so it can't also be your
-            grade. Your bank balance is left out for the same reason &mdash; otherwise spending
+            grade. Your bank balance is left out for the same reason: otherwise spending
             your budget, which is simply doing the job, would quietly make the target easier.
           </p>
           <p>
@@ -457,7 +457,7 @@ export function Manual() {
           <p>
             The second is your save's <strong>difficulty</strong>. Easy boards are forgiving, Brutal
             boards are not, with Normal and Hard in between. It's the one difficulty knob that has no
-            effect at all on the world around you &mdash; it changes how long you keep your job,
+            effect at all on the world around you. It changes how long you keep your job,
             nothing else.
           </p>
           <p>
@@ -467,7 +467,7 @@ export function Manual() {
           <h6>Job offers</h6>
           <p>
             Beat expectations and clubs come calling in the offseason. Two things decide which ones.
-            Your <strong>current club sets the floor</strong> &mdash; while you're employed you'll
+            Your <strong>current club sets the floor</strong>: while you're employed you'll
             never be offered a step down, only a lateral move or better, so the list is worth reading
             rather than noise. Your <strong>reputation sets how far above it you can reach</strong>,
             and it's built from the titles and cups you've won, how consistently you've beaten what
@@ -478,7 +478,7 @@ export function Manual() {
           <p>
             Being at the very top doesn't switch the offers off. If you're already at one of the
             biggest clubs there is nowhere left to climb, so what you get instead are approaches from
-            your peers &mdash; fewer of them, and all from clubs in the same bracket as yours.
+            your peers: fewer of them, and all from clubs in the same bracket as yours.
           </p>
           <p>
             <strong>You can also say which jobs you'd like.</strong> Under Jobs you'd like on the
@@ -496,7 +496,7 @@ export function Manual() {
             squad goes straight to the AI. Your youth academy graduates onto that club's senior
             roster on the way out, so those prospects are gone. Any transfer talks, incoming bids and
             loan listings you had open are dropped. And you arrive at the new club knowing its
-            players' ratings but <em>not</em> their potential &mdash; scouting starts from scratch,
+            players' ratings but <em>not</em> their potential: scouting starts from scratch,
             exactly as if you'd just signed all of them. The club keeps its own money, so you inherit
             its budget and its wage bill, not your old club's.
           </p>
@@ -504,7 +504,7 @@ export function Manual() {
           <p>
             If confidence hits zero, you're out. You'll be shown a list of clubs still willing to
             take you on, generally a rung below the one that just let you go, and you have to pick
-            one &mdash; there's no sitting a season out. The save carries on from there with your
+            one. There's no sitting a season out. The save carries on from there with your
             record intact, sacking and all.
           </p>
           <p>
@@ -528,26 +528,26 @@ export function Manual() {
             <li><strong>National Teams</strong>. A whole section for the summer's national-team football: Player Pool (call players into your own country's squad) and My Squad (pick its eleven), Federation (your international career, and who wants you), the current World Cup, Qualifying and Confederation Cups (the Euro, Copa América and AFCON), Rosters showing every nation's named squad, a Schedule of fixtures, Power Rankings of every nation, Stat Leaders (top nations and top players, filterable by country), and History with past winners and each nation's record. More in <a href="#international">International Football</a>.</li>
             <li><strong>Power Rankings</strong>. Every club in the world ranked by a blended Power score: squad OVR (Starting XI plus bench, depth-weighted, same formula as Standings' OVR column) plus a current-season form bonus or penalty. Form isn't just your record. Beating a strong side counts for more than beating a weak one (and losing to a weak side hurts more than losing to a strong one), and goal difference factors in too, so a club can rank above or below its raw OVR depending on how it's actually playing. Record, goal difference, OVR, and the blended Power score all sit side by side, with a badge showing each club's competition and its rank within it. Click a team to expand its full roster in place. In a world with leagues in the Americas, a Europe / Americas switch shows one continent at a time, and the rank column counts within that continent, since the two never meet in a club competition. The rankings also get snapshotted every 10 matchdays (plus once after the final matchday), so four times a season, and a dropdown lets you browse any past snapshot from any season, with arrows showing how far each club rose or fell since the last one. Snapshots taken before this cadence changed are kept, so an older save has a denser dropdown for its early seasons. Historical views can't expand rosters, since past squads aren't stored, and snapshots only start piling up from the point this feature shipped.</li>
             <li><strong>Schedule</strong>. Every matchday's fixtures and results. Click a played match for its box score.</li>
-            <li><strong>Stat Leaders</strong>. A Players tab (league-wide leaderboards for one season at a time: goals, assists, shots, shots on target, xG, tackles, interceptions, passes, crosses, fouls, yellow cards, red cards, saves, minutes, and average match rating, with a season dropdown covering the current season and every completed one) and a Teams tab (the same stats plus possession, goals against, and xG against, totaled per club, with its own season dropdown). Match rating is an average rather than a running total, so to keep a one-off cameo from topping the chart a player needs to have appeared in at least half of the games played so far before he shows up on the match-rating board (a threshold that scales as the season goes, so it works ten games in as well as at the end). A <strong>Totals / Per 90</strong> switch sits next to the stat dropdown: Per 90 divides each stat by the number of full matches the player's minutes add up to, which is how you find the squad player outproducing a starter rather than just the one who played most. Per-90 mode has a playing-time floor of its own &mdash; 30% of the minutes available so far, quoted above the table &mdash; because a rate is far easier to fluke than a total: score in a twelve-minute cameo and you've "scored" 7.5 per 90. It's counted in minutes rather than appearances, since twenty run-outs off the bench is exactly the case an appearance count would wave through. Appearances, minutes and match rating stay as totals either way (the first two are what the rate divides by, and a match rating is already an average). For career totals and all-time bests across every season at once, see <a href="#frivolities">Frivolities</a>' All-Time Leaders.</li>
-            <li><strong>Database</strong>. Every player in the world in one sortable table. Click any heading to sort by it, and a column-set switch swaps between four sets: <strong>Overview</strong> (rating, potential, market value, wage, contract length), <strong>Attributes</strong>, which puts all fourteen ratings side by side, <strong>Season</strong> (appearances, minutes, goals, assists, shots, xG, tackles, interceptions, saves, passes, crosses, fouls, cards and average match rating, with a dropdown for any season on record), and <strong>Career</strong>, the same stats totalled across a whole career. So "who is the fastest player in the world", "the best finisher in the second division" and "who has scored the most goals of anyone still playing" are each one click. The Season view lists the players that season has a record of and shows the club they played for <em>then</em>, not the one they're at now; cards don't appear on the Career view, because they're kept per season and never totalled, and a column of zeros pretending to be a career figure would be worse than no column. The filters narrow the whole world before anything is ranked, so what you see really is the top of what you asked for: position, nationality, age, overall, potential, value, wage, contract length, name, whether he's at a club or a free agent, and where to look. That last one is a single dropdown covering everything from one division up to the whole world, with presets for the top divisions only and for the top 5 leagues &mdash; and "top 5" means the five strongest countries in <em>your</em> world, worked out from the leagues themselves, so it still means something if you've added or retuned leagues in World setup. The table shows 100 players at a time with the full count beside the page buttons; that cap is deliberate, since a page trying to draw fifteen thousand rows at once is what makes a browser hang. One thing to know about the potential column: it's your scouts' estimate, exactly as it is everywhere else, and sorting and filtering both use the <strong>top</strong> of that estimate rather than the real number &mdash; otherwise ordering the table would quietly tell you something your scouts haven't found out yet. The top end rather than the middle because it's the number you can see: sort by potential and the right-hand figure in each band counts down the column, so the order explains itself. Market value is worked out from the <em>middle</em> of the band instead, since a price is what he's worth on balance rather than at his best. Whatever you've filtered and sorted goes into the page's address, so a view is a link you can bookmark or hand to someone else, and only the things you actually changed show up in it. A <strong>Clubs</strong> tab does the same for every club in the world, on three column sets: <strong>Overview</strong> (squad rating and potential, power score, squad size, average age, hype), <strong>Finance</strong> (budget, how full its savings ceiling is, wage bill, and what it has spent and taken in on transfers this season), and <strong>Season</strong> (played, won, drawn, lost, goals for and against, goal difference, points, then shots, shots on target, xG, xG against, saves, tackles, possession and average match rating). So "who has the biggest wage bill in Europe", "which second-division club has scored the most" and "who is running closest to their savings cap" are all a click. Its strength columns are the same numbers the Power Rankings page shows and its money columns the same ones Finance shows, so no two screens disagree about the same club.</li>
+            <li><strong>Stat Leaders</strong>. A Players tab (league-wide leaderboards for one season at a time: goals, assists, shots, shots on target, xG, tackles, interceptions, passes, crosses, fouls, yellow cards, red cards, saves, minutes, and average match rating, with a season dropdown covering the current season and every completed one) and a Teams tab (the same stats plus possession, goals against, and xG against, totaled per club, with its own season dropdown). Match rating is an average rather than a running total, so to keep a one-off cameo from topping the chart a player needs to have appeared in at least half of the games played so far before he shows up on the match-rating board (a threshold that scales as the season goes, so it works ten games in as well as at the end). A <strong>Totals / Per 90</strong> switch sits next to the stat dropdown: Per 90 divides each stat by the number of full matches the player's minutes add up to, which is how you find the squad player outproducing a starter rather than just the one who played most. Per-90 mode has a playing-time floor of its own (30% of the minutes available so far, quoted above the table) because a rate is far easier to fluke than a total: score in a twelve-minute cameo and you've "scored" 7.5 per 90. It's counted in minutes rather than appearances, since twenty run-outs off the bench is exactly the case an appearance count would wave through. Appearances, minutes and match rating stay as totals either way (the first two are what the rate divides by, and a match rating is already an average). For career totals and all-time bests across every season at once, see <a href="#frivolities">Frivolities</a>' All-Time Leaders.</li>
+            <li><strong>Database</strong>. Every player in the world in one sortable table. Click any heading to sort by it, and a column-set switch swaps between four sets: <strong>Overview</strong> (rating, potential, market value, wage, contract length), <strong>Attributes</strong>, which puts all fourteen ratings side by side, <strong>Season</strong> (appearances, minutes, goals, assists, shots, xG, tackles, interceptions, saves, passes, crosses, fouls, cards and average match rating, with a dropdown for any season on record), and <strong>Career</strong>, the same stats totalled across a whole career. So "who is the fastest player in the world", "the best finisher in the second division" and "who has scored the most goals of anyone still playing" are each one click. The Season view lists the players that season has a record of and shows the club they played for <em>then</em>, not the one they're at now; cards don't appear on the Career view, because they're kept per season and never totalled, and a column of zeros pretending to be a career figure would be worse than no column. The filters narrow the whole world before anything is ranked, so what you see really is the top of what you asked for: position, nationality, age, overall, potential, value, wage, contract length, name, whether he's at a club or a free agent, and where to look. That last one is a single dropdown covering everything from one division up to the whole world, with presets for the top divisions only and for the top 5 leagues. And "top 5" means the five strongest countries in <em>your</em> world, worked out from the leagues themselves, so it still means something if you've added or retuned leagues in World setup. The table shows 100 players at a time with the full count beside the page buttons; that cap is deliberate, since a page trying to draw fifteen thousand rows at once is what makes a browser hang. One thing to know about the potential column: it's your scouts' estimate, exactly as it is everywhere else, and sorting and filtering both use the <strong>top</strong> of that estimate rather than the real number. Otherwise, ordering the table would quietly tell you something your scouts haven't found out yet. The top end rather than the middle because it's the number you can see: sort by potential and the right-hand figure in each band counts down the column, so the order explains itself. Market value is worked out from the <em>middle</em> of the band instead, since a price is what he's worth on balance rather than at his best. Whatever you've filtered and sorted goes into the page's address, so a view is a link you can bookmark or hand to someone else, and only the things you actually changed show up in it. A <strong>Clubs</strong> tab does the same for every club in the world, on three column sets: <strong>Overview</strong> (squad rating and potential, power score, squad size, average age, hype), <strong>Finance</strong> (budget, how full its savings ceiling is, wage bill, and what it has spent and taken in on transfers this season), and <strong>Season</strong> (played, won, drawn, lost, goals for and against, goal difference, points, then shots, shots on target, xG, xG against, saves, tackles, possession and average match rating). So "who has the biggest wage bill in Europe", "which second-division club has scored the most" and "who is running closest to their savings cap" are all a click. Its strength columns are the same numbers the Power Rankings page shows and its money columns the same ones Finance shows, so no two screens disagree about the same club.</li>
             <li><strong>Awards</strong>. World gives the Ballon d'Or for the best player in the world that season (with a top-10 shortlist and a breakdown of where his points came from), a Goalkeeper and a Defender of the Year judged on the defensive work the Ballon d'Or can't see (side by side, each showing the stat it's decided on and a table of where the winner's points came from next to the runner-up's), and a World Team of the Year pitch view. Americas, in a world with leagues there, gives the same four honours for the Americas alone: a Player, Goalkeeper, Defender and Team of the Year. By league gives Player of the Season, the Golden Boot, and a Team of the Season pitch view for one competition. Both have a dropdown to browse past years.</li>
-            <li><strong>Season History</strong>. Who won what, one line per season, newest first &mdash; so you can read a twenty-year dynasty in one screen instead of clicking through twenty seasons. It&apos;s also where you land after <a href="#season">jumping ahead</a>, since that&apos;s the moment you most want it. Each line gives the Continental Cup and Continental Shield winners, whoever won the World Cup or their confederation&apos;s championship in the offseason that followed, and then one column per country holding that country&apos;s champion. A toggle swaps those country columns between <strong>league champions</strong> and <strong>domestic cup winners</strong>. The country columns use three-letter club codes to keep the whole world on one line &mdash; hover one for the full name, or click through to what that club did that year. Your own club&apos;s titles are shaded. Two things worth knowing: the continental finals are played before a season rolls over, so the season you&apos;re in appears as soon as one of them is decided, marked &quot;(now)&quot; and with its league columns still empty; and an international tournament is played in the offseason <em>after</em> a season, so it sits on that season&apos;s line. It&apos;s all read straight off the records your save already keeps, so a dynasty that started long before this page existed shows its whole back catalogue.</li>
-            <li><strong>Club History</strong>. A per-club honours page (yours by default, with a dropdown for any club in the world): a trophy case (league titles, second-tier titles, Continental Cups, domestic cups, any trebles, promotions and relegations), individual honours won by the club's players (Player of the Season, Golden Boot, Team of the Season selections, and they stay on the list after the player retires), franchise records (best finish, most points and wins in a season, all-time record), and a season-by-season table of every completed season (each season's note also shows how far the club got in that year's Continental Cup and domestic cup). It also ranks the club's greatest players &mdash; see <a href="#frivolities">Frivolities</a> for how that score is worked out.</li>
-            <li><strong>A club in one season</strong>. Click any club anywhere in the game &mdash; a table, a transfer, the club beside a season on a player's profile &mdash; and you land on what that club did that year: the squad, where it finished and its record, how far it got in the domestic cup, the Continental Cup and the Continental Shield, and where the Power Rankings had it at the end. A dropdown walks you through the club's other seasons. Two things to know about an old squad. It's who <em>finished</em> the season there, so a player sold in January shows up at his new club and not his old one. And players who retired long ago may be missing altogether, because the game only keeps a permanent career record for the ones worth remembering &mdash; the rest are gone for good. Retirees who are still on record show their appearances and the rating they played at, but not their goals and assists for that year, which aren't kept.</li>
+            <li><strong>Season History</strong>. Who won what, one line per season, newest first, so you can read a twenty-year dynasty in one screen instead of clicking through twenty seasons. It&apos;s also where you land after <a href="#season">jumping ahead</a>, since that&apos;s the moment you most want it. Each line gives the Continental Cup and Continental Shield winners, whoever won the World Cup or their confederation&apos;s championship in the offseason that followed, and then one column per country holding that country&apos;s champion. A toggle swaps those country columns between <strong>league champions</strong> and <strong>domestic cup winners</strong>. The country columns use three-letter club codes to keep the whole world on one line. Hover one for the full name, or click through to what that club did that year. Your own club&apos;s titles are shaded. Two things worth knowing: the continental finals are played before a season rolls over, so the season you&apos;re in appears as soon as one of them is decided, marked &quot;(now)&quot; and with its league columns still empty; and an international tournament is played in the offseason <em>after</em> a season, so it sits on that season&apos;s line. It&apos;s all read straight off the records your save already keeps, so a dynasty that started long before this page existed shows its whole back catalogue.</li>
+            <li><strong>Club History</strong>. A per-club honours page (yours by default, with a dropdown for any club in the world): a trophy case (league titles, second-tier titles, Continental Cups, domestic cups, any trebles, promotions and relegations), individual honours won by the club's players (Player of the Season, Golden Boot, Team of the Season selections, and they stay on the list after the player retires), franchise records (best finish, most points and wins in a season, all-time record), and a season-by-season table of every completed season (each season's note also shows how far the club got in that year's Continental Cup and domestic cup). It also ranks the club's greatest players (see <a href="#frivolities">Frivolities</a> for how that score is worked out).</li>
+            <li><strong>A club in one season</strong>. Click any club anywhere in the game (a table, a transfer, the club beside a season on a player's profile) and you land on what that club did that year: the squad, where it finished and its record, how far it got in the domestic cup, the Continental Cup and the Continental Shield, and where the Power Rankings had it at the end. A dropdown walks you through the club's other seasons. Two things to know about an old squad. It's who <em>finished</em> the season there, so a player sold in January shows up at his new club and not his old one. And players who retired long ago may be missing altogether, because the game only keeps a permanent career record for the ones worth remembering. The rest are gone for good. Retirees who are still on record show their appearances and the rating they played at, but not their goals and assists for that year, which aren't kept.</li>
             <li><strong>Frivolities</strong>. All-time lists that don't affect play (in a world with leagues in the Americas, the GOAT, Records, All-Time Leaders and Club Records tabs have a Europe / Americas switch: clubs belong to their league's continent, and a player to wherever he made most of his appearances): GOAT rankings for players and clubs, an awards record book (most Ballon d'Ors, World Team of the Year places, Players of the Season, Golden Boots and Team of the Season places, the highest-scoring individual seasons ever, and awards by club and country), all-time records (most dominant and worst team seasons, highest rating ever reached, longest careers, biggest transfer fees), All-Time Leaders (the top 10 in every stat at a glance, click through for the full board, career totals or best single seasons, world-wide and including retired players), an international record book (most caps, international goals and World Cups won, laid out the same way and filterable by country), player bios (oldest, youngest, where players come from, one-club men, name oddities), and club records (trophy cabinet, longest title droughts, biggest spenders and best traders). More in <a href="#frivolities">Frivolities</a>.</li>
             <li><strong>Season Preview</strong>. A snapshot of how the offseason shook out: the league's top 10 highest-rated players, top 10 highest-rated teams (both by OVR), the top 10 biggest transfers from the summer window ranked by fee, and who <a href="#development">retired</a>. It opens automatically the moment you advance past a season, with a link through to Awards.</li>
-            <li><strong>News Feed</strong>. Transfers and player accomplishments woven into one timeline per season, with club and season filters, and your club's items highlighted. It's filtered by how much the story has to do with you, because the world is sixteen leagues across eight countries and reporting all of them equally buries you in news about clubs you'll never play. Your own club is always in, whatever it did &mdash; every transfer, loan, loan return and free signing, and every accomplishment. Your league is next: every deal (loans included) and every accomplishment in it. From the rest of the world you only get the big stories &mdash; a four-goal haul, a 100th career goal, a 35-goal season, the standout performance of the matchday, the Ballon d'Or, the World Team of the Year, Goalkeeper and Defender of the Year, and transfers over $40M. Accomplishments themselves are hat-tricks, one standout performance a matchday, career goal milestones at 50 and then every 50, season goal milestones at 25 and then every 5, and position changes for established players. <strong>Trophies and end-of-season awards land in the feed too</strong>, at the bottom of the season they belong to. Trophies first: who won the Continental Cup and the Continental Shield, and who won the World Cup and each confederation cup, with the final score. Then the honours: anything one of your players wins, plus your league's Player of the Season, Golden Boot and Team of the Season. All of it comes straight off the same records the Awards and cup pages read, so old saves show every trophy and honour they ever handed out, right back to season 1. Last of all comes what it changed: <strong>countries winning and losing Continental Cup places</strong>, saying which way the places went and what the counts went from and to. Those are always reported, wherever they happen, because a place changes hands well under once a season across the whole world and when it does it reshapes the competition everyone plays in. They're worked out from the cups your save already has on record too, so an old dynasty shows every place it ever won or lost. Trophies also reach your dashboard's news panel the moment they're won, and an honour won by one of your own players sits there until the new season kicks off.</li>
+            <li><strong>News Feed</strong>. Transfers and player accomplishments woven into one timeline per season, with club and season filters, and your club's items highlighted. It's filtered by how much the story has to do with you, because the world has dozens of leagues across two continents and reporting all of them equally buries you in news about clubs you'll never play. Your own club is always in, whatever it did: every transfer, loan, loan return and free signing, and every accomplishment. Your league is next: every deal (loans included) and every accomplishment in it. From the rest of the world you only get the big stories: a four-goal haul, a 100th career goal, a 35-goal season, the standout performance of the matchday, the Ballon d'Or, the World Team of the Year, Goalkeeper and Defender of the Year, and transfers over $40M. Accomplishments themselves are hat-tricks, one standout performance a matchday, career goal milestones at 50 and then every 50, season goal milestones at 25 and then every 5, and position changes for established players. <strong>Trophies and end-of-season awards land in the feed too</strong>, at the bottom of the season they belong to. Trophies first: who won the Continental Cup and the Continental Shield, and who won the World Cup and each confederation cup, with the final score. Then the honours: anything one of your players wins, plus your league's Player of the Season, Golden Boot and Team of the Season. All of it comes straight off the same records the Awards and cup pages read, so old saves show every trophy and honour they ever handed out, right back to season 1. Last of all comes what it changed: <strong>countries winning and losing Continental Cup places</strong>, saying which way the places went and what the counts went from and to. Those are always reported, wherever they happen, because a place changes hands well under once a season across the whole world and when it does it reshapes the competition everyone plays in. They're worked out from the cups your save already has on record too, so an old dynasty shows every place it ever won or lost. Trophies also reach your dashboard's news panel the moment they're won, and an honour won by one of your own players sits there until the new season kicks off.</li>
             <li><strong>Roster</strong>. Your squad: your Starting XI on a pitch view (with an optional Depth Chart overlay), a stats table for the XI, and a bench table (both with ratings, ages, contracts, and season stats, and goalkeepers also show goals against and xG against). Drag a bench player onto a pitch slot to swap him into the XI, drag one starter onto another to switch their positions, extend contracts, or release players.</li>
             <li><strong>Transfers</strong>. Recommended targets you can actually afford, plus a search across every player in the world, and your live negotiations. Make offers, read counter-offers, close deals. Both tables carry the view switch described below.</li>
-            <li><strong>Watchlist</strong>. Players you&apos;ve starred to keep an eye on. Click the star beside anyone&apos;s name &mdash; on his profile, in the transfer search, on the Free Agents list or on the Academy page &mdash; and he shows up here with his club, this season&apos;s form, his wage, when his contract runs out, what your scouts think he&apos;s worth, and whether his club would entertain an offer at all. It&apos;s a shortlist and nothing more: watching a player doesn&apos;t scout him, doesn&apos;t tell his club anything, and doesn&apos;t change what he costs. Everything on it is worked out fresh each time you open it, so a name you starred three seasons ago shows the club he&apos;s at today at today&apos;s price. He drops off on his own if he retires.</li>
+            <li><strong>Watchlist</strong>. Players you&apos;ve starred to keep an eye on. Click the star beside anyone&apos;s name (on his profile, in the transfer search, on the Free Agents list or on the Academy page) and he shows up here with his club, this season&apos;s form, his wage, when his contract runs out, what your scouts think he&apos;s worth, and whether his club would entertain an offer at all. It&apos;s a shortlist and nothing more: watching a player doesn&apos;t scout him, doesn&apos;t tell his club anything, and doesn&apos;t change what he costs. Everything on it is worked out fresh each time you open it, so a name you starred three seasons ago shows the club he&apos;s at today at today&apos;s price. He drops off on his own if he retires.</li>
             <li><strong>Incoming Offers</strong>. AI clubs bidding for <em>your</em> players. Accept, reject, or counter to push the fee upward.</li>
             <li><strong>Loans</strong>. List your own players for a fixed-length loan, look over AI clubs' incoming loan offers, borrow other clubs' young players, and keep track of who's out on loan and who you have in.</li>
             <li><strong>Finance</strong>. Budget, the full wage-bill table, a projected (or final) season settlement, your transfer history, and a league-wide money table.</li>
             <li><strong>Free Agents</strong>. Every other unsigned player, sign straight to your senior team. The default view shows the best across every position but caps how many of any one position it lists, so a spot that always has lots of free agents (defensive and attacking mids only get two roster spots per club, so their good extras spill into free agency more often) can't crowd out the rest. Pick a position from the dropdown to see that position's full list.</li>
-            <li><strong>Academy</strong>. Your club's youth academy. Kids join at 14 every summer; your scouts decide who stays at 16 and who turns pro at 18, and a Next rollover column lets you change any of those calls. Release or promote anyone early. Also where you set your scout directions &mdash; which countries your scouts look in, and which positions they look for. Sorting by potential ranks kids on the top of each scouting estimate, not on what they'll really become: nobody has told you that yet.</li>
+            <li><strong>Academy</strong>. Your club's youth academy. Kids join at 14 every summer; your scouts decide who stays at 16 and who turns pro at 18, and a Next rollover column lets you change any of those calls. Release or promote anyone early. Also where you set your scout directions: which countries your scouts look in, and which positions they look for. Sorting by potential ranks kids on the top of each scouting estimate, not on what they'll really become: nobody has told you that yet.</li>
             <li><strong>Box Score</strong>. Per-match detail, in three parts. The scoreboard at the top names the competition and matchday and starts the Man of the Match, the highest-rated player among those who actually played. Under it, a head-to-head strip compares the two sides on possession, shots, shots on target, xG, corners and fouls. Then a full-width stat table per club (xG, passes completed/attempted, crosses and fouls, goals against and xG against on the goalkeeper's row, and a 0&ndash;10 match rating for everyone who appeared), grouped into attacking, keeping, defending, passing and discipline blocks. The play-by-play at the bottom runs down a timeline with one club on each side, showing goals, cards, substitutions, penalties and injuries by default; switch it to "Every event" to add every shot and corner too.</li>
             <li><strong>Leagues</strong>. Your saved leagues. Create, enter, or delete saves. Each one is fully independent. Every save is named after the club you took over, so the row also shows the season it's reached and when you started it, which is how you tell two saves of the same club apart.</li>
-            <li><strong>Player Profile</strong>. Click any player's name anywhere in the game (Roster, Stat Leaders, Awards, Transfers, News Feed) to open his full career page: every attribute rating, individual and team honors (Ballon d'Or, World Team of the Year, Goalkeeper of the Year, Defender of the Year, Player of the Season, Golden Boot, Team of the Season, league titles), the fullest season-by-season stat line in the game (goals, assists, goals+assists, shots, shots on target, shot accuracy, conversion rate, xG, goals over or under xG, passes, pass completion, crosses, tackles, interceptions, fouls, yellow and red cards, and average match rating), with a <strong>Career</strong> row underneath totaling the lot. Keepers get their own set instead &mdash; saves, save percentage, goals against, xG against, and goals prevented &mdash; and the shooting columns disappear for them, so nobody carries a row of columns that will only ever read zero (a keeper who has actually scored keeps them). Two of those columns are worth knowing what to do with. <strong>Goals over xG</strong> is the finishing read: xG doesn't care who's taking the shot, so a striker sitting well above his xG season after season really is finishing better than the chances he's getting, and one below it is missing chances an average forward would take. <strong>Goals prevented</strong> is the same idea for keepers, the other way round: xG against minus what he actually let in, so positive means he's saving shots that usually go in. The table carries the same Totals / Per 90 switch as Stat Leaders &mdash; on the Cup tab as well, but not on national-team stats, where caps are recorded without minutes and so have no per-90 reading. Percentages and match ratings stay put in Per 90 mode, since they're already rates. The Career row is worked out from the underlying totals rather than by averaging the seasons above it, so a big season counts for more than a six-game one in his career pass completion or match rating &mdash; full transfer history, a transfer-value-over-time chart, and a season-by-season OVR/POT/attribute history. The value chart plots what he's worth on the market against the seasons he's played, with the line colored by whichever club he was at and club crests marking transfers. Hover any season for a card with his value that year, his age, his OVR and POT, his goals and assists, his appearances, his average match rating, and the club he was at, where a youth-academy year reads as "Club (Academy)". A Value/OVR switch in the corner of the panel flips the same chart to his rating over time, which is worth a look on an older player: a veteran's OVR can sit flat for years while his value falls away underneath it, because the market is paying for the seasons he has left as much as for how good he is. His ratings only move in the offseason, so there's one real value per season and the line between them is just a smooth join, not extra readings. The value is worked out from the same numbers the market uses, which includes his potential &mdash; so if your scouts still only have a range on his POT, the chart is priced off that range rather than the real number, and it sharpens as they do.</li>
+            <li><strong>Player Profile</strong>. Click any player's name anywhere in the game (Roster, Stat Leaders, Awards, Transfers, News Feed) to open his full career page: every attribute rating, individual and team honors (Ballon d'Or, World Team of the Year, Goalkeeper of the Year, Defender of the Year, Player of the Season, Golden Boot, Team of the Season, league titles), the fullest season-by-season stat line in the game (goals, assists, goals+assists, shots, shots on target, shot accuracy, conversion rate, xG, goals over or under xG, passes, pass completion, crosses, tackles, interceptions, fouls, yellow and red cards, and average match rating), with a <strong>Career</strong> row underneath totaling the lot. Keepers get their own set instead (saves, save percentage, goals against, xG against, and goals prevented), and the shooting columns disappear for them, so nobody carries a row of columns that will only ever read zero (a keeper who has actually scored keeps them). Two of those columns are worth knowing what to do with. <strong>Goals over xG</strong> is the finishing read: xG doesn't care who's taking the shot, so a striker sitting well above his xG season after season really is finishing better than the chances he's getting, and one below it is missing chances an average forward would take. <strong>Goals prevented</strong> is the same idea for keepers, the other way round: xG against minus what he actually let in, so positive means he's saving shots that usually go in. The table carries the same Totals / Per 90 switch as Stat Leaders, on the Cup tab as well, but not on national-team stats, where caps are recorded without minutes and so have no per-90 reading. Percentages and match ratings stay put in Per 90 mode, since they're already rates. The Career row is worked out from the underlying totals rather than by averaging the seasons above it, so a big season counts for more than a six-game one in his career pass completion or match rating. It also has full transfer history, a transfer-value-over-time chart, and a season-by-season OVR/POT/attribute history. The value chart plots what he's worth on the market against the seasons he's played, with the line colored by whichever club he was at and club crests marking transfers. Hover any season for a card with his value that year, his age, his OVR and POT, his goals and assists, his appearances, his average match rating, and the club he was at, where a youth-academy year reads as "Club (Academy)". A Value/OVR switch in the corner of the panel flips the same chart to his rating over time, which is worth a look on an older player: a veteran's OVR can sit flat for years while his value falls away underneath it, because the market is paying for the seasons he has left as much as for how good he is. His ratings only move in the offseason, so there's one real value per season and the line between them is just a smooth join, not extra readings. The value is worked out from the same numbers the market uses, which includes his potential. So if your scouts still only have a range on his POT, the chart is priced off that range rather than the real number, and it sharpens as they do.</li>
           </ul>
           <p>
             <strong>Three ways to read the same list.</strong> Transfers, Free Agents, the
@@ -604,7 +604,7 @@ export function Manual() {
           </p>
           <p>
             You sim from the Dashboard (or the Sim menu in the top bar) in whatever chunk you want:
-            one game, the rest of the season, or a distance you pick yourself &mdash; either{" "}
+            one game, the rest of the season, or a distance you pick yourself: either{" "}
             <strong>sim to matchday</strong> a number, or <strong>sim this many matchdays</strong>{" "}
             forward. The line under the box tells you what you're about to play, how many matchdays
             that is, and what month it lands in, so you can stop anywhere: the game before a big
@@ -612,8 +612,8 @@ export function Manual() {
             <strong>deadline day</strong> with the winter transfer window still open. Matches
             involving your club use your saved starting XI. Once the season's over, both the card
             and the menu keep their place and swap their buttons for the offseason ones, so
-            whatever comes next &mdash; a round of World Cup qualifying, a tournament stage, or
-            advancing into the new season &mdash; is right where the sim controls always were.
+            whatever comes next (a round of World Cup qualifying, a tournament stage, or
+            advancing into the new season) is right where the sim controls always were.
           </p>
           <p>
             <strong>Watching a match.</strong> Next to Sim One Game there's <strong>Watch Next
@@ -634,7 +634,7 @@ export function Manual() {
             <strong>The lineups.</strong> Below the commentary both teams are laid out on a pitch,
             the way the Roster page draws yours: your club in its own half, the opposition mirrored
             in theirs, each in the shape it started in. Every player carries his{" "}
-            <strong>match rating</strong>, and it moves as the game does &mdash; a goal, an assist,
+            <strong>match rating</strong>, and it moves as the game does: a goal, an assist,
             a tackle, a save or a booking all show up the moment they happen. A little icon sits
             beside anyone who has scored, set one up, been booked or come off the bench. When a
             substitution is made, the man coming on takes the spot on the pitch, so the shape you're
@@ -644,13 +644,13 @@ export function Manual() {
             Those ratings are the real thing, not a guess: they're worked out from what each player
             has actually done so far, using the same sums that produce the rating on the box score
             at full time. That's also why nobody has a rating before kickoff. Players who stayed on
-            the bench all game aren't shown at all &mdash; nothing about them is recorded, since
+            the bench all game aren't shown at all. Nothing about them is recorded, since
             they never played.
           </p>
           <p>
             Cup ties can be watched too. Continental Cup rounds land on league matchdays, so on
             one of those you have two matches: the game asks which you'd rather watch, and plays
-            both either way &mdash; the one you skip still has its box score. A league-phase match
+            both either way; the one you skip still has its box score. A league-phase match
             shows the Swiss table beside it instead of your league table, and a two-legged
             quarter-final or semi-final is watched a leg at a time, the second leg at the other
             club's ground.
@@ -659,7 +659,7 @@ export function Manual() {
             The match is played the moment you press the button, and what you're watching is the
             recording of it, so watching never changes the result. It also means the matchday isn't
             saved until you're done with it, which is why the game keeps you on that page while
-            it's going &mdash; there's a <strong>Skip the rest</strong> link next to the playback
+            it's going. There's a <strong>Skip the rest</strong> link next to the playback
             controls if you'd rather get on with it. You can't make substitutions while you watch
             yet, and possession and xG appear only at full time (they aren't tracked minute by
             minute).
@@ -681,7 +681,7 @@ export function Manual() {
             a striker's efforts sit closer to goal than a holding midfielder's. Over a season that
             lands on the same split real top flights have. The location is a description, though,
             not a cause: it doesn't change the xG. It's all worked out from the match itself, not
-            stored, so old box scores have it too &mdash; right back to your first season.
+            stored, so old box scores have it too, right back to your first season.
           </p>
           <p>After matchday 38, the offseason runs on its own, in this order:</p>
           <ol>
@@ -690,7 +690,7 @@ export function Manual() {
             <li>Every player ages a year and develops (or declines) per the <a href="#development">development model</a>.</li>
             <li>Retirements: veterans from the mid-30s onward, plus players nobody has signed (<a href="#development">details</a>).</li>
             <li>The youth academy delivers each club's new intake (<a href="#youth">details</a>).</li>
-            <li>AI clubs sign free agents, both to fill holes and to poach any that upgrade a spot they're already stocked at, then trim their squads back to 25 &mdash; and then go round the pool a second time, because that trim is what puts most of the year's free agents there in the first place.</li>
+            <li>AI clubs sign free agents, both to fill holes and to poach any that upgrade a spot they're already stocked at, then trim their squads back to 25. Then they go round the pool a second time, because that trim is what puts most of the year's free agents there in the first place.</li>
             <li>The summer transfer window opens and the AI-to-AI market runs.</li>
             <li>New season: budgets get settled, base allocation in and the full season's wages out (<a href="#finance">details</a>).</li>
           </ol>
@@ -700,7 +700,7 @@ export function Manual() {
           </p>
           <p>
             <strong>Jumping ahead.</strong> The <strong>Jump</strong> menu in the top bar, next to Sim,
-            plays whole seasons at once &mdash; up to 25 &mdash; with the AI running your club
+            plays whole seasons at once (up to 25) with the AI running your club
             while they go by. It's for seeing where a world ends up, or for skipping past a
             rebuild you don't fancy managing. It works mid-season too: it finishes the season
             you're in first, so jumping 1 season always means "get me to next year".
@@ -711,7 +711,7 @@ export function Manual() {
             back to 25. The one exception is your <a href="#youth">academy</a>, which keeps running
             the way it does when you leave it alone: new kids join every summer and the cuts at 16
             and 18 go to the defaults. Other clubs can bid for your players, and your stars are protected exactly
-            the way an AI club's are &mdash; by price, not by a veto. If it gets relegated its best
+            the way an AI club's are: by price, not by a veto. If it gets relegated its best
             players can be pulled up to the first division like anyone else's, and your{" "}
             <a href="#squad">saved starting XI</a>, transfer listings and any talks you had open
             are cleared when you hand it over, because nobody's there to finish them.
@@ -722,7 +722,7 @@ export function Manual() {
             read who won everything else while you were away. Two things to know: potential comes
             back <a href="#players">fogged</a>{" "}
             for anyone signed while you were away (you haven't watched those players), and there's
-            no undo &mdash; the only way back to the season you left is a save you exported first.
+            no undo. The only way back to the season you left is a save you exported first.
             A long jump takes a few minutes to play out.
           </p>
         </Section>
@@ -767,8 +767,8 @@ export function Manual() {
             third.
           </p>
           <p>
-            <strong>Every country runs three divisions.</strong> Sizes vary — England, Spain and
-            Italy field 20 in every tier, down to Scotland's 10 in its bottom two — and the third
+            <strong>Every country runs three divisions.</strong> Sizes vary, from England, Spain and
+            Italy fielding 20 in every tier down to Scotland's 10 in its bottom two. The third
             tier works like any other division: its own table, its own promotion and relegation with
             the division above, its clubs in the domestic cup. Starting down there is the longest
             climb the game offers. Be warned that it's a genuinely different game: third-division
@@ -827,7 +827,7 @@ export function Manual() {
             It happens at <em>every</em> step of a country&apos;s pyramid, not just the top one, so
             a country with three divisions plays two of them each summer: one for the last place in
             the top flight, one for the last place in the second. That matters most when you start
-            at the bottom — there&apos;s a way up out of the third division on the same terms as
+            at the bottom: there&apos;s a way up out of the third division on the same terms as
             everyone else, and you can be promoted twice in two seasons without ever finishing
             first.
           </p>
@@ -871,7 +871,7 @@ export function Manual() {
             <a href="#title-playoffs">title playoffs</a>: each click plays one round everywhere, and
             the rounds are lined up so every final is on the last click. "Sim through the playoffs"
             plays them all, but stops before any round your club is in so you can pick your team.
-            Suspensions don't carry into it — there are no matchdays left to serve a ban against —
+            Suspensions don't carry into it (there are no matchdays left to serve a ban against),
             but injuries do. Results are on the <strong>Promotion Playoffs</strong> page, for any
             country and any past season.
           </p>
@@ -879,7 +879,7 @@ export function Manual() {
             The big four (England, Spain, Italy and Germany) are all built to the same strength and
             budget bands, so none of them is a flagship league above the others. The other eight are
             deliberately weaker and poorer: their clubs generate at lower OVR, and they earn and can
-            bank less money. They step down in that order —{" "}
+            bank less money. They step down in that order:{" "}
             <strong>France</strong>, then the <strong>Netherlands</strong>, then{" "}
             <strong>Portugal</strong>, then <strong>Belgium</strong>, then <strong>Turkey</strong>,
             then <strong>Greece</strong>, then <strong>Scotland</strong>, then{" "}
@@ -930,8 +930,8 @@ export function Manual() {
             ways in, whether you started a plain new league or came through Import Custom League.
           </p>
           <p>
-            It starts closed, with a one-line summary of the world you'd get — how many countries,
-            divisions and clubs — so you can take the default without scrolling past a dozen rows
+            It starts closed, with a one-line summary of the world you'd get (how many countries,
+            divisions and clubs), so you can take the default without scrolling past a dozen rows
             of countries you weren't going to change. Hit <strong>Customize</strong> on it to open
             it up. If you loaded a roster file it opens on its own, because adding or renaming a
             league in there is usually the thing that makes your file apply.
@@ -949,7 +949,7 @@ export function Manual() {
           <p>
             The one thing you can't change on a shipped country is its <em>name</em>, because its
             clubs, its flag and its player nationalities all hang off it. If you want a country the
-            game doesn't have, switch one off and add your own — that's what adding is for.
+            game doesn't have, switch one off and add your own. That's what adding is for.
           </p>
           <p>
             <strong>Building a league like the American ones.</strong> Everything that makes MLS,
@@ -988,7 +988,7 @@ export function Manual() {
           </p>
           <p>
             The name still does real work in the other direction: a file written for a league this
-            world doesn't have — the Eredivisie, say, if you've switched the Netherlands off —
+            world doesn't have (the Eredivisie, say, if you've switched the Netherlands off)
             fills nothing until you rename a league to it or add one and name it. The Import Custom
             League screen tells you which of your file's leagues it couldn't place, and World setup
             sits directly underneath so you can fix it and watch the count of matched clubs change.
@@ -1075,7 +1075,7 @@ export function Manual() {
             <strong>Where its players come from.</strong> A league you add has its own
             nationalities panel: name the nations you want and give each one a number. The numbers
             are relative, so you can type percentages, squad counts, or anything else you find
-            easier — the share shown beside each row is what you'll actually get, which matters
+            easier. The share shown beside each row is what you'll actually get, which matters
             because a real league's published breakdown usually adds up to more than 100 and would
             otherwise quietly hand you a smaller home share than it says.
           </p>
@@ -1088,7 +1088,7 @@ export function Manual() {
           </p>
           <p>
             <strong>Rest of the world</strong> is a single row standing for everyone you didn't
-            name, and it's worth knowing that it leans English — it's built from how often each
+            name, and it's worth knowing that it leans English: it's built from how often each
             nation turns up in English football, which is where those numbers came from. The panel
             shows you the countries it'll mostly produce. If you want a league that genuinely isn't
             English, name the nations you want rather than leaning on that row. Leave the panel
@@ -1106,7 +1106,7 @@ export function Manual() {
           <p>
             A roster file can carry the mix too, as a <code>nationalities</code> block. Loading one
             fills the panel in for you, and you can still change it afterwards. The shipped
-            countries aren't editable — they keep the real breakdowns they were built from.
+            countries aren't editable. They keep the real breakdowns they were built from.
           </p>
           <p>
             <strong>Naming the clubs.</strong> Tick <strong>Name the clubs yourself</strong> before
@@ -1252,7 +1252,7 @@ export function Manual() {
             <strong>separately</strong> from your league stats (they don't feed Stat Leaders, the
             end-of-season awards, or player development). You'll find a club's cup record under the{" "}
             <strong>Cup</strong> tab on any <a href="#players">player's profile</a>. That tab is a
-            little thinner than the league one &mdash; no xG, passing or cards &mdash; because cup
+            little thinner than the league one (no xG, passing or cards) because cup
             matches have always been stored as a summary rather than a full stat line, and the older
             seasons can't be filled in after the fact. Average match rating is there, though, and
             it's the one number in the game you can compare straight across leagues: cup ratings are
@@ -1281,7 +1281,7 @@ export function Manual() {
             your league campaign went. He takes the lowest of his league's Shield places, so the
             field is still 24 and it's your league's 6th-placed club who makes way, not your 5th.
             Most years this changes nothing, because the club who wins the cup has usually finished
-            high enough to qualify anyway — and when that happens the place just passes back down
+            high enough to qualify anyway, and when that happens the place just passes back down
             the table.
           </p>
           <p>
@@ -1295,7 +1295,7 @@ export function Manual() {
             Because all of this is settled at the end of the season, the shading on the Standings
             table is a live projection: it shows where each club would go if the season ended today,
             and it can move when a cup final is played. A club shaded from mid-table is there on one
-            of these routes — hover the bar and it tells you which.
+            of these routes. Hover the bar and it tells you which.
           </p>
           <p>
             It runs exactly like the Cup: a 24-club league phase of six games, then the top four go
@@ -1424,7 +1424,7 @@ export function Manual() {
             That's what makes a cup run worth chasing from the lower divisions. It won't make you
             rich: a typical run is worth about <strong>1%</strong> of your season, and the top flight
             still collects a bit more cup money per club than you do, because they're the ones who
-            go deep. What it does is spread the money around instead of handing it all to one club —
+            go deep. What it does is spread the money around instead of handing it all to one club:
             roughly <strong>300</strong> clubs below the top flight bank something from the cup every
             season. A deep run in a smaller country is worth far more than that, up to a quarter of
             your year if you go all the way.
@@ -1473,7 +1473,7 @@ export function Manual() {
           </p>
           <p>
             Because they're played before the first matchday, they use the squad you have{" "}
-            <em>then</em> — so anyone you sign in the summer can play in yours, and anyone you sell
+            <em>then</em>, so anyone you sign in the summer can play in yours, and anyone you sell
             can't. You can play them from your dashboard when the season opens. If you'd rather not
             stop for it, just sim as normal and they'll be played on the way into the season.
           </p>
@@ -1482,8 +1482,8 @@ export function Manual() {
             the same reason: I measured what handing the domestic cup real payouts did to a
             20-season dynasty and it pushed two of four test worlds' poorest clubs into the red.
             A one-off match crediting the same clubs would do the same thing, so it's a trophy and
-            bragging rights and nothing else. It also means the competition can't disturb anything
-            — I've got a test that plays a season with the champions cups and a season without and
+            bragging rights and nothing else. It also means the competition can't disturb anything.
+            I've got a test that plays a season with the champions cups and a season without and
             checks the two come out identical down to the last scoreline.
           </p>
           <p className="text-muted small">
@@ -1587,8 +1587,8 @@ export function Manual() {
           </p>
           <p>
             Every nation with enough players in the world enters qualifying. They're split into
-            groups by confederation and play a long home-and-away campaign spread over the three
-            qualifying offseasons. Places are shared out between confederations the way FIFA does
+            groups by confederation, and everyone in a group plays everyone else three times, one
+            round in each of the three qualifying offseasons. Places are shared out between confederations the way FIFA does
             it, by quota rather than by who happens to be strong right now. The quotas come from
             the real World Cup of the same size: a 16-nation one uses the 1974 split, 24 uses 1986,
             32 uses the 1998-2022 split and 48 uses 2026's. Because this world has far more European
@@ -1653,19 +1653,19 @@ export function Manual() {
             The <strong>confederation cups</strong> have no qualifying of their own: each
             confederation simply takes its strongest nations at the time of the draw, which is the
             order you see on Power Rankings. How big a cup is depends on how much football
-            its continent has — Europe fills a sixteen-nation field with four groups and a
+            its continent has: Europe fills a sixteen-nation field with four groups and a
             quarter-final, while a confederation with only a handful of real football nations plays
             a single group and sends its top two straight to the final. A confederation that can't
             field even four nations doesn't hold one at all, which is why you'll usually see the
             Euro, Copa América, the Gold Cup, AFCON and usually the Asian Cup, but not the OFC
             Nations Cup: nearly every player in the world is born into one of the sixteen countries
             whose leagues you play in, so the rest of the world is thin, and Oceania has only one
-            nation with enough players to field a squad. Fill it out — with an imported roster, say — and those cups start
+            nation with enough players to field a squad. Fill it out (with an imported roster, say) and those cups start
             being played on their own.
           </p>
           <p>
             <strong>You can manage one of these countries yourself.</strong> Pick one when you
-            start a save — there's a National team box under Difficulty — or leave it alone and
+            start a save (there's a National team box under Difficulty) or leave it alone and
             wait, because federations get in touch over the summer and anything on the table shows
             up on the <strong>Federation</strong> page. Managing a country is entirely optional,
             and plenty of good saves never bother. Every nation you don't manage picks itself:
@@ -1683,7 +1683,7 @@ export function Manual() {
           <p>
             What you actually control is the squad and the team, and they're two pages. When a
             campaign is drawn, at the end of a season, a squad of 23 is named for you.{" "}
-            <strong>Player Pool</strong> is where you change who's in it — everyone born in your
+            <strong>Player Pool</strong> is where you change who's in it. Everyone born in your
             country is eligible, whoever they play for, so you can call anyone up and drop anyone
             you don't fancy. <strong>My Squad</strong> is where you pick the shape and drag your
             eleven around, exactly as you do on your club's Roster page. Both are open until the
@@ -1696,7 +1696,7 @@ export function Manual() {
             in between rounds.
           </p>
           <p>
-            You don't get a transfer market, a budget or any say in training — a national manager
+            You don't get a transfer market, a budget or any say in training. A national manager
             picks from who exists, and that's the whole job. One consequence worth knowing: a squad
             is chosen from the ratings and injuries your players finished the club season with, so
             a star who ends the year injured really does miss the tournament. The whole thing also
@@ -1704,7 +1704,7 @@ export function Manual() {
             at it.
           </p>
           <p>
-            The federation judges you once per campaign, not once per season — after qualifying
+            The federation judges you once per campaign, not once per season: after qualifying
             ends, after a World Cup, after a continental championship. They compare how far you got
             with how good your players are, which is a bar you genuinely cannot move: it's read off
             your country's best available eleven, not the squad you named, so leaving your stars at
@@ -1730,8 +1730,8 @@ export function Manual() {
           </p>
           <p>
             Your club career isn't invisible to federations, but they discount it heavily. A big
-            trophy cabinet at club level gets you noticed by a decent country &mdash; somewhere
-            around the top quarter of the world, roughly the level of Wales or Serbia &mdash; and
+            trophy cabinet at club level gets you noticed by a decent country, somewhere
+            around the top quarter of the world, roughly the level of Wales or Serbia, and
             never by one of the giants. It starts to count once your club reputation is up around
             the high 40s, which is about one league title. The best national jobs stay behind an
             international reputation you can only earn in the job, so the way to Spain or Brazil is
@@ -1739,9 +1739,9 @@ export function Manual() {
           </p>
           <p>
             International football is mostly a record, not a lever. Caps, goals, tournaments played
-            and titles won show up on a player's profile and build over his career — confederation
+            and titles won show up on a player's profile and build over his career (confederation
             cups are counted separately from World Cups, so winning the Euro doesn't read
-            as winning the World Cup — and the{" "}
+            as winning the World Cup), and the{" "}
             <strong>National Team</strong> tab on his stats card breaks them down campaign by
             campaign, the same way his league and cup seasons are listed. None of it feeds his
             development or his value. There's one real cost, though: if a player gets hurt
@@ -1763,7 +1763,7 @@ export function Manual() {
             eleven it would field highlighted; Schedule lists the fixtures for whatever's being
             played, opening on the qualifying round currently being played (a whole campaign at once
             is hundreds of games, but "All rounds" is there if you want it); Power Rankings sorts every
-            nation by a Power score, the same idea as the club rankings &mdash; squad strength plus a
+            nation by a Power score, the same idea as the club rankings: squad strength plus a
             bonus or penalty for recent results, where beating a nation you were expected to lose to
             counts for more than beating one you weren't. Where the game was played counts as well:
             it uses FIFA's own weighting, so a qualifier is worth 25, a continental final tournament
@@ -1779,8 +1779,8 @@ export function Manual() {
             you stand against the nations you actually have to qualify past (narrowed, the rank and
             the movement are both against that confederation, and a World column keeps the place
             overall). One thing worth knowing: your federation judges you on squad strength, not on
-            Power, so the order here and the bar you're held to can differ. That's deliberate
-            &mdash; if results moved the bar, losing on purpose would lower it.
+            Power, so the order here and the bar you're held to can differ. That's deliberate.
+            If results moved the bar, losing on purpose would lower it.
             Stat Leaders has both the most
             successful nations and the top individual players, which you can filter to a single
             country; and History keeps the roll of past winners plus each nation's tally of titles,
@@ -1817,17 +1817,17 @@ export function Manual() {
           </ul>
           <p>
             Those numbers should feel familiar if you've played the big licensed football games,
-            and that's on purpose &mdash; the whole scale was lifted 11 points so it reads the way
+            and that's on purpose: the whole scale was lifted 11 points so it reads the way
             you expect. A top-flight squad now runs from the low 60s up to the low 90s, where it
             used to run from about 50 to 81. Nothing else moved with it: wages, transfer fees,
             match results and every rule in the game were shifted by the same amount at the same
-            time, so a player who was worth £40M is still worth £40M and a season that finished
+            time, so a player who was worth $40M is still worth $40M and a season that finished
             with 82 points still finishes with 82 points. Only the number on his card changed.
           </p>
           <p>
             One consequence worth knowing: the lower you go, the further the game runs below what
             those games cover. A third division here sits in the 30s and 40s, because this world
-            has sixteen countries and three divisions each &mdash; a lot of football that a game
+            has sixteen countries and three divisions each, a lot of football that a game
             built around the top flights never has to put a number on.
           </p>
           <p>
@@ -1884,7 +1884,7 @@ export function Manual() {
           <p>
             There are two ways a save can develop its players, and you pick which one when you
             create it (there's a switch on the New League screen, and you can change your mind
-            later in God Mode &mdash; it takes effect at your next offseason and leaves seasons
+            later in God Mode. It takes effect at your next offseason and leaves seasons
             you've already played exactly as they were). Everything in this section describes the
             default, <strong>random growth</strong>. The alternative, <strong>steady careers</strong>,
             is described at the end of it.
@@ -1904,7 +1904,7 @@ export function Manual() {
             be at: a 17-year-old on the books is a prospect rated well below the first team, the
             best players in the world are in their mid-to-late twenties, and a 35-year-old has
             lost a yard without losing his technique. Before, age carried no information at all at
-            the start of a save &mdash; an 18-year-old was generated at the same standard as a
+            the start of a save: an 18-year-old was generated at the same standard as a
             27-year-old, and then got a decade of growth on top of it. That's why the first few
             seasons of an old save felt strange: within two or three years the best players in the
             game were all 20 to 23, the very top ratings ran away toward the ceiling, and squads
@@ -1983,9 +1983,9 @@ export function Manual() {
             in <em>your</em> academy, treat him accordingly.
           </p>
           <p>
-            <strong>Steady careers.</strong> The other setting. Everything above still applies
-            &mdash; physical ratings still go before technical ones, keepers still last longest,
-            the retirement rules are unchanged, generational talents still turn up &mdash; but the
+            <strong>Steady careers.</strong> The other setting. Everything above still applies:
+            physical ratings still go before technical ones, keepers still last longest,
+            the retirement rules are unchanged, generational talents still turn up. But the
             summer dice are gone and the shape of the arc is drawn differently.
             A player improves through his early twenties, holds through his peak years, and starts
             falling away from about thirty, dropping faster every year after that. He'll still
@@ -2000,14 +2000,14 @@ export function Manual() {
             journeyman depending on how the next few Julys go. Under steady careers it's settled
             in the player himself: some are clean developers and some never quite kick on, and
             that's true of them from the day they're generated. Playing time still matters exactly
-            as much either way &mdash; a kid getting regular minutes really does come on faster
+            as much either way: a kid getting regular minutes really does come on faster
             than one rotting on the bench.
           </p>
           <p>
             Two things follow from that, and they're the reason to pick it. Your scouting reports
             are worth far more, because there's a real answer for them to be closing in on: a
             potential estimate stops being a guess at a dice roll and becomes a genuine read on
-            where a player ends up. And the best players in your league stay recognizable &mdash;
+            where a player ends up. And the best players in your league stay recognizable:
             they're the ones who were always going to be good, developed by clubs that gave them
             games, rather than whoever the last few offseasons happened to smile on.
           </p>
@@ -2021,12 +2021,12 @@ export function Manual() {
             <li><strong>Who gets credited</strong>. Every event is pinned on a real player, picked from who's on the pitch using both his position and how good he is at that particular thing. Goals lean on finishing, assists on passing, tackles and interceptions on tackling and reading the game, corners on heading. Ability counts for a lot in that pick, so your best defender really does top your tackles chart and your playmaker really does rack up the assists, rather than them landing on whoever happened to be nearby. Fouls are the deliberate exception: they're spread by position and not sharpened by ability, because "best defender" and "most booked" shouldn't be the same list. Around a quarter of goals are scored with no assist at all.</li>
             <li><strong>The position each player played</strong>. The Pos column on a box score is the job he actually did that afternoon, not the position listed on his profile. A winger who filled in at full-back reads as a full-back for that match, which is also what his rating was judged against. It's the same information the lineups on the watch screen are built from.</li>
             <li><strong>Passes, crosses &amp; fouls</strong>. Every box score also carries per-player passing (completed / attempted), crosses, and fouls committed. Central and deep players move the ball most, wide players do most of the crossing. These are just stat-sheet detail, they don't change the scoreline.</li>
-            <li><strong>Cards</strong>. Yellows, second yellows, and straight reds. Going a man down is a real hit to your side's strength for the rest of the match, and cards now carry a cost past the final whistle too &mdash; see Suspensions below.</li>
+            <li><strong>Cards</strong>. Yellows, second yellows, and straight reds. Going a man down is a real hit to your side's strength for the rest of the match, and cards now carry a cost past the final whistle too (see Suspensions below).</li>
             <li><strong>Set pieces</strong>. Corners, and penalty kicks resolved as a duel between the taker and the keeper (saved, scored, or dragged wide).</li>
             <li><strong>Fatigue &amp; substitutions</strong>. Players tire as the match runs, and the coach has five substitutions to spend. Like real football, they're limited by <em>opportunities</em> rather than one at a time: he gets three chances to make changes during play, and he can bring on up to three players at a single one of them, so a triple change costs him one chance and not three. Half-time is a free extra chance that doesn't count against those three. That's why you'll see two or three players go on together around the hour, and why a coach who's already used all three chances has nothing left to respond with late on. Managers pick their own minutes rather than every club in the world changing its team at the same moment. Most sides end up making four or five changes, some fewer, which is roughly what a real top-flight team does. Subs aren't automatic anymore: the coach weighs how good the fresh bench player is against the tired starter he'd replace, and also how that starter is actually playing on the day. A close-quality bench refreshes freely, but he won't pull a good starter for a much weaker reserve unless that starter is genuinely gassed, so a shallow bench leaves your tired legs on. A starter tearing the game up is harder to justify hooking than one having a stinker, even at the same fitness. The coach also cares where a replacement would have to play: he's filling a specific hole in the shape, so a bench striker who'd have to cover at centre-back has to be a lot better to be worth it, and if nobody on the bench fits, the tired starter stays on rather than the shape getting wrecked. The one exception is the chase-the-game sub late on when you're losing, where the coach deliberately changes shape instead, pulling a defender for an attacker who plays his own position. He also gets less fussy as the clock runs down. A player brought on with five minutes left only has five minutes to be worse in, so a drop in quality that would be daft at half-time costs almost nothing at 85 minutes, and that's where the familiar late run-out for a fringe player comes from. Half-time is the opposite: nobody is tired yet and there's a whole half to play, so he only makes one when the bench is a genuine upgrade, usually on someone having a poor half. And if you've spent all five and then someone gets injured, you finish the game with ten men. Your matches use the same in-match sub logic. You can also flag any bench player for <strong>More minutes</strong> on the Roster page, which tips the coach toward bringing him on more often.</li>
             <li><strong>Suspensions</strong>. Cards follow a player around. Pick up 5 yellows over the league season and he misses the next match; get sent off for a second yellow and he misses 1; get a straight red and he misses 3. If a sending-off and your fifth yellow land in the same game you serve the longer of the two, not both. Bans only cover league matches, so a suspended player is still available for the Continental Cup, and only league cards count toward them. He shows a red card marker on your Roster and his profile, your Dashboard lists everyone banned, and he's left out of your XI automatically until he's served it. Everything resets when the season does.</li>
             <li><strong>Injuries</strong>. A player can go down mid-match and miss 1&ndash;6 matches. Recovery ticks down as you sim, and he comes back on his own. While he's hurt he shows a red cross on your Roster (both the pitch and the tables) and on his profile, and your Dashboard lists everyone currently sidelined. He's automatically left out of your XI until he's fit.</li>
-            <li><strong>Stoppage time</strong>. Each half ends with its own, so the clock reads 45+2 and 90+4 rather than running straight past 90. The board is a standing minute, plus time for each notable thing that happened in that half, plus the time the goals actually took &mdash; a goal costs about a minute for the celebration and the restart, and the referee gives it back. Score in stoppage and the board goes up again, because that celebration has to be added on too. Expect around three minutes at the break and six at the end, more in a busy half. The feed marks the board, half time and full time as they happen. Minutes played are counted the way a scoreboard counts them: the clock holds at 45 and 90 through stoppage, so a player who lasts the whole match is down for 90 however much was added, and per-90 figures divide by exactly that.</li>
+            <li><strong>Stoppage time</strong>. Each half ends with its own, so the clock reads 45+2 and 90+4 rather than running straight past 90. The board is a standing minute, plus time for each notable thing that happened in that half, plus the time the goals actually took. A goal costs about a minute for the celebration and the restart, and the referee gives it back. Score in stoppage and the board goes up again, because that celebration has to be added on too. Expect around three minutes at the break and six at the end, more in a busy half. The feed marks the board, half time and full time as they happen. Minutes played are counted the way a scoreboard counts them: the clock holds at 45 and 90 through stoppage, so a player who lasts the whole match is down for 90 however much was added, and per-90 figures divide by exactly that.</li>
           </ul>
           <p>
             When the XI changes mid-match (a sub, a red card, an injury), the team's effective
@@ -2077,9 +2077,9 @@ export function Manual() {
             the same as a winger's rather than at the scarcer midfield rate. The{" "}
             <strong>Golden Boot</strong> is just the league's top
             goalscorer. <strong>Team of the Season</strong> fills an 11-man pitch, laid out as a
-            4-3-3 &mdash; a keeper, a back four, a midfield three of a holding man, a central
-            midfielder and an attacking midfielder, and a front three of two wingers and a striker
-            &mdash; with whoever rates highest at each of those positions across the whole league.
+            4-3-3 (a keeper, a back four, a midfield three of a holding man, a central
+            midfielder and an attacking midfielder, and a front three of two wingers and a striker),
+            with whoever rates highest at each of those positions across the whole league.
             Every position has its own formula, and they all start from the same place: the Player
             of the Season score, so match rating, goals and assists, and overall quality.
             Attackers (attacking midfielders, wingers and strikers) are judged on that alone, which
@@ -2147,13 +2147,13 @@ export function Manual() {
           <p>
             One thing worth knowing about how the world award compares leagues. Match ratings are
             scored against the standard of the league you're playing in, so a 7.5 average in a weak
-            league and a 7.5 in a strong one are not the same season &mdash; the first was earned
+            league and a 7.5 in a strong one are not the same season: the first was earned
             against easier opponents. The world award corrects for that by how strong each league's
             players actually are, so the trophy doesn't just drift to whoever plays in the weakest
             division. It's a correction, not a penalty: a genuinely better player in France or
             Portugal still beats a merely good one in England, and the second division is not shut
             out by rule, only by the correction. The Continental Cup is the exception that needs no
-            correcting &mdash; everyone in it is measured against the same pooled field, which is why
+            correcting: everyone in it is measured against the same pooled field, which is why
             it carries the weight it does.
           </p>
           <p>
@@ -2163,7 +2163,7 @@ export function Manual() {
             same to a world award, which is plainly wrong. Both are now scaled by how far your
             league sits above or below the world's average standard: in the shipped world that's
             roughly a 1.45x gap between the strongest top flight and the weakest. Winning a weaker
-            league is still worth real points, never a penalty &mdash; and a second-division club
+            league is still worth real points, never a penalty, and a second-division club
             that wins its domestic cup still gets credit, just heavily reduced. The Continental Cup
             and international football take no such scaling, because they're contested between
             countries already, so winning them is equally hard whoever you are.
@@ -2193,8 +2193,8 @@ export function Manual() {
             award to whichever keeper played for the club that won things rather than the best keeper.
           </p>
           <p>
-            Two of those extras &mdash; the Continental Cup and your summer with your country
-            &mdash; are the only parts of the whole calculation that put players from different
+            Two of those extras (the Continental Cup and your summer with your country)
+            are the only parts of the whole calculation that put players from different
             leagues against each other directly, and a club from a weak league rarely goes deep in
             the cup. That, plus the league-strength correction, is what stops these two awards
             drifting to weak leagues. Your league title and your domestic cup don't help with that
@@ -2401,7 +2401,7 @@ export function Manual() {
             <strong>Keeping a shortlist.</strong> The star beside a player's name puts him on your{" "}
             <strong>Watchlist</strong>, which is just a list of names you're keeping an eye on. It
             shows each of them with his club, his form this season, his wage and contract, what your
-            scouts reckon he's worth, and whether his club would take an offer &mdash; so you can
+            scouts reckon he's worth, and whether his club would take an offer, so you can
             line targets up in October and act on them when the window opens. It changes nothing
             about the player: he isn't scouted any harder, his club never finds out, and his price
             doesn't move.
@@ -2419,9 +2419,9 @@ export function Manual() {
             <strong>Values are capped, and the very best players aren't for sale.</strong> No
             player's value ever runs past $350M, so you'll never see a fantasy price tag. Instead,
             the genuine elite are simply taken off the market the way a top club would never sell
-            its star at any price: if a player was one of the best in the world last season &mdash;
-            either a top-of-the-league OVR, or he won Player of the Season, the Golden Boot, or a
-            Team of the Season place &mdash; and his club finished in the top four of a top-flight
+            its star at any price: if a player was one of the best in the world last season
+            (either a top-of-the-league OVR, or he won Player of the Season, the Golden Boot, or a
+            Team of the Season place) and his club finished in the top four of a top-flight
             league, he's not for sale to anyone. He won't appear in your recommended targets and any
             offer you make is ignored. You can still buy a solid, competitive squad, but the
             difference-makers who actually win titles you have to develop yourself (a gamble, per the
@@ -2435,7 +2435,7 @@ export function Manual() {
             search rather than just hiding rows, so pinning a position pulls up a fresh, fuller list
             of players there. You can filter on position, nationality, which league he plays in, a
             range of overall, potential, age and scout value, a weekly wage ceiling, and how much
-            contract he has left &mdash; and every column heading sorts the table. Money boxes take
+            contract he has left, and every column heading sorts the table. Money boxes take
             shorthand, so "50m" and "800k" work as well as typing the zeros. Negotiation goes
             like this: the selling club has a hidden asking price, rolled once per window, so you
             can't reopen talks hoping they're in a better mood. Offer way below it and they hang up
@@ -2448,10 +2448,10 @@ export function Manual() {
             <strong>Search all players.</strong> Under the recommended list is a search panel that
             reaches every club in the world, not just targets near your level. Type a name, or set
             any of the same filters, and it lists matching players from every league with an Offer
-            control right on the row &mdash; negotiation works exactly as above. Two things it won't
+            control right on the row. Negotiation works exactly as above. Two things it won't
             let you buy: a player his club needs for squad depth, and the very best players at clubs
             coming off a big season, who aren't for sale at any price. In those cases the row says
-            why instead of taking an offer that would go nowhere &mdash; or tick "only show players I
+            why instead of taking an offer that would go nowhere, or tick "only show players I
             can actually bid on" and they drop out of the list entirely. The search shows the best 60
             matches by overall, so if you're hunting something specific, narrow the filters rather
             than scrolling.
@@ -2482,7 +2482,7 @@ export function Manual() {
             Each offer comes with a one-line scout take: a straight "take it," a suggested counter
             price, or a dismissive "not worth discussing," based on how the offer stacks up against
             the player's open-market value. Like Recommended Transfers, how sharp that read is
-            depends on your scouting spend (<a href="#finance">Finance</a>) &mdash; a thin scouting
+            depends on your scouting spend (<a href="#finance">Finance</a>): a thin scouting
             budget gives you a fuzzier, less reliable take.
           </p>
           <p>
@@ -2570,7 +2570,7 @@ export function Manual() {
             (the depth floor still applies, so you can't loan away your last cover at a position).
             You can also list him from the Roster page: the <strong>List</strong> menu on each
             player (pitch popover, XI row or bench row) holds both listings, so
-            "List for loan (1 season)" is one click from the squad screen &mdash; use the Loans page
+            "List for loan (1 season)" is one click from the squad screen. Use the Loans page
             if you want a 2 or 3 season loan instead. It's the same listing either way, so it shows
             up on both pages, and the loan half of the menu is only available while a transfer
             window is open. A player listed for loan carries an <strong>L</strong> flag on his pitch
@@ -2583,7 +2583,7 @@ export function Manual() {
             they stick strictly to real-football logic: <strong>only young players who aren't in
             their club's starting XI</strong> go out on loan. A starter is already getting his
             minutes at home, so he's never loaned, whatever the numbers say. The club taking him
-            has to be one that would <strong>actually play him</strong> &mdash; he has to be better
+            has to be one that would <strong>actually play him</strong>: he has to be better
             than the weakest man in their first eleven at his position. That's the whole point of
             the move, and it's why a weak player can sit listed and draw no offers at all: nobody
             wants to develop someone who'd be on their bench too. A club will let a
@@ -2596,7 +2596,7 @@ export function Manual() {
           <p>
             <strong>A loan can't run past his contract.</strong> Since his deal doesn't change while
             he's away, a loan that outlasted it would mean he was somewhere else when it ran down
-            and left on a free the moment he got home &mdash; so the duration list only offers the
+            and left on a free the moment he got home, so the duration list only offers the
             seasons his current contract covers. A player in the last year of his deal can go out
             for one season, not three. Extend him first if you want to send him further out.
           </p>
@@ -2604,7 +2604,7 @@ export function Manual() {
             He's still your player the whole time he's away, contract included. The
             <strong> Players Out on Loan</strong> list at the bottom of the Loans page shows when
             each deal expires and lets you extend him from there, one at a time or all at once,
-            which is the only place you can &mdash; he isn't on your Roster page while he's gone,
+            which is the only place you can. He isn't on your Roster page while he's gone,
             so the Roster page's own Extend all button can't reach him.
           </p>
           <p>
@@ -2614,7 +2614,7 @@ export function Manual() {
             same ones the AI plays by: a club will only lend someone{" "}
             <strong>23 or under</strong> who <strong>isn&apos;t in its starting
             eleven</strong>, whose contract covers the loan, and who it can spare without leaving
-            itself thin at his position &mdash; only to a club he&apos;d be worth more to than
+            itself thin at his position, and only to a club he&apos;d be worth more to than
             he is to them, and only if he&apos;d <strong>get into your team</strong>. That last
             condition is the one that shapes the list: he has to be better than the weakest man in
             your first eleven at his position, because a club lends a young player to get him games,
@@ -2626,7 +2626,7 @@ export function Manual() {
           </p>
           <p>
             That&apos;s what decides how good a loan you can get, and it isn&apos;t a dial anyone
-            set &mdash; it falls out of how strong your own eleven is. The better your squad, the
+            set. It falls out of how strong your own eleven is. The better your squad, the
             fewer players clear it: the very best sides in the world are offered nobody, a
             mid-table top-flight club gets a short list, and a second- or third-division club can
             borrow players who&apos;d walk straight into its team. Loans are how a small club
@@ -2640,7 +2640,7 @@ export function Manual() {
             injuries exactly like anyone else, and counts against your squad cap. But his contract
             belongs to his parent club, so you can&apos;t sell him, release him, loan him on, or
             re-sign him, and no club will bid for him. When the loan runs out he goes home, whether
-            you wanted him to or not &mdash; there's no option to buy him or keep him on. The{" "}
+            you wanted him to or not. There's no option to buy him or keep him on. The{" "}
             <strong>Players In on Loan</strong> list at the bottom of the Loans page shows who
             you&apos;re borrowing and when you lose them.
           </p>
@@ -2698,7 +2698,7 @@ export function Manual() {
           </p>
           <p>
             Signing a free agent shows up on his profile as a <strong>free move</strong> the same way
-            a paid transfer does &mdash; in his transfer history, on his transfer-value chart, and in
+            a paid transfer does: in his transfer history, on his transfer-value chart, and in
             the News Feed for your own signings. Signing a prospect straight into your academy counts
             as one too, so the club on his profile matches where he actually is.
             Before, a free signing left no trace, so his profile could wrongly show him still at a
@@ -2709,7 +2709,7 @@ export function Manual() {
             free-agent pool before you do, and they don't just fill holes: any club will grab a
             genuinely useful free agent to upgrade a spot it's already stocked at. They now get that
             look <em>after</em> the squad trimming that fills the pool in the first place, which is
-            the point &mdash; most of a year's free agents are players a club released for being
+            the point: most of a year's free agents are players a club released for being
             surplus at a position rather than for being bad, and those used to sit untouched until
             the following summer with you the only manager in the world able to sign them. By the
             time you get to the Free Agents page the genuinely elite ones are gone. What's left is
@@ -2722,7 +2722,7 @@ export function Manual() {
             no persuading: a good player won't drop to your level just because he's available,
             exactly as he'd refuse a move there if you tried to buy him. It's judged against
             whichever is higher, the club that released him or the level his ability entitles him
-            to &mdash; both matter, because a very good player who happens to have been at a small
+            to. Both matter, because a very good player who happens to have been at a small
             club is still a very good player. How much he cares scales with how good he is, so
             squad players go wherever there's a game and only real quality turns anyone down. The
             Free Agents page tells you when that's what's stopping a signing, and the answer is to
@@ -2738,7 +2738,7 @@ export function Manual() {
           </p>
           <p>
             <strong>Signed a free agent? You're keeping him for a season.</strong> A free agent you
-            sign onto your senior roster can't be sold until the following season &mdash; no AI club
+            sign onto your senior roster can't be sold until the following season. No AI club
             will bid on him, and the Roster page shows "Can't sell yet (just signed)" in place of the
             List for Transfer button until the hold clears. This closes the old loophole of signing a
             free agent for nothing and immediately flipping him for a fee. You can still release him
@@ -2816,7 +2816,7 @@ export function Manual() {
             savings cap scales with a club's fame: a top-flight club can bank up to{" "}
             <strong>$400M</strong> at full hype, down to <strong>$200M</strong> for a club with no
             fame (lower divisions are capped lower still, reflecting the money gap between them).
-            Spending below your cap is unrestricted, but you can't bank cash past it &mdash; money
+            Spending below your cap is unrestricted, but you can't bank cash past it: money
             you would have saved above the line is never paid at all rather than carried over, so if
             you're near the ceiling the page warns you before the next cheque disappears.
           </p>
@@ -2825,8 +2825,8 @@ export function Manual() {
         <Section id="debt" title="Debt &amp; Sanctions">
           <p>
             Your balance can go below zero, and going there is a decision rather than an accident.
-            Every club has an <strong>overdraft</strong> worth about nine months of its own income
-            &mdash; roughly <strong>$66M</strong> for a big-four top-flight side, proportionally
+            Every club has an <strong>overdraft</strong> worth about nine months of its own income:
+            roughly <strong>$66M</strong> for a big-four top-flight side, proportionally
             less for a smaller or lower-division one, and less again on the harder difficulty
             levels, because it scales with what you earn. You can spend into it freely. Buy the
             striker you can't quite afford and worry about it later; that's what it's for.
@@ -2844,7 +2844,7 @@ export function Manual() {
               <strong>A transfer embargo.</strong> End a season more than{" "}
               <strong>40%</strong> into your overdraft and you can't buy or sign anyone at all next
               season. You can still sell, still promote from your academy, and your academy still
-              takes in its yearly intake &mdash; the ways out stay open, the ways further in don't.
+              takes in its yearly intake. The ways out stay open, the ways further in don't.
             </li>
             <li>
               <strong>A points deduction.</strong> End it more than <strong>75%</strong> in and
@@ -2856,20 +2856,20 @@ export function Manual() {
           <p>
             <strong>Your books are read at the final whistle, not in the summer.</strong> The check
             runs on the balance you finish the season with, after prize money and hype revenue have
-            landed &mdash; so a good cup run really can rescue you, and selling your best player in
+            landed, so a good cup run really can rescue you, and selling your best player in
             July can't. That's why the Dashboard and the Finance page both start warning you
             <em>during</em> the season, as soon as today's balance would cost you something. Take
             the warning seriously; by the time the penalty exists it's too late to trade out of it.
           </p>
           <p>
             A deduction is a sporting penalty and nothing else. Your board doesn't have a separate
-            opinion about your finances &mdash; but the points come off your league table, you
+            opinion about your finances, but the points come off your league table, you
             finish lower, and the board very much has an opinion about <em>that</em>. Docked points
             show in the standings as a red figure next to your total, so the table always adds up.
           </p>
           <p>
             Both penalties appear in your <strong>news feed</strong> the season they come into
-            force, at the top of that season ahead of the summer window &mdash; which is the right
+            force, at the top of that season ahead of the summer window, which is the right
             place for them, because an embargo governs the window you are about to trade in. A club
             in your own league picking one up shows there too.
           </p>
@@ -2975,7 +2975,7 @@ export function Manual() {
             kids already there.
           </p>
           <p>
-            <strong>Countries</strong> &mdash; up to three, and they'll turn up most of next
+            <strong>Countries</strong>: up to three, and they'll turn up most of next
             summer's intake between them, with the rest still coming from around your own league.
             Be clear about what this one does: your scouts find you <em>different</em> players, not
             better ones. Where a player is from decides his name and which country is allowed to
@@ -2983,7 +2983,7 @@ export function Manual() {
             you'd like to build a national team out of players you developed yourself.
           </p>
           <p>
-            <strong>Positions</strong> &mdash; up to three, if you can see a hole coming in a few
+            <strong>Positions</strong>: up to three, if you can see a hole coming in a few
             years and would rather start filling it now. It's a strong lean and not a filter: ask
             for centre-backs and you'll get a lot of centre-backs, never an intake of nothing else,
             because an academy that stopped producing everything you weren't thinking about this
@@ -2991,7 +2991,7 @@ export function Manual() {
           </p>
           <p>
             One honest note on positions. Your own academy turns up a handful of kids each summer
-            on its own, and those arrive as they are &mdash; positions shape the ones your{" "}
+            on its own, and those arrive as they are. Positions shape the ones your{" "}
             <em>scouts</em> go out and find, which is most of the intake but not all of it.
             Countries are the exception and cover everyone, because that only changes where a
             player is from rather than what kind of player he is.
@@ -3033,7 +3033,7 @@ export function Manual() {
             Pricing its <em>own</em> players is a different question, and the club asks it
             differently: not "how much would he improve us" (he's already here) but "how far would we
             fall back without him". A star with no ready deputy behind him is priced brutally
-            &mdash; that's the whole gap between his level and his replacement's &mdash; while one
+            (that's the whole gap between his level and his replacement's), while one
             with a good understudy is easier to prise loose. A club also won't write off its own
             young talent just because it's chasing the title this season.
           </p>
@@ -3054,8 +3054,8 @@ export function Manual() {
             gap-filling club never bankrupts itself, and the genuine superstars stay unbuyable at any
             price). On top of all that, players won't drop to much smaller clubs and won't be
             shifted easily in their first seasons somewhere (see{" "}
-            <a href="#transfers">Transfers</a>), so the very best players change club rarely &mdash;
-            roughly one in ten in a season &mdash; and when they do it's sideways or upward, for a
+            <a href="#transfers">Transfers</a>), so the very best players change club rarely,
+            roughly one in ten in a season, and when they do it's sideways or upward, for a
             fee that makes the news. Those are exactly the moves the News Feed carries from
             leagues other than your own.
           </p>
@@ -3102,7 +3102,7 @@ export function Manual() {
             trophy and stat that contributed, how many of each, and what one is worth. Retired
             players are ranked alongside active ones. Known limitation: the player ranking still
             favours attackers, because it builds on the Ballon d'Or and Player of the Season scores,
-            which are based on scoring and contain no defensive stats. Three things offset it &mdash;
+            which are based on scoring and contain no defensive stats. Three things offset it:
             the Team of the Season and World Team of the Year terms, which fill specific positions,
             and the Goalkeeper and Defender of the Year awards, which are the first honours on this
             board a keeper or a centre-back can win outright rather than take a slot in. It's not a
@@ -3132,7 +3132,7 @@ export function Manual() {
             a player is counted at the club he finished each season with, so a January signing
             is credited with the title his new club wins that May, and a January departure isn't.
             International honours are left off entirely: a World Cup belongs to his country. Goals and assists are left off too, but for a different
-            reason &mdash; once a player retires the game keeps his career totals rather than a
+            reason: once a player retires the game keeps his career totals rather than a
             breakdown club by club, so a per-club figure isn't something the save can still answer.
             Rather than show one thing for players who are still playing and another for the ones
             who have retired, the board leaves production out for everybody and ranks on quality,
@@ -3237,7 +3237,7 @@ export function Manual() {
             the seasons list means he was in the squad that year but never got on the pitch.
           </p>
           <p>
-            A retiree the game didn't keep is just a name &mdash; but if he ever won something, it
+            A retiree the game didn't keep is just a name, but if he ever won something, it
             keeps that name. Every award is stored with the winner's name, country, position and
             club at the time, so an honours board still tells you who won a Player of the Season
             forty years ago even though the player himself is long gone from the save. He shows up
@@ -3255,7 +3255,7 @@ export function Manual() {
           </p>
           <p>
             Separately from that permanent career record, the game keeps a plain name for every
-            retiree your save still mentions anywhere &mdash; an old transfer, a news item, an
+            retiree your save still mentions anywhere: an old transfer, a news item, an
             awards board, a cup stat line. That's a much shorter record than a career page, so
             there's no limit on it the way there is on the career records: if something in your
             history points at a player, his name stays. It costs about 20 KB a season. This is
@@ -3267,7 +3267,7 @@ export function Manual() {
             One more place names survive: the Season Preview's retirements list. Every offseason it
             writes down the biggest names who went, and the game now reads that list back. So a
             player who made that table when he hung his boots up keeps his name everywhere he comes
-            up afterwards &mdash; an old transfer, a news item, an awards board &mdash; even if his
+            up afterwards (an old transfer, a news item, an awards board), even if his
             career wasn't big enough to keep. This one works backwards as well as forwards, because
             those lists have been in your save all along, so loading an old league gets some names
             back straight away. Like an award winner, he's a name without a career page, so he isn't
@@ -3290,7 +3290,7 @@ export function Manual() {
             <li><strong>Manage any club.</strong> The <em>God Mode</em> page (it shows up in the sidebar once the switch is on) opens on a Switch Club tab. Pick any club in the world and take charge of it on the spot, no job offer needed and no waiting for the offseason. The club you leave goes straight to the AI, its youth academy graduates onto the senior squad on the way out, and any transfer talks you were holding are dropped. You arrive at the new club knowing its players' ratings but not their ceilings, same as taking a job normally. It goes in your career record as a spell like any other, and the board there starts you on a fresh slate.</li>
             <li><strong>Manage any country.</strong> The same page has a Switch Country tab. Take charge of any national team in the world without waiting for a federation to come calling, and step down again whenever you like. Every country is listed, including ones without enough players born into your world to name a squad yet. Those are marked, and you can still take them: they join the next campaign once they have the players. The country you leave goes back to the AI and picks its own eleven again from the squad you named, the new one starts you on a fresh slate with its federation, and your club job carries on untouched. If a campaign is already under way you inherit it as it stands. In a spectator save there's nobody for a federation to appoint, so take a club first.</li>
             <li><strong>Edit any player.</strong> Open any player's profile and hit <em>Edit</em>. Change every one of his 14 ratings (OVR recomputes as you go), his potential, name, nationality, age, position, height, and his contract wage and length. You can also clear an injury outright.</li>
-            <li><strong>Lock a player's ratings.</strong> Freeze a player where he is and the offseason stops moving him: no growth, no decline with age, and his overall and potential hold too. There's a <em>Lock ratings</em> button on his profile, a checkbox in the edit window, and a Lock button on every row of the Roster Builder if you're doing a whole squad. Everything else about him carries on as normal — he still plays, gets injured, signs contracts, moves clubs and eventually retires. Unlock him and he picks up developing again from wherever you left him. The lock is saved with the game, so it stays put if you switch God Mode back off, and his profile says so.</li>
+            <li><strong>Lock a player's ratings.</strong> Freeze a player where he is and the offseason stops moving him: no growth, no decline with age, and his overall and potential hold too. There's a <em>Lock ratings</em> button on his profile, a checkbox in the edit window, and a Lock button on every row of the Roster Builder if you're doing a whole squad. Everything else about him carries on as normal: he still plays, gets injured, signs contracts, moves clubs and eventually retires. Unlock him and he picks up developing again from wherever you left him. The lock is saved with the game, so it stays put if you switch God Mode back off, and his profile says so.</li>
             <li><strong>Move players freely.</strong> From a player's profile, send him to any club instantly, with no fee, no budget check, and no cap, or release him to free agency.</li>
             <li><strong>Create players.</strong> The <em>God Mode</em> page has a Create Player tool. Build a player from scratch and drop him onto any club or leave him a free agent.</li>
             <li><strong>Build any club's roster.</strong> The same page lets you pick any club and add, move, or release its players directly.</li>
@@ -3322,8 +3322,8 @@ export function Manual() {
           <p><strong>Why is potential shown as a range like "74&ndash;88"?</strong> You never see a player's exact potential, just a scouting estimate that brackets the real value (see <a href="#players">Players</a>). Raise your <a href="#finance">scouting spend</a> to tighten it, and keep a player on your senior roster for a couple of seasons to reveal his true ceiling. The midpoint isn't the answer, the truth can sit anywhere inside the band.</p>
           <p><strong>Do AI clubs cheat?</strong> Nope. They play by the exact same rules you do: same wages, same budgets, same roster limits, same transfer machinery, no hidden income. The whole league's finances are on the Finance page if you want to check.</p>
           <p><strong>How does a player earn a "League Champion" trophy?</strong> He has to have been in the squad that won it. The credit comes from his own season record at the club, so signing for a club with a trophy cabinet doesn't hand him anything he wasn't there for. The one rough edge is mid-season movers: a title counts for whoever's squad he finished the season in, so a January arrival at the champions gets it and a January departure doesn't.</p>
-          <p><strong>Why does the transfers page only show some of the completed deals?</strong> Because drawing all of them is what used to freeze the page. A full world moves thousands of players in a summer window, and rendering every one (each with a flag) was over 10,000 elements and about a megabyte of flag art. You now get all of your own club's business plus the 50 biggest deals elsewhere. The News Feed goes wider &mdash; everything in your own league, and the big moves from the rest of the world &mdash; but it isn't a complete record either, and nothing in the game shows you literally every deal any more. That's deliberate: a full world's transfer log is thousands of rows a season, nearly all of it clubs swapping squad players in countries you don't play in.</p>
-          <p><strong>My News Feed got a lot shorter.</strong> On purpose. It used to report all sixteen leagues equally, which came to thousands of rows a season with only about one in ten having anything to do with your club or your league &mdash; the rest was a second-division striker in another country reaching ten career goals. Now your own club is always in, your league is fully covered, and everywhere else has to clear a much higher bar to reach you. Goal milestones moved with it: they used to fire every ten goals, which meant almost everyone hit one constantly, and now a career milestone starts at 50 and a season milestone at 25. Old saves get the same treatment, so a feed that was already buried clears out too. Nothing was deleted &mdash; the milestones you'd already earned just aren't headlines any more. There's also a ceiling per season now: a season shows its 150 biggest stories and says how many it held back, for the same reason the transfers page has one. The feed is kept forever and only ever grows, so on a long save it was heading for the same freeze. Anything involving your own club is always shown, however deep into the season it falls.</p>
+          <p><strong>Why does the transfers page only show some of the completed deals?</strong> Because drawing all of them is what used to freeze the page. A full world moves thousands of players in a summer window, and rendering every one (each with a flag) was over 10,000 elements and about a megabyte of flag art. You now get all of your own club's business plus the 50 biggest deals elsewhere. The News Feed goes wider (everything in your own league, and the big moves from the rest of the world), but it isn't a complete record either, and nothing in the game shows you literally every deal any more. That's deliberate: a full world's transfer log is thousands of rows a season, nearly all of it clubs swapping squad players in countries you don't play in.</p>
+          <p><strong>My News Feed got a lot shorter.</strong> On purpose. It used to report every league equally, which came to thousands of rows a season with only about one in ten having anything to do with your club or your league. The rest was a second-division striker in another country reaching ten career goals. Now your own club is always in, your league is fully covered, and everywhere else has to clear a much higher bar to reach you. Goal milestones moved with it: they used to fire every ten goals, which meant almost everyone hit one constantly, and now a career milestone starts at 50 and a season milestone at 25. Old saves get the same treatment, so a feed that was already buried clears out too. Nothing was deleted: the milestones you'd already earned just aren't headlines any more. There's also a ceiling per season now: a season shows its 150 biggest stories and says how many it held back, for the same reason the transfers page has one. The feed is kept forever and only ever grows, so on a long save it was heading for the same freeze. Anything involving your own club is always shown, however deep into the season it falls.</p>
           <p><strong>My player's cup stats suddenly went up a lot.</strong> They were wrong before, and now they're right. The Continental Cup has three stages, and cup stats used to count only the knockout ties, so league-phase and playoff games never showed up on anyone's profile at all. They all count now, including for past seasons, so appearances and goals jump for anyone who played group games. Nothing was inflated, it was under-counted.</p>
           <p><strong>Where did all the free agents go?</strong> Once a free agent turns 24, has never been any good in his career, and isn't projected to become good, he's permanently removed from the game. Nothing ever cleared these players out before, so a long save built up thousands of them, which bloated saves badly. Anyone under 24 is kept, so your incoming talent list is unaffected, as is anyone with real potential left and any former star who's since declined.</p>
           <p><strong>Why does the game get slower the longer I play?</strong> It used to be because the entire save was rewritten every time anything happened, so the more history you'd built up, the more every single click cost. Players are now stored individually and only the ones that actually changed get written, so signing someone or setting your lineup no longer depends on how long you've been playing. What's left is the running history a save keeps (power rankings, transfers, news, past seasons), which is still rewritten in full, so there's still some growth. Simming is a separate cost. Advancing hands your save to a background worker and takes it back again, so it scales with the whole save rather than with what changed. The heaviest thing in there was match reports: every game played this season keeps its full box score and event timeline, which on a big world is most of your save by the end of a season, and it was enough to run a phone out of memory and crash the tab. The worker no longer gets them, along with the retiree archive and the power rankings history, none of which it read. On a real 60-season save that took the end of a season from 222 MB to 99 MB, and the copy from 4.8 seconds to 1.2. Note this was never about how long you'd been playing: match reports clear every offseason, so it depended on how big your world is and how far into the season you were. A very old save is still large, so this makes the crash much less likely rather than impossible.</p>

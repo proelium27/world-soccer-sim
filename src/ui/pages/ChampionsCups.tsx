@@ -38,12 +38,13 @@ export function ChampionsCups() {
   const intro = (
     <HelpHint>
       The season opens with the champions cups, played before anyone has a league point on the
-      board. Every country holds one between its league champions and its cup winners — and when
+      board. Every country holds one between its league champions and its cup winners, and when
       one club won both, the league runners-up take their place, the way the Community Shield
-      does it. There&apos;s one more on top of those: the Continental Cup winners against the
-      Continental Shield winners, the only match of the year between the two.
+      does it. On top of those, the Continental Cup winners play the Continental Shield winners,
+      and in a world with leagues in the Americas, the Continental Cup winners also play the
+      Americas Cup winners in the Intercontinental Cup.
       They&apos;re one-off games at a neutral ground, so there&apos;s no home advantage and no
-      second leg to fix a bad night — level after 90 minutes goes to extra time and then
+      second leg to fix a bad night. Level after 90 minutes goes to extra time and then
       penalties. No prize money rides on any of it. It&apos;s a trophy and bragging rights, which
       is about what the real ones are worth too.
     </HelpHint>

@@ -122,6 +122,12 @@
      token block above), which is exactly the property an "info" colour needs. */
   --bs-info: var(--sg-cup);
   --bs-info-rgb: 108, 187, 205;
+  /* `.alert-info` reads these three instead, so without them its text and
+     border stayed stock cyan (#6edff6 / #087990) on the Dashboard, Roster and
+     Academy notices. */
+  --bs-info-text-emphasis: var(--sg-cup);
+  --bs-info-bg-subtle: var(--sg-cup-wash);
+  --bs-info-border-subtle: var(--sg-cup-line);
 
   --bs-emphasis-color-rgb: 240, 245, 242;
   --bs-heading-color: var(--sg-text);

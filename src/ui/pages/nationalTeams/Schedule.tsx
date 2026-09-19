@@ -217,8 +217,9 @@ export function NTSchedule() {
       ) : qualifying ? (
         <>
           <p className="text-muted small">
-            Qualifying fixtures, played home and away within each confederation. One round is played
-            each offseason, so this opens on the round being played now.
+            Qualifying fixtures within each confederation. Every nation meets each of its group
+            rivals three times, one round each offseason, so this opens on the round being played
+            now.
           </p>
           <QualifyingSchedule campaign={qualifying} />
         </>
