@@ -174,8 +174,16 @@ const SEASON = simSeason(mulberry32(12345));
  * composite values did. The football is conserved (ovrScaleMatchProbe, 8
  * seasons, main -> this): goals/match 3.0997 -> 3.1059, home-win .4109 -> .4197,
  * champion points 80.38 -> 80.00.
+ *
+ * And again (3620983212 -> 3877017743) when foul volume in simMatchDetailed rose
+ * to a real top flight's (FOUL_RATE_MULTIPLIER, BOOKED_FOUL_WEIGHT): ~13 -> ~23
+ * fouls a match, with the penalty and free-kick chances per foul divided by the
+ * same factor so set pieces per tick are unchanged. The foul roll replaces the
+ * tick's open-play roll, so draws move. Measured (cardRateSweep, 3 seasons):
+ * yellows 2.34 -> 4.03, reds 0.169 -> 0.205, shots 26.66 -> 26.48, goals
+ * 3.041 -> 3.067 (the extra cards add stoppage).
  */
-const BASELINE_SCORELINE_HASH = 3620983212;
+const BASELINE_SCORELINE_HASH = 3877017743;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");
@@ -263,10 +271,12 @@ describe("touch attribution — realism", () => {
     expect(crossMean).toBeLessThan(23);
   });
 
-  it("fouls per team match the engine's actual foul events (~5-9)", () => {
-    // Tied to real FOUL_BASE foul events (not synthesized), so consistent with cards.
-    expect(foulMean).toBeGreaterThan(4);
-    expect(foulMean).toBeLessThan(10);
+  it("fouls per team match a real top flight (~11-12)", () => {
+    // Tied to real FOUL_BASE_DETAILED foul events (not synthesized), so consistent
+    // with cards. A real top-flight side commits ~11-12 a match; the engine sat at
+    // ~6.6 until FOUL_RATE_MULTIPLIER (2026-09-19).
+    expect(foulMean).toBeGreaterThan(9);
+    expect(foulMean).toBeLessThan(14);
   });
 
   it("distributes touches sensibly by position", () => {
