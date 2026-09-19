@@ -1672,6 +1672,15 @@ export function Manual() {
             its best available players in the strongest shape it can field.
           </p>
           <p>
+            <strong>You can take a country that can't field a team yet.</strong> A country needs 18
+            players born into your world, one of them a goalkeeper, before it
+            enters international football. Pick one short of that and you're still its manager.
+            It just sits out every campaign, and the federation has nothing to judge you on. Once
+            it has enough players (your own academy kids count, which is what scout directions are
+            for) it joins the next campaign that gets drawn, with you already in charge. Your
+            national-team pages tell you how far off it is.
+          </p>
+          <p>
             What you actually control is the squad and the team, and they're two pages. When a
             campaign is drawn, at the end of a season, a squad of 23 is named for you.{" "}
             <strong>Player Pool</strong> is where you change who's in it — everyone born in your
@@ -3279,7 +3288,7 @@ export function Manual() {
           <p>What it unlocks while it's on:</p>
           <ul>
             <li><strong>Manage any club.</strong> The <em>God Mode</em> page (it shows up in the sidebar once the switch is on) opens on a Switch Club tab. Pick any club in the world and take charge of it on the spot, no job offer needed and no waiting for the offseason. The club you leave goes straight to the AI, its youth academy graduates onto the senior squad on the way out, and any transfer talks you were holding are dropped. You arrive at the new club knowing its players' ratings but not their ceilings, same as taking a job normally. It goes in your career record as a spell like any other, and the board there starts you on a fresh slate.</li>
-            <li><strong>Manage any country.</strong> The same page has a Switch Country tab. Take charge of any national team in the world without waiting for a federation to come calling, and step down again whenever you like. Only countries with enough players born into your world to name a squad are listed, since the rest have no team to manage. The country you leave goes back to the AI and picks its own eleven again from the squad you named, the new one starts you on a fresh slate with its federation, and your club job carries on untouched. If a campaign is already under way you inherit it as it stands. In a spectator save there's nobody for a federation to appoint, so take a club first.</li>
+            <li><strong>Manage any country.</strong> The same page has a Switch Country tab. Take charge of any national team in the world without waiting for a federation to come calling, and step down again whenever you like. Every country is listed, including ones without enough players born into your world to name a squad yet. Those are marked, and you can still take them: they join the next campaign once they have the players. The country you leave goes back to the AI and picks its own eleven again from the squad you named, the new one starts you on a fresh slate with its federation, and your club job carries on untouched. If a campaign is already under way you inherit it as it stands. In a spectator save there's nobody for a federation to appoint, so take a club first.</li>
             <li><strong>Edit any player.</strong> Open any player's profile and hit <em>Edit</em>. Change every one of his 14 ratings (OVR recomputes as you go), his potential, name, nationality, age, position, height, and his contract wage and length. You can also clear an injury outright.</li>
             <li><strong>Lock a player's ratings.</strong> Freeze a player where he is and the offseason stops moving him: no growth, no decline with age, and his overall and potential hold too. There's a <em>Lock ratings</em> button on his profile, a checkbox in the edit window, and a Lock button on every row of the Roster Builder if you're doing a whole squad. Everything else about him carries on as normal — he still plays, gets injured, signs contracts, moves clubs and eventually retires. Unlock him and he picks up developing again from wherever you left him. The lock is saved with the game, so it stays put if you switch God Mode back off, and his profile says so.</li>
             <li><strong>Move players freely.</strong> From a player's profile, send him to any club instantly, with no fee, no budget check, and no cap, or release him to free agency.</li>
