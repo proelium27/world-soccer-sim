@@ -84,6 +84,15 @@ export interface MatchEvent {
   type: MatchEventType;
   side: "home" | "away";
   pids: number[];
+  /**
+   * Open-play shots only: the zone the shot was taken from, as an index into
+   * SHOT_ZONES (0 six-yard box, 1 rest of the area, 2 outside). It set the
+   * shot's odds (see resolveShot), so the match feed reads it rather than
+   * guessing. Absent on penalties, corners, free kicks, every other event, and
+   * every shot recorded before zones existed; a number rather than a name
+   * because it rides on ~20 events a match forever.
+   */
+  zone?: 0 | 1 | 2;
 }
 
 export interface PlayerMatchLine {

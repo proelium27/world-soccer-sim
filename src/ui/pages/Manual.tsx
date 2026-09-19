@@ -648,14 +648,15 @@ export function Manual() {
             recognised as one rather than guessed at.
           </p>
           <p>
-            Shot locations have one honest limit: the match engine doesn't track where anyone is on
-            the pitch. Penalties, corner headers and free kicks are real, because the engine really
-            played them. For every other shot the game picks a spot that fits how the shot ended,
-            so goals mostly come from inside the box, blocked shots more often from outside it, and
-            a striker's efforts sit closer to goal than a holding midfielder's. Over a season that
-            lands on the same split real top flights have. The location is a description, though,
-            not a cause: it doesn't change the xG. It's all worked out from the match itself, not
-            stored, so old box scores have it too &mdash; right back to your first season.
+            Where a shot comes from matters. Every open-play shot is taken from the six-yard box,
+            the rest of the area, or outside it, and that decides how good the chance is: a shot
+            from close in converts about a third of the time, one from the rest of the box about one
+            in eight, and one from distance only a few percent of the time, and long shots get blocked far
+            more often. A striker takes more of his shots close in and a holding midfielder more of
+            his from range, and the split over a season (about 7 / 55 / 38) is the same one real top
+            flights have. Penalties, corner headers and free kicks are read straight off the match.
+            Matches played before this was added didn't record where shots were taken, so on those
+            the game picks a spot that fits how the shot ended, and there it's only a description.
           </p>
           <p>After matchday 38, the offseason runs on its own, in this order:</p>
           <ol>
@@ -2198,7 +2199,8 @@ export function Manual() {
           </p>
           <p>
             <strong>xG (expected goals).</strong> Every shot's chance of going in before you know
-            the outcome, based on the defense and keeper it's taken against, tallied up per player
+            the outcome, based on where it was taken from and the defense and keeper it's taken
+            against (a tap-in is worth far more than a 30-yard effort), tallied up per player
             and per team, shown next to the score on the Box Score page and as a column on Stat
             Leaders. It deliberately ignores the shooter's own finishing skill (an elite finisher's
             shots don't get marked as better chances just because he's elite), so comparing a

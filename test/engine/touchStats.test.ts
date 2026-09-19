@@ -182,8 +182,13 @@ const SEASON = simSeason(mulberry32(12345));
  * tick's open-play roll, so draws move. Measured (cardRateSweep, 3 seasons):
  * yellows 2.34 -> 4.03, reds 0.169 -> 0.205, shots 26.66 -> 26.48, goals
  * 3.041 -> 3.067 (the extra cards add stoppage).
+ *
+ * And again (3877017743 -> 3471481401) when open-play shots began rolling a
+ * zone that sets their block/on-target/save odds (SHOT_ZONE_STAGE): one more
+ * draw per shot. Scoring held (shotZoneEngineProbe, 3 seasons): goals/match
+ * 3.134 -> 3.132, shots 26.66 -> 26.94, on target 9.31 -> 9.31.
  */
-const BASELINE_SCORELINE_HASH = 3877017743;
+const BASELINE_SCORELINE_HASH = 3471481401;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");
