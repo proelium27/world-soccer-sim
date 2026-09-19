@@ -13,7 +13,7 @@ import { setPendingRoster } from "../pendingRoster.js";
 import { ROSTER_FILES } from "../rosterDownload.js";
 import { RosterFilesSection } from "../components/RosterFilesSection.js";
 import { CopyAiPromptButton } from "../components/CopyAiPromptButton.js";
-import { worldCompetitions, worldTeamSlots } from "../../core/competitions.js";
+import { competitionTeamCount, worldCompetitions, worldTeamSlots } from "../../core/competitions.js";
 
 interface LeagueSummary {
   lid: number;
@@ -30,6 +30,16 @@ interface TeamEditor {
   competitions: { id: number; name: string }[];
 }
 
+/** The shipped world's size, for the intro below. Computed once at load. */
+const WORLD_SIZE = (() => {
+  const comps = worldCompetitions();
+  return {
+    leagues: comps.length,
+    countries: new Set(comps.map((c) => c.country)).size,
+    clubs: comps.reduce((n, c) => n + competitionTeamCount(c), 0),
+  };
+})();
+
 /**
  * What a first-time visitor sees instead of an empty save list. Doubles as the
  * site's only real homepage copy, so it's plain prose rather than UI chrome.
@@ -45,10 +55,15 @@ function FirstRunIntro({ brand }: { brand: string }) {
         this device.
       </p>
       <ul className="text-muted">
-        <li>36 leagues across 12 countries, 626 clubs, promotion and relegation</li>
+        {/* Counted off the shipped world rather than typed in: this line went
+            two world expansions out of date when it was a literal. */}
+        <li>
+          {WORLD_SIZE.leagues} leagues across {WORLD_SIZE.countries} countries,{" "}
+          {WORLD_SIZE.clubs} clubs, promotion and relegation
+        </li>
         <li>A transfer market where rival clubs value players the same way you do</li>
         <li>A youth academy, scouting reports, contracts, and a budget that has to balance</li>
-        <li>A continental cup, and a World Cup on a four year cycle</li>
+        <li>Continental cups in Europe and the Americas, and a World Cup every four years</li>
       </ul>
       <p className="text-muted">
         New to it? The{" "}
@@ -284,7 +299,7 @@ export function Leagues() {
       <div className="container py-4" style={{ maxWidth: 700 }}>
         <h2 className="mb-1">Customize Teams</h2>
         <p className="text-muted mb-3">
-          {editor.leagueName} — rename any club, change its abbreviation or colors.
+          {editor.leagueName}: rename any club, change its abbreviation or colors.
         </p>
         <TeamIdentityEditor
           initialTeams={editor.teams}

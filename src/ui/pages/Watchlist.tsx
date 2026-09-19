@@ -99,8 +99,8 @@ export function Watchlist() {
       <h4>
         Watchlist
         <HelpHint>
-          Players you've starred to keep an eye on. Click the star beside anyone's name — on his
-          profile, in the transfer search, or on the free agent and youth lists — to add or remove
+          Players you've starred to keep an eye on. Click the star beside anyone's name (on his
+          profile, in the transfer search, or on the free agent and youth lists) to add or remove
           him. It's just a shortlist: watching a player doesn't scout him, doesn't tell his club
           anything, and doesn't affect anything in the game.
         </HelpHint>
@@ -171,7 +171,7 @@ export function Watchlist() {
                     <SortableTh sortKey="value" sort={sort} onSort={toggle} className="text-end">
                       Scout value
                       <HelpHint>
-                        Our scouts' estimate of his transfer value — the same figure the Transfers
+                        Our scouts' estimate of his transfer value. It's the same figure the Transfers
                         page quotes, and an estimate rather than the asking price. More scouting spend
                         makes it sharper.
                       </HelpHint>
