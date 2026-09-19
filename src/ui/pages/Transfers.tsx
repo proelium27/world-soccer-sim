@@ -65,11 +65,11 @@ function windowBanner(league: LeagueStore): React.ReactNode {
     const label = ws.window === "summer" ? "Summer" : "Winter";
     const until =
       league.phase === "offseason"
-        ? `open through matchday ${ws.closesAfterMatchday} of next season`
-        : `closes after matchday ${ws.closesAfterMatchday}`;
+        ? `and stays open through matchday ${ws.closesAfterMatchday} of next season`
+        : `and closes after matchday ${ws.closesAfterMatchday}`;
     return (
       <div className="alert alert-success mb-3">
-        <strong>{label} transfer window is open</strong>. {until}.
+        <strong>{label} transfer window is open</strong> {until}.
       </div>
     );
   }
@@ -456,7 +456,7 @@ export function Transfers() {
             </div>
             <p className="card-text text-muted">
               Players near your team&apos;s level, within budget. The scout
-              valuation is your baseline for offers — the selling club&apos;s
+              valuation is your baseline for offers, but the selling club&apos;s
               real price may differ.
               {league.phase === "regular" && (
                 <> Mid-season buys also charge the player&apos;s season wages
@@ -508,8 +508,9 @@ export function Transfers() {
                           Scout value
                           <HelpHint>
                             Our scouts' estimate of this player's transfer value. It's an estimate, not
-                            the exact asking price. More scouting spend makes it more accurate (it can be
-                            off by up to &plusmn;35% at &pound;0 spend, down to about &plusmn;5% at the max).
+                            the exact asking price. More scouting spend makes it more accurate: at $0
+                            spend it&apos;s usually within about &plusmn;35% of the truth, and at the max
+                            usually within about &plusmn;5%, though a bad miss can still happen.
                           </HelpHint>
                         </SortableTh>
                       </>
@@ -572,7 +573,7 @@ export function Transfers() {
             <h5 className="card-title">Search all players</h5>
             <p className="card-text text-muted">
               Look up any player in the world by name or filters and bid on him
-              directly — not just the recommended shortlist. A club won&apos;t part
+              directly, not just the recommended shortlist. A club won&apos;t part
               with a player it needs for depth, and the very best players at
               successful clubs simply aren&apos;t for sale at any price.
             </p>
@@ -702,7 +703,7 @@ export function Transfers() {
             )}
             {hasSearch && searchResults.length >= PLAYER_SEARCH_LIMIT && (
               <p className="text-muted small mb-0">
-                Showing the top {PLAYER_SEARCH_LIMIT} by overall — narrow your
+                Showing the top {PLAYER_SEARCH_LIMIT} by overall. Narrow your
                 filters to see more specific targets.
               </p>
             )}
@@ -757,7 +758,7 @@ export function Transfers() {
               <p className="card-text text-muted">
                 Your own deals, plus the {otherDeals.length} biggest elsewhere.{" "}
                 {hiddenTransfers.toLocaleString()} more went through around the
-                league &mdash; the <Link to="/news">News Feed</Link> has the lot.
+                league. The <Link to="/news">News Feed</Link> has the lot.
               </p>
             )}
             <ul className="mb-0">
@@ -766,7 +767,7 @@ export function Transfers() {
                 return (
                   <li key={i}>
                     <PlayerRefLink pid={t.pid} fallback={`Player ${t.pid}`} />{" "}
-                    {ref && <Flag nationality={ref.nationality} />} — <ClubLink tid={t.fromTid} season={t.season} /> →{" "}
+                    {ref && <Flag nationality={ref.nationality} />}: <ClubLink tid={t.fromTid} season={t.season} /> →{" "}
                     <ClubLink tid={t.toTid} season={t.season} /> for {currency.format(t.fee)}
                   </li>
                 );

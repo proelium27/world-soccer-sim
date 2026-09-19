@@ -130,11 +130,12 @@ export function DomesticCup() {
       <h4>
         Domestic Cup
         <HelpHint>
-          Every country runs its own knockout cup alongside the league, and both divisions are in
-          it, so a second-tier club can knock out a champion. There are no seeds and no bracket: the
+          Every country runs its own knockout cup alongside the league, and every division is in
+          it, so a lower-division club can knock out a champion. There are no seeds and no bracket: the
           survivors go back in the hat after every round and the home side is drawn at random. Ties
           are one match: level after 90 minutes goes to extra time, then penalties. Win this, your
-          league and the Continental Cup in the same season and you have the treble. If your club
+          league and your continental cup (the Continental Cup, or the Americas Cup for a club in
+          the Americas) in the same season and you have the treble. If your club
           reaches the final, the sim pauses so you can play it.
         </HelpHint>
       </h4>

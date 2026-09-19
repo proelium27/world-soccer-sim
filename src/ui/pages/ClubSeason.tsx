@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { EmptyState } from "../components/EmptyState.js";
 import type { ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
@@ -91,10 +92,12 @@ export function ClubSeason() {
       <div className="container-fluid p-3">
         <BackLink fallback={`/history?tid=${tid}`} />
         <h4 className="mb-2 mt-2">{team?.name ?? `Team ${tid}`}</h4>
-        <p className="text-muted">
-          No record of {team?.name ?? `this club`} in {seasonYear(season)}.
-        </p>
-        <Link to={`/history?tid=${tid}`}>Club History</Link>
+        <EmptyState
+          headline={`No record of ${team?.name ?? "this club"} in ${seasonYear(season)}.`}
+          action={<Link to={`/history?tid=${tid}`}>Club History</Link>}
+        >
+          <p>That season either hasn&apos;t been played yet or happened before this club&apos;s record starts.</p>
+        </EmptyState>
       </div>
     );
   }

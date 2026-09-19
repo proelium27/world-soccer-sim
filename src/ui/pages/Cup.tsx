@@ -206,14 +206,16 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
               ) : isShield ? (
                 <>
                   A {format.fieldSize}-club competition played alongside the league, for the clubs
-                  that just miss out on the Continental Cup. The 5th and 6th placed clubs of each of
-                  the four strongest leagues get in, plus 3rd and 4th from each of the weaker ones.
+                  that just miss out on the Continental Cup. Every European league sends the next
+                  two clubs below its Continental Cup places, and a country&apos;s domestic cup
+                  winner takes one of those spots if they didn&apos;t qualify some other way.
                 </>
               ) : (
                 <>
-                  A {format.fieldSize}-club competition played alongside the league. The top four
-                  clubs of each of the four strongest leagues get in, plus the top two from each of
-                  the weaker leagues.
+                  A {format.fieldSize}-club competition played alongside the league. The strongest
+                  European leagues send their top four and the rest their top two, and unless
+                  you&apos;ve switched it off, which leagues count as strongest is decided by a
+                  five-season record of how their clubs have done in Europe.
                 </>
               )}
             </p>

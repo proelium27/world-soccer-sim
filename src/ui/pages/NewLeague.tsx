@@ -724,9 +724,9 @@ export function NewLeague() {
           <p className="text-muted small mt-2 mb-0">
             A plain text (JSON) file listing clubs by league, each one optionally
             carrying a squad. Write one yourself, or press "Copy AI Prompt to Customize"
-            below and paste that into ChatGPT or Claude — it describes the file format
+            below and paste that into ChatGPT or Claude. It describes the file format
             and, importantly, the exact leagues and squad sizes of the world you're
-            building here, which an AI can't guess. Load as many files as you like — one
+            building here, which an AI can't guess. Load as many files as you like; one
             per league is a far easier ask than a whole world at once. They only load
             while a league is being created: replacing squads in a save already going
             would wipe out the careers of everyone they replaced.
@@ -859,7 +859,7 @@ export function NewLeague() {
       {worldRoster && (
         <div className="alert alert-secondary py-2">
           <div>
-            Loaded <strong>{worldRoster.sources.map((s) => s.name).join(", ")}</strong> —{" "}
+            Loaded <strong>{worldRoster.sources.map((s) => s.name).join(", ")}</strong>:{" "}
             {worldRoster.clubs} {worldRoster.clubs === 1 ? "club" : "clubs"},{" "}
             {worldRoster.squads} with a full squad
             {worldRoster.logos.size > 0 && `, ${worldRoster.logos.size} with a badge`}.
@@ -1260,7 +1260,7 @@ export function NewLeague() {
             className={`list-group-item list-group-item-action py-1${userNation === null ? " active" : ""}`}
             onClick={() => setUserNation(null)}
           >
-            None &mdash; club football only
+            None (club football only)
           </button>
           {shownNations.map((n) => (
             <button
@@ -1339,7 +1339,7 @@ export function NewLeague() {
             eight points out of nowhere, and a prospect can go backwards for no reason
             you'll ever see. Steady careers take the dice out. Everyone still improves
             through their early twenties, holds through their peak, and falls away from
-            thirty — faster every year after that — but a player follows his own arc
+            thirty, faster every year after that, but a player follows his own arc
             instead of lurching about. How much he plays still speeds it up or slows it
             down, and players still turn out differently from each other; the difference
             is that who a player becomes is settled in his talent rather than re-rolled

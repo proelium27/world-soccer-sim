@@ -769,7 +769,7 @@ function RosterPicker({
         </p>
       ) : (
         <p className="text-muted mb-2" style={{ fontSize: "0.75rem" }}>
-          {sources.map((s) => s.name).join(", ")} — {clubs} {clubs === 1 ? "club" : "clubs"}.
+          {sources.map((s) => s.name).join(", ")}: {clubs} {clubs === 1 ? "club" : "clubs"}.
         </p>
       )}
 

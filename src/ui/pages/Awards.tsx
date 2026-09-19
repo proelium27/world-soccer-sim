@@ -713,9 +713,9 @@ export function Awards() {
       <h4>
         Awards
         <HelpHint>
-          End-of-season honours. The world awards judge every league at once — the Ballon d'Or for
+          End-of-season honours. The world awards judge every league at once: the Ballon d'Or for
           the best player alive, a Goalkeeper and a Defender of the Year, and a World Team of the
-          Year — while the league awards pick a Player of the Season, a Golden Boot and a Team of
+          Year. The league awards pick a Player of the Season, a Golden Boot and a Team of
           the Season inside one competition. Use the dropdown to look back at past seasons.
         </HelpHint>
       </h4>

@@ -57,7 +57,7 @@ export function SeasonPreview() {
 
   return (
     <div className="container-fluid p-3">
-      <h4>Season Preview — {seasonYear(league.season)}</h4>
+      <h4>Season Preview: {seasonYear(league.season)}</h4>
       <p className="text-muted small mb-4">
         Here's how the offseason shook out before {seasonYear(league.season)} kicks off.
       </p>

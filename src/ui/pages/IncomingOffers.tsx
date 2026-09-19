@@ -233,7 +233,7 @@ export function IncomingOffers() {
       ) : (
         <p>
           Other clubs sometimes come in for your players during an open
-          window. Accept, counter for more, or reject &mdash; a rejection or a
+          window. Accept, counter for more, or reject. A rejection or a
           walked-away counter ends talks for that player for the rest of this
           window.
           {league.phase === "regular" && (

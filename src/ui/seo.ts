@@ -21,7 +21,7 @@ export const SITE_ORIGIN = "https://worldsoccersim.org";
 
 /** Fallback description, matching the one hard-coded in index.html. */
 const DEFAULT_DESCRIPTION =
-  "Free browser soccer manager game. Take over a club, sign players, work the transfer market, run a youth academy and chase the title across 36 leagues and 626 clubs.";
+  "Free browser soccer manager game. Take over a club, sign players, work the transfer market, run a youth academy and chase the title across 48 leagues and 884 clubs.";
 
 interface PageSeo {
   /** Page title, rendered as "<title> | <brand>". Empty means brand only. */

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { EmptyState } from "../components/EmptyState.js";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -90,7 +91,11 @@ function PlayerLeaders({ compId }: { compId: number }) {
   }
 
   if (seasonOptions.length === 0) {
-    return <p>No matches played yet.</p>;
+    return (
+      <EmptyState headline="No matches played yet.">
+        <p>The leaderboards fill in from the first matchday. Sim a game from the Dashboard to get them going.</p>
+      </EmptyState>
+    );
   }
 
   return <PlayerLeadersBody league={league} compId={compId} seasonOptions={seasonOptions} />;
@@ -397,7 +402,11 @@ function TeamLeaders({ compId }: { compId: number }) {
   const seasonOptions = [...league.seasonHistory.map((h) => h.season)].sort((a, b) => b - a);
 
   if (league.played.length === 0 && seasonOptions.length === 0) {
-    return <p>No matches played yet.</p>;
+    return (
+      <EmptyState headline="No matches played yet.">
+        <p>The leaderboards fill in from the first matchday. Sim a game from the Dashboard to get them going.</p>
+      </EmptyState>
+    );
   }
 
   const teamIds = league.teams.filter((t) => t.compId === compId).map((t) => t.tid);

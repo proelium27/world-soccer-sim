@@ -409,10 +409,11 @@ export function IntlEmpty({ footer }: { footer?: ReactNode } = {}) {
           offseasons of each cycle play one round of qualifying apiece, where every nation with
           enough players works through its confederation group for a place at the{" "}
           {INTL_TOURNAMENT_NAME}. The fourth offseason, the qualifiers meet in groups of four and
-          then a knockout. It's 32 nations unless you change it: the size is on the Qualifying page.
+          then a knockout. Out of the box it's sized to how many nations your world can field,
+          which is 32 on the standard world, and you can change that on the Qualifying page.
         </p>
         <p>
-          You can manage a country alongside your club — pick one when you start a save, or wait
+          You can manage a country alongside your club. Pick one when you start a save, or wait
           for a federation to get in touch over the summer. Every other nation picks itself, so
           the rest of your job is developing players worth calling up and watching how they get on.
         </p>

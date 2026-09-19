@@ -164,7 +164,7 @@ export function Manager() {
           </div>
           <div className="text-muted small mt-2">
             {manager.sackingEnabled
-              ? "The board judges you on where you finish against what your squad is worth. Beat that and you bank goodwill; fall short often enough and you're out."
+              ? "The board judges you on where you finish against where they expect a club like this to finish. Beat that and you bank goodwill. Fall short often enough and you're out."
               : "Sackings are switched off for this save, so the job is yours for as long as you want it."}
           </div>
 
@@ -213,7 +213,7 @@ export function Manager() {
       </h5>
       {manager.offers.length === 0 ? (
         <p className="text-muted">
-          Nobody's come calling. Beat what your squad is worth and that changes fast.
+          Nobody's come calling. Finish above what your board expects, or win something, and that changes fast.
         </p>
       ) : (
         <>

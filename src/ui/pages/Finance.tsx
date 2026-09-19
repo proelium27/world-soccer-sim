@@ -308,8 +308,8 @@ export function Finance() {
             {currency.format(debt.sanction.limit)} limit
             {debt.sanction.consecutiveSeasons > 1
               && `, and that is ${debt.sanction.consecutiveSeasons} seasons running`}.
-            You can&apos;t buy or sign anyone this season. You can still sell, promote from your
-            academy, and take on trialists.
+            You can&apos;t buy anyone or sign free agents this season. You can still sell, take
+            players on loan, and promote kids from your academy.
             {debt.sanction.pointsDeduction > 0
               && ` The ${debt.sanction.pointsDeduction} points are already off your league table.`}
           </div>
@@ -609,9 +609,9 @@ export function Finance() {
                     : debt.projected === "deduction" ? "done" : "ahead"
                 }
                 note={
-                  "Finish a season below this line and you can't buy or sign anyone for the "
-                  + "whole of the next one. You can still sell, promote from your academy and "
-                  + "take on trialists, which is the cheapest way back out."
+                  "Finish a season below this line and you can't buy anyone or sign free agents "
+                  + "for the whole of the next one. You can still sell, take players on loan and "
+                  + "promote from your academy, which is the cheapest way back out."
                 }
               >
                 <Line label="Finish the season below" amount={debt.embargoAt} plain />
@@ -676,7 +676,8 @@ export function Finance() {
               exact number, and more scouting tightens the band and reveals a player&apos;s true
               ceiling sooner. Players on your senior roster also sharpen on their own over 2&ndash;3
               seasons, while prospects, free agents and rival clubs&apos; players stay fogged until
-              you scout or sign them. Starts at $5M each season.
+              you scout or sign them. A new save starts you at $5M, and whatever you set carries over
+              from season to season until you change it.
             </HelpHint>
           </p>
           {difficulty.budgetScale !== 1 && (
