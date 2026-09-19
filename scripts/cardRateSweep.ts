@@ -22,19 +22,19 @@
  */
 import { mulberry32 } from "../src/engine/rng.js";
 import { simSeason } from "../src/core/season.js";
-import { YELLOW_GIVEN_FOUL, RED_STRAIGHT_GIVEN_FOUL, FOUL_BASE } from "../src/engine/constants.js";
+import { YELLOW_GIVEN_FOUL, RED_STRAIGHT_GIVEN_FOUL, FOUL_BASE_DETAILED, FOUL_RATE_MULTIPLIER, BOOKED_FOUL_WEIGHT } from "../src/engine/constants.js";
 
 const SEEDS = Number(process.env.SEEDS ?? 3);
 
 console.log(
-  `FOUL_BASE=${FOUL_BASE}  YELLOW_GIVEN_FOUL=${YELLOW_GIVEN_FOUL}  RED_STRAIGHT_GIVEN_FOUL=${RED_STRAIGHT_GIVEN_FOUL}`,
+  `FOUL_BASE_DETAILED=${FOUL_BASE_DETAILED.toFixed(4)} (x${FOUL_RATE_MULTIPLIER})  BOOKED_FOUL_WEIGHT=${BOOKED_FOUL_WEIGHT}  YELLOW_GIVEN_FOUL=${YELLOW_GIVEN_FOUL}  RED_STRAIGHT_GIVEN_FOUL=${RED_STRAIGHT_GIVEN_FOUL}`,
 );
 
-let tY = 0, tR = 0, tSecond = 0, tStraight = 0, tGoals = 0, tMatches = 0, tFouls = 0;
+let tY = 0, tR = 0, tSecond = 0, tStraight = 0, tGoals = 0, tMatches = 0, tFouls = 0, tShots = 0;
 
 for (let s = 0; s < SEEDS; s++) {
   const { matches } = simSeason(mulberry32(7000 + s));
-  let y = 0, r = 0, second = 0, straight = 0, goals = 0, fouls = 0;
+  let y = 0, r = 0, second = 0, straight = 0, goals = 0, fouls = 0, shots = 0;
 
   for (const m of matches) {
     goals += m.homeGoals + m.awayGoals;
@@ -42,6 +42,7 @@ for (let s = 0; s < SEEDS; s++) {
       y += l.yellowCards;
       r += l.redCards;
       fouls += l.foulsCommitted;
+      shots += l.shots;
       if (l.redCards > 0) {
         if (l.yellowCards >= 2) second++;
         else straight++;
@@ -55,7 +56,7 @@ for (let s = 0; s < SEEDS; s++) {
   );
 
   tY += y; tR += r; tSecond += second; tStraight += straight;
-  tGoals += goals; tMatches += matches.length; tFouls += fouls;
+  tGoals += goals; tMatches += matches.length; tFouls += fouls; tShots += shots;
 }
 
 console.log(
@@ -64,5 +65,6 @@ console.log(
     `  yellows/match  ${(tY / tMatches).toFixed(3)}   (real ~3.5-4.5)\n` +
     `  reds/match     ${(tR / tMatches).toFixed(4)}   (real ~0.15-0.25)\n` +
     `  red split      ${tSecond} second yellow / ${tStraight} straight\n` +
+    `  shots/match    ${(tShots / tMatches).toFixed(3)}\n` +
     `  goals/match    ${(tGoals / tMatches).toFixed(4)}   <- watch this\n`,
 );
