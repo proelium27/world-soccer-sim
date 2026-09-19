@@ -5,7 +5,7 @@ import { progressPlayer } from "../../src/core/players/progression.js";
 import { computeOvr } from "../../src/core/players/ovr.js";
 import { mulberry32 } from "../../src/engine/rng.js";
 import { createLeagueState } from "../../src/core/leagueState.js";
-import { simThrough } from "../../src/core/simThrough.js";
+import { playSeason } from "../helpers/offseasonLeague.js";
 import { simOffseason } from "../../src/core/offseason.js";
 import { COVERABLE } from "../../src/engine/positionFit.js";
 import { POSITIONS, type Player, type PlayerRatings, type Position } from "../../src/core/players/types.js";
@@ -301,7 +301,13 @@ describe("offseason wiring", () => {
       players: league.players.map((p) => (p.pid === target.pid ? planted : p)),
     };
 
-    league = simThrough(league, "season", rng);
+    // playSeason, not a bare simThrough: simThrough HALTS before the user's own
+    // cup final, and simOffseason then silently does nothing on a league still
+    // in the regular phase — no player is progressed, so no conversion fires and
+    // this reads as "he stayed a winger". Which seeds halt moves with any change
+    // to match results; the raised foul rate is what put this seed's club in a
+    // final (2026-09-19). Byte-identical for a seed that never halts.
+    league = playSeason(league, rng);
     const next = simOffseason(league, rng);
 
     const after = next.players.find((p) => p.pid === target.pid);
