@@ -190,22 +190,54 @@ export function recordedChampion(
 }
 
 /** Sum each club's box-score lines across a season's played matches. */
-export function computeTeamSeasonStats(teamIds: number[], matches: PlayedMatch[]): TeamSeasonStats[] {
-  const rows = new Map<number, TeamSeasonStats>();
-  for (const tid of teamIds) {
-    rows.set(tid, {
-      tid, played: 0, goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, xg: 0, goalsAgainst: 0, xga: 0,
-      saves: 0, tackles: 0, possessionPct: 0, avgRating: 0,
-    });
+/**
+ * A running fold of team season stats, so the per-player lines behind them need
+ * not be kept.
+ *
+ * `computeTeamSeasonStats` is the ONLY reader of a played match's player lines
+ * that runs over a whole season, and those lines are most of what a season's
+ * box scores weigh. Holding this accumulator instead lets the db layer drop the
+ * lines from memory as it reads them (see `loadLeague`) while every consumer
+ * still gets the same numbers.
+ *
+ * Kept per club for every club it sees, not just a requested few, which is
+ * exact rather than approximate: each club's sums read only that club's own
+ * lines, so accumulating a club nobody asked for cannot move one that was.
+ * Additions happen in match order, the same order the one-shot fold used, so
+ * the floating-point sums come out bit-identical — `test/db/lazyMatchLines`
+ * pins that against a real simmed season.
+ */
+export interface TeamSeasonAcc {
+  rows: Map<number, TeamSeasonStats>;
+  ratingSum: Map<number, number>;
+  ratingCount: Map<number, number>;
+  possessionSum: Map<number, number>;
+}
+
+export function emptyTeamSeasonAcc(): TeamSeasonAcc {
+  return { rows: new Map(), ratingSum: new Map(), ratingCount: new Map(), possessionSum: new Map() };
+}
+
+function zeroRow(tid: number): TeamSeasonStats {
+  return {
+    tid, played: 0, goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, xg: 0, goalsAgainst: 0, xga: 0,
+    saves: 0, tackles: 0, possessionPct: 0, avgRating: 0,
+  };
+}
+
+function accRow(acc: TeamSeasonAcc, tid: number): TeamSeasonStats {
+  let r = acc.rows.get(tid);
+  if (!r) {
+    r = zeroRow(tid);
+    acc.rows.set(tid, r);
   }
+  return r;
+}
 
-  const ratingSum = new Map<number, number>();
-  const ratingCount = new Map<number, number>();
-  const possessionSum = new Map<number, number>();
-
+/** Fold more matches in, mutating the accumulator. Order matters; see above. */
+export function addToTeamSeasonAcc(acc: TeamSeasonAcc, matches: readonly PlayedMatch[]): void {
   const addLines = (tid: number, lines: PlayerMatchLine[]): void => {
-    const r = rows.get(tid);
-    if (!r) return;
+    const r = accRow(acc, tid);
     r.played++;
     for (const l of lines) {
       r.goals += l.goals;
@@ -218,26 +250,47 @@ export function computeTeamSeasonStats(teamIds: number[], matches: PlayedMatch[]
       r.saves += l.saves;
       r.tackles += l.tackles;
       if (l.minutesPlayed > 0) {
-        ratingSum.set(tid, (ratingSum.get(tid) ?? 0) + l.rating);
-        ratingCount.set(tid, (ratingCount.get(tid) ?? 0) + 1);
+        acc.ratingSum.set(tid, (acc.ratingSum.get(tid) ?? 0) + l.rating);
+        acc.ratingCount.set(tid, (acc.ratingCount.get(tid) ?? 0) + 1);
       }
     }
   };
-
   for (const m of matches) {
     addLines(m.home, m.boxScore.home);
     addLines(m.away, m.boxScore.away);
-    possessionSum.set(m.home, (possessionSum.get(m.home) ?? 0) + m.possessionHome * 100);
-    possessionSum.set(m.away, (possessionSum.get(m.away) ?? 0) + (1 - m.possessionHome) * 100);
+    acc.possessionSum.set(m.home, (acc.possessionSum.get(m.home) ?? 0) + m.possessionHome * 100);
+    acc.possessionSum.set(m.away, (acc.possessionSum.get(m.away) ?? 0) + (1 - m.possessionHome) * 100);
   }
+}
 
-  for (const r of rows.values()) {
-    const count = ratingCount.get(r.tid) ?? 0;
-    r.avgRating = count > 0 ? (ratingSum.get(r.tid) ?? 0) / count : 0;
-    r.possessionPct = r.played > 0 ? (possessionSum.get(r.tid) ?? 0) / r.played : 0;
+/** An independent copy, so a read can fold more matches in without touching the original. */
+export function cloneTeamSeasonAcc(acc: TeamSeasonAcc): TeamSeasonAcc {
+  return {
+    rows: new Map([...acc.rows].map(([tid, r]) => [tid, { ...r }])),
+    ratingSum: new Map(acc.ratingSum),
+    ratingCount: new Map(acc.ratingCount),
+    possessionSum: new Map(acc.possessionSum),
+  };
+}
+
+/** The finished rows for `teamIds`, in that order; a club with no matches reads zero. */
+export function teamSeasonStatsFromAcc(acc: TeamSeasonAcc, teamIds: number[]): TeamSeasonStats[] {
+  const out: TeamSeasonStats[] = [];
+  for (const tid of new Set(teamIds)) {
+    const base = acc.rows.get(tid);
+    const r = base ? { ...base } : zeroRow(tid);
+    const count = acc.ratingCount.get(tid) ?? 0;
+    r.avgRating = count > 0 ? (acc.ratingSum.get(tid) ?? 0) / count : 0;
+    r.possessionPct = r.played > 0 ? (acc.possessionSum.get(tid) ?? 0) / r.played : 0;
+    out.push(r);
   }
+  return out;
+}
 
-  return [...rows.values()];
+export function computeTeamSeasonStats(teamIds: number[], matches: PlayedMatch[]): TeamSeasonStats[] {
+  const acc = emptyTeamSeasonAcc();
+  addToTeamSeasonAcc(acc, matches);
+  return teamSeasonStatsFromAcc(acc, teamIds);
 }
 
 /** Build a league table (3/1/0), sorted by points, then GD, then GF, then tid. */

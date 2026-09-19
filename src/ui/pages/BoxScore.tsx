@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -10,6 +10,8 @@ import { ClubCrest } from "../components/ClubCrest.js";
 import { BackLink } from "../components/BackLink.js";
 import { KEY_EVENTS, TimelineRow, TimelineMarkerRow } from "../components/matchEvents.js";
 import { matchTimeline, periodMarkers } from "../matchClock.js";
+import { useMatchDetail, withDetail } from "../useMatchDetail.js";
+import { isDetailElided } from "../../db/index.js";
 import { eventDetail } from "../matchNarration.js";
 
 
@@ -249,12 +251,30 @@ export function BoxScore() {
   const playerMap = usePlayerMap(league?.players);
   const [showAllEvents, setShowAllEvents] = useState(false);
 
+  // A loaded league carries no event timelines (see db/leagueDb.ts), so this
+  // match's are fetched. Above the guards, because hooks cannot sit under an
+  // early return — and `idx` with them, for the same reason. A match simmed
+  // this session is not elided and asks for nothing.
+  const idx = matchIndex === undefined ? -1 : parseInt(matchIndex, 10);
+  const stored: PlayedMatch | undefined = league?.played[idx];
+  const wanted = useMemo(
+    () => (stored !== undefined && isDetailElided(stored) ? [idx] : []),
+    [stored, idx],
+  );
+  const { boxScores, loading: detailLoading } = useMatchDetail(league?.lid, wanted);
+
   if (!league || matchIndex === undefined) {
     return <p className="p-3">Loading...</p>;
   }
 
-  const idx = parseInt(matchIndex, 10);
-  const match: PlayedMatch | undefined = league.played[idx];
+  const match: PlayedMatch | undefined =
+    stored === undefined ? undefined : withDetail(stored, boxScores.get(idx));
+
+  // The whole page reads the box score, player tables included, so it waits for
+  // the fetch rather than drawing empty tables that say the match had no players.
+  if (match && detailLoading) {
+    return <p className="p-3">Loading the match...</p>;
+  }
 
   if (!match) {
     return (
