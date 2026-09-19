@@ -18,7 +18,7 @@ import {
   PlayerViewCells, PlayerViewHeaders, PlayerViewSwitch, performanceSeason,
   performanceSeasonOptions, usePlayerView, viewTableClass,
 } from "../../playerViews.js";
-import { NationalTeamsLayout, NationName, useClubIndex, ClubCell } from "./shared.js";
+import { NationalTeamsLayout, NationName, useClubIndex, ClubCell, DormantNationNote } from "./shared.js";
 
 const DRAG_MIME = "application/x-soccer-gm-pid";
 
@@ -118,11 +118,17 @@ export function NTMySquad() {
   if (!shown || !derived) {
     return (
       <NationalTeamsLayout title="My Squad">
-        <p className="text-muted">
-          <NationName nation={nation} /> haven't named a squad yet. One is picked for you
-          the moment a campaign is drawn, at the end of the season, and you can change it
-          from here before the first match.
-        </p>
+        <DormantNationNote
+          nation={nation}
+          players={league.players}
+          otherwise={
+            <p className="text-muted">
+              <NationName nation={nation} /> haven't named a squad yet. One is picked for you
+              the moment a campaign is drawn, at the end of the season, and you can change it
+              from here before the first match.
+            </p>
+          }
+        />
       </NationalTeamsLayout>
     );
   }

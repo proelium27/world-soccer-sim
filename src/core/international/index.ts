@@ -23,7 +23,7 @@ export { qualifyingPlan, placesByPosition, playoffShape, type ConfederationQuali
 export { runPlayoff } from "./qualifyingPlayoff.js";
 export {
   buildSquads, selectSquad, isEligibleNation, manageableNations, nationPools,
-  buildPowerSnapshot, squadRating, nationMatchData,
+  buildPowerSnapshot, squadRating, nationMatchData, nationPoolStatus, type NationPoolStatus,
 } from "./squads.js";
 export {
   editableSquad, displaySquad, writeSquad, isValidNationSquad,

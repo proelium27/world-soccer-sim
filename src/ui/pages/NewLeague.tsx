@@ -11,8 +11,7 @@ import {
   type ProgressionModel, DEFAULT_WORLD_CUP_SIZE, type WorldCupSize,
 } from "../../core/constants.js";
 import { WorldCupSizeSelect, worldCupSizeBlurb } from "../components/WorldCupSizeSelect.js";
-import { confederationOf, isEligibleNation } from "../../core/international/index.js";
-import { PICKABLE_NATIONALITIES } from "../components/NationalityEditor.js";
+import { APPOINTABLE_NATIONS } from "./nationalTeams/shared.js";
 import {
   buildCompetitions,
   competitionAbbrev,
@@ -199,9 +198,6 @@ export function NewLeague() {
   // taking a federation's offer, so this is a starting point rather than a
   // decision for the save's lifetime the way difficulty is.
   const [userNation, setUserNation] = useState<string | null>(null);
-  // A chosen country the generated world turned out not to be able to field a
-  // squad for. Reported rather than silently dropped — see handleStart.
-  const [nationError, setNationError] = useState<string | null>(null);
   // Filter box for the country list. 211 countries is far too many to scroll
   // for a specific one, and still too few to be worth paginating.
   const [nationFilter, setNationFilter] = useState("");
@@ -407,17 +403,12 @@ export function NewLeague() {
 
   const parsedStartYear = normalizeStartYear(startYear);
 
-  // Countries that can be managed: anything the game ships names for that also
-  // belongs to a confederation, since no confederation means no competition to
-  // enter. One flat alphabetical list, deliberately — whether a country happens
-  // to host one of this world's leagues is not the question being asked here,
-  // and splitting on it implied a distinction the player has no use for. What
-  // actually decides eligibility is how many of its players get generated, which
-  // no grouping can promise and the check at Start reports honestly.
-  const manageableNations = useMemo(
-    () => PICKABLE_NATIONALITIES.filter((n) => confederationOf(n) !== null),
-    [],
-  );
+  // Countries that can be managed: APPOINTABLE_NATIONS, one flat alphabetical
+  // list. Whether a country hosts one of this world's leagues, or even has
+  // enough players to field a team yet, is deliberately not a filter: a
+  // country that can't field one yet is still a job you can hold, and it
+  // joins the next campaign once it has the players.
+  const manageableNations = APPOINTABLE_NATIONS;
   const shownNations = useMemo(() => {
     const q = nationFilter.trim().toLowerCase();
     return q ? manageableNations.filter((n) => n.toLowerCase().includes(q)) : manageableNations;
@@ -460,11 +451,8 @@ export function NewLeague() {
   }
 
   function buildLeague(tid: number): LeagueStore {
-    // Fixed for the life of the page, not re-rolled per attempt. If a chosen
-    // country turns out not to be able to field a squad, the advice is "pick
-    // another one" — which is only true if pressing Start again builds the same
-    // world. A fresh Date.now() would answer a different question each time, so
-    // the same country could fail and then succeed.
+    // Fixed for the life of the page, not re-rolled per attempt, so pressing
+    // Start again (after customizing, say) builds the same world.
     const seed = (seedRef.current ??= Date.now());
     const rng = mulberry32(seed);
     const generated = createLeagueState(
@@ -550,17 +538,11 @@ export function NewLeague() {
       await yieldToPaint();
       try {
         const league = buildLeague(buildTid);
-        // Whether a country can enter international football at all depends on
-        // the world that just got generated (INTL_MIN_POOL players and a
-        // keeper), and there is no way to know before building it. A pick that
-        // doesn't clear the bar is reported rather than silently dropped — a
-        // save that quietly ignored the country you chose is worse than being
-        // told to choose again.
-        if (userNation && !isEligibleNation(userNation, league.players.filter((p) => p.nationality === userNation))) {
-          setNationError(userNation);
-          return;
-        }
-        setNationError(null);
+        // A country that can't field a team in this world is NOT refused. You
+        // hold the job anyway, and the country joins the next campaign drawn
+        // once it has INTL_MIN_POOL players and a keeper (academy kids count).
+        // Until then the federation has nothing to judge you on, and the
+        // national-team pages say how far off it is (DormantNationNote).
         if (customize || nameClubs) {
           // Hold the generated league in memory and let the user edit team
           // identities before anything is persisted.
@@ -1240,13 +1222,11 @@ export function NewLeague() {
           <HelpHint label="What does managing a country involve?">
             You pick the squad and the eleven for qualifying, the World Cup and their
             continental championship, on top of your club job, and the federation judges
-            you every campaign. A country needs enough players born into your world to
-            field a squad at all, so you'll be told if the one you pick can't.
+            you every campaign. A country needs {INTL_MIN_POOL} players and a keeper in
+            your world to enter. Pick one that doesn't have them yet and you're still its
+            manager: it joins the next campaign once it does, academy kids included.
           </HelpHint>
         </h6>
-        {/* The squad-eligibility rule used to be spelled out here as well, which
-            was explaining an error before it happened: the nationError alert
-            below already says it in full, and only in the case where it's true. */}
         <p className="text-muted small mb-2">
           {userNation
             ? `You'll pick ${userNation}'s squad and their eleven, on top of your club job.`
@@ -1278,7 +1258,7 @@ export function NewLeague() {
           <button
             type="button"
             className={`list-group-item list-group-item-action py-1${userNation === null ? " active" : ""}`}
-            onClick={() => { setUserNation(null); setNationError(null); }}
+            onClick={() => setUserNation(null)}
           >
             None &mdash; club football only
           </button>
@@ -1287,7 +1267,7 @@ export function NewLeague() {
               type="button"
               key={n}
               className={`list-group-item list-group-item-action py-1 d-flex align-items-center gap-2${userNation === n ? " active" : ""}`}
-              onClick={() => { setUserNation(n); setNationError(null); }}
+              onClick={() => setUserNation(n)}
             >
               <CountryFlag country={n} fallback={n.slice(0, 2).toUpperCase()} />
               {n}
@@ -1299,13 +1279,6 @@ export function NewLeague() {
             </div>
           )}
         </div>
-        {nationError && (
-          <div className="alert alert-warning py-2 mt-2 mb-0" role="alert">
-            {nationError} can't field a squad in this world — there aren't {INTL_MIN_POOL} of
-            their players in it, or no goalkeeper among them. Pick another country, or start
-            with none and wait for an offer.
-          </div>
-        )}
       </div>
       )}
 
