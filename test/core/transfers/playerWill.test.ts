@@ -112,7 +112,7 @@ describe("refusesFreeAgentSigning", () => {
     const mk = (pid: number, ovr: number): Player => ({
       pid, name: `p${pid}`, pos: "CM", nationality: "England", born: 0, ovr,
       potential: ovr, ratings: {} as never, contract: { salary: 1, expiresSeason: 9 },
-      stats: [], hist: [],
+      recentStats: [], recentHist: [],
     } as unknown as Player);
     const team = (tid: number, hype: number) =>
       ({ tid, hype, roster: [] as number[] } as unknown as StoredTeam);
@@ -133,7 +133,7 @@ describe("refusesFreeAgentSigning", () => {
     fill(otherSmall, 300, 45);
     const fa = mk(999, faOvr);
     // The stats line is how a free agent's last club is recovered at all.
-    if (lastTid != null) (fa as { stats: { tid: number }[] }).stats = [{ tid: lastTid } as never];
+    if (lastTid != null) (fa as { recentStats: { tid: number }[] }).recentStats = [{ tid: lastTid } as never];
     players.push(fa);
     return { teams: [big, small, otherSmall], players, fa, big, small, otherSmall };
   };

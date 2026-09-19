@@ -47,7 +47,7 @@ function leagueWithPlayedSeasons(): { league: LeagueStore; pid: number } {
   const league = makeLeague(0, 3);
   const player = league.players[0];
   const tid = league.teams[0].tid;
-  player.stats = [
+  player.recentStats = [
     { ...emptySeasonStats(league.season - 1, tid), appearances: 30, minutesPlayed: 2600, goals: 12, assists: 5, avgRating: 7.1 },
     { ...emptySeasonStats(league.season, tid), appearances: 18, minutesPlayed: 900, goals: 9, assists: 2, avgRating: 7.4 },
   ];

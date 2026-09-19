@@ -144,8 +144,8 @@ function mkPlayer(pid: number, pos: Player["pos"], ovr: number): Player {
     potential: ovr,
     contract: { salary: 10000, expiresSeason: 5 },
     injury: null,
-    stats: [],
-    hist: [],
+    recentStats: [],
+    recentHist: [],
   };
 }
 

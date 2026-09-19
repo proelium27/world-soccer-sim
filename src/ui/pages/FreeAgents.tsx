@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSeasonStats } from "../useSeasonStats.js";
 import { useLeague } from "../context/LeagueContext.js";
 import { HelpHint, PotHelp } from "../components/HelpHint.js";
 import { freeAgentPids } from "../../core/freeAgency.js";
@@ -61,6 +62,9 @@ export function FreeAgents() {
   const season = pickedSeason !== null && seasonOptions.includes(pickedSeason)
     ? pickedSeason
     : defaultSeason;
+  // Lines for that season from memory, or read back from disk for an older
+  // one (see useSeasonStats) — never a two-line window read as the season.
+  const lines = useSeasonStats(league, season);
   const changeView = (next: PlayerView) => {
     setView(next);
     if (!viewKeepsSort(sort.key, next, OVERVIEW_ONLY)) setSort({ key: "ovr", dir: "desc" });
@@ -137,7 +141,7 @@ export function FreeAgents() {
     ovr: (p) => p.ovr,
     pot: (p) => potView.ceiling(p),
     age: (p) => league.season - p.born,
-    ...viewSortAccessors((p: Player) => p, season, pool),
+    ...viewSortAccessors((p: Player) => p, lines, pool),
   });
 
   return (
@@ -184,6 +188,7 @@ export function FreeAgents() {
         </p>
         <PlayerViewSwitch
           value={view}
+          loading={lines.loading}
           onChange={changeView}
           season={season}
           seasons={seasonOptions}
@@ -240,7 +245,7 @@ export function FreeAgents() {
                   ) : (
                     <>
                       <td className="text-end">{league.season - p.born}</td>
-                      <PlayerViewCells view={view} player={p} season={season} />
+                      <PlayerViewCells view={view} player={p} lines={lines} />
                     </>
                   )}
                   <td className="text-end">

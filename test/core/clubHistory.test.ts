@@ -39,8 +39,8 @@ function entry(
 const noAwards: SeasonAwards = { playerOfSeasonPid: null, goldenBootPid: null, teamOfSeason: [] };
 
 function player(pid: number, seasonTids: Record<number, number>): Player {
-  const stats = Object.entries(seasonTids).map(([s, tid]) => ({ season: Number(s), tid }) as Player["stats"][number]);
-  return { pid, stats } as unknown as Player;
+  const stats = Object.entries(seasonTids).map(([s, tid]) => ({ season: Number(s), tid }) as Player["recentStats"][number]);
+  return { pid, recentStats: stats } as unknown as Player;
 }
 
 function makeLeague(

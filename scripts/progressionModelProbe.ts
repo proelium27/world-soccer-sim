@@ -54,13 +54,13 @@ const END_AGE = 38;
 function withMinutes(p: Player, season: number, share: number): Player {
   return {
     ...p,
-    stats: [{
+    recentStats: [{
       season, tid: 0, appearances: Math.round(FULL_SEASON_APPEARANCES * share),
       goals: 0, assists: 0, shots: 0, shotsOnTarget: 0, tackles: 0, interceptions: 0,
       saves: 0, cleanSheets: 0, minutesPlayed: 0, ratingSum: 0, avgRating: 0,
       xg: 0, goalsAgainst: 0, xga: 0, passes: 0, passesCompleted: 0, crosses: 0,
       foulsCommitted: 0, yellowCards: 0, redCards: 0,
-    } as Player["stats"][number]],
+    } as Player["recentStats"][number]],
   };
 }
 

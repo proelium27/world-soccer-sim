@@ -49,12 +49,12 @@ function player(
   const stats = Object.entries(seasonTids).map(([s, tid]) => ({
     season: Number(s), tid, appearances: 10, goals: 2, assists: 1,
     minutesPlayed: 900, avgRating: 7,
-  }) as Player["stats"][number]);
+  }) as Player["recentStats"][number]);
   const hist = Object.entries(opts.ovrBySeason ?? {}).map(([s, ovr]) => ({
     season: Number(s), ovr,
-  }) as Player["hist"][number]);
+  }) as Player["recentHist"][number]);
   return {
-    pid, stats, hist, name: `P${pid}`, nationality: "England",
+    pid, recentStats: stats, recentHist: hist, name: `P${pid}`, nationality: "England",
     pos: opts.pos ?? "CM", born: opts.born ?? 0, ovr: opts.ovr ?? 60,
     // A flat skill set, because the live-season path runs computeTeamRating,
     // which picks an XI and therefore reads real per-position ratings. The

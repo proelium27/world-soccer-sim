@@ -46,7 +46,7 @@ function leagueWithAwards(withBreakdown: boolean): LeagueStore {
     statted.has(p.pid)
       ? {
           ...p,
-          stats: [{
+          recentStats: [{
             ...emptySeasonStats(SEASON, tidOf.get(p.pid)!),
             appearances: 30, avgRating: 6.9, saves: 90, goalsAgainst: 25, tackles: 60, interceptions: 55,
           }],

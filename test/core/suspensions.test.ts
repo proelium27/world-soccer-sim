@@ -31,8 +31,8 @@ function mk(pid: number, over: Partial<Player> = {}): Player {
     potential: 50,
     contract: { salary: 1000, expiresSeason: 2030 },
     injury: null,
-    stats: [emptySeasonStats(2026)],
-    hist: [],
+    recentStats: [emptySeasonStats(2026)],
+    recentHist: [],
     ...over,
   };
 }

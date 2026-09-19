@@ -33,9 +33,9 @@ function player(spec: PlayerSpec): Player {
     born: SEASON - 26,
     pos: spec.pos,
     ovr,
-    stats: [stats],
+    recentStats: [stats],
     // ovrDuringSeason reads the hist entry tagged `season - 1`.
-    hist: [{ season: SEASON - 1, ovr, potential: ovr, academy: false, ratings: {} }],
+    recentHist: [{ season: SEASON - 1, ovr, potential: ovr, academy: false, ratings: {} }],
   } as unknown as Player;
 }
 
@@ -54,7 +54,7 @@ describe("award position groups", () => {
   it("gives an AM and a W with the same season the same end-product credit", () => {
     const am = player({ pid: 1, pos: "AM", goals: 12, assists: 10 });
     const w = player({ pid: 2, pos: "W", goals: 12, assists: 10 });
-    expect(potyScore(am, am.stats[0], SEASON)).toBeCloseTo(potyScore(w, w.stats[0], SEASON), 10);
+    expect(potyScore(am, am.recentStats[0], SEASON)).toBeCloseTo(potyScore(w, w.recentStats[0], SEASON), 10);
   });
 
   it("lets a winger with more goals beat an otherwise identical AM", () => {
@@ -72,7 +72,7 @@ describe("award position groups", () => {
     // moving AM must not flatten that.
     const cb = player({ pid: 1, pos: "CB", goals: 10 });
     const st = player({ pid: 2, pos: "ST", goals: 10 });
-    expect(potyScore(cb, cb.stats[0], SEASON)).toBeGreaterThan(potyScore(st, st.stats[0], SEASON));
+    expect(potyScore(cb, cb.recentStats[0], SEASON)).toBeGreaterThan(potyScore(st, st.recentStats[0], SEASON));
   });
 });
 
@@ -102,8 +102,8 @@ describe("Team of the Season slots", () => {
 });
 
 /** Same player with a season's defensive work, keeper numbers, or a different appearance count. */
-function withStats(p: Player, extra: Partial<Player["stats"][number]>): Player {
-  return { ...p, stats: [{ ...p.stats[0], ...extra }] };
+function withStats(p: Player, extra: Partial<Player["recentStats"][number]>): Player {
+  return { ...p, recentStats: [{ ...p.recentStats[0], ...extra }] };
 }
 
 describe("Team of the Season: a formula per position", () => {
@@ -112,7 +112,7 @@ describe("Team of the Season: a formula per position", () => {
     // wins Player of the Season the best at his position by construction.
     for (const pos of ["AM", "W", "ST"] as Position[]) {
       const p = withStats(player({ pid: 1, pos, goals: 14, assists: 6 }), { tackles: 40, interceptions: 30 });
-      expect(totsScore(p, p.stats[0], SEASON)).toBeCloseTo(potyScore(p, p.stats[0], SEASON), 10);
+      expect(totsScore(p, p.recentStats[0], SEASON)).toBeCloseTo(potyScore(p, p.recentStats[0], SEASON), 10);
     }
   });
 
@@ -136,17 +136,17 @@ describe("Team of the Season: a formula per position", () => {
     const base = player({ pid: 1, pos: "CB", avgRating: 6.6 });
     const regular = withStats(base, { appearances: 34, tackles: 68, interceptions: 68 });
     const longer = withStats(base, { appearances: 38, tackles: 76, interceptions: 76 });
-    expect(totsScore(regular, regular.stats[0], SEASON))
-      .toBeCloseTo(totsScore(longer, longer.stats[0], SEASON), 10);
+    expect(totsScore(regular, regular.recentStats[0], SEASON))
+      .toBeCloseTo(totsScore(longer, longer.recentStats[0], SEASON), 10);
     // A higher rate is.
     const busier = withStats(base, { appearances: 34, tackles: 102, interceptions: 102 });
-    expect(totsScore(busier, busier.stats[0], SEASON)).toBeGreaterThan(totsScore(regular, regular.stats[0], SEASON));
+    expect(totsScore(busier, busier.recentStats[0], SEASON)).toBeGreaterThan(totsScore(regular, regular.recentStats[0], SEASON));
   });
 
   it("gives a centre-back more for his defending than a central midfielder", () => {
     const cb = withStats(player({ pid: 1, pos: "CB" }), { tackles: 60, interceptions: 60 });
     const cm = withStats(player({ pid: 2, pos: "CM" }), { tackles: 60, interceptions: 60 });
-    const work = (p: Player) => totsScore(p, p.stats[0], SEASON) - potyScore(p, p.stats[0], SEASON);
+    const work = (p: Player) => totsScore(p, p.recentStats[0], SEASON) - potyScore(p, p.recentStats[0], SEASON);
     expect(work(cb)).toBeGreaterThan(work(cm));
     expect(work(cm)).toBeGreaterThan(0);
   });
@@ -156,13 +156,13 @@ describe("Team of the Season: a formula per position", () => {
     const sheltered = withStats(player({ pid: 1, pos: "GK" }), { goalsAgainst: 20, saves: 30 });
     // Behind a bad one: concedes more and makes more saves, but stops 75%.
     const shotStopper = withStats(player({ pid: 2, pos: "GK" }), { goalsAgainst: 40, saves: 120 });
-    expect(totsScore(shotStopper, shotStopper.stats[0], SEASON))
-      .toBeGreaterThan(totsScore(sheltered, sheltered.stats[0], SEASON));
+    expect(totsScore(shotStopper, shotStopper.recentStats[0], SEASON))
+      .toBeGreaterThan(totsScore(sheltered, sheltered.recentStats[0], SEASON));
     expect(computeSeasonAwards([sheltered, shotStopper], SEASON).teamOfSeason[0]).toBe(2);
   });
 
   it("reads a keeper who faced no shots as average rather than docking him", () => {
     const idle = withStats(player({ pid: 1, pos: "GK" }), { goalsAgainst: 0, saves: 0 });
-    expect(totsScore(idle, idle.stats[0], SEASON)).toBeCloseTo(potyScore(idle, idle.stats[0], SEASON), 10);
+    expect(totsScore(idle, idle.recentStats[0], SEASON)).toBeCloseTo(potyScore(idle, idle.recentStats[0], SEASON), 10);
   });
 });

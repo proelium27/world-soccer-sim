@@ -12,7 +12,7 @@ import type { LeagueStore } from "../../src/core/leagueState.js";
 /** What both readers used to do inline, kept here as the thing to match. */
 function scanPeak(p: Player): number {
   let peak = p.ovr;
-  for (const h of p.hist ?? []) if (h.ovr > peak) peak = h.ovr;
+  for (const h of p.recentHist ?? []) if (h.ovr > peak) peak = h.ovr;
   return peak;
 }
 
@@ -48,7 +48,7 @@ describe("Player.peakOvr", () => {
   it("is actually being maintained, not just falling through to the scan", () => {
     // A player who has been progressed at least once must carry the field, or
     // the fallback is quietly doing all the work and nothing has been saved.
-    const progressed = league.players.filter((p) => p.hist.length > 0);
+    const progressed = league.players.filter((p) => p.recentHist.length > 0);
     expect(progressed.length).toBeGreaterThan(500);
     expect(progressed.every((p) => p.peakOvr != null)).toBe(true);
   });
@@ -66,7 +66,7 @@ describe("Player.peakOvr", () => {
     expect(declined.length).toBeGreaterThan(0);
     for (const p of declined.slice(0, 50)) {
       expect(p.peakOvr).toBe(scanPeak(p));
-      expect(Math.max(...p.hist.map((h) => h.ovr))).toBe(p.peakOvr);
+      expect(Math.max(...p.recentHist.map((h) => h.ovr))).toBe(p.peakOvr);
     }
   });
 

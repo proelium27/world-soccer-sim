@@ -55,7 +55,7 @@ for (const seed of SEEDS) {
     winnersByCountry.set(country, (winnersByCountry.get(country) ?? 0) + 1);
     for (const pid of worldTeamOfYear) {
       if (pid === null) continue;
-      const stats = byPid.get(pid)?.stats.find((x) => x.season === entry.season);
+      const stats = byPid.get(pid)?.recentStats.find((x) => x.season === entry.season);
       const c = stats ? countryOf(stats.tid) : "?";
       xiByCountry.set(c, (xiByCountry.get(c) ?? 0) + 1);
     }
@@ -64,7 +64,7 @@ for (const seed of SEEDS) {
     // a Ballon d'Or going to the world's 200th-best player means the correction
     // is off, not that a statistical outlier had a good year.
     const played = league.players
-      .filter((p) => p.stats.some((x) => x.season === entry.season && x.appearances > 0))
+      .filter((p) => p.recentStats.some((x) => x.season === entry.season && x.appearances > 0))
       .sort((a, b) => b.ovr - a.ovr);
     const rank = played.findIndex((p) => p.pid === winner.pid) + 1;
     winnerOvrRanks.push(rank);
@@ -94,7 +94,7 @@ for (const seed of SEEDS) {
 
     const line = (e: typeof winner, i: number): string => {
       const p = byPid.get(e.pid);
-      const st = p?.stats.find((x) => x.season === entry.season);
+      const st = p?.recentStats.find((x) => x.season === entry.season);
       const r = played.findIndex((x) => x.pid === e.pid) + 1;
       const cl = cupLines.get(e.pid);
       const cupDetail = cl

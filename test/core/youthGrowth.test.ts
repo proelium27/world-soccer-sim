@@ -102,7 +102,7 @@ describe("an academy kid, enrolment to sixteen", () => {
     expect(kid.potential).toBe(rolled.potential);
     // peakOvr is authoritative once set, so it must describe the shown player.
     expect(kid.peakOvr).toBe(kid.ovr);
-    expect(kid.hist.every((h) => h.academy && h.ovr === kid.ovr)).toBe(true);
+    expect(kid.recentHist.every((h) => h.academy && h.ovr === kid.ovr)).toBe(true);
   });
 
   it("leaves a kid already at the reference age exactly as rolled", () => {
@@ -127,7 +127,7 @@ describe("an academy kid, enrolment to sixteen", () => {
     expect(at16.ovr).toBe(computeOvr(rolled.pos, rolled.ratings, rolled.heightCm));
     expect(at16.potential).toBe(rolled.potential);
     expect("youthTarget" in at16).toBe(false);
-    expect(at16.hist[at16.hist.length - 1].ovr).toBe(at16.ovr);
+    expect(at16.recentHist[at16.recentHist.length - 1].ovr).toBe(at16.ovr);
   });
 
   it("spends exactly the draws a kid without a target spends", () => {

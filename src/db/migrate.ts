@@ -177,7 +177,7 @@ function peakFromHist(p: Player): { peakOvr: number; peakOvrSeason?: number } {
   }
   let peakOvr = p.ovr;
   let peakOvrSeason: number | undefined;
-  for (const h of p.hist ?? []) {
+  for (const h of p.recentHist ?? []) {
     if (h.ovr > peakOvr) {
       peakOvr = h.ovr;
       peakOvrSeason = h.season;
@@ -193,7 +193,76 @@ function peakFromHist(p: Player): { peakOvr: number; peakOvrSeason?: number } {
  * on in a past season (same irreconstructable-history situation as the
  * minutes/rating defaults below).
  */
+/**
+ * One ratings snapshot brought up to date: the academy and position backfills,
+ * and its ovr re-derived from its own ratings.
+ *
+ * Exported because a snapshot is no longer always in memory when `migrateLeague`
+ * runs — anything older than the resident window is on disk (`seasons` store),
+ * and `loadCareer` puts each row it reads through this exact function, so a row
+ * read back later is the row load would have produced.
+ */
+export function migrateHistRow(
+  h: RatingsSnapshot & { academy?: boolean; pos?: Position },
+  fallbackPos: Position,
+  heightCm: number,
+): RatingsSnapshot {
+  const pos = h.pos ?? fallbackPos;
+  const histOvr = computeOvr(pos, h.ratings, heightCm);
+  return {
+    ...h,
+    // Pre-academy-tracking saves have no per-season academy flag on their
+    // rating snapshots; there's no way to reconstruct which past seasons a
+    // player spent in the academy, so they default to senior (false) and only
+    // future seasons record the real value.
+    academy: h.academy ?? false,
+    // Pre-position-change saves stamp no position on a rating snapshot. The
+    // backfill is exact rather than a guess: nothing could change a player's
+    // position before that feature existed, so every past snapshot was taken
+    // at the position he still holds. (Contrast the academy flag above, which
+    // genuinely can't be reconstructed.)
+    pos,
+    // Re-derived on the same rule as the live rating, so a career OVR chart
+    // reads as one continuous scale instead of stepping at the season this
+    // shipped.
+    ovr: histOvr,
+    potential: Math.max(h.potential, histOvr),
+  };
+}
+
+/**
+ * One season's stat line with every field added since it was written backfilled.
+ * Exported for the same reason as `migrateHistRow`.
+ */
+export function migrateStatsRow(s: SeasonStatsAnyVersion, fallbackTid: number): SeasonStats {
+  return {
+    ...s,
+    tid: s.tid ?? fallbackTid,
+    minutesPlayed: s.minutesPlayed ?? 0,
+    ratingSum: s.ratingSum ?? 0,
+    avgRating: s.avgRating ?? 0,
+    interceptions: s.interceptions ?? 0,
+    xg: s.xg ?? 0,
+    goalsAgainst: s.goalsAgainst ?? 0,
+    xga: s.xga ?? 0,
+    passes: s.passes ?? 0,
+    passesCompleted: s.passesCompleted ?? 0,
+    crosses: s.crosses ?? 0,
+    foulsCommitted: s.foulsCommitted ?? 0,
+    // Cards were simulated per match long before they were totalled per
+    // season, so a past season's real card count is sitting in box scores
+    // that archived cups have since discarded. Backfilling from what survives
+    // would under-count some seasons and not others, which reads worse than
+    // an honest zero — past seasons start blank and future ones are exact.
+    yellowCards: s.yellowCards ?? 0,
+    redCards: s.redCards ?? 0,
+  };
+}
+
 function migratePlayer(p: Player, fallbackTid: number, currentSeason: number): Player {
+  // History arrives under `recentStats`/`recentHist` whatever the save called
+  // it — `adoptHistoryNames` ran before anything else.
+  //
   // OVR is re-derived from stored ratings, not carried over (position-OVR
   // balance, 2026-08-23). It has to be: progression recomputes `ovr` from
   // scratch each offseason, so an old save left alone would show its full backs
@@ -210,65 +279,22 @@ function migratePlayer(p: Player, fallbackTid: number, currentSeason: number): P
   // (POSITION_RATING_SPREAD applies at generation), so an old save keeps its
   // original spread and only new leagues get that half.
   const ovr = computeOvr(p.pos, p.ratings, p.heightCm);
-  const hist = (p.hist as (RatingsSnapshot & { academy?: boolean; pos?: Position })[]).map((h) => {
-    const pos = h.pos ?? p.pos;
-    const histOvr = computeOvr(pos, h.ratings, p.heightCm);
-    return {
-      ...h,
-      // Pre-academy-tracking saves have no per-season academy flag on their
-      // rating snapshots; there's no way to reconstruct which past seasons a
-      // player spent in the academy, so they default to senior (false) and only
-      // future seasons record the real value.
-      academy: h.academy ?? false,
-      // Pre-position-change saves stamp no position on a rating snapshot. The
-      // backfill is exact rather than a guess: nothing could change a player's
-      // position before that feature existed, so every past snapshot was taken
-      // at the position he still holds. (Contrast the academy flag above, which
-      // genuinely can't be reconstructed.)
-      pos,
-      // Re-derived on the same rule as the live rating above, so a career OVR
-      // chart reads as one continuous scale instead of stepping at the season
-      // this shipped.
-      ovr: histOvr,
-      potential: Math.max(h.potential, histOvr),
-    };
-  });
+  const hist = p.recentHist.map((h) => migrateHistRow(h, p.pos, p.heightCm));
 
   // Peak and the career summary are derived from the RE-DERIVED ratings above,
   // never from the stored ones. Both are stored from here on and are then
   // treated as authoritative (`careerPeakOvr`, `peakOf`, every all-time board),
   // so seeding them from numbers this same function has just replaced would
   // freeze a stale peak into the save permanently.
-  const rederived: Player = { ...p, ovr, hist };
+  const rederived: Player = { ...p, ovr, recentHist: hist };
   const peak = peakFromHist(rederived);
 
   return {
     ...p,
     ovr,
     potential: Math.max(p.potential, ovr),
-    stats: (p.stats as SeasonStatsAnyVersion[]).map((s) => ({
-      ...s,
-      tid: s.tid ?? fallbackTid,
-      minutesPlayed: s.minutesPlayed ?? 0,
-      ratingSum: s.ratingSum ?? 0,
-      avgRating: s.avgRating ?? 0,
-      interceptions: s.interceptions ?? 0,
-      xg: s.xg ?? 0,
-      goalsAgainst: s.goalsAgainst ?? 0,
-      xga: s.xga ?? 0,
-      passes: s.passes ?? 0,
-      passesCompleted: s.passesCompleted ?? 0,
-      crosses: s.crosses ?? 0,
-      foulsCommitted: s.foulsCommitted ?? 0,
-      // Cards were simulated per match long before they were totalled per
-      // season, so a past season's real card count is sitting in box scores
-      // that archived cups have since discarded. Backfilling from what survives
-      // would under-count some seasons and not others, which reads worse than
-      // an honest zero — past seasons start blank and future ones are exact.
-      yellowCards: s.yellowCards ?? 0,
-      redCards: s.redCards ?? 0,
-    })),
-    hist,
+    recentStats: (p.recentStats as SeasonStatsAnyVersion[]).map((s) => migrateStatsRow(s, fallbackTid)),
+    recentHist: hist,
     // Per-campaign international lines (added 2026-07-25). Saves from before
     // them keep their career totals, which stay the authoritative record; the
     // breakdown can't be reconstructed (archived campaigns hold no box scores),
@@ -289,7 +315,7 @@ function migratePlayer(p: Player, fallbackTid: number, currentSeason: number): P
     // finished seasons only, matching the contract — the season in progress is
     // excluded, because a live reader adds the current row itself.
     career: p.career ?? summaryOf(
-      (p.stats ?? []).filter((s) => s.season !== currentSeason),
+      (p.recentStats ?? []).filter((s) => s.season !== currentSeason),
       // Peak as the fallback rating, matching what the boards did inline; `born`
       // is a season number too and would read as a real-looking wrong year.
       ovrLookup(hist, peak.peakOvr),
@@ -331,7 +357,43 @@ function migratePlayer(p: Player, fallbackTid: number, currentSeason: number): P
  * the real-club-names era) would be silently reverted on the next load.
  */
 export function migrateLeague(league: LeagueStore): LeagueStore {
-  return cullOnLoad(migrateFields(rescaleRatings(league)));
+  return cullOnLoad(migrateFields(rescaleRatings(adoptHistoryNames(league))));
+}
+
+/**
+ * Move a player's history from `stats`/`hist` to `recentStats`/`recentHist`.
+ *
+ * The old names are what a player carried before careers left memory, and they
+ * are still what an EXPORTED file uses (exportImport.ts keeps them, so a file
+ * from this build reads in an older one). Either way the arrays hold a whole
+ * career, which lands in the window fields here and is cut to the window once
+ * it is safely on disk (leagueDb.ts).
+ *
+ * FIRST, before even `rescaleRatings`, because everything after it reads the
+ * new names: run later, the rating lift would find no history to lift and crash
+ * on exactly the files that most need it (any save from before the lift).
+ * Hands back the same player object when there is nothing to move, so a
+ * current-shape league goes through untouched.
+ */
+function adoptHistoryNames(league: LeagueStore): LeagueStore {
+  type Legacy = Player & { stats?: Player["recentStats"]; hist?: Player["recentHist"] };
+  const legacy = (p: Player) => {
+    const l = p as Legacy;
+    return l.stats !== undefined || l.hist !== undefined || l.recentStats === undefined || l.recentHist === undefined;
+  };
+  if (!league.players.some(legacy)) return league;
+  return {
+    ...league,
+    players: league.players.map((p) => {
+      if (!legacy(p)) return p;
+      const { stats, hist, ...rest } = p as Legacy;
+      return {
+        ...rest,
+        recentStats: rest.recentStats ?? stats ?? [],
+        recentHist: rest.recentHist ?? hist ?? [],
+      } as Player;
+    }),
+  };
 }
 
 /**
@@ -384,7 +446,7 @@ function rescaleRatings(league: LeagueStore): LeagueStore {
     ovr: lift(p.ovr),
     potential: lift(p.potential),
     ...(p.peakOvr === undefined ? {} : { peakOvr: lift(p.peakOvr) }),
-    hist: p.hist.map((h) => ({
+    recentHist: p.recentHist.map((h) => ({
       ...h,
       ratings: liftRatings(h.ratings, h.pos ?? p.pos),
       ovr: lift(h.ovr),

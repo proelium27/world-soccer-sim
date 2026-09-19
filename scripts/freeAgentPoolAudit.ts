@@ -30,7 +30,7 @@ const pool = league.players.filter((p) => !onRoster.has(p.pid));
 const age = (p: Player) => league.season - p.born;
 /** Best ovr the player ever reached, from his ratings snapshots. */
 const peak = (p: Player) =>
-  Math.max(p.ovr, ...(p.hist ?? []).map((h) => h.ovr));
+  Math.max(p.ovr, ...(p.recentHist ?? []).map((h) => h.ovr));
 
 console.log(`season ${league.season}, save ${mb(total)} MB`);
 console.log(`players ${league.players.length}: ${onRoster.size} on a roster, ${pool.length} unsigned free agents\n`);

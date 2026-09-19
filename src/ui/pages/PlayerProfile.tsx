@@ -13,6 +13,7 @@ import { ValueHistoryChart } from "../components/ValueHistoryChart.js";
 import { OvrHistoryChart } from "../components/OvrHistoryChart.js";
 import { careerValueHistory } from "../../core/finance/valueHistory.js";
 import { usePotentialView } from "../potentialView.js";
+import { useCareer } from "../useCareer.js";
 import { getRatingColor } from "../utils/ratingColor.js";
 import { Flag } from "../components/Flag.js";
 import { BackLink } from "../components/BackLink.js";
@@ -99,6 +100,9 @@ export function PlayerProfile() {
   // guards below; shared with PotDisplay and the player database so the three
   // can't disagree about what the user is allowed to know.
   const potView = usePotentialView();
+  // His whole career, read back from disk (see useCareer). Above the guards
+  // because it is a hook; undefined for a retiree or an unknown pid.
+  const career = useCareer(league, pid === undefined ? undefined : parseInt(pid, 10));
 
   if (!league || pid === undefined) {
     return <p className="p-3">Loading...</p>;
@@ -121,6 +125,12 @@ export function PlayerProfile() {
     );
   }
 
+  // Every table and chart below reads a whole career, and the window alone would
+  // pass for one — so the page waits for the read rather than showing the last
+  // two seasons as though they were all of them.
+  if (!career) return <p className="p-3">Loading...</p>;
+  const { stats, hist } = career;
+
   const team = league.teams.find((t) => t.roster.includes(player.pid));
   const inAcademy = league.teams.find((t) => t.academyRoster.includes(player.pid));
 
@@ -138,8 +148,8 @@ export function PlayerProfile() {
     domesticCupHistory: league.domesticCupHistory,
   });
 
-  const statsBySeasonDesc = [...player.stats].sort((a, b) => b.season - a.season);
-  const histBySeasonDesc = [...player.hist].sort((a, b) => b.season - a.season);
+  const statsBySeasonDesc = [...stats].sort((a, b) => b.season - a.season);
+  const histBySeasonDesc = [...hist].sort((a, b) => b.season - a.season);
   // Both continental competitions on one tab, each row labelled. A player can
   // have Cup seasons and Shield seasons in one career (and, if he moves clubs
   // mid-season, one of each in the same season), so the rows are keyed by
@@ -190,8 +200,8 @@ export function PlayerProfile() {
   const cupLines = cupRows.map((r) => r.line);
   const cupColumns = cupStatColumns(statColumnScope(player.pos, cupLines));
   const cupTotals = sumStatRows(cupLines);
-  const leagueColumns = leagueStatColumns(statColumnScope(player.pos, player.stats));
-  const leagueTotals = sumStatRows(player.stats);
+  const leagueColumns = leagueStatColumns(statColumnScope(player.pos, stats));
+  const leagueTotals = sumStatRows(stats);
   // Scouting fog also applies to the POT column of the history table, per row
   // and keyed off that row's own season — so a player the user has never
   // scouted stays fogged here too (closing the "read the exact number one tab
@@ -212,9 +222,9 @@ export function PlayerProfile() {
   const pricedPotential = (potential: number): number =>
     potView.midpoint(potential, player.pid, league.season);
 
-  const valuePoints = careerValueHistory(player, league.season, (snap) =>
+  const valuePoints = careerValueHistory(player, hist, league.season, (snap) =>
     pricedPotential(snap.potential));
-  const statsBySeason = new Map(player.stats.map((s) => [s.season, s]));
+  const statsBySeason = new Map(stats.map((s) => [s.season, s]));
 
   /**
    * The club a season belongs to, for the club column on the season tables.
@@ -238,8 +248,8 @@ export function PlayerProfile() {
   // POT shown for a played season comes from the snapshot before it, while the
   // academy label comes from the snapshot for that same season — falling back
   // to his live squad for the current one, which has no snapshot yet.
-  const histBySeasonPlayed = new Map(player.hist.map((h) => [h.season + 1, h]));
-  const academyBySeason = new Map(player.hist.map((h) => [h.season, h.academy]));
+  const histBySeasonPlayed = new Map(hist.map((h) => [h.season + 1, h]));
+  const academyBySeason = new Map(hist.map((h) => [h.season, h.academy]));
 
   return (
     <div className="container-fluid p-3">
@@ -292,7 +302,7 @@ export function PlayerProfile() {
       </p>
 
       <PositionStrip player={player} />
-      <PositionHistoryNote player={player} />
+      <PositionHistoryNote hist={hist} />
 
       {player.intl && player.intl.caps > 0 && (
         <p className="mb-3 small">
@@ -469,7 +479,7 @@ export function PlayerProfile() {
                 <OvrHistoryChart
                   pid={player.pid}
                   name={player.name}
-                  points={player.hist}
+                  points={hist}
                   league={league}
                   teamTidForSeason={(season) => {
                     if (!team) return inAcademy ? inAcademy.tid : null;

@@ -13,8 +13,16 @@ import {
   resetWriteCache,
   storedPlayerRows,
   storedCareerRows,
+  storedSeasonRows,
   storedRetireeRows,
+  trimWrittenCareers,
+  loadCareer,
+  loadSeasonStats,
+  withFullCareers,
 } from "../../src/db/index.js";
+import type { LeagueStore } from "../../src/core/leagueState.js";
+import { emptySeasonStats } from "../../src/core/players/types.js";
+import { RECENT_HIST_SEASONS, RECENT_STATS_SEASONS } from "../../src/core/simArchive.js";
 import type { ArchivedPlayer } from "../../src/core/players/archive.js";
 
 // An England-only world (two divisions, ~1,000 players) rather than the full
@@ -76,6 +84,7 @@ beforeEach(async () => {
   await db.clear("leagues");
   await db.clear("players");
   await db.clear("careers");
+  await db.clear("seasons");
   await db.clear("retirees");
   await db.clear("played");
   // Otherwise this tab still believes the pool it wrote in the previous test is
@@ -253,7 +262,7 @@ describe("leagueDb", () => {
       championTidByCompId: {},
     }] as unknown as typeof league.seasonHistory;
     // He has to have played that season for the award to be able to name him.
-    league.players[0].stats = [{ ...league.players[0].stats[0], season: 1 }];
+    league.players[0].recentStats = [{ ...league.players[0].recentStats[0], season: 1 }];
     const lid = await saveLeague(league);
 
     const db = await getDb();
@@ -378,151 +387,297 @@ describe("leagueDb retiree store", () => {
   });
 });
 
-describe("leagueDb career store", () => {
-  it("writes careers to their own store, not onto the player rows", async () => {
-    const league = makeLeague();
-    const lid = await saveLeague(league);
-
-    const rows = await storedPlayerRows(lid);
-    const careers = await storedCareerRows(lid);
-
-    expect(rows.length).toBe(league.players.length);
-    expect(careers.length).toBe(league.players.length);
-    // The whole point: a player row no longer carries the half that grows.
-    expect(rows.every((r) => r.stats === undefined && r.hist === undefined)).toBe(true);
-    expect(careers.every((c) => Array.isArray(c.stats) && Array.isArray(c.hist))).toBe(true);
-  });
-
-  it("reassembles whole players on load", async () => {
-    const league = makeLeague();
-    const lid = await saveLeague(league);
-    const loaded = await loadLeague(lid);
-
-    expect(loaded!.players.length).toBe(league.players.length);
-    const before = new Map(league.players.map((p) => [p.pid, p]));
-    for (const p of loaded!.players) {
-      const orig = before.get(p.pid)!;
-      expect(p.stats).toEqual(orig.stats);
-      expect(p.hist).toEqual(orig.hist);
-      expect(p.ovr).toBe(orig.ovr);
-    }
-  });
-
-  it("splits a v3 row that still carries its career inline", async () => {
-    const league = makeLeague();
-    const lid = await saveLeague(league);
-
-    // Put the pre-v4 shape back on disk: career inline on the player row and the
-    // career store empty, which is exactly what a save written by the previous
-    // build looks like.
-    const db = await getDb();
-    await db.clear("careers");
-    for (const p of league.players) {
-      await db.put("players", p as never, [lid, p.pid]);
-    }
-    resetWriteCache();
-
-    const loaded = await loadLeague(lid);
-    expect(loaded!.players.length).toBe(league.players.length);
-    expect(loaded!.players[0].hist.length).toBeGreaterThan(0);
-
-    // And it must have been written back in the new shape, or every startup
-    // redoes the split before first paint.
-    const rows = await storedPlayerRows(lid);
-    const careers = await storedCareerRows(lid);
-    expect(rows.every((r) => r.stats === undefined)).toBe(true);
-    expect(careers.length).toBe(league.players.length);
-  });
-
-  it("does not rewrite a career when only the player's identity changed", async () => {
-    const league = makeLeague();
-    const lid = await saveLeague(league);
-
-    // A contract extension: new player object, same career arrays. This is the
-    // case the narrower diff exists for.
-    const target = league.players[0];
-    const bumped = {
-      ...target,
-      contract: { ...target.contract, salary: target.contract.salary + 1 },
-    };
-
-    const careersBefore = await storedCareerRows(lid);
-    await saveLeague({
-      ...league,
-      lid,
-      players: league.players.map((p) => (p.pid === target.pid ? bumped : p)),
+/**
+ * A copy of the world where the first `n` players have long careers.
+ *
+ * A fresh world's players have one snapshot and no stat lines, which is all
+ * inside the window — so nothing about windowing could fail on it. These have
+ * eight seasons of each, most of which must live on disk alone.
+ */
+function withLongCareers(n = 5) {
+  const league = makeLeague();
+  league.season = 9;
+  league.players = league.players.map((p, i) => {
+    if (i >= n) return p;
+    const line = (season: number) => ({
+      ...emptySeasonStats(season, 1), appearances: 20 + season, goals: season + i,
     });
-    const careersAfter = await storedCareerRows(lid);
+    return {
+      ...p,
+      recentStats: [1, 2, 3, 4, 5, 6, 7, 8].map(line),
+      recentHist: [0, 1, 2, 3, 4, 5, 6, 7].map((season) => ({
+        ...p.recentHist[0], season, ovr: 50 + season,
+      })),
+    };
+  });
+  return league;
+}
 
-    expect(careersAfter).toEqual(careersBefore);
-    // The identity row did change, so that one must have been rewritten.
-    const rows = await storedPlayerRows(lid);
-    expect(rows.find((r) => r.pid === target.pid)!.contract.salary).toBe(bumped.contract.salary);
+/** Every season of one player as the save knows it: disk under memory. */
+async function careerOnDisk(league: LeagueStore, pid: number) {
+  const player = league.players.find((p) => p.pid === pid)!;
+  return loadCareer(league, player);
+}
+
+describe("leagueDb history store", () => {
+  it("puts every season in `seasons` and only the window on the player row", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    const long = league.players[0];
+
+    const rows = await storedSeasonRows(lid);
+    const mine = rows.filter((r) => r.pid === long.pid);
+    expect(mine.filter((r) => r.kind === 0)).toHaveLength(8);
+    expect(mine.filter((r) => r.kind === 1)).toHaveLength(8);
+
+    const stored = (await storedPlayerRows(lid)).find((r) => r.pid === long.pid)!;
+    expect(stored.recentStats).toHaveLength(RECENT_STATS_SEASONS);
+    expect(stored.recentHist).toHaveLength(RECENT_HIST_SEASONS);
+    expect(stored.stats).toBeUndefined();
+  });
+
+  it("loads only the window, and reads the rest back whole", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    resetWriteCache();
+    const loaded = (await loadLeague(lid))!;
+
+    const orig = league.players[0];
+    const p = loaded.players.find((x) => x.pid === orig.pid)!;
+    expect(p.recentStats.map((s) => s.season)).toEqual([7, 8]);
+    expect(p.recentHist.map((h) => h.season)).toEqual([5, 6, 7]);
+
+    const career = await careerOnDisk(loaded, orig.pid);
+    expect(career.stats.map((s) => s.goals)).toEqual(orig.recentStats.map((s) => s.goals));
+    expect(career.hist.map((h) => h.season)).toEqual(orig.recentHist.map((h) => h.season));
   });
 
   /**
-   * The mirror of the test above, and the one that keeps a matchday cheap.
-   *
-   * `accumulateStats` hands back a new player object for everyone who played
-   * while leaving ratings, contract and ovr untouched, so a reference-only diff
-   * would rewrite the whole identity store with rows byte-for-byte identical to
-   * what is already on disk. Measured, that doubled the puts and took a matchday
-   * save from 622ms to 1459ms.
+   * THE data-loss gate. A save made after a load holds only windows, and it is a
+   * full write (load seeds no cache). If a full write cleared history and put
+   * back what memory holds, every season older than the window would be gone
+   * after the first click of every session.
    */
-  it("does not rewrite identity rows when only the career moved", async () => {
-    const league = makeLeague();
+  it("never loses older seasons to a save of a windowed pool", async () => {
+    const league = withLongCareers();
     const lid = await saveLeague(league);
-    const rowsBefore = await storedPlayerRows(lid);
+    resetWriteCache();
+    const loaded = (await loadLeague(lid))!;
 
-    // Every player gets a new object carrying a new stats array, exactly as a
-    // simmed matchday produces, with nothing else changed.
-    await saveLeague({
-      ...league,
-      lid,
-      players: league.players.map((p) => ({ ...p, stats: [...p.stats] })),
-    });
+    // Any mutation: a new object for one player, forcing a write.
+    const mutated = {
+      ...loaded,
+      players: loaded.players.map((p, i) => (i === 0 ? { ...p, ovr: p.ovr + 1 } : p)),
+    };
+    await saveLeague(mutated);
+    resetWriteCache();
+    const again = (await loadLeague(lid))!;
 
-    expect(await storedPlayerRows(lid)).toEqual(rowsBefore);
-    // ...but the careers must all have been rewritten.
-    const careers = await storedCareerRows(lid);
-    expect(careers.length).toBe(league.players.length);
+    for (const orig of league.players.slice(0, 5)) {
+      const career = await careerOnDisk(again, orig.pid);
+      expect(career.stats.map((s) => s.season)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(career.hist.map((h) => h.season)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    }
   });
 
-  it("writes a career when the career itself moved", async () => {
-    const league = makeLeague();
+  it("converts a v4-v6 save, whose careers sit in `careers`, without losing a season", async () => {
+    const league = withLongCareers();
     const lid = await saveLeague(league);
 
-    const target = league.players[0];
-    const played = { ...target, hist: [...target.hist, { ...target.hist[0], season: 99 }] };
-    await saveLeague({
-      ...league,
-      lid,
-      players: league.players.map((p) => (p.pid === target.pid ? played : p)),
-    });
+    // The shape the previous build wrote: identity-only player rows, whole
+    // careers in `careers`, nothing in `seasons`.
+    const db = await getDb();
+    await db.clear("seasons");
+    for (const p of league.players) {
+      const { recentStats, recentHist, ...identity } = p;
+      await db.put("players", identity as never, [lid, p.pid]);
+      await db.put("careers", { stats: recentStats, hist: recentHist }, [lid, p.pid]);
+    }
+    resetWriteCache();
 
-    const loaded = await loadLeague(lid);
-    expect(loaded!.players.find((p) => p.pid === target.pid)!.hist.at(-1)!.season).toBe(99);
-  });
+    const loaded = (await loadLeague(lid))!;
+    const p = loaded.players.find((x) => x.pid === league.players[0].pid)!;
+    expect(p.recentStats).toHaveLength(RECENT_STATS_SEASONS);
 
-  it("deletes careers along with the league", async () => {
-    const league = makeLeague();
-    const lid = await saveLeague(league);
-    expect((await storedCareerRows(lid)).length).toBeGreaterThan(0);
-
-    await deleteLeague(lid);
+    const career = await careerOnDisk(loaded, p.pid);
+    expect(career.stats).toHaveLength(8);
+    expect(career.hist).toHaveLength(8);
+    // Converted once: the legacy store is empty for this league afterwards.
     expect(await storedCareerRows(lid)).toEqual([]);
   });
 
-  it("drops the career of a player who left the save", async () => {
-    const league = makeLeague();
+  it("converts a v3 row that still carries its career inline", async () => {
+    const league = withLongCareers();
     const lid = await saveLeague(league);
-    const gone = league.players[0].pid;
+    const db = await getDb();
+    await db.clear("seasons");
+    for (const p of league.players) {
+      const { recentStats, recentHist, ...identity } = p;
+      await db.put("players", { ...identity, stats: recentStats, hist: recentHist } as never, [lid, p.pid]);
+    }
+    resetWriteCache();
 
+    const loaded = (await loadLeague(lid))!;
+    const career = await careerOnDisk(loaded, league.players[0].pid);
+    expect(career.stats).toHaveLength(8);
+    // Written back in the current shape, or every startup redoes this.
+    const rows = await storedPlayerRows(lid);
+    expect(rows.every((r) => r.stats === undefined)).toBe(true);
+  });
+
+  it("writes no history when only a player's identity changed", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    league.lid = lid;
+    const before = await storedSeasonRows(lid);
+
+    const target = league.players[0];
+    const bumped = { ...target, contract: { ...target.contract, salary: target.contract.salary + 1 } };
+    await saveLeague({ ...league, players: league.players.map((p) => (p === target ? bumped : p)) });
+
+    expect(await storedSeasonRows(lid)).toEqual(before);
+    const row = (await storedPlayerRows(lid)).find((r) => r.pid === target.pid)!;
+    expect(row.contract.salary).toBe(bumped.contract.salary);
+  });
+
+  /**
+   * What keeps a matchday cheap. The sim clones every player's stat lines before
+   * accumulating, so after a matchday every player is a new object carrying new
+   * row objects — most of them with the same values. Only a real change is
+   * written.
+   */
+  it("writes nothing for a player whose rows were cloned but not changed", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    league.lid = lid;
+    const playersBefore = await storedPlayerRows(lid);
+
+    const cloned = league.players.map((p) => ({ ...p, recentStats: p.recentStats.map((s) => ({ ...s })) }));
+    await saveLeague({ ...league, players: cloned });
+    expect(await storedPlayerRows(lid)).toEqual(playersBefore);
+  });
+
+  it("writes a season's line when it really changed", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    league.lid = lid;
+    const target = league.players[0];
+    const scored = {
+      ...target,
+      recentStats: target.recentStats.map((s) => (s.season === 8 ? { ...s, goals: 99 } : s)),
+    };
+    await saveLeague({ ...league, players: league.players.map((p) => (p === target ? scored : p)) });
+
+    const lines = await loadSeasonStats({ ...league, players: [] } as LeagueStore, 8);
+    expect(lines.get(target.pid)!.goals).toBe(99);
+  });
+
+  it("reads one season for everyone, from disk, under the window", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    resetWriteCache();
+    const loaded = (await loadLeague(lid))!;
+
+    const season3 = await loadSeasonStats(loaded, 3);
+    for (const [i, orig] of league.players.slice(0, 5).entries()) {
+      expect(season3.get(orig.pid)!.goals).toBe(3 + i);
+    }
+  });
+
+  it("cuts a grown window back once its save has landed, keeping everything on disk", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    // The pool just saved still holds whole careers, as memory does straight
+    // after a conversion or an import.
+    const trimmed = trimWrittenCareers({ ...league, lid });
+    expect(trimmed.players[0].recentStats).toHaveLength(RECENT_STATS_SEASONS);
+
+    const career = await careerOnDisk(trimmed, league.players[0].pid);
+    expect(career.stats).toHaveLength(8);
+  });
+
+  it("leaves a pool alone when its save has not landed", () => {
+    const league = { ...withLongCareers(), lid: 12345 };
+    expect(trimWrittenCareers(league)).toBe(league);
+  });
+
+  it("writes whole careers into an export", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    resetWriteCache();
+    const loaded = (await loadLeague(lid))!;
+
+    const full = await withFullCareers(loaded);
+    const p = full.players.find((x) => x.pid === league.players[0].pid)!;
+    expect(p.recentStats.map((s) => s.season)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it("deletes history along with the league", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    expect((await storedSeasonRows(lid)).length).toBeGreaterThan(0);
+    await deleteLeague(lid);
+    expect(await storedSeasonRows(lid)).toEqual([]);
+  });
+
+  it("drops the history of a player who left the save, and only his", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    league.lid = lid;
+    const gone = league.players[0].pid;
+    const kept = league.players[1].pid;
+
+    await saveLeague({ ...league, players: league.players.filter((p) => p.pid !== gone) });
+    const rows = await storedSeasonRows(lid);
+    expect(rows.some((r) => r.pid === gone)).toBe(false);
+    expect(rows.filter((r) => r.pid === kept && r.kind === 0)).toHaveLength(8);
+  });
+
+  it("drops a leaver's history on a FULL write too", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    resetWriteCache();
+    const gone = league.players[0].pid;
     await saveLeague({ ...league, lid, players: league.players.filter((p) => p.pid !== gone) });
 
-    const careers = await storedCareerRows(lid);
-    expect(careers.length).toBe(league.players.length - 1);
-    const rows = await storedPlayerRows(lid);
+    const rows = await storedSeasonRows(lid);
     expect(rows.some((r) => r.pid === gone)).toBe(false);
+    expect((await storedPlayerRows(lid)).some((r) => r.pid === gone)).toBe(false);
+  });
+});
+
+describe("leagueDb history store, full writes", () => {
+  /**
+   * A full write skips rows already on disk (the first save of every session
+   * would otherwise rewrite every resident row). The skip must never swallow a
+   * LIVE row that really differs from disk — the reason a full write exists is
+   * that disk cannot be trusted to match memory.
+   */
+  it("still writes a live-season row that differs from disk", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    const target = league.players[0];
+    const scored = {
+      ...target,
+      recentStats: target.recentStats.map((s) => (s.season === 8 ? { ...s, goals: 77 } : s)),
+    };
+    resetWriteCache();
+    await saveLeague({ ...league, lid, players: league.players.map((p) => (p === target ? scored : p)) });
+
+    const lines = await loadSeasonStats({ ...league, lid, players: [] } as LeagueStore, 8);
+    expect(lines.get(target.pid)!.goals).toBe(77);
+  });
+
+  it("writes an old-season row that is missing from disk, as a multi-season jump creates", async () => {
+    const league = withLongCareers();
+    const lid = await saveLeague(league);
+    const db = await getDb();
+    const target = league.players[0];
+    await db.delete("seasons", [lid, target.pid, 3, 0]);
+    resetWriteCache();
+    await saveLeague({ ...league, lid });
+
+    const lines = await loadSeasonStats({ ...league, lid, players: [] } as LeagueStore, 3);
+    expect(lines.get(target.pid)!.goals).toBe(3);
   });
 });

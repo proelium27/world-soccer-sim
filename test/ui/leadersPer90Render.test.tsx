@@ -36,7 +36,7 @@ function leagueWithStats(): LeagueStore {
   const comp = league.competitions[0];
   const tids = league.teams.filter((t) => t.compId === comp.id).map((t) => t.tid);
   league.players.slice(0, 40).forEach((p, i) => {
-    p.stats = [
+    p.recentStats = [
       {
         ...emptySeasonStats(league.season, tids[i % tids.length]),
         appearances: 20 + (i % 10),

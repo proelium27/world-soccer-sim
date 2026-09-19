@@ -102,10 +102,10 @@ describe("simThrough", () => {
     const result = simThrough(store, { matchday: 4 }, rng);
 
     const withInterceptions = result.players.find((p) =>
-      p.stats.some((s) => s.season === store.season && s.interceptions > 0),
+      p.recentStats.some((s) => s.season === store.season && s.interceptions > 0),
     );
     expect(withInterceptions).toBeDefined();
-    const ss = withInterceptions!.stats.find((s) => s.season === store.season)!;
+    const ss = withInterceptions!.recentStats.find((s) => s.season === store.season)!;
     expect(ss.interceptions).toBeGreaterThan(0);
     expect(ss.appearances).toBeGreaterThan(0);
   });

@@ -1,3 +1,4 @@
+import { squadTidInSeason } from "./players/careerSummary.js";
 import type { Player } from "./players/types.js";
 import type { ArchivedPlayer } from "./players/archive.js";
 import type { SeasonHistoryEntry } from "./standings.js";
@@ -67,7 +68,7 @@ export interface PlayerHonors {
  * won before he was generated.
  */
 function squadTidForSeason(player: Player, season: number): number | undefined {
-  return player.stats.find((s) => s.season === season)?.tid;
+  return squadTidInSeason(player, season);
 }
 
 /**

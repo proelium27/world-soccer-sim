@@ -56,6 +56,7 @@ beforeEach(async () => {
   const db = await getDb();
   await db.clear("leagues");
   await db.clear("players");
+  await db.clear("seasons");
   await db.clear("retirees");
   await db.clear("played");
   resetWriteCache();

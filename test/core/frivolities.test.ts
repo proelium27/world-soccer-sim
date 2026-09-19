@@ -38,7 +38,7 @@ interface PlayerOver {
   heightCm?: number;
   /** [season, tid, appearances, goals, assists] */
   lines?: [number, number, number, number, number][];
-  hist?: [number, number][];
+  recentHist?: [number, number][];
   /** [caps, international goals, World Cups won] */
   intl?: [number, number, number];
 }
@@ -53,13 +53,13 @@ function makePlayer(o: PlayerOver): Player {
     heightCm: o.heightCm ?? 180,
     ovr: o.ovr ?? 60,
     potential: o.ovr ?? 60,
-    stats: (o.lines ?? []).map(([season, tid, appearances, goals, assists]) => ({
+    recentStats: (o.lines ?? []).map(([season, tid, appearances, goals, assists]) => ({
       ...emptySeasonStats(season, tid), appearances, goals, assists,
       // Real SeasonStats carries avgRating alongside ratingSum (see its type),
       // so the fixture must too, or the single-season rating board sees nothing.
       ratingSum: appearances * 7, avgRating: 7, minutesPlayed: appearances * 90,
     })),
-    hist: (o.hist ?? []).map(([season, ovr]) => ({
+    recentHist: (o.recentHist ?? []).map(([season, ovr]) => ({
       season, ovr, ratings: {}, potential: ovr, academy: false,
     })),
     intl: o.intl
@@ -204,7 +204,7 @@ describe("computeRecordBook", () => {
 
   it("puts retirees on the all-time lists alongside active players", () => {
     const store = makeStore({
-      players: [makePlayer({ pid: 1, lines: [[2029, 1, 30, 20, 5]], hist: [[2029, 75]] })],
+      players: [makePlayer({ pid: 1, lines: [[2029, 1, 30, 20, 5]], recentHist: [[2029, 75]] })],
       retiredPlayers: [makeArchived({ pid: 99, peakOvr: 88 })],
     });
     const book = computeRecordBook(store);
@@ -588,7 +588,7 @@ describe("GOAT rankings", () => {
       const player = makePlayer({
         pid: 1,
         lines: [[2028, 1, 30, 10, 2], [2029, 1, 0, 0, 0]],
-        hist: [[2027, 85], [2028, 86]],
+        recentHist: [[2027, 85], [2028, 86]],
       });
       const history = [
         historyWithAwards(2028, [row(1, 38, 90)], { 1: 0 },
@@ -658,8 +658,8 @@ describe("GOAT rankings", () => {
     it("ranks a decorated career above an equally rated one with no honours", () => {
       const store = makeStore({
         players: [
-          makePlayer({ pid: 1, lines: [[2029, 1, 38, 20, 5]], hist: [[2028, 90]] }),
-          makePlayer({ pid: 2, lines: [[2029, 2, 38, 20, 5]], hist: [[2028, 90]] }),
+          makePlayer({ pid: 1, lines: [[2029, 1, 38, 20, 5]], recentHist: [[2028, 90]] }),
+          makePlayer({ pid: 2, lines: [[2029, 2, 38, 20, 5]], recentHist: [[2028, 90]] }),
         ],
         seasonHistory: [
           historyWithAwards(2029, [row(1, 38, 90), row(2, 38, 80)], { 1: 0, 2: 0 },
@@ -679,7 +679,7 @@ describe("GOAT rankings", () => {
       // reconcile with the total. That shipped once already.
       const store = makeStore({
         players: [makePlayer({
-          pid: 1, lines: [[2029, 1, 38, 20, 5]], hist: [[2028, 90]],
+          pid: 1, lines: [[2029, 1, 38, 20, 5]], recentHist: [[2028, 90]],
         })],
         seasonHistory: [
           historyWithAwards(2029, [row(1, 38, 90)], { 1: 0 },
@@ -712,7 +712,7 @@ describe("GOAT rankings", () => {
 
     it("names each award in the breakdown, so a reader can check the working", () => {
       const store = makeStore({
-        players: [makePlayer({ pid: 1, lines: [[2029, 1, 38, 20, 5]], hist: [[2028, 90]] })],
+        players: [makePlayer({ pid: 1, lines: [[2029, 1, 38, 20, 5]], recentHist: [[2028, 90]] })],
         seasonHistory: [
           historyWithAwards(2029, [row(1, 38, 90)], { 1: 0 },
             { champion: 1, ballonDOr: 1, tots: [1] }),
@@ -732,12 +732,12 @@ describe("GOAT rankings", () => {
       // Same peak, very different careers — the distinction the formula exists
       // to make.
       const oneYear = makePlayer({
-        pid: 1, lines: [[2029, 1, 38, 20, 5]], hist: [[2028, 90]],
+        pid: 1, lines: [[2029, 1, 38, 20, 5]], recentHist: [[2028, 90]],
       });
       const longCareer = makePlayer({
         pid: 2,
         lines: Array.from({ length: 10 }, (_, i) => [2020 + i, 2, 38, 20, 5] as [number, number, number, number, number]),
-        hist: Array.from({ length: 10 }, (_, i) => [2019 + i, 88] as [number, number]),
+        recentHist: Array.from({ length: 10 }, (_, i) => [2019 + i, 88] as [number, number]),
       });
       const store = makeStore({ players: [oneYear, longCareer] });
       const rank = playerGoatRanking(store);
@@ -748,7 +748,7 @@ describe("GOAT rankings", () => {
     it("gives no peak or prime credit below the baseline", () => {
       // A journeyman shouldn't accumulate a GOAT case just by existing.
       const store = makeStore({
-        players: [makePlayer({ pid: 1, lines: [[2029, 1, 38, 0, 0]], hist: [[2028, 55]] })],
+        players: [makePlayer({ pid: 1, lines: [[2029, 1, 38, 0, 0]], recentHist: [[2028, 55]] })],
       });
       const r = playerGoatRanking(store)[0];
       expect(pointsOf(r, "peak")).toBe(0);

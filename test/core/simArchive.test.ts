@@ -263,7 +263,7 @@ describe("simArchive career windows", () => {
 
     const bytes = (l: LeagueStore) =>
       l.players.reduce(
-        (n, p) => n + JSON.stringify(p.stats).length + JSON.stringify(p.hist).length,
+        (n, p) => n + JSON.stringify(p.recentStats).length + JSON.stringify(p.recentHist).length,
         0,
       );
     expect(bytes(payload)).toBeLessThan(bytes(aged));

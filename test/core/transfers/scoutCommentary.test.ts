@@ -26,8 +26,8 @@ function makePlayer(overrides: Partial<Player> = {}): Player {
     potential: 78,
     contract: { salary: 1_000_000, expiresSeason: 2027 },
     injury: null,
-    stats: [],
-    hist: [],
+    recentStats: [],
+    recentHist: [],
     ...overrides,
   };
 }

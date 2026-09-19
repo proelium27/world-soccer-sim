@@ -19,7 +19,7 @@ export function RatingDelta({ value, previous }: { value: number; previous: numb
 
 /** Ovr/potential from the second-to-last hist entry, or null if not enough history. */
 export function previousRatings(p: Player): { ovr: number; potential: number } | null {
-  if (p.hist.length < 2) return null;
-  const prev = p.hist[p.hist.length - 2];
+  if (p.recentHist.length < 2) return null;
+  const prev = p.recentHist[p.recentHist.length - 2];
   return { ovr: prev.ovr, potential: prev.potential };
 }

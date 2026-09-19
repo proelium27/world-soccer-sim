@@ -150,10 +150,13 @@ describe("Club History page render", () => {
       ...played,
       players: stats
         ? played.players.map((p) =>
-          p.pid === ourPid ? { ...p, stats: [line(userTid)] }
-            : p.pid === theirPid ? { ...p, stats: [line(other.tid)] }
-              : { ...p, stats: [] })
-        : played.players.map((p) => ({ ...p, stats: [] })),
+          // No stored summary on the two edited players, so their career is
+          // exactly the line given here (the boards read the summary, which a
+          // real save keeps in step with the lines; a fixture has to as well).
+          p.pid === ourPid ? { ...p, recentStats: [line(userTid)], career: undefined }
+            : p.pid === theirPid ? { ...p, recentStats: [line(other.tid)], career: undefined }
+              : { ...p, recentStats: [] })
+        : played.players.map((p) => ({ ...p, recentStats: [] })),
     } as unknown as LeagueStore);
 
     it("names the club's own alumni and nobody else's", () => {

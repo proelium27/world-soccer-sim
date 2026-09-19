@@ -156,8 +156,8 @@ describe("injuries persist across matchdays via simThrough", () => {
       potential: 50,
       contract: { salary: 1000, expiresSeason: 2030 },
       injury,
-      stats: [emptySeasonStats(2026)],
-      hist: [],
+      recentStats: [emptySeasonStats(2026)],
+      recentHist: [],
     });
 
     const healthy = makePlayer(1, null);
@@ -207,8 +207,8 @@ describe("carryIntlInjuries", () => {
     potential: 50,
     contract: { salary: 1000, expiresSeason: 2030 },
     injury: null,
-    stats: [emptySeasonStats(2026)],
-    hist: [],
+    recentStats: [emptySeasonStats(2026)],
+    recentHist: [],
   });
 
   it("carries a reduced injury (or none) onto named pids only, leaving others untouched", () => {

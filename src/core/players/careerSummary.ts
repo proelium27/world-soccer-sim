@@ -188,21 +188,20 @@ export function summaryOf(
 /**
  * A player's career summary, computing it from his seasons if he has none yet.
  *
- * The fallback is for a save that has not been migrated; every construction site
- * seeds the field and the offseason maintains it, so in practice the stored one
- * is always there. It exists so a reader never has to ask, and it is the last
- * thing to go when the seasons stop being resident: at that point an unmigrated
- * save simply cannot reach here, because `loadLeague` migrates before anything
- * else sees the league.
+ * The fallback folds only the resident window, so it would under-count a real
+ * career — and that is acceptable only because nothing can reach it: every
+ * construction site seeds the field, the offseason maintains it, and
+ * `migrateLeague` backfills it from the WHOLE career before a save's history is
+ * ever split onto disk. It stays so a hand-built fixture still reads sensibly.
  */
 export function careerOf(player: {
   career?: CareerSummary;
-  stats: readonly SeasonStats[];
-  hist: readonly { season: number; ovr: number }[];
+  recentStats: readonly SeasonStats[];
+  recentHist: readonly { season: number; ovr: number }[];
   ovr: number;
   peakOvr?: number;
 }): CareerSummary {
-  return player.career ?? summaryOf(player.stats, ovrLookup(player.hist, player.peakOvr ?? player.ovr));
+  return player.career ?? summaryOf(player.recentStats, ovrLookup(player.recentHist, player.peakOvr ?? player.ovr));
 }
 
 export function ovrLookup(
@@ -211,4 +210,47 @@ export function ovrLookup(
 ): (season: number) => number {
   const bySeason = new Map(hist.map((h) => [h.season, h.ovr]));
   return (season) => bySeason.get(season - 1) ?? fallback;
+}
+
+/**
+ * The club a player was on in one season, or undefined if he was on no squad.
+ *
+ * Answered from memory, without his history on disk: the resident window holds
+ * the season in progress (and the one before), and the summary's `seasons` line
+ * holds every season he has FINISHED — including ones where he never got a game,
+ * which is the same squad-membership rule a stat line carries (`accumulateStats`
+ * opens one for every squad member). So this is exactly what reading his
+ * `SeasonStats.tid` for that season used to be.
+ */
+export function squadTidInSeason(
+  player: { recentStats: readonly SeasonStats[]; career?: CareerSummary },
+  season: number,
+): number | undefined {
+  return player.recentStats.find((s) => s.season === season)?.tid
+    ?? player.career?.seasons.find((s) => s.season === season)?.tid;
+}
+
+/**
+ * A player's career INCLUDING the season in progress, from memory alone.
+ *
+ * The stored summary covers the seasons he has finished; the one being played
+ * is still moving, so it is folded in here from the resident window — the fold
+ * the offseason will do for good. The guard is for a hand-built player with no
+ * stored summary, whose fallback (`careerOf`) has already folded every line he
+ * holds, the current one included.
+ */
+export function liveCareer(
+  player: {
+    career?: CareerSummary;
+    recentStats: readonly SeasonStats[];
+    recentHist: readonly { season: number; ovr: number }[];
+    ovr: number;
+    peakOvr?: number;
+  },
+  currentSeason: number,
+): CareerSummary {
+  const career = careerOf(player);
+  const live = player.recentStats.find((s) => s.season === currentSeason);
+  if (!live || career.seasons.some((s) => s.season === currentSeason)) return career;
+  return withSeason(career, live, ovrLookup(player.recentHist, player.peakOvr ?? player.ovr)(currentSeason));
 }

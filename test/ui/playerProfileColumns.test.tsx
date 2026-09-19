@@ -84,7 +84,7 @@ function profileWithStats(): { league: LeagueStore; pid: number } {
   const league = makeLeague(0, 3);
   const player = league.players[0];
   const tid = league.teams[0].tid;
-  player.stats = [
+  player.recentStats = [
     {
       ...emptySeasonStats(league.season, tid),
       appearances: 30, minutesPlayed: 2600, goals: 12, assists: 5,
@@ -123,9 +123,9 @@ describe("player profile table columns", () => {
   it("gives a multi-season career row the same width as a season row", () => {
     const { league, pid } = profileWithStats();
     const player = league.players.find((p) => p.pid === pid)!;
-    player.stats = [
-      { ...player.stats[0] },
-      { ...player.stats[0], season: league.season - 1 },
+    player.recentStats = [
+      { ...player.recentStats[0] },
+      { ...player.recentStats[0], season: league.season - 1 },
     ];
     const stats = tablesIn(render(league, pid)).find(
       (t) => t.includes(">Apps<") && t.includes(">Rtg<"),

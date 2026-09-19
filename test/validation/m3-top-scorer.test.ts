@@ -41,7 +41,7 @@ describe("M3 §8 gate — top scorer", () => {
       // Best league-goals tally in each competition this season.
       const bestByComp = new Map<number, number>();
       for (const p of league.players) {
-        for (const ss of p.stats) {
+        for (const ss of p.recentStats) {
           const compId = compOfTid.get(ss.tid);
           if (compId === undefined) continue;
           if (ss.goals > (bestByComp.get(compId) ?? 0)) bestByComp.set(compId, ss.goals);

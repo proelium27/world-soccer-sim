@@ -402,13 +402,13 @@ export function simOffseasonReporting(
     // summary covers finished seasons only, so exactly one fold per player per
     // season, and anything wanting a live number adds the current row itself
     // (see players/careerSummary.ts). Pure and rng-free.
-    const finished = p.stats.find((s) => s.season === endingSeason);
+    const finished = p.recentStats.find((s) => s.season === endingSeason);
     // Always set, even for a youth-intake player who has finished nothing: every
     // player carrying the field is what lets readers drop the "or compute it
     // from his seasons" fallback, which stops being possible at all once the
     // seasons live on disk.
-    const ovrFor = ovrLookup(p.hist, p.peakOvr ?? p.ovr);
-    const base = p.career ?? summaryOf(p.stats.filter((s) => s.season !== endingSeason), ovrFor);
+    const ovrFor = ovrLookup(p.recentHist, p.peakOvr ?? p.ovr);
+    const base = p.career ?? summaryOf(p.recentStats.filter((s) => s.season !== endingSeason), ovrFor);
     p = { ...p, career: finished ? withSeason(base, finished, ovrFor(endingSeason)) : base };
     const progressed = progressPlayer(
       rng, p, endingSeason, academyPids.has(p.pid), league.progressionModel,
@@ -1223,7 +1223,7 @@ export function simOffseasonReporting(
   const bonusSettlement = settleBonuses(clauses, {
     rosterOf,
     statsByPid: new Map(
-      players.map((p) => [p.pid, p.stats.find((st) => st.season === league.season)]),
+      players.map((p) => [p.pid, p.recentStats.find((st) => st.season === league.season)]),
     ),
     qualifiedTids: new Set(
       qualificationByTid(league.competitions, tablesByCompId, cupRoutes).keys(),

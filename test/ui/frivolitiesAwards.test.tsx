@@ -91,9 +91,12 @@ describe("Frivolities awards tab", () => {
     // A career row only exists for a player with an appearance on record. He
     // sits at the user's club so the all-time XI panel, which opens on it,
     // renders a real pick as well as its empty slots.
-    winner.stats = [{
+    winner.recentStats = [{
       season: 2028, tid: league.meta.userTid, appearances: 38, goals: 30, assists: 8,
-    }] as typeof winner.stats;
+    }] as typeof winner.recentStats;
+    // The boards read the career summary, which a real save keeps in step with
+    // the lines; with none stored, the fallback folds the line above.
+    winner.career = undefined;
 
     const html = render(league);
     expect(html).toContain("Most decorated careers");

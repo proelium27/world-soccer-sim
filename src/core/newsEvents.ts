@@ -67,7 +67,7 @@ export function playerGoalTotals(
 ): Map<number, { season: number; career: number }> {
   const map = new Map<number, { season: number; career: number }>();
   for (const p of players) {
-    const seasonGoals = p.stats.find((s) => s.season === season)?.goals ?? 0;
+    const seasonGoals = p.recentStats.find((s) => s.season === season)?.goals ?? 0;
     // Finished seasons come off the stored summary rather than by summing his
     // stat lines, and the current season is added on top — the summary covers
     // finished seasons only (see players/careerSummary.ts).
@@ -80,7 +80,7 @@ export function playerGoalTotals(
     // test/core/simArchive.test.ts, not by reading the code.
     const career = p.career
       ? p.career.totals.goals + seasonGoals
-      : p.stats.reduce((sum, s) => sum + s.goals, 0);
+      : p.recentStats.reduce((sum, s) => sum + s.goals, 0);
     map.set(p.pid, { season: seasonGoals, career });
   }
   return map;

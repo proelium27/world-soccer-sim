@@ -114,7 +114,7 @@ export interface SeasonAwards {
 }
 
 export function statsFor(p: Player, season: number): SeasonStats | undefined {
-  return p.stats.find((s) => s.season === season);
+  return p.recentStats.find((s) => s.season === season);
 }
 
 /**
@@ -130,7 +130,7 @@ export function statsFor(p: Player, season: number): SeasonStats | undefined {
  * point p.ovr *is* the season-1 ovr — or pre-hist legacy data).
  */
 export function ovrDuringSeason(p: Player, season: number): number {
-  const snapshot = p.hist.find((h) => h.season === season - 1);
+  const snapshot = p.recentHist.find((h) => h.season === season - 1);
   return snapshot?.ovr ?? p.ovr;
 }
 

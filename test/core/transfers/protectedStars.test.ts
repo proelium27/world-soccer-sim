@@ -22,7 +22,7 @@ function player(pid: number, ovr: number): Player {
   return {
     pid, name: `P${pid}`, nationality: "TST", born: 2000, pos: "CM", heightCm: 180,
     ratings: RATINGS, ovr, potential: ovr, contract: { salary: 1000, expiresSeason: 2030 },
-    injury: null, stats: [], hist: [],
+    injury: null, recentStats: [], recentHist: [],
   };
 }
 

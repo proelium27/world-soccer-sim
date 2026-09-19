@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useSeasonStats } from "../../useSeasonStats.js";
 import { useLeague } from "../../context/LeagueContext.js";
 import type { Player } from "../../../core/players/types.js";
 import { editableSquad } from "../../../core/international/index.js";
@@ -65,6 +66,9 @@ export function NTPlayerPool() {
   const season = pickedSeason !== null && seasonOptions.includes(pickedSeason)
     ? pickedSeason
     : defaultSeason;
+  // Lines for that season from memory, or read back from disk for an older
+  // one (see useSeasonStats) — never a two-line window read as the season.
+  const lines = useSeasonStats(league, season);
 
   /**
    * A view switch keeps the sort where its column still has a header and falls
@@ -134,7 +138,7 @@ export function NTPlayerPool() {
     age: (p: Player) => league.season - p.born,
     ovr: (p: Player) => p.ovr,
     caps: (p: Player) => p.intl?.caps ?? 0,
-    ...viewSortAccessors((p: Player) => p, season, eligible),
+    ...viewSortAccessors((p: Player) => p, lines, eligible),
   };
 
   // Filter, then sort, then slice: the sort has to see the whole eligible pool,
@@ -170,7 +174,7 @@ export function NTPlayerPool() {
           <td className="text-end">{p.intl?.caps ?? 0}</td>
         </>
       ) : (
-        <PlayerViewCells view={view} player={p} season={season} />
+        <PlayerViewCells view={view} player={p} lines={lines} />
       )}
       <td className="text-end">
         {inSquad ? (
@@ -255,6 +259,7 @@ export function NTPlayerPool() {
 
       <PlayerViewSwitch
         value={view}
+        loading={lines.loading}
         onChange={changeView}
         season={season}
         seasons={seasonOptions}

@@ -122,8 +122,8 @@ function materializePlayer(spec: RosterFilePlayer, ctx: MaterializeCtx): Player 
     potential,
     contract: { salary: seasonSalaryForOvr(ovr, ctx.pid, ctx.season), expiresSeason: ctx.season + length },
     injury: null,
-    stats: [],
-    hist: [{ season: ctx.season - 1, ratings, ovr, potential, academy: false, pos: spec.pos }],
+    recentStats: [],
+    recentHist: [{ season: ctx.season - 1, ratings, ovr, potential, academy: false, pos: spec.pos }],
     // Set alongside `hist`, never left to the first progression. `peakOvr` is
     // authoritative once present, so a player carrying a history and a stale
     // peak would read as worse than he ever was — and the fallback that would
@@ -385,8 +385,10 @@ export function applyRosterFile(
 
   if (removedPids.size > 0) {
     // Keep replaced players who actually have history (as free agents); drop
-    // the rest so a fresh-save import doesn't leave hundreds of orphans.
-    players = players.filter((p) => !removedPids.has(p.pid) || p.stats.length > 0);
+    // the rest so a fresh-save import doesn't leave hundreds of orphans. The
+    // window is enough to ask: it keeps his last lines by COUNT, so it is empty
+    // exactly when his whole career is.
+    players = players.filter((p) => !removedPids.has(p.pid) || p.recentStats.length > 0);
   }
 
   // After the pool is final, so squad strength is measured on who actually

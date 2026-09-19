@@ -183,9 +183,41 @@ export function detachPlayed(league: LeagueStore): {
  *
  * `test/core/simArchive.test.ts` pins that these are enough by running a whole
  * season and offseason on the window and requiring the same league out.
+ *
+ * **This is also the RESIDENT window** (`docs/lazy-career-plan.md` phase 3):
+ * `loadLeague` holds exactly this much of each player and the rest stays on disk.
+ * One definition for both is the point — the sim is proven on this window, so
+ * holding the same one on the main thread needs no second proof, and the two can
+ * never drift apart.
  */
-const RECENT_HIST_SEASONS = POSITION_CHANGE_SEASONS;
-const RECENT_STATS_SEASONS = 2;
+export const RECENT_HIST_SEASONS = POSITION_CHANGE_SEASONS;
+export const RECENT_STATS_SEASONS = 2;
+
+/**
+ * Is every player's line for `season` guaranteed to be in memory?
+ *
+ * True for the season in progress and the one before, and that follows from the
+ * window being cut by COUNT: a player's two newest lines are whatever his two
+ * newest seasons on a squad were, so a line for `current` or `current - 1`, if he
+ * has one, is always among them. Anything older may be on disk only — the
+ * performance views, Leaders and the Database read those back (`useSeasonStats`).
+ */
+export function seasonIsResident(season: number, currentSeason: number): boolean {
+  return season >= currentSeason - (RECENT_STATS_SEASONS - 1);
+}
+
+/**
+ * A player cut down to the window, or the same object when he already fits.
+ *
+ * Returning the input untouched when nothing is cut matters: the save's dirty
+ * set diffs players by reference, so a needless copy would read as a change.
+ */
+export function windowCareer<P extends { recentStats: SeasonStats[]; recentHist: RatingsSnapshot[] }>(p: P): P {
+  const statsCut = Math.max(0, p.recentStats.length - RECENT_STATS_SEASONS);
+  const histCut = Math.max(0, p.recentHist.length - RECENT_HIST_SEASONS);
+  if (statsCut === 0 && histCut === 0) return p;
+  return { ...p, recentStats: p.recentStats.slice(statsCut), recentHist: p.recentHist.slice(histCut) };
+}
 
 /**
  * What was cut from one player's career, so it can be put back.
@@ -218,11 +250,11 @@ export function detachCareer(league: LeagueStore): {
 } {
   const careers = new Map<number, CutCareer>();
   const players = league.players.map((p) => {
-    const statsCut = Math.max(0, p.stats.length - RECENT_STATS_SEASONS);
-    const histCut = Math.max(0, p.hist.length - RECENT_HIST_SEASONS);
+    const statsCut = Math.max(0, p.recentStats.length - RECENT_STATS_SEASONS);
+    const histCut = Math.max(0, p.recentHist.length - RECENT_HIST_SEASONS);
     if (statsCut === 0 && histCut === 0) return p;
-    careers.set(p.pid, { stats: p.stats, hist: p.hist, statsCut, histCut });
-    return { ...p, stats: p.stats.slice(statsCut), hist: p.hist.slice(histCut) };
+    careers.set(p.pid, { stats: p.recentStats, hist: p.recentHist, statsCut, histCut });
+    return { ...p, recentStats: p.recentStats.slice(statsCut), recentHist: p.recentHist.slice(histCut) };
   });
   return { payload: { ...league, players }, careers };
 }
@@ -245,8 +277,8 @@ export function reattachCareer(
       if (!cut) return p;
       return {
         ...p,
-        stats: cut.statsCut === 0 ? p.stats : [...cut.stats.slice(0, cut.statsCut), ...p.stats],
-        hist: cut.histCut === 0 ? p.hist : [...cut.hist.slice(0, cut.histCut), ...p.hist],
+        recentStats: cut.statsCut === 0 ? p.recentStats : [...cut.stats.slice(0, cut.statsCut), ...p.recentStats],
+        recentHist: cut.histCut === 0 ? p.recentHist : [...cut.hist.slice(0, cut.histCut), ...p.recentHist],
       };
     }),
   };

@@ -118,7 +118,7 @@ export function refusesMoveToClub(
  * belonged to.
  */
 export function lastClubTid(player: Player): number | null {
-  const stats = player.stats ?? [];
+  const stats = player.recentStats ?? [];
   return stats.length > 0 ? stats[stats.length - 1].tid : null;
 }
 

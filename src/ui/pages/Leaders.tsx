@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSeasonStats } from "../useSeasonStats.js";
+import { seasonsWithStats } from "../playerDatabase.js";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -78,10 +80,10 @@ export function Leaders() {
 function PlayerLeaders({ compId }: { compId: number }) {
   const { league } = useLeague();
 
+  // The same list the Database's season picker offers, off the career summaries
+  // and the window, so neither needs a season read back to know it exists.
   const seasonOptions = useMemo(
-    () => [
-      ...new Set((league?.players ?? []).flatMap((p) => p.stats.map((s) => s.season))),
-    ].sort((a, b) => b - a),
+    () => seasonsWithStats(league?.players ?? []),
     [league?.players],
   );
 
@@ -125,6 +127,8 @@ function PlayerLeadersBody({
     seasonOptions.includes(league.season) ? league.season : seasonOptions[0],
   );
   const [initializedSeason, setInitializedSeason] = useState(false);
+  // That season's lines, from memory or read back from disk (useSeasonStats).
+  const lines = useSeasonStats(league, season);
 
   useEffect(() => {
     if (initializedSeason) return;
@@ -191,7 +195,7 @@ function PlayerLeadersBody({
     const rows: LeaderRow[] = [];
     const compByTid = compByTidForSeason(season);
     for (const p of league.players) {
-      const ss = p.stats.find((s) => s.season === season);
+      const ss = lines.lineOf(p);
       if (!ss || ss[stat] <= 0) continue;
       if (compByTid.get(ss.tid) !== compId) continue;
       rows.push({
@@ -205,7 +209,7 @@ function PlayerLeadersBody({
     return rows;
   }, [
     league.players, league.meta.userTid, season, stat, compId,
-    compByTidForSeason, teamNameByTid,
+    compByTidForSeason, teamNameByTid, lines,
   ]);
 
   // Ranking and both playing-time qualifiers live in ../leadersBoard.js — the
@@ -247,6 +251,9 @@ function PlayerLeadersBody({
             <option key={o.key} value={o.key}>{o.label}</option>
           ))}
         </select>
+        {lines.loading && (
+          <span className="text-muted small align-self-center" role="status">Loading that season...</span>
+        )}
         <div className="btn-group" role="group" aria-label="Totals or per 90 minutes">
           <button
             type="button"

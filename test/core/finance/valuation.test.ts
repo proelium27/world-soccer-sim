@@ -23,8 +23,8 @@ function makePlayer(overrides: Partial<Player>): Player {
     potential: 65,
     contract: { salary: 1000, expiresSeason: 2027 },
     injury: null,
-    stats: [],
-    hist: [],
+    recentStats: [],
+    recentHist: [],
     ...overrides,
   };
 }

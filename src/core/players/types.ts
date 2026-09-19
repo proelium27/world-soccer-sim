@@ -111,8 +111,19 @@ export interface Player {
    * which is the season's un-reset total.
    */
   yellowCount?: number;
-  stats: SeasonStats[];
-  hist: RatingsSnapshot[];
+  /**
+   * The END of this player's per-season stat lines: at most the last two seasons
+   * he has a line for, with everything older on disk (`loadCareer`,
+   * `loadSeasonStats` in src/db). Named for what it is so a read that wanted a
+   * whole career fails to compile instead of returning a plausible wrong number
+   * (docs/lazy-career-plan.md). The last line may be old — a free agent keeps
+   * the line from the last season he was on a squad.
+   *
+   * Whole-career questions go to `career` (the summary) or to disk.
+   */
+  recentStats: SeasonStats[];
+  /** The last few ratings snapshots, by count. Same rule as `recentStats`. */
+  recentHist: RatingsSnapshot[];
   /**
    * Best ovr this player has ever reached, and the season he reached it.
    *

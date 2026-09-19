@@ -47,8 +47,8 @@ function player(spec: {
     born: SEASON - 26,
     pos: spec.pos ?? "ST",
     ovr: spec.ovr,
-    stats: [stats],
-    hist: [{ season: SEASON - 1, ovr: spec.ovr, potential: spec.ovr, academy: false, ratings: {} }],
+    recentStats: [stats],
+    recentHist: [{ season: SEASON - 1, ovr: spec.ovr, potential: spec.ovr, academy: false, ratings: {} }],
   } as unknown as Player;
 }
 

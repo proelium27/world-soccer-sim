@@ -16,11 +16,11 @@ interface Over {
   /** [season, tid, appearances, goals, assists] per season line. */
   lines?: [season: number, tid: number, appearances: number, goals: number, assists: number][];
   /** [season, ovr] ratings snapshots. */
-  hist?: [season: number, ovr: number][];
+  recentHist?: [season: number, ovr: number][];
   caps?: number;
 }
 
-function makePlayer({ pid, ovr = 60, age = 34, lines = [], hist = [], caps }: Over): Player {
+function makePlayer({ pid, ovr = 60, age = 34, lines = [], recentHist: hist = [], caps }: Over): Player {
   return {
     pid,
     name: `Player ${pid}`,
@@ -30,13 +30,13 @@ function makePlayer({ pid, ovr = 60, age = 34, lines = [], hist = [], caps }: Ov
     heightCm: 180,
     ovr,
     potential: ovr,
-    stats: lines.map(([season, tid, appearances, goals, assists]) => ({
+    recentStats: lines.map(([season, tid, appearances, goals, assists]) => ({
       ...emptySeasonStats(season, tid), appearances, goals, assists,
       // Real SeasonStats carries avgRating alongside ratingSum (see its type),
       // so the fixture must too, or the single-season rating board sees nothing.
       ratingSum: appearances * 7, avgRating: 7, minutesPlayed: appearances * 90,
     })),
-    hist: hist.map(([season, h]) => ({ season, ovr: h, ratings: {}, potential: h, academy: false })),
+    recentHist: hist.map(([season, h]) => ({ season, ovr: h, ratings: {}, potential: h, academy: false })),
     ...(caps === undefined ? {} : { intl: { caps, goals: 3, assists: 0, tournaments: 0, titles: 0, seasons: [] } }),
   } as unknown as Player;
 }
@@ -45,7 +45,7 @@ describe("isArchiveWorthy", () => {
   it("rejects a player who never made a senior appearance, however highly rated", () => {
     // The bulk of every offseason's retirees: unsigned players with no career.
     // Letting these through is what turns the archive into the 88 MB save.
-    const p = makePlayer({ pid: 1, hist: [[2029, 90]] });
+    const p = makePlayer({ pid: 1, recentHist: [[2029, 90]] });
     expect(isArchiveWorthy(p)).toBe(false);
   });
 
@@ -53,7 +53,7 @@ describe("isArchiveWorthy", () => {
     const p = makePlayer({
       pid: 2,
       lines: [[2029, 3, 10, 2, 1]],
-      hist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR]],
+      recentHist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR]],
     });
     expect(isArchiveWorthy(p)).toBe(true);
   });
@@ -64,7 +64,7 @@ describe("isArchiveWorthy", () => {
     const p = makePlayer({
       pid: 3,
       lines: [[2029, 3, RETIREE_ARCHIVE_MIN_APPEARANCES, 5, 5]],
-      hist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR - 10]],
+      recentHist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR - 10]],
     });
     expect(isArchiveWorthy(p)).toBe(true);
   });
@@ -73,7 +73,7 @@ describe("isArchiveWorthy", () => {
     const p = makePlayer({
       pid: 4,
       lines: [[2029, 3, 20, 1, 1]],
-      hist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR - 1]],
+      recentHist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR - 1]],
     });
     expect(isArchiveWorthy(p)).toBe(false);
   });
@@ -90,7 +90,7 @@ describe("archivePlayer", () => {
       [2028, 2, 25, 12, 9],
       [2029, 2, 0, 0, 0], // injured out — must not count as a season played
     ],
-    hist: [[2026, 72], [2027, 78], [2028, 74]],
+    recentHist: [[2026, 72], [2027, 78], [2028, 74]],
     caps: 40,
   });
   const row = archivePlayer(player, SEASON);
@@ -139,13 +139,13 @@ describe("extendRetireeArchive", () => {
   const worthy = (pid: number, peak: number) => makePlayer({
     pid,
     lines: [[2029, 1, 30, 5, 5]],
-    hist: [[2029, peak]],
+    recentHist: [[2029, peak]],
   });
 
   it("appends only the archive-worthy retirees", () => {
     const out = extendRetireeArchive([], [
       worthy(1, RETIREE_ARCHIVE_MIN_PEAK_OVR),
-      makePlayer({ pid: 2, hist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR + 10]] }), // never played
+      makePlayer({ pid: 2, recentHist: [[2029, RETIREE_ARCHIVE_MIN_PEAK_OVR + 10]] }), // never played
     ], SEASON);
     expect(out.map((r) => r.pid)).toEqual([1]);
   });

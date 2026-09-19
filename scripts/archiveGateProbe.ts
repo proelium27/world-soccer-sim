@@ -19,8 +19,8 @@ import type { Player } from "../src/core/players/types.js";
 const SEASONS = Number(process.argv[2] ?? 10);
 const SEED = Number(process.argv[3] ?? 7);
 
-const apps = (p: Player) => p.stats.reduce((n, s) => n + s.appearances, 0);
-const peak = (p: Player) => Math.max(p.ovr, ...p.hist.map((h) => h.ovr));
+const apps = (p: Player) => p.recentStats.reduce((n, s) => n + s.appearances, 0);
+const peak = (p: Player) => Math.max(p.ovr, ...p.recentHist.map((h) => h.ovr));
 
 /** The shipped gate and three looser ones, to price how much each would admit. */
 const GATES = [

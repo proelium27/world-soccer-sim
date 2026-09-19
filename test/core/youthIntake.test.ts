@@ -99,7 +99,7 @@ describe("the academy fills itself", () => {
       // what puts him in front of it at exactly the right rollover.
       expect(p.contract.expiresSeason).toBe(p.born + ACADEMY_SCHOLARSHIP_AGE - 1);
       // His history starts in the academy rather than with a senior point.
-      expect(p.hist.every((h) => h.academy)).toBe(true);
+      expect(p.recentHist.every((h) => h.academy)).toBe(true);
     }
   });
 

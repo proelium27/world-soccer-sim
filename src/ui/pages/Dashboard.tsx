@@ -118,7 +118,7 @@ function topByStat(
   const rows: StatLeaderRow[] = [];
   for (const p of players) {
     if (!pidPool.has(p.pid)) continue;
-    const ss = p.stats.find((s) => s.season === season);
+    const ss = p.recentStats.find((s) => s.season === season);
     if (!ss || Number(ss[key]) <= 0) continue;
     // Match Rating is an average: a one-off cameo shouldn't top the board. The
     // threshold scales with how many games have been played (see caller).

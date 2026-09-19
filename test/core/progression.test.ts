@@ -101,10 +101,10 @@ describe("progressPlayer", () => {
   it("appends a hist snapshot for the season", () => {
     const rng = mulberry32(7);
     const p = generatePlayer(rng, "CB", 55, 1, 19, 1);
-    expect(p.hist).toHaveLength(1);
+    expect(p.recentHist).toHaveLength(1);
     const after = progressPlayer(rng, p, 1);
-    expect(after.hist).toHaveLength(2);
-    expect(after.hist[1].season).toBe(1);
+    expect(after.recentHist).toHaveLength(2);
+    expect(after.recentHist[1].season).toBe(1);
   });
 
   it("does not mutate the input player", () => {
@@ -270,8 +270,8 @@ describe("progressPlayer", () => {
       const rng = mulberry32(22);
       const p = generatePlayer(rng, "CB", 55, 1, 19, 1);
       const after = progressPlayer(rng, { ...p, ratingsLocked: true }, 1);
-      expect(after.hist).toHaveLength(p.hist.length + 1);
-      const snap = after.hist[after.hist.length - 1];
+      expect(after.recentHist).toHaveLength(p.recentHist.length + 1);
+      const snap = after.recentHist[after.recentHist.length - 1];
       expect(snap.season).toBe(1);
       expect(snap.ovr).toBe(p.ovr);
       expect(snap.ratings).toEqual(p.ratings);
@@ -473,7 +473,7 @@ describe("generational talents", () => {
     const template = generatePlayer(mulberry32(11), "CM", 24, 999, 16, 2026);
     const careerPeak = (pid: number, seed: number): number => {
       const rng = mulberry32(seed);
-      let p: Player = { ...template, pid, stats: [], hist: [] };
+      let p: Player = { ...template, pid, recentStats: [], recentHist: [] };
       let peak = p.ovr;
       for (let season = 2027; season <= 2044; season++) {
         p = progressPlayer(rng, p, season, true);

@@ -29,9 +29,9 @@ function entry(
 /** A player whose only record is which club he was on in each listed season. */
 function player(pid: number, seasonTids: Record<number, number>): Player {
   const stats = Object.entries(seasonTids).map(
-    ([s, tid]) => ({ season: Number(s), tid, appearances: 0 }) as Player["stats"][number],
+    ([s, tid]) => ({ season: Number(s), tid, appearances: 0 }) as Player["recentStats"][number],
   );
-  return { pid, stats } as unknown as Player;
+  return { pid, recentStats: stats } as unknown as Player;
 }
 
 describe("computePlayerHonors", () => {

@@ -39,7 +39,7 @@ for (let s = 0; s < SEASONS; s++) {
   let worldMax = 0;
 
   for (const p of league.players) {
-    for (const ss of p.stats) {
+    for (const ss of p.recentStats) {
       if (ss.goals > worldMax) worldMax = ss.goals;
       const compId = compOfTid.get(ss.tid);
       if (compId === undefined) continue;

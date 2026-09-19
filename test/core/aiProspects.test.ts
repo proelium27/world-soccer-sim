@@ -28,8 +28,8 @@ describe("AI prospect retention", () => {
       potential,
       nationality: "England",
       contract: { salary: 100_000, expiresSeason: season + 3 },
-      hist: [],
-      stats: [],
+      recentHist: [],
+      recentStats: [],
     }) as unknown as Player;
 
   /**

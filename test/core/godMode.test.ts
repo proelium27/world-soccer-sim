@@ -40,7 +40,7 @@ function player(over: Partial<Player> = {}): Player {
     pid: 1, name: "A", nationality: "England", born: 2000, pos: "ST",
     heightCm: 180, ratings: { ...RATINGS }, ovr: computeOvr("ST", RATINGS, 180),
     potential: 70, contract: { salary: 1000, expiresSeason: 5 }, injury: null,
-    stats: [], hist: [], ...over,
+    recentStats: [], recentHist: [], ...over,
   };
 }
 
@@ -201,9 +201,9 @@ describe("createCustomPlayer", () => {
     const p = out.players.find((x) => x.pid === pid)!;
     expect(p.ovr).toBe(computeOvr("CM", RATINGS, 178));
     expect(p.born).toBe(l.season - spec.age); // season 3 - age 20
-    expect(p.hist).toHaveLength(1);
-    expect(p.hist[0].season).toBe(l.season - 1); // baseline snapshot at season - 1
-    expect(p.stats).toEqual([]);
+    expect(p.recentHist).toHaveLength(1);
+    expect(p.recentHist[0].season).toBe(l.season - 1); // baseline snapshot at season - 1
+    expect(p.recentStats).toEqual([]);
   });
 
   it("places the new player on the requested club", () => {

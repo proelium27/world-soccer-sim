@@ -182,7 +182,7 @@ export function enrolAcademyYouth(
     peakOvr: growing ? ovr : p.peakOvr,
     ...(growing ? { youthTarget: p.ratings } : {}),
     contract: { salary: terms.salary, expiresSeason: terms.expiresSeason },
-    hist: p.hist.map((h) => (growing ? { ...h, academy: true, ratings, ovr } : { ...h, academy: true })),
+    recentHist: p.recentHist.map((h) => (growing ? { ...h, academy: true, ratings, ovr } : { ...h, academy: true })),
   };
 }
 

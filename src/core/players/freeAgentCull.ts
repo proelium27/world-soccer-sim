@@ -43,7 +43,7 @@ export function careerPeakOvr(player: Player): number {
   // (docs/lazy-career-plan.md), so the invariant is the only thing holding.
   if (player.peakOvr != null) return Math.max(player.ovr, player.peakOvr);
   let peak = player.ovr;
-  for (const h of player.hist ?? []) {
+  for (const h of player.recentHist ?? []) {
     if (h.ovr > peak) peak = h.ovr;
   }
   return peak;
