@@ -704,11 +704,13 @@ export function worldCompetitions(): Competition[] {
     // and a per-conference playoff for the title. The divisions below stand in
     // for the USL.
     { id: 45, country: "United States", tier: 1, name: "US Division 1", teamCount: 30, promotionSpots: 0 },
-    // The USL Championship's shape: 25 clubs in Eastern and Western Conferences
-    // of 13 and 12, placed by geography, with the top eight of each into a
-    // playoff. Below it USL League One's single table of 17, top eight into a
-    // playoff (COUNTRY_LOWER_TITLE_PLAYOFF).
-    { id: 46, country: "United States", tier: 2, name: "US Division 2", teamCount: 25, promotionSpots: 0 },
+    // The USL Championship's shape: 24 clubs in Eastern and Western Conferences
+    // of 12, placed by geography, with the top eight of each into a playoff.
+    // Twelve a side rather than the thirteen and twelve of 25 because only EQUAL halves
+    // can play cross-over games, and a 30-game season needs them: 22 against
+    // your own conference plus 8 across the divide. Below it USL League One's
+    // single table of 17, top eight into a playoff (COUNTRY_LOWER_TITLE_PLAYOFF).
+    { id: 46, country: "United States", tier: 2, name: "US Division 2", teamCount: 24, promotionSpots: 0 },
     { id: 47, country: "United States", tier: 3, name: "US Division 3", teamCount: 17, promotionSpots: 0 },
   ];
 }

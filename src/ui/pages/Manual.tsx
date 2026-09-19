@@ -736,7 +736,7 @@ export function Manual() {
             <strong>Greece</strong>, <strong>Scotland</strong> and <strong>Serbia</strong>) and
             four are in the Americas (<strong>Brazil</strong>, <strong>Argentina</strong>,{" "}
             <strong>Mexico</strong> and the <strong>United States</strong>). Each has its own league
-            pyramid, for 48 leagues and 884 clubs total. You pick any club in any country and
+            pyramid, for 48 leagues and 883 clubs total. You pick any club in any country and
             division when you start.
           </p>
           <p>
@@ -758,11 +758,11 @@ export function Manual() {
             zone. Each half gets its own table on the Standings page, but the overall table is the
             one that counts for prize money, continental places and relegation. Their second
             divisions are split the same way: Argentina&apos;s has its real 36 clubs in two zones
-            of 18, playing 34 games. The US lower divisions copy the USL: a second division of 25
-            in an Eastern Conference of 13 and a Western Conference of 12, each club playing its own
-            conference twice (24 games in the East, 22 in the West), and a third division of 17 in
-            one table, playing 32 with a bye on the rounds a club sits out. Both finish with a
-            playoff of their own: the top eight of each conference in the second division, one-off
+            of 18, playing 34 games. The US lower divisions copy the USL: a second division of 24
+            in an Eastern and a Western Conference of 12, each club playing its own conference
+            twice and then eight games against the other conference for 30 in all, and a third
+            division of 17 in one table, playing 32 with a bye on the rounds a club sits out.
+            Both finish with a playoff of their own: the top eight of each conference in the second division, one-off
             games through each conference and then a final, and the top eight of the table in the
             third.
           </p>

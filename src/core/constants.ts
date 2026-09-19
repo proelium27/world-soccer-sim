@@ -503,7 +503,8 @@ export interface ConferenceFormat {
  * entry). So both countries get at least one second-division club per top-flight
  * club, in the shape their real second divisions have: Argentina's Primera
  * Nacional is 36 clubs in two zones (18 each, zone twice = 34 games), and the
- * USL Championship plays in two conferences (15 each here, 30 games).
+ * USL Championship plays in two conferences (12 each, own conference twice = 22,
+ * plus 8 across the divide = 30 games).
  */
 export const COUNTRY_CONFERENCES: Readonly<Record<string, Readonly<Record<number, ConferenceFormat>>>> = {
   Argentina: {
@@ -512,7 +513,7 @@ export const COUNTRY_CONFERENCES: Readonly<Record<string, Readonly<Record<number
   },
   "United States": {
     1: { names: ["Eastern Conference", "Western Conference"], crossRounds: 4 },
-    2: { names: ["Eastern Conference", "Western Conference"], crossRounds: 0 },
+    2: { names: ["Eastern Conference", "Western Conference"], crossRounds: 8 },
   },
 };
 
