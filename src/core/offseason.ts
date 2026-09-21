@@ -46,6 +46,7 @@ import { continentalFormatFor } from "./cup/cupShape.js";
 import type { QualificationContext } from "./cup/qualification.js";
 import { domesticCupWinners, qualificationByTid } from "./cup/qualification.js";
 import { coefficientSlots } from "./cup/coefficients.js";
+import { continentalSlotOverrides } from "./cup/qualification.js";
 import { buildDomesticCups } from "./domesticCup/cup.js";
 import { archiveDomesticCup } from "./domesticCup/archive.js";
 import { buildSuperCups } from "./superCup/superCup.js";
@@ -1173,7 +1174,12 @@ export function simOffseasonReporting(
     // before it. Zero-sum against the defaults, so the fields stay the size
     // they were (see cup/coefficients.ts); null before there is any record,
     // which leaves the shipped strength-class allocation in place.
-    slots: coefficientSlots(
+    //
+    // Wrapped in continentalSlotOverrides so a save that has resized a
+    // competition (God Mode) awards the places it says it does. The Standings
+    // projection and the news feed wrap the same call the same way; all three
+    // must, or the table shades a place the draw then doesn't hand out.
+    slots: continentalSlotOverrides(league.competitions, league.continentalFormats, coefficientSlots(
       league.competitions,
       teams,
       [
@@ -1189,7 +1195,7 @@ export function simOffseasonReporting(
       ],
       nextSeason,
       league.rollingCoefficients ?? true,
-    ) ?? undefined,
+    )) ?? undefined,
   };
 
   // 6.7. Settle transfer bonuses earned by the season just played, then expire

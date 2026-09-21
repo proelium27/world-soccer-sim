@@ -310,11 +310,15 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
             <span className="cup-tie-seg">2nd {legs[1].awayGoals}–{legs[1].homeGoals}</span>
           </div>
         )}
-        {(slot.tie.wentToExtraTime || slot.tie.wentToPens) && (
+        {(slot.tie.wentToExtraTime || slot.tie.wentToPens || slot.tie.decidedByAwayGoals) && (
           <div className="cup-tie-note">
-            {slot.tie.wentToPens
-              ? `${slot.tie.homePens}–${slot.tie.awayPens} on pens`
-              : "after extra time"}
+            {slot.tie.decidedByAwayGoals
+              // The aggregate is level, so the scoreline above says nothing
+              // about who went through — this line is the only explanation.
+              ? (slot.tie.wentToExtraTime ? "on away goals after extra time" : "on away goals")
+              : slot.tie.wentToPens
+                ? `${slot.tie.homePens}–${slot.tie.awayPens} on pens`
+                : "after extra time"}
           </div>
         )}
       </>

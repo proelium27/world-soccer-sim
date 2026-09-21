@@ -48,6 +48,23 @@ export interface ContinentalFormatSettings {
   playoffRound: boolean;
   /** Whether the knockout ties before the final are two-legged. The final is always one match. */
   twoLegged: boolean;
+  /**
+   * Whether a two-legged tie level on aggregate is decided on away goals — the
+   * real pre-2021 UEFA rule, extra time included. Ignored by a single-leg
+   * format, which has no away leg to count. See resolveTwoLeggedTie.
+   */
+  awayGoals: boolean;
+  /**
+   * How many clubs contest it. "auto" = however many the leagues send, which is
+   * what every save played before this existed.
+   *
+   * A number is a TARGET, not a cap: the places are rescaled across the
+   * competition's leagues to reach it (see continentalSlotOverrides), so a
+   * bigger competition digs deeper into every table and a smaller one is the
+   * best clubs only. Snapped to a size the draw can build — see
+   * snapFieldSize — and capped by how many clubs the leagues actually have.
+   */
+  fieldSize: "auto" | number;
 }
 
 /** The shipped format. Every save that has never touched the setting plays this. */
@@ -57,10 +74,22 @@ export const DEFAULT_CONTINENTAL_FORMAT: Readonly<ContinentalFormatSettings> = O
   knockoutSize: "auto",
   playoffRound: true,
   twoLegged: true,
+  awayGoals: false,
+  fieldSize: "auto",
 });
 
 export const LEAGUE_PHASE_GAME_OPTIONS = [4, 6, 8] as const;
 export const KNOCKOUT_SIZE_OPTIONS: readonly CupKnockoutSize[] = ["auto", 4, 8, 16];
+
+/**
+ * The field sizes offered. Every one is a multiple of four at or above
+ * CUP_MIN_FIELD, which is exactly what isValidCupFieldSize accepts, so a chosen
+ * size survives cupPlan's trim untouched rather than being silently reduced by
+ * it. 64 is the ceiling because a straight knockout can't hold more than two
+ * Round-of-16 brackets anyway and the deeper openings stop being drawable well
+ * before the leagues run out of clubs.
+ */
+export const FIELD_SIZE_OPTIONS: readonly (number)[] = [12, 16, 20, 24, 28, 32, 36, 40, 48, 56, 64];
 
 /** A save's per-competition formats. Absent key = the shipped format. */
 export type ContinentalFormats = Partial<Record<CupCompetitionId, ContinentalFormatSettings>>;
@@ -78,13 +107,33 @@ export function sanitizeContinentalFormat(raw: unknown): ContinentalFormatSettin
     ? (r.leaguePhaseGames as 4 | 6 | 8) : d.leaguePhaseGames;
   const knockoutSize = (KNOCKOUT_SIZE_OPTIONS as readonly unknown[]).includes(r.knockoutSize)
     ? (r.knockoutSize as CupKnockoutSize) : d.knockoutSize;
+  // A hand-edited size is snapped rather than rejected, so "40ish" still gets a
+  // competition. Anything that isn't a usable number falls back to "auto".
+  const rawSize = r.fieldSize;
+  const fieldSize: "auto" | number = typeof rawSize === "number" && Number.isFinite(rawSize) && rawSize >= CUP_MIN_FIELD
+    ? snapFieldSize(rawSize)
+    : d.fieldSize;
   return {
     opening,
     leaguePhaseGames,
     knockoutSize,
     playoffRound: typeof r.playoffRound === "boolean" ? r.playoffRound : d.playoffRound,
     twoLegged: typeof r.twoLegged === "boolean" ? r.twoLegged : d.twoLegged,
+    awayGoals: typeof r.awayGoals === "boolean" ? r.awayGoals : d.awayGoals,
+    fieldSize,
   };
+}
+
+/**
+ * The largest size at or below `n` that the draw can build: a multiple of
+ * CUP_LEAGUE_PHASE_POTS × 2 (so both pots are even), at or above CUP_MIN_FIELD.
+ * Returns CUP_MIN_FIELD for anything smaller, since a competition below the
+ * floor is not one.
+ */
+export function snapFieldSize(n: number): number {
+  const step = CUP_LEAGUE_PHASE_POTS * 2;
+  const snapped = Math.floor(n / step) * step;
+  return Math.max(CUP_MIN_FIELD, snapped);
 }
 
 /** Whether these settings play the shipped format (absent counts as shipped). */
@@ -95,7 +144,9 @@ export function isDefaultContinentalFormat(s: ContinentalFormatSettings | undefi
     && s.leaguePhaseGames === d.leaguePhaseGames
     && s.knockoutSize === d.knockoutSize
     && s.playoffRound === d.playoffRound
-    && s.twoLegged === d.twoLegged;
+    && s.twoLegged === d.twoLegged
+    && s.awayGoals === d.awayGoals
+    && s.fieldSize === d.fieldSize;
 }
 
 /** The settings a competition plays under in a save. */
@@ -146,6 +197,8 @@ export interface ResolvedCupShape {
   openingGames: number;
   koSize: number;
   twoLegged: boolean;
+  /** Whether a level two-legged tie is decided on away goals. Always false for a single-leg format. */
+  awayGoals: boolean;
   /** Swiss: straight into the bracket / into the playoff. Knockout opening: byes / preliminary-round entrants. Groups: all 0. */
   directQF: number;
   playoffTeams: number;
@@ -155,6 +208,11 @@ export interface ResolvedCupShape {
 
 export function resolveCupShape(fieldSize: number, s: ContinentalFormatSettings): ResolvedCupShape {
   const twoLegged = s.twoLegged;
+  // A one-off tie has no away leg to count, so the rule is recorded as off
+  // rather than stored and quietly ignored — the cup page and the tie renderer
+  // both read the shape, and a format that claims a rule it can't apply reads
+  // as a bug.
+  const awayGoals = twoLegged && s.awayGoals;
   if (s.opening === "groups") {
     const groups = Math.floor(fieldSize / 4);
     // Top two of every group is the natural bracket; round to the nearest power
@@ -167,7 +225,7 @@ export function resolveCupShape(fieldSize: number, s: ContinentalFormatSettings)
     const auto = natural - down < up - natural ? down : up;
     let koSize = s.knockoutSize === "auto" ? auto : s.knockoutSize;
     koSize = Math.min(koSize, CUP_KO_MAX_SIZE_CUSTOM, pow2Floor(3 * groups));
-    return { opening: "groups", openingGames: 6, koSize: Math.max(2, koSize), twoLegged, directQF: 0, playoffTeams: 0, groups };
+    return { opening: "groups", openingGames: 6, koSize: Math.max(2, koSize), twoLegged, awayGoals, directQF: 0, playoffTeams: 0, groups };
   }
 
   if (s.opening === "knockout") {
@@ -177,7 +235,7 @@ export function resolveCupShape(fieldSize: number, s: ContinentalFormatSettings)
     const koSize = Math.min(CUP_KO_MAX_SIZE_CUSTOM, pow2Floor(fieldSize), Math.max(wanted, pow2Ceil(fieldSize / 2)));
     const prelim = Math.max(0, fieldSize - koSize); // clubs who must win a preliminary tie
     return {
-      opening: "knockout", openingGames: 0, koSize, twoLegged,
+      opening: "knockout", openingGames: 0, koSize, twoLegged, awayGoals,
       directQF: koSize - prelim, playoffTeams: 2 * prelim, groups: 0,
     };
   }
@@ -185,7 +243,7 @@ export function resolveCupShape(fieldSize: number, s: ContinentalFormatSettings)
   // Swiss league phase.
   if (s.knockoutSize === "auto" && s.playoffRound) {
     const plan = cupKnockoutPlan(fieldSize);
-    return { opening: "league", openingGames: s.leaguePhaseGames, twoLegged, groups: 0, ...plan };
+    return { opening: "league", openingGames: s.leaguePhaseGames, twoLegged, awayGoals, groups: 0, ...plan };
   }
   const koSize = s.knockoutSize === "auto"
     ? cupKnockoutPlan(fieldSize).koSize
@@ -194,7 +252,7 @@ export function resolveCupShape(fieldSize: number, s: ContinentalFormatSettings)
     ? Math.min(CUP_LP_MAX_ADVANCE_BRACKETS * koSize, fieldSize - (fieldSize % 2))
     : koSize;
   return {
-    opening: "league", openingGames: s.leaguePhaseGames, koSize, twoLegged, groups: 0,
+    opening: "league", openingGames: s.leaguePhaseGames, koSize, twoLegged, awayGoals, groups: 0,
     directQF: 2 * koSize - advancing, playoffTeams: 2 * (advancing - koSize),
   };
 }
@@ -296,8 +354,9 @@ function spreadOpening(n: number, last: number): number[] {
 /** Plain-language summary of a format for a given field, for the God Mode preview and the cup page. */
 export function describeCupShape(shape: ResolvedCupShape, fieldSize: number): string {
   const bracket = bracketName(shape.koSize);
+  const away = shape.awayGoals ? ", away goals breaking a level tie" : "";
   const legs = shape.koSize > 2
-    ? (shape.twoLegged ? "two-legged ties up to a one-off final" : "one match per tie, final included")
+    ? (shape.twoLegged ? `two-legged ties up to a one-off final${away}` : "one match per tie, final included")
     : "a one-off final";
   if (shape.opening === "groups") {
     const top = shape.koSize === 2 * shape.groups ? "the top two in each group go through"

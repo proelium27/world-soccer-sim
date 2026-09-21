@@ -46,6 +46,14 @@ export interface CupTie {
    */
   decidedByTablePosition?: true;
   /**
+   * The tie finished level on aggregate and went to the club with more away
+   * goals (see resolveTwoLeggedTie's `awayGoals` rule). Set whether the rule
+   * fired after 90 minutes of the second leg or after extra time —
+   * `wentToExtraTime` says which. Absent on every other tie, so a cup that
+   * doesn't play the rule is unchanged.
+   */
+  decidedByAwayGoals?: true;
+  /**
    * A best-of-three SERIES rather than a tie: MLS's first round. Each game from
    * `home`'s perspective, `at` the club that hosted it; a level game is decided
    * on penalties. On a series `homeGoals`/`awayGoals` are GAMES WON, not goals.

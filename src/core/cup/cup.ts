@@ -132,7 +132,7 @@ export function koFinalRound(cup: CupState): number {
 export type { CupPlan, Entrant, QualificationRoute, QualificationContext } from "./qualification.js";
 export {
   cupPlan, worldHasCup, cupSlotsForCompetition, cupOffsetForCompetition, cupSlotRange,
-  qualifyCupTeams, allocateContinentalPlaces, qualificationByTid,
+  qualifyCupTeams, allocateContinentalPlaces, qualificationByTid, continentalSlotOverrides,
 } from "./qualification.js";
 
 /**
@@ -171,7 +171,7 @@ export function buildCupState(
   /** The save's format for this competition (God Mode). Absent or default → the shipped format, built exactly as before. */
   settings?: ContinentalFormatSettings,
 ): CupState | null {
-  const plan = cupPlan(competitions, format);
+  const plan = cupPlan(competitions, format, routes.slots);
   if (!plan) return null;
   const { field, drawGroups: countryOf } = qualifyCupTeams(competitions, tablesByCompId, format, routes);
   if (field.length !== plan.total) return null;

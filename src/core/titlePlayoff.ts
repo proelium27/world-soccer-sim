@@ -288,7 +288,7 @@ function playTie(
     // The better seed takes a level tie everywhere but the final.
     const levelGoesTo = round === TITLE_ROUND_FINAL ? undefined : high;
     return {
-      ...resolveTwoLeggedTie(rng, leg1, matchData.get(low)!, matchData.get(high)!, 0, levelGoesTo),
+      ...resolveTwoLeggedTie(rng, leg1, matchData.get(low)!, matchData.get(high)!, 0, { levelGoesTo }),
       boxScore: null,
     };
   }
