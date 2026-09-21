@@ -937,6 +937,19 @@ export function Manual() {
             league in there is usually the thing that makes your file apply.
           </p>
           <p>
+            <strong>Each league opens on a set of ready-made shapes</strong>, so you don&apos;t have
+            to work out what a strength of 14 means before you can build anything. Pick
+            &quot;Small European&quot; and you get a 12-club top flight with two up and two down,
+            around the standard of Scotland or Greece; &quot;Closed league&quot; gets you the MLS
+            arrangement, 30 clubs in two conferences with nobody going up or down and the title
+            settled in playoffs. Under the shapes, a short summary tells you what the league you
+            have described would actually be, including roughly what its best club would rate, so
+            you can see where it lands against the leagues already in the game. Every individual
+            control is still there, under <strong>Fine-tune this league</strong>, and it opens by
+            itself if you&apos;ve already set something no shape describes. On a country the game
+            ships, <strong>As shipped</strong> puts it back exactly as it was.
+          </p>
+          <p>
             <strong>Every setting works on the countries the game ships, too.</strong> Hit{" "}
             <strong>Customize</strong> beside England, Spain, Turkey or any of the others and you
             get the same panel a league you added gets: names, strength, money, shape, promotion,
