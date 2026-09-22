@@ -306,7 +306,7 @@ describe("offseason wiring", () => {
     // in the regular phase — no player is progressed, so no conversion fires and
     // this reads as "he stayed a winger". Which seeds halt moves with any change
     // to match results; the raised foul rate is what put this seed's club in a
-    // final (2026-09-19). Byte-identical for a seed that never halts.
+    // final (2026-09-22). Byte-identical for a seed that never halts.
     league = playSeason(league, rng);
     const next = simOffseason(league, rng);
 
