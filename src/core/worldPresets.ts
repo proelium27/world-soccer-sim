@@ -101,6 +101,14 @@ export function describeStrength(offset: number, country?: string): string {
  * blurb can name it and the numbers are already known to work — a world built
  * entirely of these is a world the audits have seen.
  */
+/**
+ * Every shape states each division's conference split, `null` meaning one
+ * table. Leaving them out lets a country's own default split ride through: the
+ * US second division is split by default, so "Small European" on the US came
+ * out as a 12-club division in two halves, which is no preset at all.
+ */
+const ONE_TABLE = { d1Conferences: null, d2Conferences: null, d3Conferences: null } as const;
+
 export const LEAGUE_PRESETS: readonly LeaguePreset[] = [
   {
     id: "shipped",
@@ -112,6 +120,7 @@ export const LEAGUE_PRESETS: readonly LeaguePreset[] = [
     name: "Like the big four",
     blurb: "The strongest football in the world: three divisions of 20, three up and three down, a playoff for the last place up.",
     shape: {
+      ...ONE_TABLE,
       strengthOffset: 0,
       budgetScale: 1,
       divisions: 3,
@@ -129,6 +138,7 @@ export const LEAGUE_PRESETS: readonly LeaguePreset[] = [
     name: "Mid-tier European",
     blurb: "Around France or the Netherlands: 18 clubs a division, still three deep, three up and down.",
     shape: {
+      ...ONE_TABLE,
       strengthOffset: 6,
       budgetScale: 0.65,
       divisions: 3,
@@ -146,6 +156,7 @@ export const LEAGUE_PRESETS: readonly LeaguePreset[] = [
     name: "Small European",
     blurb: "Around Scotland or Greece: a 12-club top flight, two up and down, no playoff.",
     shape: {
+      ...ONE_TABLE,
       strengthOffset: 14,
       budgetScale: 0.36,
       divisions: 3,
@@ -163,6 +174,7 @@ export const LEAGUE_PRESETS: readonly LeaguePreset[] = [
     name: "South American",
     blurb: "Around Brazil: 20 clubs, four up and down, and it plays in the Americas rather than Europe.",
     shape: {
+      ...ONE_TABLE,
       strengthOffset: 6,
       budgetScale: 0.65,
       divisions: 3,
@@ -180,6 +192,7 @@ export const LEAGUE_PRESETS: readonly LeaguePreset[] = [
     name: "Closed league",
     blurb: "MLS-style: 30 clubs in two conferences, nobody promoted or relegated, and the title settled in playoffs.",
     shape: {
+      ...ONE_TABLE,
       strengthOffset: 12,
       budgetScale: 0.4,
       divisions: 2,

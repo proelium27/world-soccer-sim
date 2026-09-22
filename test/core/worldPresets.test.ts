@@ -27,8 +27,9 @@ describe("league presets", () => {
   });
 
   it("puts a country back exactly as it ships, after any preset", () => {
-    for (const country of ["England", "Scotland", "United States"]) {
-      const shipped = shippedSpecs.get(country)!;
+    // Every country, not a sample: a country's own defaults (the US second
+    // division's conference split) are exactly what a preset can fail to clear.
+    for (const [country, shipped] of shippedSpecs) {
       for (const p of LEAGUE_PRESETS) {
         if (!p.shape) continue;
         const changed = normalizeLeagueSpec(applyLeaguePreset(shipped, p, shipped));
