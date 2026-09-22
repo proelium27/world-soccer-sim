@@ -263,7 +263,7 @@ export function SeasonHistory() {
         Country columns are three-letter club codes. Hover one for the full name, or click through
         to that club&apos;s season. In the International column <strong>WC</strong> is the World Cup
         and the other codes are confederations (EUR, SAM, AFR, ASI, NAM, OCE); those championships
-        are played in the two offseasons of every four that don&apos;t have a World Cup.
+        are played once every four years, in the offseason halfway between two World Cups.
       </p>
     </div>
   );

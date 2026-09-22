@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from "react";
+import { EmptyState } from "../components/EmptyState.js";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -261,7 +262,12 @@ export function ClubHistory() {
       </div>
 
       {history.seasonsPlayed === 0 ? (
-        <p>No season's been completed yet. A club's history shows up once you advance past your first season.</p>
+        <EmptyState headline="No season's been completed yet.">
+          <p>
+            A club&apos;s history starts once you advance past your first season: where it
+            finished, what it won and its greatest players.
+          </p>
+        </EmptyState>
       ) : (
         <>
           <h5 className="d-flex align-items-center gap-2">
@@ -527,7 +533,7 @@ export function ClubHistory() {
               {history.seasons.map((s) => {
                 const comp = competitionOf(league.competitions, s.compId);
                 const notes: string[] = [];
-                if (s.champion) notes.push(s.tier === 1 ? "Champions" : "Div 2 Champions");
+                if (s.champion) notes.push(s.tier === 1 ? "Champions" : `Div ${s.tier} Champions`);
                 if (s.promoted) notes.push("Promoted");
                 if (s.relegated) notes.push("Relegated");
                 const cupNote = cupRunNote(s.cupRun);

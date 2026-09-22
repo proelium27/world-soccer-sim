@@ -94,7 +94,9 @@ function allFormats(): ContinentalFormatSettings[] {
     for (const knockoutSize of KNOCKOUT_SIZE_OPTIONS) {
       for (const leaguePhaseGames of LEAGUE_PHASE_GAME_OPTIONS) {
         for (const playoffRound of [true, false]) {
-          out.push({ opening: "league", leaguePhaseGames, knockoutSize, playoffRound, twoLegged });
+          for (const awayGoals of [false, true]) {
+            out.push({ ...DEFAULT_CONTINENTAL_FORMAT, opening: "league", leaguePhaseGames, knockoutSize, playoffRound, twoLegged, awayGoals });
+          }
         }
       }
       out.push({ ...DEFAULT_CONTINENTAL_FORMAT, opening: "groups", knockoutSize, twoLegged });

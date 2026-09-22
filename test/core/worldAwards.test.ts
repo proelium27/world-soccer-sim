@@ -387,6 +387,26 @@ describe("computeWorldAwards — shape and determinism", () => {
     expect(first).toEqual(second);
   });
 
+  it("splits each entry's league season into parts that add back up to it", () => {
+    // The Awards page reads the split to say why a Goalkeeper or Defender of the
+    // Year won; parts that stopped reconciling would explain a different score.
+    const players = [
+      ...squad(100, 1, 78), ...squad(200, 2, 74), ...squad(300, 11, 66),
+      player({ pid: 900, tid: 1, ovr: 80, pos: "GK", saves: 100, goalsAgainst: 20 }),
+      player({ pid: 901, tid: 2, ovr: 76, pos: "CB", tackles: 90, interceptions: 80, goals: 3 }),
+    ];
+    const awards = computeWorldAwards(players, SEASON, ctx());
+    const all = [...awards.ballonDOr, ...awards.goalkeeperOfYear!, ...awards.defenderOfYear!];
+    for (const e of all) {
+      const b = e.breakdown!;
+      expect(b.rating + b.scoring + b.work + b.quality).toBeCloseTo(e.league, 9);
+    }
+    // The Ballon d'Or is scored without position work, so its share must be empty.
+    for (const e of awards.ballonDOr) expect(e.breakdown!.work).toBeCloseTo(0, 12);
+    // A keeper's work is his save percentage, which a real one always has some of.
+    expect(awards.goalkeeperOfYear!.some((e) => Math.abs(e.breakdown!.work) > 0)).toBe(true);
+  });
+
   it("returns empty honors when nobody played that season", () => {
     const { ballonDOr, worldTeamOfYear } = computeWorldAwards([], SEASON, ctx());
     expect(ballonDOr).toEqual([]);

@@ -13,6 +13,7 @@ import type { LeagueStore } from "../../core/leagueState.js";
 import { farewellIndex } from "../../core/players/retirements.js";
 import { playerNameIndex } from "../../core/players/playerNames.js";
 import { TOTS_SLOTS } from "../../core/awards.js";
+import { TOTS_KEEPER_SAVE_PCT_BASELINE } from "../../core/constants.js";
 import { TOTS_LAYOUT } from "../pitchLayout.js";
 import { getRatingColor } from "../utils/ratingColor.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
@@ -244,12 +245,9 @@ function TeamOfSeasonField({
 }
 
 /**
- * The three season stats a shortlist shows beside the score.
- *
- * They differ by award because the awards are decided on different numbers:
- * printing goals and assists next to a Goalkeeper of the Year would suggest the
- * thing he was judged on, and it isn't. Each set is the end product the award's
- * own formula actually weighs.
+ * The season stats the Ballon d'Or shortlist shows beside the score: the end
+ * product its formula actually weighs. The position awards name their own (see
+ * PositionAwardKind).
  */
 interface StatColumn {
   label: string;
@@ -265,33 +263,13 @@ const OUTFIELD_COLUMNS: StatColumn[] = [
   RATING_COLUMN,
 ];
 
-/** `totsScore` judges a keeper on save percentage, not on saves or goals conceded. */
-const KEEPER_COLUMNS: StatColumn[] = [
-  { label: "Saves", value: (s) => s.saves },
-  {
-    label: "Save %",
-    value: (s) => {
-      const faced = s.saves + s.goalsAgainst;
-      return faced > 0 ? `${Math.round((s.saves / faced) * 100)}%` : "—";
-    },
-  },
-  RATING_COLUMN,
-];
-
-/** And pays a defender for tackles and interceptions, counted per game. */
-const DEFENDER_COLUMNS: StatColumn[] = [
-  { label: "Tackles", value: (s) => s.tackles },
-  { label: "Int", value: (s) => s.interceptions },
-  RATING_COLUMN,
-];
-
 /**
  * A worldwide award's shortlist: the winner and the players behind him, with
  * the score broken into the parts that made it up — so a win off the back of a
  * cup run or a World Cup reads differently from a pure league season.
  *
- * Shared by all three worldwide awards, which differ here only in which season
- * stats are worth showing.
+ * Used for the player-of-the-year shortlist. The position awards have their own
+ * layout (PositionAward), built around the one stat each is decided on.
  */
 function WorldAwardTable({
   entries,
@@ -360,66 +338,253 @@ function WorldAwardTable({
 }
 
 /**
- * One of the two position awards: its winner and the rest of his shortlist.
+ * What a position award is actually decided on, beyond the parts every award
+ * shares. Each kind names its own stats, because printing goals and assists
+ * next to a Goalkeeper of the Year would suggest the thing he was judged on,
+ * and it isn't.
+ */
+interface PositionAwardKind {
+  /** What `breakdown.work` is called for this award. */
+  workLabel: string;
+  /** Four headline figures for the winner's strip. */
+  strip: (s: SeasonStats) => { label: string; value: string; sub?: string }[];
+  /** The one number the shortlist ranks the award's own work by. */
+  keyStat: { label: string; value: (s: SeasonStats) => string };
+  /** Keepers almost never score, so their breakdown leaves the row out. */
+  showScoring: boolean;
+}
+
+const perGame = (n: number, s: SeasonStats) =>
+  s.appearances > 0 ? (n / s.appearances).toFixed(1) : "—";
+
+/** Save percentage as the award reads it: saves over shots on target faced. */
+function savePct(s: SeasonStats): string {
+  const faced = s.saves + s.goalsAgainst;
+  return faced > 0 ? `${((s.saves / faced) * 100).toFixed(1)}%` : "—";
+}
+
+const KEEPER_KIND: PositionAwardKind = {
+  workLabel: "Shot-stopping",
+  strip: (s) => [
+    {
+      label: "Save %",
+      value: savePct(s),
+      sub: `${Math.round(TOTS_KEEPER_SAVE_PCT_BASELINE * 100)}% is an average keeper`,
+    },
+    { label: "Saves / game", value: perGame(s.saves, s), sub: `${s.saves} in ${s.appearances} games` },
+    { label: "Conceded / game", value: perGame(s.goalsAgainst, s), sub: `${s.goalsAgainst} in total` },
+    { label: "Avg rating", value: s.avgRating.toFixed(2) },
+  ],
+  keyStat: { label: "Save %", value: savePct },
+  showScoring: false,
+};
+
+const DEFENDER_KIND: PositionAwardKind = {
+  workLabel: "Defending",
+  strip: (s) => [
+    {
+      label: "Tkl + Int / game",
+      value: perGame(s.tackles + s.interceptions, s),
+      sub: `${s.appearances} games`,
+    },
+    { label: "Tackles", value: String(s.tackles), sub: `${perGame(s.tackles, s)} a game` },
+    { label: "Interceptions", value: String(s.interceptions), sub: `${perGame(s.interceptions, s)} a game` },
+    { label: "Avg rating", value: s.avgRating.toFixed(2), sub: `${s.goals}G ${s.assists}A` },
+  ],
+  keyStat: { label: "Tkl+Int / g", value: (s) => perGame(s.tackles + s.interceptions, s) },
+  showScoring: true,
+};
+
+/**
+ * The rows of a "how he won it" table. With a stored breakdown the league
+ * season is split into what the award actually weighs; an entry written before
+ * breakdowns existed only knows the coarse split, and says so by having fewer rows.
+ */
+function awardParts(
+  e: WorldAwardEntry,
+  kind: PositionAwardKind,
+  cupLabel: string,
+): { label: string; value: number }[] {
+  const rows: { label: string; value: number }[] = [];
+  if (e.breakdown) {
+    rows.push({ label: "Match rating", value: e.breakdown.rating });
+    rows.push({ label: kind.workLabel, value: e.breakdown.work });
+    if (kind.showScoring) rows.push({ label: "Goals and assists", value: e.breakdown.scoring });
+    rows.push({ label: "Quality and league strength", value: e.breakdown.quality });
+  } else {
+    rows.push({ label: "League season", value: e.league });
+  }
+  rows.push({ label: "League title", value: e.title });
+  rows.push({ label: `${cupLabel} and domestic cup`, value: e.cup + (e.domesticCup ?? 0) });
+  rows.push({ label: "International", value: e.intl });
+  return rows;
+}
+
+/** A signed difference, with the sign spelled out so it survives without colour. */
+function signed(n: number): string {
+  const r = Math.round(n * 100) / 100;
+  if (r === 0) return "0.00";
+  return `${r > 0 ? "+" : "−"}${Math.abs(r).toFixed(2)}`;
+}
+
+/**
+ * One of the two position awards: who won, the numbers the award is decided
+ * on, where his points came from next to the runner-up's, and the shortlist.
  *
- * Renders nothing at all when the season has no such award, rather than an
- * empty panel saying so — every season already played on an existing save is in
- * exactly that position, and a permanent "no winner" block on all of them would
- * read as something being broken.
+ * The "vs 2nd" column is the point of the breakdown. Match rating and overall
+ * quality are most of everybody's score, so a winner's own totals barely say
+ * anything; the gap to the man behind him says what actually decided it.
+ *
+ * Renders nothing when the season has no such award, rather than an empty panel
+ * saying so. Every season played before these awards existed is in exactly that
+ * position, and a permanent "no winner" block on all of them would read as broken.
  */
 function PositionAward({
   title,
   blurb,
   entries,
-  columns,
+  kind,
+  cupLabel,
   subjectOf,
   leagueName,
   season,
-  statLine,
 }: {
   title: string;
   blurb: string;
   entries: WorldAwardEntry[];
-  columns: StatColumn[];
+  kind: PositionAwardKind;
+  cupLabel: string;
   subjectOf: (pid: number) => AwardSubject | undefined;
   leagueName: (tid: number) => string;
   season: number;
-  statLine: (s: SeasonStats) => string;
 }) {
   if (entries.length === 0) return null;
   const winner = entries[0];
+  const runnerUp = entries[1];
   const subject = subjectOf(winner.pid);
-  const stats = subject?.player?.stats.find((s) => s.season === season);
+  const statsOf = (pid: number) =>
+    subjectOf(pid)?.player?.stats.find((s) => s.season === season);
+  const stats = statsOf(winner.pid);
+  const parts = awardParts(winner, kind, cupLabel);
+  const rivalParts = runnerUp ? awardParts(runnerUp, kind, cupLabel) : null;
+  // Only compare like with like: an old entry and a new one split differently.
+  const comparable = rivalParts !== null && rivalParts.length === parts.length;
+
   return (
-    <>
-      <h5 className="mt-4">
-        {title}
-        <HelpHint>{blurb}</HelpHint>
-      </h5>
-      <div className="row g-3">
-        <div className="col-lg-4">
-          <AwardCard
-            title={title}
-            subject={subject}
-            subtitle={
-              <>
-                <ClubLink tid={winner.tid} season={season} />
-                {stats ? ` · ${statLine(stats)} · ${stats.avgRating.toFixed(2)} avg rating` : ""}
-              </>
-            }
-          />
-        </div>
-        <div className="col-lg-8">
-          <WorldAwardTable
-            entries={entries}
-            subjectOf={subjectOf}
-            leagueName={leagueName}
-            season={season}
-            columns={columns}
-          />
+    <div className="card h-100">
+      <div className="card-body">
+        <h5 className="mb-3 d-flex align-items-center">
+          {title}
+          <HelpHint>{blurb}</HelpHint>
+        </h5>
+
+        {subject ? (
+          <div className="mb-3">
+            <div className="d-flex align-items-center gap-2 fs-5 fw-semibold">
+              <Flag nationality={subject.nationality} />
+              <SubjectName subject={subject} />
+              <span className="text-muted small fw-normal">{subject.pos}</span>
+            </div>
+            <div className="text-muted small mt-1">
+              <ClubLink tid={winner.tid} season={season} />
+              {leagueName(winner.tid) ? ` · ${leagueName(winner.tid)}` : ""}
+            </div>
+          </div>
+        ) : (
+          <p className="text-muted">Not enough qualifying players.</p>
+        )}
+
+        {stats && (
+          <div className="award-strip">
+            {kind.strip(stats).map((f) => (
+              <div key={f.label} className="fin-stat">
+                <div className="fin-stat-label">{f.label}</div>
+                <div className="fin-stat-value">{f.value}</div>
+                {f.sub && <div className="fin-stat-sub">{f.sub}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <h6 className="text-muted text-uppercase small mt-3">How he won it</h6>
+        <table className="table table-sm award-parts mb-3">
+          <thead>
+            <tr>
+              <th>Points from</th>
+              <th className="text-end">Points</th>
+              {comparable && <th className="text-end">vs 2nd</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {parts.map((p, i) => {
+              const diff = comparable ? p.value - rivalParts![i].value : 0;
+              return (
+                <tr key={p.label}>
+                  <td>{p.label}</td>
+                  <td className="text-end">{p.value.toFixed(2)}</td>
+                  {comparable && (
+                    <td
+                      className={
+                        "text-end " +
+                        (Math.abs(diff) < 0.005 ? "text-muted" : diff > 0 ? "text-success" : "text-danger")
+                      }
+                    >
+                      {signed(diff)}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th className="text-end">{winner.score.toFixed(2)}</th>
+              {comparable && <th className="text-end">{signed(winner.score - runnerUp!.score)}</th>}
+            </tr>
+          </tfoot>
+        </table>
+
+        <h6 className="text-muted text-uppercase small">Shortlist</h6>
+        <div className="table-responsive">
+          <table className="table table-sm table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th style={{ width: "2rem" }}>#</th>
+                <th>Player</th>
+                <th className="d-none d-sm-table-cell">Club</th>
+                <th className="text-end">{kind.keyStat.label}</th>
+                <th className="text-end">Rtg</th>
+                <th className="text-end">Pts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e, i) => {
+                const who = subjectOf(e.pid);
+                const s = statsOf(e.pid);
+                return (
+                  <tr key={e.pid}>
+                    <td className="text-muted">{i + 1}</td>
+                    <td>
+                      <span className="d-inline-flex align-items-center gap-2">
+                        {who && <Flag nationality={who.nationality} />}
+                        {who
+                          ? <SubjectName subject={who} />
+                          : <Link to={`/player/${e.pid}`}>{`#${e.pid}`}</Link>}
+                      </span>
+                    </td>
+                    <td className="d-none d-sm-table-cell"><ClubLink tid={e.tid} season={season} /></td>
+                    <td className="text-end">{s ? kind.keyStat.value(s) : "—"}</td>
+                    <td className="text-end">{s ? s.avgRating.toFixed(2) : "—"}</td>
+                    <td className="text-end fw-semibold">{e.score.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -445,14 +610,14 @@ const WORLD_LABELS: HonoursLabels = {
   playerAward: "Ballon d'Or",
   shortlist: "Ballon d'Or shortlist",
   shortlistHelp:
-    "Every league is scored on one scale, so a big season in a weaker league doesn't outrank a big season in a strong one just because its opponents were easier. Cup and international football count too — they're the only places players from different leagues actually meet. Anything done at a club in the Americas counts for a fraction of the same thing in Europe; those players have awards of their own.",
+    "Every league is scored on one scale, so a big season in a weaker league doesn't outrank a big season in a strong one just because its opponents were easier. Cup and international football count too, because they're the only places players from different leagues actually meet. Anything done at a club in the Americas counts for a fraction of the same thing in Europe; those players have awards of their own.",
   cup: "Continental Cup",
   keeper: "Goalkeeper of the Year",
   keeperBlurb:
-    "The Ballon d'Or is scored on goals, assists and rating, so no goalkeeper has ever come close to winning one. This is the award that is actually his: same worldwide scale, but judged on the things a keeper does — saves, goals kept out, and how he rated week to week.",
+    "The Ballon d'Or is scored on goals and assists, so a keeper never gets near it. This one's his. It's the Team of the Season formula on the Ballon d'Or's worldwide scale: his match rating and overall, plus his save percentage against an average keeper's. The table under each winner shows where his points came from next to the runner-up's, so you can see what actually decided it. Trophies, cup runs and international football count exactly as much as they do for the Ballon d'Or.",
   defender: "Defender of the Year",
   defenderBlurb:
-    "Centre-backs and full-backs, judged on the work they actually do: tackles, interceptions, goals kept out and their rating, on the same worldwide scale as the Ballon d'Or.",
+    "Centre-backs and full-backs, on the Ballon d'Or's worldwide scale. On top of their match rating, overall, goals and assists, they get credit for tackles and interceptions per game, so a defender isn't rewarded just for how much defending his club left him to do. Centre-backs get a bit more for it than full-backs. Trophies, cup runs and international football count the same as they do for the Ballon d'Or.",
   team: "World Team of the Year",
   empty:
     "No worldwide awards for this season. Saves from before they existed can only reconstruct them for seasons whose players are still around.",
@@ -466,10 +631,10 @@ const AMERICAS_LABELS: HonoursLabels = {
   cup: "Americas Cup",
   keeper: "Americas Goalkeeper of the Year",
   keeperBlurb:
-    "The best keeper in the Americas, judged on saves, goals kept out and his rating across the Americas' leagues.",
+    "The best keeper in the Americas: his match rating and overall, plus his save percentage against an average keeper's, with the Americas Cup, titles and international football on top.",
   defender: "Americas Defender of the Year",
   defenderBlurb:
-    "Centre-backs and full-backs in the Americas, judged on tackles, interceptions, goals kept out and their rating.",
+    "Centre-backs and full-backs in the Americas: match rating, overall, goals and assists, plus tackles and interceptions per game, with the Americas Cup, titles and international football on top.",
   team: "Americas Team of the Year",
   empty: "No Americas awards for this season. They started with the first season the Americas' leagues finished after they were added.",
 };
@@ -548,9 +713,9 @@ export function Awards() {
       <h4>
         Awards
         <HelpHint>
-          End-of-season honours. The world awards judge every league at once — the Ballon d'Or for
+          End-of-season honours. The world awards judge every league at once: the Ballon d'Or for
           the best player alive, a Goalkeeper and a Defender of the Year, and a World Team of the
-          Year — while the league awards pick a Player of the Season, a Golden Boot and a Team of
+          Year. The league awards pick a Player of the Season, a Golden Boot and a Team of
           the Season inside one competition. Use the dropdown to look back at past seasons.
         </HelpHint>
       </h4>
@@ -672,27 +837,36 @@ export function Awards() {
               season={activeSeason}
             />
 
-            <PositionAward
-              title={labels.keeper}
-              blurb={labels.keeperBlurb}
-              entries={bestKeepers}
-              columns={KEEPER_COLUMNS}
-              subjectOf={subjectOf}
-              leagueName={leagueName}
-              season={activeSeason}
-              statLine={(st) => `${st.saves} saves · ${st.goalsAgainst} conceded`}
-            />
-
-            <PositionAward
-              title={labels.defender}
-              blurb={labels.defenderBlurb}
-              entries={bestDefenders}
-              columns={DEFENDER_COLUMNS}
-              subjectOf={subjectOf}
-              leagueName={leagueName}
-              season={activeSeason}
-              statLine={(st) => `${st.tackles} tackles · ${st.interceptions} interceptions`}
-            />
+            <div className="row g-3 mt-2">
+              {bestKeepers.length > 0 && (
+                <div className="col-xl-6">
+                  <PositionAward
+                    title={labels.keeper}
+                    blurb={labels.keeperBlurb}
+                    entries={bestKeepers}
+                    kind={KEEPER_KIND}
+                    cupLabel={labels.cup}
+                    subjectOf={subjectOf}
+                    leagueName={leagueName}
+                    season={activeSeason}
+                  />
+                </div>
+              )}
+              {bestDefenders.length > 0 && (
+                <div className="col-xl-6">
+                  <PositionAward
+                    title={labels.defender}
+                    blurb={labels.defenderBlurb}
+                    entries={bestDefenders}
+                    kind={DEFENDER_KIND}
+                    cupLabel={labels.cup}
+                    subjectOf={subjectOf}
+                    leagueName={leagueName}
+                    season={activeSeason}
+                  />
+                </div>
+              )}
+            </div>
 
             <h5 className="mt-4">{labels.team}</h5>
             <TeamOfSeasonField

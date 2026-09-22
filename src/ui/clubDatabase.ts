@@ -2,7 +2,8 @@ import type { LeagueStore } from "../core/leagueState.js";
 import type { Player } from "../core/players/types.js";
 import type { StoredTeam } from "../core/teams/clubs.js";
 import type { MatchScore, StandingsRow, TeamSeasonStats } from "../core/standings.js";
-import { computeStandings, computeTeamSeasonStats } from "../core/standings.js";
+import { computeStandings } from "../core/standings.js";
+import { teamSeasonStatsFor } from "../db/leagueDb.js";
 import { computePowerRankingSnapshot } from "../core/teams/powerRanking.js";
 import { budgetCap, financeScaleFor, wageBill } from "../core/finance/budget.js";
 import { pointsDeductionMap } from "../core/finance/debt.js";
@@ -116,7 +117,7 @@ export function buildClubRows(league: LeagueStore): ClubDbRow[] {
   }
 
   const statsByTid = new Map(
-    computeTeamSeasonStats(league.teams.map((t) => t.tid), league.played).map((s) => [s.tid, s]),
+    teamSeasonStatsFor(league, league.teams.map((t) => t.tid)).map((s) => [s.tid, s]),
   );
 
   const spent = new Map<number, number>();

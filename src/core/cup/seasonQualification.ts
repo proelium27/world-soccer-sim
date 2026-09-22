@@ -4,7 +4,7 @@ import type { StandingsRow } from "../standings.js";
 import { computeStandings } from "../standings.js";
 import type { CupCompetitionId } from "../constants.js";
 import type { QualificationRoute, QualificationContext } from "./qualification.js";
-import { qualificationByTid, domesticCupWinners } from "./qualification.js";
+import { qualificationByTid, domesticCupWinners, continentalSlotOverrides } from "./qualification.js";
 import { coefficientSlots } from "./coefficients.js";
 import { pointsDeductionMap } from "../finance/debt.js";
 
@@ -105,12 +105,16 @@ function routesFor(league: LeagueStore, season: number, current: boolean): Quali
       shield: shield?.championTid ?? undefined,
       americas: americas?.championTid ?? undefined,
     },
-    slots: coefficientSlots(
+    slots: continentalSlotOverrides(
       league.competitions,
-      league.teams,
-      [league.cupHistory ?? [], league.shieldHistory ?? [], live],
-      season + 1,
-      league.rollingCoefficients ?? true,
+      league.continentalFormats,
+      coefficientSlots(
+        league.competitions,
+        league.teams,
+        [league.cupHistory ?? [], league.shieldHistory ?? [], live],
+        season + 1,
+        league.rollingCoefficients ?? true,
+      ),
     ) ?? undefined,
   };
 }

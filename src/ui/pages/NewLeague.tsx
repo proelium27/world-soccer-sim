@@ -11,8 +11,7 @@ import {
   type ProgressionModel, DEFAULT_WORLD_CUP_SIZE, type WorldCupSize,
 } from "../../core/constants.js";
 import { WorldCupSizeSelect, worldCupSizeBlurb } from "../components/WorldCupSizeSelect.js";
-import { confederationOf, isEligibleNation } from "../../core/international/index.js";
-import { PICKABLE_NATIONALITIES } from "../components/NationalityEditor.js";
+import { APPOINTABLE_NATIONS } from "./nationalTeams/shared.js";
 import {
   buildCompetitions,
   competitionAbbrev,
@@ -38,6 +37,16 @@ import {
   type LogoTargetClub,
   type NamedLogoPack,
 } from "../../core/teams/logoPack.js";
+import {
+  DEFAULT_IMPORT_SELECTION,
+  clubLogosByTid,
+  describeRosterContents,
+  identityOptions,
+  selectFromRosterFile,
+  unplaceableCompetitions,
+  type ImportSelection,
+} from "../../core/teams/leagueFile.js";
+import { ImportChecklist } from "../components/ImportChecklist.js";
 import { loadLogoFiles } from "../logoImages.js";
 import { LogoSetup } from "../components/LogoSetup.js";
 import { takePendingRoster } from "../pendingRoster.js";
@@ -91,9 +100,25 @@ interface LoadedRoster {
   file: RosterFile;
   /** Which club each slot becomes, so the picker can show real names. */
   byTid: Map<number, RosterFileClub>;
+  /** Badges the file itself carries, by the slot they land on. */
+  logos: Map<number, string>;
   clubs: number;
   squads: number;
   warnings: string[];
+}
+
+/**
+ * Two maps as one, the second winning where both place a badge. Returns the
+ * first untouched when the second is empty, so the crest context only gets a
+ * new value when something really changed.
+ */
+function mergeCrests(
+  a: ReadonlyMap<number, string>,
+  b: ReadonlyMap<number, string>,
+): ReadonlyMap<number, string> {
+  if (b.size === 0) return a;
+  if (a.size === 0) return b;
+  return new Map([...a, ...b]);
 }
 
 /**
@@ -105,13 +130,19 @@ interface LoadedRoster {
 function describeRoster(
   sources: NamedRosterFile[],
   slotWorld: ReturnType<typeof describeWorld>["slotWorld"],
+  selection: ImportSelection,
 ): LoadedRoster {
-  const { file, warnings: combineWarnings } = combineRosterFiles(sources);
+  const { file: combined, warnings: combineWarnings } = combineRosterFiles(sources);
+  // The checklist is applied here, before anything is resolved, so every
+  // preview on the page (the club list, the badges, the counts) and the import
+  // itself all read the same trimmed file.
+  const file = selectFromRosterFile(combined, selection);
   const { slots, warnings } = resolveRosterSlots(slotWorld, file);
   return {
     sources,
     file,
     byTid: new Map(slots.map((s) => [s.tid, s.club])),
+    logos: clubLogosByTid(slots),
     clubs: slots.length,
     squads: slots.filter((s) => s.club.players && s.club.players.length > 0).length,
     warnings: [...combineWarnings, ...warnings],
@@ -167,9 +198,6 @@ export function NewLeague() {
   // taking a federation's offer, so this is a starting point rather than a
   // decision for the save's lifetime the way difficulty is.
   const [userNation, setUserNation] = useState<string | null>(null);
-  // A chosen country the generated world turned out not to be able to field a
-  // squad for. Reported rather than silently dropped — see handleStart.
-  const [nationError, setNationError] = useState<string | null>(null);
   // Filter box for the country list. 211 countries is far too many to scroll
   // for a specific one, and still too few to be worth paginating.
   const [nationFilter, setNationFilter] = useState("");
@@ -214,16 +242,20 @@ export function NewLeague() {
   // reshaped after they are loaded, and a stored resolution would go stale the
   // moment it was — which is precisely why the world editor used to be hidden
   // on this path.
+  const [handoff] = useState(() => takePendingRoster());
   const [rosterSources, setRosterSources] = useState<NamedRosterFile[]>(
-    () => takePendingRoster()?.files ?? [],
+    () => handoff?.files ?? [],
   );
   const [rosterError, setRosterError] = useState<string | null>(null);
   // Held beside the roster sources rather than inside a component, for the same
   // reason those are: the club picker previews them, the Start handlers apply
   // them, and a second copy of "what has the user loaded" is how those two end
   // up disagreeing about what the save will look like.
-  const [logoSources, setLogoSources] = useState<NamedLogoPack[]>([]);
+  const [logoSources, setLogoSources] = useState<NamedLogoPack[]>(() => handoff?.logos ?? []);
   const [logoError, setLogoError] = useState<string | null>(null);
+  // What the import checklist has ticked. Starts with everything, so loading a
+  // file and pressing Start does exactly what it did before the checklist.
+  const [importSelection, setImportSelection] = useState<ImportSelection>(DEFAULT_IMPORT_SELECTION);
   // Failures from "Import League" (a whole exported save), kept separate from
   // rosterError: they surface on different screens and mean different things.
   const [importError, setImportError] = useState<string | null>(null);
@@ -246,9 +278,25 @@ export function NewLeague() {
    * league.
    */
   const worldRoster = useMemo(
-    () => (rosterSources.length > 0 ? describeRoster(rosterSources, world.slotWorld) : null),
-    [rosterSources, world],
+    () => (rosterSources.length > 0
+      ? describeRoster(rosterSources, world.slotWorld, importSelection)
+      : null),
+    [rosterSources, world, importSelection],
   );
+
+  /**
+   * What the world-wide files hold before the checklist trims anything, which
+   * is what the checklist itself lists: a league you unticked must still be
+   * there to tick again.
+   */
+  const worldContents = useMemo(() => {
+    if (rosterSources.length === 0) return null;
+    const { file } = combineRosterFiles(rosterSources);
+    return {
+      contents: describeRosterContents(file),
+      unplaceable: unplaceableCompetitions(world.slotWorld, file),
+    };
+  }, [rosterSources, world]);
 
   /**
    * The roster actually applied: the world-wide files plus the ones attached to
@@ -262,9 +310,14 @@ export function NewLeague() {
     const { files, warnings } = leagueRosterFiles(worldEntries, world.competitions);
     const sources = [...rosterSources, ...files];
     if (sources.length === 0) return null;
-    const described = describeRoster(sources, world.slotWorld);
+    const described = describeRoster(sources, world.slotWorld, importSelection);
     return { ...described, warnings: [...warnings, ...described.warnings] };
-  }, [rosterSources, worldEntries, world]);
+  }, [rosterSources, worldEntries, world, importSelection]);
+
+  // Whether imported clubs take over a slot's name. Read by every preview that
+  // shows a club, so an unticked "names" box is visible before Start is pressed.
+  const takeNames = importSelection.names;
+  const takeColors = importSelection.colors;
 
   /** Every pack and picture batch loaded so far, folded into the one that gets applied. */
   const logoPack = useMemo(
@@ -289,7 +342,7 @@ export function NewLeague() {
       const ids = clubIdentitiesFor(r.country, r.end - r.start);
       ids.forEach((club, i) => {
         const tid = r.start + i;
-        const imported = activeRoster?.byTid.get(tid);
+        const imported = takeNames ? activeRoster?.byTid.get(tid) : undefined;
         out.push({
           tid,
           name: imported?.name ?? club.name,
@@ -298,7 +351,7 @@ export function NewLeague() {
       });
     }
     return out;
-  }, [world, activeRoster]);
+  }, [world, activeRoster, takeNames]);
 
   /**
    * Which clubs the loaded packs will badge, resolved against the world as it
@@ -322,6 +375,17 @@ export function NewLeague() {
   }, [logoMatch, prospectiveClubs]);
 
   /**
+   * Every badge the save will start with: the ones carried inside the league
+   * file, then any loaded separately. A separately loaded pack wins a clash,
+   * because it is the more deliberate choice: someone who loads a pack on top
+   * of a file that already has badges is replacing some of them.
+   */
+  const previewCrests = useMemo(
+    () => mergeCrests(activeRoster?.logos ?? NO_CRESTS, logoMatch?.byTid ?? NO_CRESTS),
+    [activeRoster, logoMatch],
+  );
+
+  /**
    * Reshaping the world can move, remove or re-letter the slot the chosen club
    * sits in, so a selection only survives a change that leaves the slot layout
    * alone — renaming a country, or retuning one, rather than adding or dropping
@@ -339,17 +403,12 @@ export function NewLeague() {
 
   const parsedStartYear = normalizeStartYear(startYear);
 
-  // Countries that can be managed: anything the game ships names for that also
-  // belongs to a confederation, since no confederation means no competition to
-  // enter. One flat alphabetical list, deliberately — whether a country happens
-  // to host one of this world's leagues is not the question being asked here,
-  // and splitting on it implied a distinction the player has no use for. What
-  // actually decides eligibility is how many of its players get generated, which
-  // no grouping can promise and the check at Start reports honestly.
-  const manageableNations = useMemo(
-    () => PICKABLE_NATIONALITIES.filter((n) => confederationOf(n) !== null),
-    [],
-  );
+  // Countries that can be managed: APPOINTABLE_NATIONS, one flat alphabetical
+  // list. Whether a country hosts one of this world's leagues, or even has
+  // enough players to field a team yet, is deliberately not a filter: a
+  // country that can't field one yet is still a job you can hold, and it
+  // joins the next campaign once it has the players.
+  const manageableNations = APPOINTABLE_NATIONS;
   const shownNations = useMemo(() => {
     const q = nationFilter.trim().toLowerCase();
     return q ? manageableNations.filter((n) => n.toLowerCase().includes(q)) : manageableNations;
@@ -392,11 +451,8 @@ export function NewLeague() {
   }
 
   function buildLeague(tid: number): LeagueStore {
-    // Fixed for the life of the page, not re-rolled per attempt. If a chosen
-    // country turns out not to be able to field a squad, the advice is "pick
-    // another one" — which is only true if pressing Start again builds the same
-    // world. A fresh Date.now() would answer a different question each time, so
-    // the same country could fail and then succeed.
+    // Fixed for the life of the page, not re-rolled per attempt, so pressing
+    // Start again (after customizing, say) builds the same world.
     const seed = (seedRef.current ??= Date.now());
     const rng = mulberry32(seed);
     const generated = createLeagueState(
@@ -409,7 +465,9 @@ export function NewLeague() {
     // club's own slot alone where it matters, and a tid nobody owns is a tid it
     // never matches — the same way every other consumer treats it.
     const league = activeRoster
-      ? applyRosterFileToNewLeague(generated, activeRoster.file, tid).league
+      ? applyRosterFileToNewLeague(
+          generated, activeRoster.file, tid, identityOptions(importSelection),
+        ).league
       : generated;
     return {
       ...league,
@@ -448,8 +506,13 @@ export function NewLeague() {
    * gave the name you gave it.
    */
   function crestsFor(league: LeagueStore): ReadonlyMap<number, string> | undefined {
-    if (!logoPack) return undefined;
-    return resolveLogoPack(league.teams, logoPack.pack).byTid;
+    // A league file's own badges are keyed by slot, and a slot's tid is the
+    // same in the preview world and the generated one, so they need no second
+    // resolve. Only the name-matched packs do.
+    const fromFile = activeRoster?.logos ?? NO_CRESTS;
+    const fromPacks = logoPack ? resolveLogoPack(league.teams, logoPack.pack).byTid : NO_CRESTS;
+    const merged = mergeCrests(fromFile, fromPacks);
+    return merged.size > 0 ? merged : undefined;
   }
 
   /**
@@ -475,17 +538,11 @@ export function NewLeague() {
       await yieldToPaint();
       try {
         const league = buildLeague(buildTid);
-        // Whether a country can enter international football at all depends on
-        // the world that just got generated (INTL_MIN_POOL players and a
-        // keeper), and there is no way to know before building it. A pick that
-        // doesn't clear the bar is reported rather than silently dropped — a
-        // save that quietly ignored the country you chose is worse than being
-        // told to choose again.
-        if (userNation && !isEligibleNation(userNation, league.players.filter((p) => p.nationality === userNation))) {
-          setNationError(userNation);
-          return;
-        }
-        setNationError(null);
+        // A country that can't field a team in this world is NOT refused. You
+        // hold the job anyway, and the country joins the next campaign drawn
+        // once it has INTL_MIN_POOL players and a keeper (academy kids count).
+        // Until then the federation has nothing to judge you on, and the
+        // national-team pages say how far off it is (DormantNationNote).
         if (customize || nameClubs) {
           // Hold the generated league in memory and let the user edit team
           // identities before anything is persisted.
@@ -667,9 +724,9 @@ export function NewLeague() {
           <p className="text-muted small mt-2 mb-0">
             A plain text (JSON) file listing clubs by league, each one optionally
             carrying a squad. Write one yourself, or press "Copy AI Prompt to Customize"
-            below and paste that into ChatGPT or Claude — it describes the file format
+            below and paste that into ChatGPT or Claude. It describes the file format
             and, importantly, the exact leagues and squad sizes of the world you're
-            building here, which an AI can't guess. Load as many files as you like — one
+            building here, which an AI can't guess. Load as many files as you like; one
             per league is a far easier ask than a whole world at once. They only load
             while a league is being created: replacing squads in a save already going
             would wipe out the careers of everyone they replaced.
@@ -721,12 +778,13 @@ export function NewLeague() {
   const countryClubs = (range ? clubIdentitiesFor(activeCountry, range.end - range.start) : []).map((club, i) => {
     const tid = range!.start + i;
     const imported = activeRoster?.byTid.get(tid);
-    // An imported club takes over the slot's identity outright, so the picker
-    // shows what the club will actually be called once the save exists.
+    // An imported club takes over the slot's identity (whichever halves the
+    // import checklist left ticked), so the picker shows what the club will
+    // actually be called once the save exists.
     return {
       tid,
-      name: imported?.name ?? club.name,
-      colors: (imported?.colors ?? club.colors) as [string, string],
+      name: (takeNames ? imported?.name : undefined) ?? club.name,
+      colors: ((takeColors ? imported?.colors : undefined) ?? club.colors) as [string, string],
       squad: imported?.players?.length ?? 0,
     };
   });
@@ -768,8 +826,10 @@ export function NewLeague() {
     // is a preview of the save, so anything it shows a badge for has to be
     // something the save will too — including a custom badge outranking the
     // suppression an import turns on.
-    <CustomCrestProvider crests={logoMatch?.byTid ?? NO_CRESTS}>
-    <CrestArtProvider tids={activeRoster ? [...activeRoster.byTid.keys()] : []}>
+    <CustomCrestProvider crests={previewCrests}>
+    {/* Built-in art is only suppressed for a slot that takes an imported NAME,
+        the same rule applyRosterFile uses for importedIdentity. */}
+    <CrestArtProvider tids={activeRoster && takeNames ? [...activeRoster.byTid.keys()] : []}>
     {/* Wider than the prose screens either side of it: this one is a stack of
         controls and a club list, not something you read left to right, and at
         600 a desktop window was mostly empty either side of it. `.container`
@@ -799,10 +859,19 @@ export function NewLeague() {
       {worldRoster && (
         <div className="alert alert-secondary py-2">
           <div>
-            Loaded <strong>{worldRoster.sources.map((s) => s.name).join(", ")}</strong> —{" "}
+            Loaded <strong>{worldRoster.sources.map((s) => s.name).join(", ")}</strong>:{" "}
             {worldRoster.clubs} {worldRoster.clubs === 1 ? "club" : "clubs"},{" "}
-            {worldRoster.squads} with a full squad.
+            {worldRoster.squads} with a full squad
+            {worldRoster.logos.size > 0 && `, ${worldRoster.logos.size} with a badge`}.
           </div>
+          {worldContents && (
+            <ImportChecklist
+              contents={worldContents.contents}
+              selection={importSelection}
+              unplaceable={worldContents.unplaceable}
+              onChange={setImportSelection}
+            />
+          )}
           {worldRoster.warnings.map((w) => (
             <div key={w} className="small text-muted mt-1">
               {w}
@@ -835,6 +904,7 @@ export function NewLeague() {
                 setRosterSources([]);
                 setRosterError(null);
                 setSelectedTid(null);
+                setImportSelection(DEFAULT_IMPORT_SELECTION);
               }}
             >
               Start over
@@ -1152,13 +1222,11 @@ export function NewLeague() {
           <HelpHint label="What does managing a country involve?">
             You pick the squad and the eleven for qualifying, the World Cup and their
             continental championship, on top of your club job, and the federation judges
-            you every campaign. A country needs enough players born into your world to
-            field a squad at all, so you'll be told if the one you pick can't.
+            you every campaign. A country needs {INTL_MIN_POOL} players and a keeper in
+            your world to enter. Pick one that doesn't have them yet and you're still its
+            manager: it joins the next campaign once it does, academy kids included.
           </HelpHint>
         </h6>
-        {/* The squad-eligibility rule used to be spelled out here as well, which
-            was explaining an error before it happened: the nationError alert
-            below already says it in full, and only in the case where it's true. */}
         <p className="text-muted small mb-2">
           {userNation
             ? `You'll pick ${userNation}'s squad and their eleven, on top of your club job.`
@@ -1190,16 +1258,16 @@ export function NewLeague() {
           <button
             type="button"
             className={`list-group-item list-group-item-action py-1${userNation === null ? " active" : ""}`}
-            onClick={() => { setUserNation(null); setNationError(null); }}
+            onClick={() => setUserNation(null)}
           >
-            None &mdash; club football only
+            None (club football only)
           </button>
           {shownNations.map((n) => (
             <button
               type="button"
               key={n}
               className={`list-group-item list-group-item-action py-1 d-flex align-items-center gap-2${userNation === n ? " active" : ""}`}
-              onClick={() => { setUserNation(n); setNationError(null); }}
+              onClick={() => setUserNation(n)}
             >
               <CountryFlag country={n} fallback={n.slice(0, 2).toUpperCase()} />
               {n}
@@ -1211,13 +1279,6 @@ export function NewLeague() {
             </div>
           )}
         </div>
-        {nationError && (
-          <div className="alert alert-warning py-2 mt-2 mb-0" role="alert">
-            {nationError} can't field a squad in this world — there aren't {INTL_MIN_POOL} of
-            their players in it, or no goalkeeper among them. Pick another country, or start
-            with none and wait for an offer.
-          </div>
-        )}
       </div>
       )}
 
@@ -1278,7 +1339,7 @@ export function NewLeague() {
             eight points out of nowhere, and a prospect can go backwards for no reason
             you'll ever see. Steady careers take the dice out. Everyone still improves
             through their early twenties, holds through their peak, and falls away from
-            thirty — faster every year after that — but a player follows his own arc
+            thirty, faster every year after that, but a player follows his own arc
             instead of lurching about. How much he plays still speeds it up or slows it
             down, and players still turn out differently from each other; the difference
             is that who a player becomes is settled in his talent rather than re-rolled

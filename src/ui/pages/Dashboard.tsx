@@ -190,6 +190,8 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
   // ties — so it needs no memo.
   const userInSuperCup = (league.superCups ?? [])
     .some((sc) => sc.teams.includes(league.meta.userTid));
+  // Which continent's club competitions your club can actually reach.
+  const userRegion = competitionRegion(competitionOf(league.competitions, userTeam.compId));
   // Slider position while dragging; persisted (and clamped) only on release
   // so we don't write to IndexedDB on every drag tick.
   const [scoutingDraft, setScoutingDraft] = useState<number | null>(null);
@@ -380,6 +382,8 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
     () => LEADER_STAT_KEYS.map(({ key }) => topByStat(league.players, teamPidPool, league.season, key, ratingMinApps)),
     [league.players, teamPidPool, league.season, ratingMinApps],
   );
+  const hasLeaders = leagueLeaders.some((rows) => rows.length > 0)
+    || teamLeaders.some((rows) => rows.length > 0);
 
   // Season wage bill: senior roster + academy, priced from every player's
   // salary. Memoized so the O(players) salary map isn't rebuilt each render.
@@ -468,7 +472,9 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
                   note={league.manager.offers.length > 0
                     ? `${league.manager.offers.length} club${league.manager.offers.length === 1 ? "" : "s"} want you`
                     : boardExpectation
-                      ? `${confidenceLabel(boardMood)} · ${ordinal(boardExpectation.expectedRank)} of ${boardExpectation.clubs} expected`
+                      ? `${confidenceLabel(boardMood)} · ${boardExpectation.playoffGoal
+                        ? `wants you to ${boardExpectation.playoffGoal}`
+                        : `${ordinal(boardExpectation.expectedRank)} of ${boardExpectation.clubs} expected`}`
                       : confidenceLabel(boardMood)}
                 />
               </div>
@@ -876,8 +882,9 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
                 )}
                 {debt?.inDebt && debt.projected === "clear" && (
                   <div className="alert alert-secondary py-2 text-start" role="alert">
-                    You're in the red. That's allowed, and you can borrow up to{" "}
-                    {currency.format(debt.limit)}, but it costs interest every season and your
+                    You're in the red. That's allowed, and your overdraft lets you keep buying and
+                    signing players down to {currency.format(-debt.limit)}, but it costs interest
+                    every season, taking a player on loan still needs money in the bank, and your
                     scouting stays switched off while you're overdrawn.
                     {" "}<Link to="/finance">See the finances</Link>.
                   </div>
@@ -968,6 +975,14 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
       <div className="card mb-3">
         <div className="card-body">
           <h5 className="card-title">Stat Leaders</h5>
+          {/* Ten empty lists is a screen of headings with nothing under them,
+              which is what this card was at the top of every season. */}
+          {!hasLeaders && (
+            <p className="text-muted small mb-0">
+              These fill up from the first matchday.
+            </p>
+          )}
+          {hasLeaders && (
           <div className="row">
             <div className="col-md-6">
               <div className="text-muted small text-uppercase mb-1">League-wide</div>
@@ -992,7 +1007,8 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
               ))}
             </div>
           </div>
-          <Link to="/leaders" className="small">Full stat leaders</Link>
+          )}
+          {hasLeaders && <Link to="/leaders" className="small">Full stat leaders</Link>}
         </div>
       </div>
 
@@ -1005,17 +1021,29 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
         picks your club out of the world's top ten.
       */}
       <InternationalBracketPanel league={league} />
+      {/*
+        Your own continent's competitions, the same rule the Standings page
+        follows: the two never meet in a club competition, so a Brazilian
+        manager watching the Continental Cup bracket is reading a tournament
+        his club can never enter, and a European one was being shown the
+        Americas Cup beside it. The spectator dashboard keeps all of them,
+        since it has no club to be on one side of.
+      */}
       <div className="row g-3 mt-0">
         <div className="col-lg-4">
           <PowerRankingPanel league={league} highlightTid={league.meta.userTid} />
         </div>
-        <div className="col-lg-4">
-          <CupBracketPanel cup={league.cup} title="Continental Cup" href="/cup" />
-        </div>
-        <div className="col-lg-4">
-          <CupBracketPanel cup={league.shield} title="Continental Shield" href="/shield" />
-        </div>
-        {(league.americasCup ?? null) !== null && (
+        {userRegion !== "americas" && (
+          <>
+            <div className="col-lg-4">
+              <CupBracketPanel cup={league.cup} title="Continental Cup" href="/cup" />
+            </div>
+            <div className="col-lg-4">
+              <CupBracketPanel cup={league.shield} title="Continental Shield" href="/shield" />
+            </div>
+          </>
+        )}
+        {userRegion === "americas" && (league.americasCup ?? null) !== null && (
           <div className="col-lg-4">
             <CupBracketPanel cup={league.americasCup ?? null} title="Americas Cup" href="/americas-cup" />
           </div>

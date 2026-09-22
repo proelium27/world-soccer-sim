@@ -7,7 +7,10 @@ import type { Competition } from "../../../core/competitions.js";
 import type {
   IntlGroup, InternationalState, IntlTournament, IntlQualifyingCampaign,
 } from "../../../core/international/index.js";
-import { groupTable } from "../../../core/international/index.js";
+import { groupTable, confederationOf, nationPoolStatus } from "../../../core/international/index.js";
+import type { Player } from "../../../core/players/types.js";
+import { Link } from "react-router-dom";
+import { PICKABLE_NATIONALITIES } from "../../components/NationalityEditor.js";
 import { INTL_TOURNAMENT_NAME, INTL_CYCLE_YEARS } from "../../../core/constants.js";
 import { EmptyState } from "../../components/EmptyState.js";
 
@@ -27,6 +30,50 @@ const DEFAULT_KO_ROUNDS = 4;
 export function koRoundName(round: number, totalRounds: number = DEFAULT_KO_ROUNDS): string {
   const fromFinal = totalRounds - 1 - round;
   return KO_ROUND_NAMES[KO_ROUND_NAMES.length - 1 - fromFinal] ?? `Round ${round + 1}`;
+}
+
+/**
+ * Every country you can be put in charge of: anything with a name pool and a
+ * confederation to qualify through. Deliberately NOT filtered on whether the
+ * country can field a team today. You can hold a job before the players exist,
+ * and the country joins the next campaign once they do (see `DormantNationNote`).
+ * New League and God Mode both offer this list, so they can't disagree about
+ * who exists.
+ */
+export const APPOINTABLE_NATIONS: string[] = PICKABLE_NATIONALITIES.filter(
+  (n) => confederationOf(n) !== null,
+);
+
+/**
+ * What a national-team page says when the country you manage can't enter
+ * international football yet: how many of its players the world has against
+ * what it needs, and a link to them. Once the country can field a team it
+ * renders `otherwise` instead (the page's ordinary "no campaign right now"
+ * copy), so the two never appear together.
+ */
+export function DormantNationNote({
+  nation, players, otherwise = null,
+}: { nation: string; players: Player[]; otherwise?: ReactNode }) {
+  const status = useMemo(() => nationPoolStatus(nation, players), [nation, players]);
+  if (status.eligible) return <>{otherwise}</>;
+  const short: string[] = [];
+  if (status.players < status.playersNeeded) {
+    short.push(`${status.players} of the ${status.playersNeeded} players they need`);
+  }
+  if (status.keepers < status.keepersNeeded) short.push("no goalkeeper");
+  return (
+    <EmptyState
+      headline={`${nation} can't field a team yet`}
+      action={
+        <Link to={`/database/players?nat=${encodeURIComponent(nation)}`}>
+          See their players
+        </Link>
+      }
+    >
+      Your world has {short.join(" and ")}. You're still their manager. Once they have
+      enough, they join the next campaign that gets drawn and you pick the squad.
+    </EmptyState>
+  );
 }
 
 export function NationName({ nation }: { nation: string }) {
@@ -362,10 +409,11 @@ export function IntlEmpty({ footer }: { footer?: ReactNode } = {}) {
           offseasons of each cycle play one round of qualifying apiece, where every nation with
           enough players works through its confederation group for a place at the{" "}
           {INTL_TOURNAMENT_NAME}. The fourth offseason, the qualifiers meet in groups of four and
-          then a knockout. It's 32 nations unless you change it: the size is on the Qualifying page.
+          then a knockout. Out of the box it's sized to how many nations your world can field,
+          which is 32 on the standard world, and you can change that on the Qualifying page.
         </p>
         <p>
-          You can manage a country alongside your club — pick one when you start a save, or wait
+          You can manage a country alongside your club. Pick one when you start a save, or wait
           for a federation to get in touch over the summer. Every other nation picks itself, so
           the rest of your job is developing players worth calling up and watching how they get on.
         </p>

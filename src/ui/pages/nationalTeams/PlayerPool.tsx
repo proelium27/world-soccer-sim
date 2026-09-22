@@ -15,7 +15,7 @@ import {
   performanceSeasonOptions, usePlayerView, viewKeepsSort, viewSortAccessors, viewTableClass,
   type PlayerView, type ViewSortKey,
 } from "../../playerViews.js";
-import { NationalTeamsLayout, NationName, useClubIndex, ClubCell } from "./shared.js";
+import { NationalTeamsLayout, NationName, useClubIndex, ClubCell, DormantNationNote } from "./shared.js";
 
 /**
  * How many of the eligible pool to list at once.
@@ -110,11 +110,17 @@ export function NTPlayerPool() {
   if (!found) {
     return (
       <NationalTeamsLayout title="Player Pool">
-        <p className="text-muted">
-          There's no campaign to name a squad for right now. One is drawn at the end of
-          each season, and you can change who's in it from here before the first match of
-          that summer.
-        </p>
+        <DormantNationNote
+          nation={nation}
+          players={league.players}
+          otherwise={
+            <p className="text-muted">
+              There's no campaign to name a squad for right now. One is drawn at the end of
+              each season, and you can change who's in it from here before the first match of
+              that summer.
+            </p>
+          }
+        />
       </NationalTeamsLayout>
     );
   }

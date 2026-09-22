@@ -122,6 +122,12 @@
      token block above), which is exactly the property an "info" colour needs. */
   --bs-info: var(--sg-cup);
   --bs-info-rgb: 108, 187, 205;
+  /* `.alert-info` reads these three instead, so without them its text and
+     border stayed stock cyan (#6edff6 / #087990) on the Dashboard, Roster and
+     Academy notices. */
+  --bs-info-text-emphasis: var(--sg-cup);
+  --bs-info-bg-subtle: var(--sg-cup-wash);
+  --bs-info-border-subtle: var(--sg-cup-line);
 
   --bs-emphasis-color-rgb: 240, 245, 242;
   --bs-heading-color: var(--sg-text);
@@ -529,6 +535,55 @@ a:hover {
 .playoff-cut > td {
   border-bottom: 2px dashed var(--bs-border-color);
 }
+
+/* Promotion and relegation lines.
+
+   A rule between two rows rather than a bar or a wash, for the reason
+   .playoff-cut above is one: the row background already carries win/loss, your
+   club and the champion, and the leading-edge bar is spoken for by continental
+   places — which a relegated club can legitimately hold at the same time (win
+   your domestic cup and go down in the same season). A line between rows is the
+   one channel nothing else is using, and it is what a printed league table has
+   always done. Solid means decided on the table; dashed means a playoff still
+   has to settle it.
+
+   Qualified on `.table > tbody > tr`, which is not decoration: `.table > tbody
+   td` sets `border-bottom-color` a line above, and it out-specifies a bare
+   `.band-cut-up > td` — so the line lands at the right width and style in the
+   wrong colour, which looks like a ruled table rather than a broken rule.
+   `.playoff-cut` above never noticed because it asks for the border colour. */
+.table > tbody > tr.band-cut-up > td {
+  border-bottom: 2px solid var(--sg-win);
+}
+.table > tbody > tr.band-cut-up-playoff > td {
+  border-bottom: 2px dashed var(--sg-win);
+}
+.table > tbody > tr.band-cut-down-playoff > td {
+  border-bottom: 2px dashed var(--sg-loss);
+}
+.table > tbody > tr.band-cut-down > td {
+  border-bottom: 2px solid var(--sg-loss);
+}
+/* In the legend the same line has no row to sit under, so it is drawn as a
+   short rule in its own box — the .qual-key-swatch idea, one border instead of
+   a filled block so solid and dashed still read as themselves. */
+.band-key-swatch {
+  display: inline-block;
+  width: 1.1em;
+  vertical-align: 0.25em;
+}
+.band-key-up {
+  border-bottom: 2px solid var(--sg-win);
+}
+.band-key-up-playoff {
+  border-bottom: 2px dashed var(--sg-win);
+}
+.band-key-down-playoff {
+  border-bottom: 2px dashed var(--sg-loss);
+}
+.band-key-down {
+  border-bottom: 2px solid var(--sg-loss);
+}
 .row-win > td {
   box-shadow: inset 0 0 0 9999px var(--sg-win-wash);
 }
@@ -671,6 +726,15 @@ a:hover {
    so capping them here beats tagging each one. */
 .new-league-page p {
   max-width: 74ch;
+}
+
+/* The import checklist's league list. A whole-world file has 48 divisions, so
+   past a handful the list scrolls in its own box instead of pushing the club
+   picker a screen further down. */
+.import-checklist-leagues {
+  max-height: 14rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 /* =========================================================================
@@ -1330,6 +1394,30 @@ a:hover {
   height: 1.3em;
   width: auto;
   vertical-align: middle;
+}
+
+/* Goalkeeper / Defender of the Year: the winner's headline numbers. The Finance
+   page's summary strip (.fin-stat tiles), narrowed so four fit across half the
+   page — the two awards sit side by side from xl up. */
+.award-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 1px;
+  background: var(--sg-border);
+  border: 1px solid var(--sg-border);
+  border-radius: var(--sg-radius);
+  overflow: hidden;
+}
+.award-strip .fin-stat-value {
+  font-size: var(--sg-text-md);
+}
+/* "How he won it": numbers only, so they align and read as a ledger. */
+.award-parts td,
+.award-parts th {
+  font-variant-numeric: tabular-nums;
+}
+.award-parts tfoot th {
+  border-top: 1px solid var(--sg-border-strong);
 }
 
 /* Nations already through to the tournament, on the Qualifying page. Same pill

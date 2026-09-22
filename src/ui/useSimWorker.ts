@@ -13,7 +13,8 @@ import {
 } from "../core/simArchive.js";
 import { referencedPids } from "../core/players/playerNames.js";
 import { honourSourcesOf } from "../core/frivolities/goat.js";
-import { computeTeamSeasonStats } from "../core/standings.js";
+import { teamSeasonStatsFor } from "../db/leagueDb.js";
+import { offseasonCoefficientSlots } from "../core/cup/coefficients.js";
 
 export type SimProgress = {
   matchday: number;
@@ -193,9 +194,11 @@ export function useSimWorker() {
             ? {
                 ...command,
                 league: payload,
-                teamStats: computeTeamSeasonStats(
+                // Off the running fold, not the matches: the league in memory
+                // no longer holds its player lines (db/leagueDb.ts).
+                teamStats: teamSeasonStatsFor(
+                  command.league,
                   command.league.teams.map((t) => t.tid),
-                  command.league.played,
                 ),
                 // extendPlayerNames walks the history we just held back, so the
                 // answer is worked out here instead. See detachNews.
@@ -203,6 +206,13 @@ export function useSimWorker() {
                 // Read off the full league, before `detachNews` empties the cup
                 // histories on the way to the worker.
                 cupChampions: honourSourcesOf(command.league),
+                // The coefficient reads the same held-back cup history, so it is
+                // worked out here too. Without it the worker saw at most one
+                // season of record and never reallocated a single place.
+                cupSlots: (() => {
+                  const slots = offseasonCoefficientSlots(command.league);
+                  return slots ? [...slots] : null;
+                })(),
               }
             : { ...command, league: payload };
 

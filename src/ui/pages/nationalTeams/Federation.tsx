@@ -8,7 +8,7 @@ import {
   type NationOffer, type NationalStint, type NationalVerdictRecord,
 } from "../../../core/nationalManager/index.js";
 import { difficultyProfile } from "../../../core/constants.js";
-import { NationalTeamsLayout, NationName } from "./shared.js";
+import { NationalTeamsLayout, NationName, DormantNationNote } from "./shared.js";
 
 const MOOD_CLASS: Record<string, string> = {
   secure: "bg-success",
@@ -186,6 +186,10 @@ export function NTFederation() {
           </div>
         </div>
       )}
+
+      {/* A country without the players to enter yet: nothing to be judged on,
+          so say so and how far off it is, above the (unmoving) meter. */}
+      {nation && <DormantNationNote nation={nation} players={league.players} />}
 
       {nation ? (
         <div className="card mb-4">

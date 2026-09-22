@@ -7,14 +7,14 @@ import { NATIONALITIES } from "../../core/players/nationalities.js";
 import { SKILL_LABELS } from "../components/PlayerRatingsTooltip.js";
 import { TeamIdentityEditor, type EditableTeam } from "../components/TeamIdentityEditor.js";
 import type { NewPlayerSpec } from "../../core/godMode.js";
-import { OVR_SCALE_SHIFT } from "../../core/constants.js";
+import { OVR_SCALE_SHIFT, INTL_MIN_POOL } from "../../core/constants.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
 import { BackLink } from "../components/BackLink.js";
 import { ClubCrest } from "../components/ClubCrest.js";
 import { Flag } from "../components/Flag.js";
 import { manageableNations } from "../../core/international/index.js";
 import { isSpectator } from "../../core/spectator.js";
-import { NationName } from "./nationalTeams/shared.js";
+import { NationName, APPOINTABLE_NATIONS } from "./nationalTeams/shared.js";
 import { currencyCompact } from "../format.js";
 import { AwardFormulas } from "./GodModeAwards.js";
 import { ContinentalFormats } from "./GodModeContinental.js";
@@ -37,7 +37,7 @@ export function GodMode() {
         <BackLink fallback="/roster" className="small" />
       </div>
       <p className="text-secondary small">
-        Sandbox tools — edits ignore fees, budgets, roster caps, and depth floors.
+        Sandbox tools: edits ignore fees, budgets, roster caps, and depth floors.
       </p>
 
       <ul className="nav nav-tabs mb-3">
@@ -241,7 +241,7 @@ export function Development() {
       </div>
       <p className="text-secondary small mb-2">
         {steady
-          ? "Players follow their own arc: they improve through their early twenties, hold through their peak, and fall away from thirty, faster every year after that. How much they play still speeds it up or slows it down, and talent still separates them — but nobody goes from squad filler to superstar over one summer."
+          ? "Players follow their own arc: they improve through their early twenties, hold through their peak, and fall away from thirty, faster every year after that. How much they play still speeds it up or slows it down, and talent still separates them, but nobody goes from squad filler to superstar over one summer."
           : "Every summer is a roll of the dice. A squad player can add eight points out of nowhere, and a prospect can go backwards for no reason you'll ever see."}
       </p>
       <p className="text-secondary small mb-0">
@@ -263,9 +263,10 @@ export function Development() {
  * that country's eleven back so the AI picks its own again, and opens a new
  * spell here. Your club job is untouched either way.
  *
- * The list is built from `manageableNations`, so it only ever offers countries
- * that can really field a squad in this world — the same call the action gates
- * on, rather than a second opinion about who exists.
+ * The list is every country with a confederation (`APPOINTABLE_NATIONS`, the
+ * same list New League offers). A country that can't field a squad yet is
+ * marked, not hidden: you can hold that job, and the country joins the next
+ * campaign once it has the players.
  */
 function SwitchCountry() {
   const { league, godModeTakeNationalJobAction, leaveNationalJobAction, simming } = useLeague();
@@ -273,13 +274,14 @@ function SwitchCountry() {
   const [filter, setFilter] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
 
-  // Every nation in the world with a deep enough pool, a keeper in it and a
-  // confederation to qualify through. Walks the whole player pool, so it is
-  // held behind a memo rather than recomputed as the search box is typed into.
-  const nations = useMemo(
-    () => (league ? manageableNations(league.players) : []),
+  // Which countries can field a team today. Walks the whole player pool, so it
+  // is held behind a memo rather than recomputed as the search box is typed
+  // into. Only used to mark rows; every appointable country is listed.
+  const ready = useMemo(
+    () => new Set(league ? manageableNations(league.players) : []),
     [league],
   );
+  const nations = APPOINTABLE_NATIONS;
   const shown = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return q ? nations.filter((n) => n.toLowerCase().includes(q)) : nations;
@@ -310,16 +312,6 @@ function SwitchCountry() {
       <div className="text-muted small" style={{ maxWidth: 560 }}>
         You&apos;re spectating, so there&apos;s no manager here for a federation to appoint.
         Take a club on the Switch Club tab first and the countries will open up.
-      </div>
-    );
-  }
-
-  if (nations.length === 0) {
-    return (
-      <div className="text-muted small" style={{ maxWidth: 560 }}>
-        No country in this world has enough players born into it to field a squad, so
-        there&apos;s no national job to take. Worlds with more leagues in them generate
-        deeper pools.
       </div>
     );
   }
@@ -359,7 +351,9 @@ function SwitchCountry() {
           >
             <Flag nationality={n} tip={false} />
             {n}
-            {n === current && <span className="ms-auto small">current</span>}
+            {n === current
+              ? <span className="ms-auto small">current</span>
+              : !ready.has(n) && <span className="ms-auto small text-muted">not enough players yet</span>}
           </button>
         ))}
         {shown.length === 0 && (
@@ -387,6 +381,12 @@ function SwitchCountry() {
               A campaign already under way is inherited as it stands. You take over the squad
               they have, the way a real country changes manager mid-cycle.
             </li>
+            {!ready.has(picked) && (
+              <li>
+                {picked} can&apos;t field a team yet. You&apos;re their manager anyway, and they
+                join the next campaign once they have {INTL_MIN_POOL} players and a keeper.
+              </li>
+            )}
             <li>Nothing about your club job changes.</li>
           </ul>
           <button className="btn btn-sm btn-warning" disabled={simming} onClick={take}>
@@ -488,7 +488,7 @@ function CreatePlayer() {
           <input type="number" className="form-control form-control-sm" value={potential} onChange={(e) => setPotential(Number(e.target.value))} />
         </div>
         <div className="col-6 col-md-3">
-          <label className="form-label form-label-sm">Season wage (£)</label>
+          <label className="form-label form-label-sm">Season wage ($)</label>
           <input type="number" className="form-control form-control-sm" value={salary} onChange={(e) => setSalary(Number(e.target.value))} />
         </div>
         <div className="col-6 col-md-3">
@@ -654,7 +654,7 @@ function RosterBuilder() {
           <option value="" disabled>Select a player to add…</option>
           {addable.map((p) => (
             <option key={p.pid} value={p.pid}>
-              {p.name} — {p.pos} {p.ovr}{rosteredPids.has(p.pid) ? "" : " (free agent)"}
+              {p.name}, {p.pos} {p.ovr}{rosteredPids.has(p.pid) ? "" : " (free agent)"}
             </option>
           ))}
         </select>
@@ -708,7 +708,7 @@ function ClubFinances() {
 
       <div className="row g-2 mb-2" style={{ maxWidth: 480 }}>
         <div className="col-6">
-          <label className="form-label form-label-sm">Budget (£)</label>
+          <label className="form-label form-label-sm">Budget ($)</label>
           <input type="number" className="form-control form-control-sm" value={budgetVal} onChange={(e) => { setBudget(Number(e.target.value)); setSaved(false); }} />
         </div>
         <div className="col-6">

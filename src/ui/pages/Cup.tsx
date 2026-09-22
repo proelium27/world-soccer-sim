@@ -206,14 +206,16 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
               ) : isShield ? (
                 <>
                   A {format.fieldSize}-club competition played alongside the league, for the clubs
-                  that just miss out on the Continental Cup. The 5th and 6th placed clubs of each of
-                  the four strongest leagues get in, plus 3rd and 4th from each of the weaker ones.
+                  that just miss out on the Continental Cup. Every European league sends the next
+                  two clubs below its Continental Cup places, and a country&apos;s domestic cup
+                  winner takes one of those spots if they didn&apos;t qualify some other way.
                 </>
               ) : (
                 <>
-                  A {format.fieldSize}-club competition played alongside the league. The top four
-                  clubs of each of the four strongest leagues get in, plus the top two from each of
-                  the weaker leagues.
+                  A {format.fieldSize}-club competition played alongside the league. The strongest
+                  European leagues send their top four and the rest their top two, and unless
+                  you&apos;ve switched it off, which leagues count as strongest is decided by a
+                  five-season record of how their clubs have done in Europe.
                 </>
               )}
             </p>
@@ -308,11 +310,15 @@ export function Cup({ competition = "continental" }: { competition?: CupCompetit
             <span className="cup-tie-seg">2nd {legs[1].awayGoals}–{legs[1].homeGoals}</span>
           </div>
         )}
-        {(slot.tie.wentToExtraTime || slot.tie.wentToPens) && (
+        {(slot.tie.wentToExtraTime || slot.tie.wentToPens || slot.tie.decidedByAwayGoals) && (
           <div className="cup-tie-note">
-            {slot.tie.wentToPens
-              ? `${slot.tie.homePens}–${slot.tie.awayPens} on pens`
-              : "after extra time"}
+            {slot.tie.decidedByAwayGoals
+              // The aggregate is level, so the scoreline above says nothing
+              // about who went through — this line is the only explanation.
+              ? (slot.tie.wentToExtraTime ? "on away goals after extra time" : "on away goals")
+              : slot.tie.wentToPens
+                ? `${slot.tie.homePens}–${slot.tie.awayPens} on pens`
+                : "after extra time"}
           </div>
         )}
       </>

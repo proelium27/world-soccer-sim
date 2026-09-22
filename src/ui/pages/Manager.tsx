@@ -6,6 +6,8 @@ import { seasonYear, ordinal } from "../format.js";
 import { confidenceMood, confidenceLabel } from "../../core/manager/confidence.js";
 import { managerReputation } from "../../core/manager/jobOffers.js";
 import { cachedExpectations } from "../../core/manager/expectation.js";
+import { boardPlayoffGoal } from "../../core/manager/playoffExpectation.js";
+import { boardContinentalGoals } from "../../core/manager/continentalExpectation.js";
 import { ExpectationPanel, LastSeasonPanel } from "./managerPanels.js";
 import { JobInterestsPanel } from "./JobInterestsPanel.js";
 import { difficultyProfile } from "../../core/constants.js";
@@ -85,7 +87,14 @@ export function Manager() {
             )}
           </div>
           <div className="text-muted small">
-            Their board would expect {ordinal(offer.expectedRank)} of {offer.clubs}
+            {(() => {
+              const { goal } = boardPlayoffGoal(
+                league.competitions.find((c) => c.id === offer.compId), offer.expectedRank,
+              );
+              return goal
+                ? `Their board would want you to ${goal}`
+                : `Their board would expect ${ordinal(offer.expectedRank)} of ${offer.clubs}`;
+            })()}
           </div>
         </div>
         <button
@@ -164,7 +173,7 @@ export function Manager() {
           </div>
           <div className="text-muted small mt-2">
             {manager.sackingEnabled
-              ? "The board judges you on where you finish against what your squad is worth. Beat that and you bank goodwill; fall short often enough and you're out."
+              ? "The board judges you on where you finish against where they expect a club like this to finish, plus your continental football. In a league with a title playoff they judge the playoffs instead of the table. Beat what they expect and you bank goodwill. Fall short often enough and you're out."
               : "Sackings are switched off for this save, so the job is yours for as long as you want it."}
           </div>
 
@@ -204,6 +213,14 @@ export function Manager() {
       <ExpectationPanel
         expectation={expectation}
         competitionName={expectation ? compName(expectation.compId) : ""}
+        continental={expectation
+          ? boardContinentalGoals(
+            league.competitions.find((c) => c.id === expectation.compId),
+            expectation.expectedRank,
+            [league.cup, league.shield, league.americasCup],
+            league.meta.userTid,
+          )
+          : null}
       />
 
       {manager.lastVerdict && <LastSeasonPanel verdict={manager.lastVerdict} />}
@@ -213,7 +230,7 @@ export function Manager() {
       </h5>
       {manager.offers.length === 0 ? (
         <p className="text-muted">
-          Nobody's come calling. Beat what your squad is worth and that changes fast.
+          Nobody's come calling. Finish above what your board expects, or win something, and that changes fast.
         </p>
       ) : (
         <>

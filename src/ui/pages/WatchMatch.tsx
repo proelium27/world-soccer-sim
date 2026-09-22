@@ -24,6 +24,8 @@ import { LiveMatchView } from "../components/LiveMatchView.js";
 import { LiveMatchPicker } from "../components/LiveMatchPicker.js";
 import { competitionOf, competitionSplit } from "../../core/competitions.js";
 import { liveTableRows, toLiveMatch } from "../live/liveMatch.js";
+import { useMatchDetail, withDetail } from "../useMatchDetail.js";
+import { isDetailElided } from "../../db/index.js";
 import { matchLineups } from "../live/lineups.js";
 import { pointsDeductionMap } from "../../core/finance/debt.js";
 
@@ -58,6 +60,26 @@ function Rewatch({ matchIndex }: { matchIndex: number }) {
     [navigate, matchIndex],
   );
 
+  // A loaded league carries no event timelines (see db/leagueDb.ts), and this
+  // screen needs the whole matchday's: the watched match to replay it, and the
+  // others because the rail reconstructs their score minute by minute. A
+  // matchday is a couple of megabytes at the largest world size, fetched once.
+  // Matches simmed in this session are not elided and ask for nothing, which is
+  // the case that matters — watching a game you just played never waits.
+  const wanted = useMemo(() => {
+    if (!league || !match) return [];
+    const homeTeam = league.teams.find((t) => t.tid === match.home);
+    const inComp = new Set(
+      league.teams.filter((t) => t.compId === homeTeam?.compId).map((t) => t.tid),
+    );
+    const out: number[] = [];
+    league.played.forEach((m, i) => {
+      if (m.matchday === match.matchday && inComp.has(m.home) && isDetailElided(m)) out.push(i);
+    });
+    return out;
+  }, [league, match]);
+  const { boxScores, loading: detailLoading } = useMatchDetail(league?.lid, wanted);
+
   // Hooks cannot sit under an early return, so the whole derivation is memoized
   // above the guard and simply answers null when there is no match.
   const view = useMemo(() => {
@@ -67,11 +89,18 @@ function Rewatch({ matchIndex }: { matchIndex: number }) {
       .filter((t) => t.compId === homeTeam?.compId)
       .map((t) => t.tid);
     const inComp = new Set(compTeamIds);
-    const sameMatchday = league.played.filter(
-      (m) => m.matchday === match.matchday && inComp.has(m.home),
-    );
-    const watched = toLiveMatch(match);
-    const others = sameMatchday.filter((m) => m !== match).map(toLiveMatch);
+    // Indices rather than the matches themselves, because the fetched
+    // timelines are keyed by index and the watched match has to be told apart
+    // from the others AFTER it has been rebuilt with its events (which makes it
+    // a different object, so an identity filter would stop excluding it).
+    const sameMatchday: number[] = [];
+    league.played.forEach((m, i) => {
+      if (m.matchday === match.matchday && inComp.has(m.home)) sameMatchday.push(i);
+    });
+    const watched = toLiveMatch(withDetail(match, boxScores.get(matchIndex)));
+    const others = sameMatchday
+      .filter((i) => i !== matchIndex)
+      .map((i) => toLiveMatch(withDetail(league.played[i], boxScores.get(i))));
     return {
       watched,
       others,
@@ -84,13 +113,19 @@ function Rewatch({ matchIndex }: { matchIndex: number }) {
       // way it did on the day rather than starting from today's finished
       // position.
       prior: league.played.filter((m) => m.matchday < match.matchday && inComp.has(m.home)),
-      lineups: matchLineups(match.boxScore),
+      lineups: matchLineups(withDetail(match, boxScores.get(matchIndex)).boxScore),
     };
-  }, [league, match]);
+  }, [league, match, boxScores, matchIndex]);
 
   if (!league) return null;
   if (!match || !view) {
     return <Empty>That match isn&apos;t in this save.</Empty>;
+  }
+  // Playback walks the timeline minute by minute, so starting before it has
+  // arrived would show a goalless match that suddenly fills in. Distinct from
+  // "that match isn't in this save", which is a different answer entirely.
+  if (detailLoading) {
+    return <Empty>Loading the match...</Empty>;
   }
 
   return (

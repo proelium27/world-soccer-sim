@@ -176,6 +176,30 @@ export interface BoxScore {
    * football they recorded.
    */
   firstHalfStoppage?: number;
+  /**
+   * Set when this box score's detail — `events`, `home` and `away` — has been
+   * emptied to keep it out of memory, rather than because the match recorded
+   * none.
+   *
+   * A season's box scores are most of what a mid-season league weighs (~21 KB a
+   * match on the shipped world), so `loadLeague` strips them and
+   * `loadMatchBoxScore` reads one back when a screen needs it. The player lines
+   * feed exactly one whole-season total, which `teamSeasonStatsFor` answers from
+   * a fold taken as they went past.
+   *
+   * It is a marker rather than inferred from empty arrays because the two cases
+   * have to be told apart: an unmarked empty box score means the match
+   * genuinely recorded nothing, and a reader that refetched those would query
+   * forever.
+   *
+   * THE INVARIANT THAT MATTERS: `saveLeague` must never write a box score
+   * carrying this flag. The row on disk holds the real detail, and writing a
+   * stripped copy over it destroys it silently — no throw, no type error, the
+   * match simply loses its box score. `test/db/lazyMatchDetail.test.ts` is the
+   * gate. For the same reason the flag must never reach a file:
+   * `exportLeagueJSON` rehydrates from the store before writing.
+   */
+  detailElided?: true;
 }
 
 const SHOT_WEIGHTS: Record<MatchPosition, number> = {
