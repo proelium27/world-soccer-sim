@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-19",
+  date: "2026-09-22",
   title: "The US second division plays a proper 30-game season",
   items: [
     "It was 25 clubs, an Eastern Conference of 13 and a Western of 12, and the two halves never played each other. That left the East on 24 games and the West on 22.",
