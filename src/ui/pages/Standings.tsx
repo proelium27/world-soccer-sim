@@ -7,7 +7,9 @@ import { computeTeamRating } from "../../core/teams/teamRating.js";
 import { teamSlots } from "../../core/lineup/formations.js";
 import {
   tierOf, competitionRegion, competitionConferences, competitionTitlePlayoff, competitionSplit,
+  divisionAbove, divisionBelow,
 } from "../../core/competitions.js";
+import { promotionBands } from "../../core/promotionBands.js";
 import { conferenceMembers } from "../../core/conferences.js";
 import { worldHasCup, cupSlotsForCompetition, cupSlotRange } from "../../core/cup/cup.js";
 import { seasonQualification } from "../../core/cup/seasonQualification.js";
@@ -97,15 +99,10 @@ export function Standings() {
     return <p className="p-3">Loading...</p>;
   }
 
-  if (league.played.length === 0 && league.seasonHistory.length === 0) {
-    return (
-      <div className="container-fluid p-3">
-        <h4>Standings</h4>
-        <p>No matches played yet.</p>
-      </div>
-    );
-  }
-
+  // A save with nothing played used to stop here with "No matches played yet."
+  // It now falls through to the table, which is the more useful answer to "who
+  // is in my division" — every club, with the position column blank until the
+  // season decides it (see `started`).
   const userTeam = league.teams.find((t) => t.tid === league.meta.userTid);
   const compId = compIdOverride ?? userTeam?.compId ?? league.competitions[0].id;
   const isTier1 = tierOf(league.competitions, compId) === 1;
@@ -191,6 +188,39 @@ export function Standings() {
   const groupNames = comp ? competitionSplit(comp)?.names : undefined;
   const showHalves = !!halves && view === "conferences";
 
+  // Nothing about a table means anything before a ball is kicked: with every
+  // club on zero the order is whatever `computeStandings` fell back to, so
+  // numbering it 1st to 20th and shading a Cup zone across the top states
+  // something the season has not decided. Same rule the Finance page follows
+  // before quoting "1st of 20".
+  const started = season !== "current" || standings.some((r) => r.played > 0);
+
+  // Which places go up and down. Positions rather than clubs, so the lines can
+  // be drawn from matchday 1 — and only on the division's own table, since a
+  // conference half's positions are not the places promotion reads.
+  const bands = comp && !showHalves
+    ? promotionBands(league.competitions, comp, standings.length)
+    : null;
+  const bandCuts = new Map<number, string>();
+  if (bands && started) {
+    const addCut = (position: number, cls: string) => {
+      if (position < 1 || position >= standings.length) return;
+      bandCuts.set(position, [bandCuts.get(position), cls].filter(Boolean).join(" "));
+    };
+    const last = (xs: number[]) => (xs.length > 0 ? xs[xs.length - 1] : null);
+    const first = (xs: number[]) => (xs.length > 0 ? xs[0] : null);
+    const upEnd = last(bands.promoted);
+    if (upEnd !== null) addCut(upEnd, "band-cut-up");
+    const playoffEnd = last(bands.promotionPlayoff);
+    if (playoffEnd !== null) addCut(playoffEnd, "band-cut-up-playoff");
+    const relPlayoff = first(bands.relegationPlayoff);
+    if (relPlayoff !== null) addCut(relPlayoff - 1, "band-cut-down-playoff");
+    const downStart = first(bands.relegated);
+    if (downStart !== null) addCut(downStart - 1, "band-cut-down");
+  }
+  const divisionAboveName = comp ? divisionAbove(league.competitions, comp.id)?.name : undefined;
+  const divisionBelowName = comp ? divisionBelow(league.competitions, comp.id)?.name : undefined;
+
   // OVR/POT are only shown (and sortable) for the current season. Precompute
   // once so the sort accessor and the row render share the same numbers.
   const ratingByTid = new Map<number, { ovr: number; pot: number }>();
@@ -260,11 +290,12 @@ export function Standings() {
             const isUser = row.tid === league.meta.userTid;
             const isChampion = row.tid === championTid;
             const place = qualification.byTid.get(row.tid);
-            const shown = place && zoneShown[place.competition] ? place : undefined;
+            const shown = started && place && zoneShown[place.competition] ? place : undefined;
             const rowClass = [
               isUser && "team-highlight",
               isChampion && "champion-highlight",
               naturalOrder && cut > 0 && pos === cut - 1 && "playoff-cut",
+              naturalOrder && bandCuts.get(pos + 1),
             ]
               .filter(Boolean)
               .join(" ") || undefined;
@@ -287,7 +318,7 @@ export function Standings() {
                       background, which already carries win/loss, your club
                       and the champion. */}
                   {qualBar && <span className={qualBar} title={qualTitle(shown)} />}
-                  {pos + 1}
+                  {started ? pos + 1 : "—"}
                 </td>
                 <td>
                   <span className="d-inline-flex align-items-center gap-1">
@@ -396,7 +427,7 @@ export function Standings() {
         )}
       </div>
       {standings.length === 0 ? (
-        <p>No matches played yet.</p>
+        <p className="text-muted">No clubs in this division.</p>
       ) : (
         <>
         {showHalves && halves && split ? (
@@ -411,6 +442,53 @@ export function Standings() {
           })
         ) : (
           renderTable(standings, 0)
+        )}
+        {groupNames && groupNames.length > 0 && season === "current" && (
+          <p className="text-muted small mt-2 mb-0">
+            Once every club has played the others, this league splits into{" "}
+            {groupNames.slice(0, -1).join(", ")} and {groupNames[groupNames.length - 1]}, and each
+            club plays out the season inside its own group.
+          </p>
+        )}
+        {!started && (
+          <p className="text-muted small mt-2 mb-0">
+            No games played yet, so this is just the clubs. Positions, the
+            promotion and relegation lines and the cup places all appear once
+            the season is under way.
+          </p>
+        )}
+        {bands && started && (bands.promoted.length > 0 || bands.relegated.length > 0
+          || bands.promotionPlayoff.length > 0 || bands.relegationPlayoff.length > 0) && (
+          <p className="qual-key text-muted small mt-2 mb-0">
+            {bands.promoted.length > 0 && (
+              <span className="qual-key-item">
+                <span className="band-key-swatch band-key-up" /> Top {bands.promoted.length} go up
+                {divisionAboveName ? ` to ${divisionAboveName}` : ""}
+              </span>
+            )}
+            {bands.promotionPlayoff.length > 0 && (
+              <span className="qual-key-item">
+                <span className="band-key-swatch band-key-up-playoff" />{" "}
+                {bands.promotionPlayoff.length === 1
+                  ? `${ordinal(bands.promotionPlayoff[0])} plays off for one more place`
+                  : `${ordinal(bands.promotionPlayoff[0])} to ${ordinal(
+                    bands.promotionPlayoff[bands.promotionPlayoff.length - 1],
+                  )} play off for one more place`}
+              </span>
+            )}
+            {bands.relegationPlayoff.length > 0 && (
+              <span className="qual-key-item">
+                <span className="band-key-swatch band-key-down-playoff" />{" "}
+                {ordinal(bands.relegationPlayoff[0])} plays off to stay up
+              </span>
+            )}
+            {bands.relegated.length > 0 && (
+              <span className="qual-key-item">
+                <span className="band-key-swatch band-key-down" /> Bottom {bands.relegated.length}{" "}
+                go down{divisionBelowName ? ` to ${divisionBelowName}` : ""}
+              </span>
+            )}
+          </p>
         )}
         {showHalves && playoffCut > 0 && (
           <p className="qual-key text-muted small mt-2 mb-0">

@@ -272,20 +272,36 @@ export function playFirstLeg(
  * advantage and doubles the sample, so the tie tracks squad strength far more
  * than a single-match coin flip.
  *
- * `levelGoesTo`, when given, replaces extra time and the shootout: a tie level
- * on aggregate is awarded straight to that club. That is the Liguilla's real
- * quarter- and semi-final rule (the better-placed club goes through). Every cup
- * omits it, and a tie that isn't level never reads it, so no existing result
- * moves. Skipping extra time also skips its rng draws, which is safe only
- * because every caller passing this runs the tie on a stream of its own.
+ * `rules.levelGoesTo`, when given, replaces extra time and the shootout: a tie
+ * level on aggregate is awarded straight to that club. That is the Liguilla's
+ * real quarter- and semi-final rule (the better-placed club goes through).
+ *
+ * `rules.awayGoals` breaks a level aggregate on away goals instead — the real
+ * pre-2021 UEFA rule, extra time included (see the block below). Only a
+ * continental competition whose save has switched it on passes it.
+ *
+ * Both default off, and a tie that isn't level on aggregate never reads either,
+ * so no existing result moves. **Skipping extra time also skips its rng draws**,
+ * which matters here in a way `levelGoesTo`'s callers escape: every tie of one
+ * cup round shares a single stream (see playKnockoutLeg), so a tie decided on
+ * away goals shifts the draws for every later tie in the same round. That is
+ * inherent to the rule rather than a defect — a cup playing it is a different
+ * competition — but it is why the rule can only be chosen at the draw.
  */
+export interface TwoLegRules {
+  /** Level on aggregate → this club goes through, with no extra time and no shootout. */
+  levelGoesTo?: number;
+  /** Level on aggregate → more away goals goes through, extra time included. */
+  awayGoals?: boolean;
+}
+
 export function resolveTwoLeggedTie(
   rng: () => number,
   firstLeg: KnockoutLeg,
   hd: TeamMatchData,
   ad: TeamMatchData,
   matchday: number,
-  levelGoesTo?: number,
+  rules: TwoLegRules = {},
 ): CupTie {
   const { round, home, away } = firstLeg;
   // Leg 2: `away` hosts, so leg2.home is the `away` club and leg2.away is `home`.
@@ -313,10 +329,26 @@ export function resolveTwoLeggedTie(
 
   // The Liguilla's quarter- and semi-final rule: level on aggregate goes straight
   // to the named club, and extra time and the shootout are never played.
-  if (homeGoals === awayGoals && levelGoesTo !== undefined) {
+  if (homeGoals === awayGoals && rules.levelGoesTo !== undefined) {
     return {
       round, matchday, home, away, homeGoals, awayGoals, wentToExtraTime, wentToPens,
-      homePens, awayPens, winner: levelGoesTo, boxScore: box, legs, decidedByTablePosition: true,
+      homePens, awayPens, winner: rules.levelGoesTo, boxScore: box, legs, decidedByTablePosition: true,
+    };
+  }
+
+  // Away goals, in this tie's orientation: `home` hosted leg 1, so HIS away
+  // goals are the ones he scored in leg 2, and `away`'s are the ones he scored
+  // in leg 1. Getting these the wrong way round is silent — the rule still
+  // picks a winner, just always the wrong one — so they are named rather than
+  // inlined into the comparison.
+  let homeAwayGoals = leg2.away;
+  const awayAwayGoals = firstLeg.awayGoals;
+  const awayGoalsWinner = (): number => (homeAwayGoals > awayAwayGoals ? home : away);
+
+  if (homeGoals === awayGoals && rules.awayGoals && homeAwayGoals !== awayAwayGoals) {
+    return {
+      round, matchday, home, away, homeGoals, awayGoals, wentToExtraTime, wentToPens,
+      homePens, awayPens, winner: awayGoalsWinner(), boxScore: box, legs, decidedByAwayGoals: true,
     };
   }
 
@@ -325,6 +357,19 @@ export function resolveTwoLeggedTie(
     const et = playExtraTime(rng, hd.composites, ad.composites, hd.xi, ad.xi, box);
     homeGoals += et.homeGoals;
     awayGoals += et.awayGoals;
+    // Extra time is played at `away`'s ground, so goals `home` scores in it are
+    // away goals too — the half of the rule that produced its famous nights.
+    // Reachable only when the aggregate is STILL level, which means both sides
+    // scored the same in extra time, so any score at all hands it to `home`.
+    if (homeGoals === awayGoals && rules.awayGoals) {
+      homeAwayGoals += et.homeGoals;
+      if (homeAwayGoals !== awayAwayGoals) {
+        return {
+          round, matchday, home, away, homeGoals, awayGoals, wentToExtraTime, wentToPens,
+          homePens, awayPens, winner: awayGoalsWinner(), boxScore: box, legs, decidedByAwayGoals: true,
+        };
+      }
+    }
     if (homeGoals === awayGoals) {
       wentToPens = true;
       ({ homePens, awayPens } = playShootout(rng, hd.composites, ad.composites));
@@ -415,7 +460,12 @@ export function playKnockoutLeg(
       const hd = matchData.get(fl.home);
       const ad = matchData.get(fl.away);
       if (!hd || !ad) continue; // defensive
-      finalizeTie(resolveTwoLeggedTie(rng, fl, hd, ad, matchday), fl.home, fl.away);
+      // A shipped-format cup has no `shape` and so never plays away goals,
+      // which is what keeps every existing save's knockout bit-identical.
+      finalizeTie(
+        resolveTwoLeggedTie(rng, fl, hd, ad, matchday, { awayGoals: cup.shape?.awayGoals ?? false }),
+        fl.home, fl.away,
+      );
     }
     return { cup: { ...cup, ties: [...cup.ties, ...newTies], championTid, koLegs: null }, prizes };
   }

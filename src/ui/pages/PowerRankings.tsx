@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
+import { Pagination } from "../components/Pagination.js";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -30,6 +31,18 @@ import {
 } from "../components/RegionSwitch.js";
 import { REGION_LABELS } from "../continents.js";
 
+/**
+ * Rows per page.
+ *
+ * This page ranks every club in the world, and this app's one known performance
+ * failure is DOM weight rather than JavaScript — the /transfers freeze was
+ * 10,684 elements at a 147ms JS render (see CLAUDE.md). Measured on the shipped
+ * 884-club world one season in, the unpaged page rendered 12,242 elements and
+ * 696 crest images down a 20,000px scroll, i.e. already past the size that
+ * froze Transfers. Same size the two database pages settled on.
+ */
+export const POWER_RANKING_PAGE_SIZE = 100;
+
 /** The stored snapshot immediately preceding `snapshot` within the same season, for rank-movement arrows. */
 function previousSnapshot(
   history: PowerRankingSnapshot[],
@@ -47,8 +60,12 @@ export function PowerRankings() {
   const { league } = useLeague();
   const playerByPid = usePlayerMap(league?.players);
   const [expandedTid, setExpandedTid] = useState<number | null>(null);
-  const [compId, setCompId] = useState<number | "all">("all");
+  // null = untouched, so the page can open on the user's own division without
+  // reaching for the league inside a useState initializer (it may still be
+  // loading on the first render).
+  const [compSel, setCompSel] = useState<number | "all" | null>(null);
   const [regionSel, setRegionSel] = useState<RegionView | null>(null);
+  const [page, setPage] = useState(0);
   // -1 = the live "Current" view; otherwise an index into powerRankingHistory.
   const [viewIndex, setViewIndex] = useState(-1);
 
@@ -72,6 +89,17 @@ export function PowerRankings() {
   }
 
   const teamByTid = new Map(league.teams.map((t) => [t.tid, t]));
+
+  // Open on your own division. Ranking 884 clubs on one list answers a question
+  // nobody asked first — where you sit among the clubs you actually play is the
+  // reading the page is for — and it keeps the default view to one division's
+  // worth of rows. A spectator save has no club, so it opens on everything.
+  const userTeam = teamByTid.get(league.meta.userTid);
+  const compId: number | "all" = compSel ?? userTeam?.compId ?? "all";
+  const setCompId = (next: number | "all") => {
+    setCompSel(next);
+    setPage(0);
+  };
 
   // One continent at a time in a world with leagues on both, since the two
   // never meet in a club competition and a club's place among the clubs it
@@ -133,6 +161,14 @@ export function PowerRankings() {
   // instead, which is genuinely new information in that view.
   const showWorldRank = shownCompId !== "all";
 
+  // Ranks, division counts and movement arrows are all computed over the whole
+  // filtered list above; only the rendering is paged, so page 3 still says
+  // "#247" rather than "#47". A filter change can leave the page past the end.
+  const pageCount = Math.max(1, Math.ceil(rows.length / POWER_RANKING_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageStart = currentPage * POWER_RANKING_PAGE_SIZE;
+  const shownRows = rows.slice(pageStart, pageStart + POWER_RANKING_PAGE_SIZE);
+
   // Newest first in the dropdown: seasons descending, matchdays descending
   // within a season. Values are indices into powerRankingHistory.
   const seasonsDesc = [...new Set(history.map((s) => s.season))].sort((a, b) => b - a);
@@ -141,19 +177,19 @@ export function PowerRankings() {
     <div className="container-fluid p-3">
       <h4>Power Rankings</h4>
       <p className="text-muted small mb-3">
-        Teams ranked by a blended Power score: squad OVR (Starting XI + bench, depth-weighted) plus
-        a current-season form bonus: results weighted by opponent quality (beating a strong side
-        counts for more than beating a weak one) and goal difference. Snapshots are kept every few
-        matchdays, so you can look back at how the rankings moved through any season.
-        {isCurrent && " Click a team to see its roster."}
+        Every club ranked by Power: squad strength blended with this season's form.
+        {isCurrent && " Click a club to see its squad."}
       </p>
       <div className="mb-3 d-flex flex-wrap gap-2">
         <select
           className="form-select form-select-sm w-auto"
+          aria-label="Snapshot"
+          title="Look back at how the rankings stood earlier in this or any past season"
           value={isCurrent ? -1 : viewIndex}
           onChange={(e) => {
             setViewIndex(Number(e.target.value));
             setExpandedTid(null);
+            setPage(0);
           }}
         >
           <option value={-1}>Current</option>
@@ -171,7 +207,16 @@ export function PowerRankings() {
             </optgroup>
           ))}
         </select>
-        {view && <RegionSwitch value={view} onChange={setRegionSel} includeBoth />}
+        {view && (
+          <RegionSwitch
+            value={view}
+            onChange={(next) => {
+              setRegionSel(next);
+              setPage(0);
+            }}
+            includeBoth
+          />
+        )}
         <CompetitionSelect
           competitions={regionCompetitions}
           value={shownCompId}
@@ -190,7 +235,12 @@ export function PowerRankings() {
         <thead>
           <tr>
             <th className="text-end">#</th>
-            <th style={{ width: "2.5em" }}></th>
+            <th className="text-center" style={{ width: "3.5em" }}>
+              Move
+              <HelpHint>
+                How many places the club has moved since the previous snapshot of this season.
+              </HelpHint>
+            </th>
             <th>Team</th>
             <th className="text-end">{showWorldRank ? rankScope : "Div"}</th>
             <th className="text-end">Record</th>
@@ -209,13 +259,14 @@ export function PowerRankings() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => {
+          {shownRows.map((r, i) => {
             const team = teamByTid.get(r.tid);
             if (!team) return null;
+            const rank = pageStart + i + 1;
             const isUser = r.tid === league.meta.userTid;
             const isExpanded = isCurrent && expandedTid === r.tid;
             const prevRank = prevRankByTid.get(r.tid);
-            const move = prevRank === undefined ? null : prevRank - (i + 1);
+            const move = prevRank === undefined ? null : prevRank - rank;
             return (
               <Fragment key={r.tid}>
                 <tr
@@ -227,7 +278,7 @@ export function PowerRankings() {
                       : undefined
                   }
                 >
-                  <td className="text-end">{i + 1}</td>
+                  <td className="text-end">{rank}</td>
                   <td className="text-center small">
                     {move !== null && move !== 0 && (
                       <span
@@ -313,6 +364,14 @@ export function PowerRankings() {
           })}
         </tbody>
       </table>
+      <Pagination
+        page={currentPage}
+        pageCount={pageCount}
+        total={rows.length}
+        pageSize={POWER_RANKING_PAGE_SIZE}
+        onPage={setPage}
+        noun="clubs"
+      />
     </div>
   );
 }

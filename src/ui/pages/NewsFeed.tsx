@@ -11,7 +11,7 @@ import { TOTS_SLOTS } from "../../core/awards.js";
 import { NEWS_FEED_SEASON_LIMIT } from "../../core/constants.js";
 import type { CompletedTransfer } from "../../core/transfers/negotiation.js";
 import { isFreeAgentTid } from "../../core/transfers/negotiation.js";
-import { clubDisplayName, currency, seasonYear } from "../format.js";
+import { clubDisplayName, currency, seasonYear, transferFeeLabel } from "../format.js";
 import { Flag } from "../components/Flag.js";
 import { PlayerRefLink, usePlayerRefs } from "../components/PlayerRefLink.js";
 import { NationName } from "./nationalTeams/shared.js";
@@ -112,7 +112,11 @@ function eventDetail(e: NewsEvent): string {
 export function NewsFeed() {
   const { league } = useLeague();
   const [clubFilter, setClubFilter] = useState<ClubFilter>("all");
-  const [seasonFilter, setSeasonFilter] = useState<"all" | number>("all");
+  // null = untouched, resolved below to the newest season that has any news.
+  // "All seasons" draws a card per season, each capped, so a long dynasty is
+  // the cap multiplied by the age of the save — the one shape the cap can't
+  // bound on its own.
+  const [seasonSel, setSeasonSel] = useState<"all" | number | null>(null);
 
   const playerMap = useMemo(
     () => new Map((league?.players ?? []).map((p) => [p.pid, p])),
@@ -283,14 +287,19 @@ export function NewsFeed() {
   const compName = (compId: number | undefined): string | undefined =>
     league.competitions.find((c) => c.id === compId)?.name;
 
+  // Seasons present across either feed, newest first, for the dropdown.
+  const seasons = [...timelinesBySeason.keys()].sort((a, b) => b - a);
+
+  // Open on the latest season that actually has news, rather than on the season
+  // being played: `league.season` has nothing in it on the morning of matchday
+  // 1, and a page that opens on "nothing matches" reads as broken.
+  const seasonFilter: "all" | number = seasonSel ?? seasons[0] ?? "all";
+
   const passesFilters = (season: number, item: FeedItem): boolean => {
     if (clubFilter === "user" && !involvesUser(item)) return false;
     if (seasonFilter !== "all" && season !== seasonFilter) return false;
     return true;
   };
-
-  // Seasons present across either feed, newest first, for the dropdown.
-  const seasons = [...timelinesBySeason.keys()].sort((a, b) => b - a);
 
   const seasonsToShow = seasonFilter === "all" ? seasons : seasons.filter((s) => s === seasonFilter);
 
@@ -350,7 +359,7 @@ export function NewsFeed() {
           className="form-select w-auto"
           value={String(seasonFilter)}
           onChange={(e) =>
-            setSeasonFilter(e.target.value === "all" ? "all" : Number(e.target.value))
+            setSeasonSel(e.target.value === "all" ? "all" : Number(e.target.value))
           }
         >
           <option value="all">All seasons</option>
@@ -387,8 +396,8 @@ export function NewsFeed() {
                 {hidden > 0 && (
                   <p className="text-muted small">
                     {hidden} more {hidden === 1 ? "story" : "stories"} from elsewhere in the world
-                    this season. Everything involving {userTeam?.name ?? "your club"} is shown;
-                    filter to a single season to narrow this down.
+                    this season aren't shown. Everything involving{" "}
+                    {userTeam?.name ?? "your club"} is.
                   </p>
                 )}
                 <div className="table-responsive">
@@ -424,7 +433,10 @@ export function NewsFeed() {
                                   {teamCell(t.fromTid, t.season)} <span className="text-muted">→</span> {teamCell(t.toTid, t.season)}
                                 </span>
                               </td>
-                              <td className="text-end stat-num">{t.loanReturn ? "—" : currency.format(t.fee)}</td>
+                              {/* Shared with every other fee cell in the game,
+                                  so a free signing reads "Free" rather than
+                                  "$0" and a loan says it is one. */}
+                              <td className="text-end stat-num">{transferFeeLabel(t)}</td>
                             </tr>
                           );
                         }

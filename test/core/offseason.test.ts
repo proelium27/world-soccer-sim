@@ -46,7 +46,7 @@ describe("simOffseason", () => {
     expect(next.played).toEqual([]);
     // The next season's opening fixtures: a split division (Scotland, Greece)
     // only has its first phase on the schedule until it is played.
-    expect(next.schedule).toHaveLength(14964);
+    expect(next.schedule).toHaveLength(15036);
   });
 
   it("every team stays at or above the roster safety floor after progression/retirement/FA/youth", () => {

@@ -4,7 +4,8 @@ import type { CupCompetitionId, CupFormat } from "../constants.js";
 import {
   CUP_FORMATS, CONTINENTAL_CUP_FORMAT, CONTINENTAL_ORDER, largestValidCupField,
 } from "../constants.js";
-import { isWeakLeague, competitionRegion } from "../competitions.js";
+import { isWeakLeague, competitionRegion, competitionTeamCount } from "../competitions.js";
+import { continentalFormatFor, type ContinentalFormats } from "./cupShape.js";
 
 /* ── Continental qualification ───────────────────────────────────────────────
  *
@@ -61,6 +62,13 @@ export interface CupPlan {
 export function cupPlan(
   competitions: Competition[],
   format: CupFormat = CONTINENTAL_CUP_FORMAT,
+  /**
+   * This season's per-league slot counts (coefficients, and any size setting).
+   * **Must be the same map the allocation is given**, or the plan promises a
+   * field size the qualifying pass doesn't produce and `buildCupState` answers
+   * a mismatch by building no competition at all.
+   */
+  overrides?: SlotOverrides,
 ): CupPlan | null {
   // Only this competition's own continent: a league elsewhere earns no places
   // in it, so it must not count toward the plan's strong/weak split either.
@@ -70,7 +78,7 @@ export function cupPlan(
   // Summed per league rather than counted by class, because a league can carry
   // its own slot count (Competition.continentalSlots) that differs from the
   // strong/weak default its class would give it.
-  const qualified = tier1.reduce((n, c) => n + cupSlotsForCompetition(c, format), 0);
+  const qualified = tier1.reduce((n, c) => n + cupSlotsForCompetition(c, format, overrides), 0);
   // Trim to a size the league-phase draw can actually build (see
   // isValidCupFieldSize). The shipped world lands exactly on one — 32 for the
   // Cup, 24 for the Shield — so this changes nothing there; a world whose
@@ -88,8 +96,9 @@ export function cupPlan(
 export function worldHasCup(
   competitions: Competition[],
   format: CupFormat = CONTINENTAL_CUP_FORMAT,
+  overrides?: SlotOverrides,
 ): boolean {
-  return cupPlan(competitions, format) !== null;
+  return cupPlan(competitions, format, overrides) !== null;
 }
 
 /**
@@ -103,6 +112,139 @@ export function worldHasCup(
  * the league, so it is passed in rather than stored.
  */
 export type SlotOverrides = ReadonlyMap<number, Partial<Record<CupCompetitionId, number>>>;
+
+/* ── Competition size (God Mode) ─────────────────────────────────────────────
+ *
+ * `ContinentalFormatSettings.fieldSize` says how many clubs contest a
+ * competition. It is applied HERE, as a SlotOverrides map, rather than by
+ * trimming the field at the draw — and that choice is the whole design:
+ *
+ *  - `cupSlotsForCompetition` is the single thing every other qualification
+ *    question is asked through, so rescaling the slots reaches `cupPlan`, the
+ *    allocation, `cupOffsetForCompetition`, `cupSlotRange`, the Standings
+ *    shading and the Cup page legend for free, and none of them can disagree.
+ *  - It is the mechanism the country coefficients already use, so the two
+ *    compose: coefficients re-sort the places between countries, then the size
+ *    scales that allocation to the target.
+ *  - Trimming at the draw could only ever make a competition SMALLER. Scaling
+ *    the slots makes a bigger one real — each league simply sends more of its
+ *    table — and the competitions below it slide down underneath, because their
+ *    offset is derived from the slots above them rather than stored.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Rescale each league's places so a competition fields `target` clubs, by
+ * largest remainder over the allocation it would otherwise have.
+ *
+ * Proportional rather than flat, deliberately: the ladder of places (a big-four
+ * league's four against a weak league's two, and whatever the coefficients have
+ * since done to that) is the shape the world was tuned with, and scaling keeps
+ * it. A flat "+1 each" would hand the smallest leagues the same gain as the
+ * biggest and flatten the ladder every time the size moved.
+ *
+ * `capOf` bounds a league's places by the clubs it actually has left after the
+ * competitions above it have taken theirs. Without it a target larger than the
+ * leagues can fill produces a field shorter than `cupPlan` promised, and
+ * `buildCupState` answers a short field with **null** — no competition at all,
+ * silently. Anything the caps make unreachable is simply not allocated, so the
+ * competition comes out as big as the world can make it.
+ */
+function rescaleSlots(
+  base: Map<number, number>,
+  target: number,
+  capOf: (compId: number) => number,
+): Map<number, number> {
+  const ids = [...base.keys()];
+  const total = [...base.values()].reduce((a, b) => a + b, 0);
+  const out = new Map<number, number>();
+  if (total <= 0 || ids.length === 0) return out;
+
+  const exact = new Map<number, number>();
+  for (const id of ids) exact.set(id, ((base.get(id) ?? 0) * target) / total);
+  // Floor everyone, then hand the remaining places out to the largest
+  // fractional parts. Ties break on compId so the result is order-free — two
+  // leagues with identical claims must not swap places because the map was
+  // built in a different order.
+  let handed = 0;
+  for (const id of ids) {
+    const n = Math.min(Math.floor(exact.get(id) ?? 0), capOf(id));
+    out.set(id, n);
+    handed += n;
+  }
+  const byRemainder = [...ids].sort((a, b) => {
+    const ra = (exact.get(a) ?? 0) - Math.floor(exact.get(a) ?? 0);
+    const rb = (exact.get(b) ?? 0) - Math.floor(exact.get(b) ?? 0);
+    return rb - ra || a - b;
+  });
+  // Several passes, because a league that hits its cap passes its share on to
+  // the next in line rather than leaving the competition short.
+  for (let pass = 0; handed < target && pass <= ids.length; pass++) {
+    let moved = false;
+    for (const id of byRemainder) {
+      if (handed >= target) break;
+      if ((out.get(id) ?? 0) >= capOf(id)) continue;
+      out.set(id, (out.get(id) ?? 0) + 1);
+      handed++;
+      moved = true;
+    }
+    if (!moved) break; // every league is at its cap
+  }
+  return out;
+}
+
+/**
+ * The per-league slot counts a save actually plays, combining the country
+ * coefficients (`base`, which is zero-sum and moves places between countries)
+ * with each competition's size setting (which changes how many there are).
+ *
+ * **Every caller that asks who qualifies must go through this**, or the
+ * Standings shading promises a place the offseason then doesn't award. There
+ * are three: the offseason draw, the live Standings projection and the
+ * continental news feed.
+ *
+ * Returns `base` untouched when no competition sets a size, so a save that has
+ * never opened the setting is byte-identical.
+ */
+export function continentalSlotOverrides(
+  competitions: Competition[],
+  formats: ContinentalFormats | undefined,
+  base: SlotOverrides | null,
+): SlotOverrides | null {
+  const anySized = CONTINENTAL_ORDER.some(
+    (id) => continentalFormatFor(formats, id).fieldSize !== "auto",
+  );
+  if (!anySized) return base;
+
+  const tier1 = competitions.filter((c) => c.tier === 1);
+  const out = new Map<number, Partial<Record<CupCompetitionId, number>>>();
+  for (const [compId, slots] of base ?? []) out.set(compId, { ...slots });
+  // Places already committed to competitions higher up the order, per league.
+  const used = new Map<number, number>();
+
+  const slotsNow = (comp: Competition, id: CupCompetitionId): number =>
+    cupSlotsForCompetition(comp, CUP_FORMATS[id], out);
+
+  for (const id of CONTINENTAL_ORDER) {
+    const format = CUP_FORMATS[id];
+    const inRegion = tier1.filter((c) => competitionRegion(c) === format.region);
+    const setting = continentalFormatFor(formats, id).fieldSize;
+
+    if (setting !== "auto") {
+      const current = new Map<number, number>();
+      for (const c of inRegion) current.set(c.id, slotsNow(c, id));
+      const capOf = (compId: number): number => {
+        const comp = inRegion.find((c) => c.id === compId);
+        if (!comp) return 0;
+        return Math.max(0, competitionTeamCount(comp) - (used.get(compId) ?? 0));
+      };
+      for (const [compId, n] of rescaleSlots(current, setting, capOf)) {
+        out.set(compId, { ...out.get(compId), [id]: n });
+      }
+    }
+    for (const c of inRegion) used.set(c.id, (used.get(c.id) ?? 0) + slotsNow(c, id));
+  }
+  return out;
+}
 
 /** How many league-phase places a tier-1 competition earns in this competition. */
 export function cupSlotsForCompetition(
@@ -401,7 +543,7 @@ export function qualifyCupTeams(
   format: CupFormat = CONTINENTAL_CUP_FORMAT,
   routes: QualificationContext = {},
 ): { field: number[]; compOf: Map<number, number>; drawGroups: Map<number, number>; entrants: Entrant[] } {
-  const plan = cupPlan(competitions, format);
+  const plan = cupPlan(competitions, format, routes.slots);
   const all = allocateContinentalPlaces(competitions, tablesByCompId, routes).get(format.id) ?? [];
   const seeded = [...all].sort(seedSort);
   // Trimmed AFTER seeding, so what gets dropped is the weakest qualifiers in

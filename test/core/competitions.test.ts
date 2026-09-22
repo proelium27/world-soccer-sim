@@ -156,10 +156,10 @@ describe("countryClubRanges", () => {
       { country: "Greece", start: 538, end: 580 },
       { country: "Serbia", start: 580, end: 616 },
       { country: "Brazil", start: 616, end: 676 },
-      // Argentina (30/36/20) and the US (30/25/17) field split top two divisions.
+      // Argentina (30/36/20) and the US (30/24/17) field split top two divisions.
       { country: "Argentina", start: 676, end: 762 },
       { country: "Mexico", start: 762, end: 812 },
-      { country: "United States", start: 812, end: 884 },
+      { country: "United States", start: 812, end: 883 },
     ]);
   });
 });

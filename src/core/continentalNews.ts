@@ -1,7 +1,8 @@
 import type { Competition } from "./competitions.js";
 import type { CupState } from "./cup/types.js";
 import { coefficientSlots } from "./cup/coefficients.js";
-import { cupSlotsForCompetition } from "./cup/qualification.js";
+import { cupSlotsForCompetition, continentalSlotOverrides } from "./cup/qualification.js";
+import type { ContinentalFormats } from "./cup/cupShape.js";
 import { CONTINENTAL_CUP_FORMAT } from "./constants.js";
 
 /**
@@ -37,8 +38,15 @@ function allocationFor(
   histories: readonly CupState[][],
   season: number,
   enabled: boolean,
+  formats: ContinentalFormats | undefined,
 ): Map<number, number> {
-  const overrides = coefficientSlots(competitions, teams, histories, season, enabled);
+  // Through the same combiner the offseason and the Standings projection use,
+  // so a resized competition's news reports the places it actually awards.
+  const overrides = continentalSlotOverrides(
+    competitions,
+    formats,
+    coefficientSlots(competitions, teams, histories, season, enabled),
+  );
   const out = new Map<number, number>();
   for (const comp of competitions) {
     if (comp.tier !== 1) continue;
@@ -60,6 +68,8 @@ export function seasonContinentalNews(
   histories: readonly CupState[][],
   season: number,
   enabled: boolean,
+  /** The save's continental formats, for their size settings. Absent = every competition at its natural size. */
+  formats?: ContinentalFormats,
 ): ContinentalNews[] {
   // A save with the setting off never reallocates, so there is never anything
   // to report — and the two allocations below would be equal anyway. Bailing
@@ -70,8 +80,8 @@ export function seasonContinentalNews(
   // but bailing early saves walking the archive twice on every render.
   if (season < 1) return [];
 
-  const before = allocationFor(competitions, teams, histories, season, enabled);
-  const after = allocationFor(competitions, teams, histories, season + 1, enabled);
+  const before = allocationFor(competitions, teams, histories, season, enabled, formats);
+  const after = allocationFor(competitions, teams, histories, season + 1, enabled, formats);
 
   const out: ContinentalNews[] = [];
   for (const comp of competitions) {

@@ -30,7 +30,7 @@ describe("the Liguilla tiebreaker", () => {
   const play = (seed: number, levelGoesTo?: number) => {
     const rng = mulberry32(seed);
     const leg1 = playFirstLeg(rng, low, high, ld, hd, 0);
-    return resolveTwoLeggedTie(rng, leg1, ld, hd, 0, levelGoesTo);
+    return resolveTwoLeggedTie(rng, leg1, ld, hd, 0, { levelGoesTo });
   };
 
   const levelSeed = Array.from({ length: 400 }, (_, s) => s).find((s) => play(s).wentToExtraTime);
