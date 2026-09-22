@@ -2873,6 +2873,18 @@ export const PLAYER_WILL_REFUSAL_DROP = 0.18;
 export const PLAYER_WILL_RISE_BONUS = 0.35;
 
 /**
+ * Home-country pull, in rating points at full strength: how much more an AI
+ * club values a free agent from its own country, before scaling by how
+ * domestic that league really is and by how little the player cares about club
+ * size (stars feel none of it). See transfers/homePull.ts and
+ * docs/club-reputation.md.
+ *
+ * 0 = off, which is the shipped behaviour until it is tuned against the
+ * nationality drift probe and the ladder/solvency audit.
+ */
+export const HOME_PULL_K = 0;
+
+/**
  * Settling-in friction: a player who has only just joined is much harder to
  * prise away again, scaling his club's keep-value up by this much in his first
  * season and decaying to nothing over PLAYER_SETTLED_SEASONS.

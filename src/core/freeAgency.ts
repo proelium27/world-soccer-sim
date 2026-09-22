@@ -7,7 +7,7 @@ import {
   ROSTER_COMPOSITION, ROSTER_CAP, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
   ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, PROSPECT_AGE_MAX,
   AI_PROSPECT_SLOTS, AI_PROSPECT_MAX_AGE, AI_PROSPECT_MIN_POT,
-  potentialBar, type ProgressionModel,
+  potentialBar, type ProgressionModel, HOME_PULL_K,
 } from "./constants.js";
 import {
   contractTerms, extendContract, seasonSalaryForOvr, extendAcademyContract, academyContractTerms,
@@ -16,6 +16,8 @@ import { mulberry32, hashInts } from "../engine/rng.js";
 import { affordable, type SpendPolicy } from "./finance/debt.js";
 import { refusesFreeAgentSigning, refusesFreeAgentSigningWith } from "./transfers/playerWill.js";
 import { clubStatures } from "./ai/clubContext.js";
+import { homeClubs, homePull } from "./transfers/homePull.js";
+import type { Competition } from "./competitions.js";
 
 /**
  * True while a player the user signed from free agency is inside his
@@ -155,6 +157,13 @@ export function runAIFreeAgency(
    * lever here that works.
    */
   poolMinOvr = 0,
+  /**
+   * The world's competitions, so a club's home country is known. Empty (the
+   * default) means no club has one, i.e. no home pull at all.
+   */
+  competitions: readonly Competition[] = [],
+  /** Strength of home-country pull; see HOME_PULL_K and transfers/homePull.ts. */
+  homePullK = HOME_PULL_K,
 ): { teams: StoredTeam[]; players: Player[]; signings: { pid: number; toTid: number }[] } {
   const prospectPot = potentialBar(AI_PROSPECT_MIN_POT, model);
   const playerMap = new Map(players.map((p) => [p.pid, { ...p }]));
@@ -183,6 +192,14 @@ export function runAIFreeAgency(
    * squad player and every prospect, who are the bulk of what is on offer.
    */
   const statures = clubStatures(teams, players);
+  // How much each club prefers a player from its own country, in rating
+  // points. Added to the ranking score only: it changes WHICH candidate a club
+  // takes, never whether a shortfall is filled, so pass 1's shared-rng draw
+  // count holds whenever the pool has a candidate either way
+  // (homePullRng.test.ts pins that).
+  const homes = homeClubs(teams, competitions);
+  const rankOvr = (p: Player, tid: number): number => p.ovr + homePull(p, homes.get(tid), homePullK);
+  const rankPot = (p: Player, tid: number): number => p.potential + homePull(p, homes.get(tid), homePullK);
   const willing = (p: Player, tid: number): boolean =>
     !refusesFreeAgentSigningWith(p, statures.get(tid) ?? 0, statures, tid);
   // Each free-agent arrival is logged by the caller as a fee-0 transfer (see
@@ -213,7 +230,7 @@ export function runAIFreeAgency(
         const candidates = pool
           .map((pid) => playerMap.get(pid)!)
           .filter((p) => p.pos === pos && willing(p, tid))
-          .sort((a, b) => b.ovr - a.ovr);
+          .sort((a, b) => rankOvr(b, tid) - rankOvr(a, tid));
         const signing = candidates[0];
         if (!signing) break;
         sign(team, signing);
@@ -267,7 +284,7 @@ export function runAIFreeAgency(
       const best = pool
         .map((pid) => playerMap.get(pid)!)
         .filter((p) => p.pos === pos && willing(p, tid))
-        .sort((a, b) => b.ovr - a.ovr)[0];
+        .sort((a, b) => rankOvr(b, tid) - rankOvr(a, tid))[0];
       if (best && best.ovr > weakest) poachSign(team, best);
     }
   }
@@ -334,7 +351,7 @@ export function runAIFreeAgency(
           (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot
             && willing(p, tid),
         )
-        .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid)[0];
+        .sort((a, b) => rankPot(b, tid) - rankPot(a, tid) || b.ovr - a.ovr || a.pid - b.pid)[0];
       if (!best) break;
       prospectSign(team, best);
     }

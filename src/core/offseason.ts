@@ -774,7 +774,7 @@ export function simOffseasonReporting(
   let faSignings: { pid: number; toTid: number }[];
   ({ teams, players, signings: faSignings } = runAIFreeAgency(
     teams, players, nextSeason, rng, league.meta.userTid, signingOrder, activeLoans,
-    league.progressionModel,
+    league.progressionModel, 0, league.competitions,
   ));
   // Log each free-agent arrival as a fee-0 transfer FROM the sentinel so the
   // player's club-by-season history registers the move (an unrecorded free
@@ -1033,7 +1033,7 @@ export function simOffseasonReporting(
   let mopUpSignings: { pid: number; toTid: number }[];
   ({ teams, players, signings: mopUpSignings } = runAIFreeAgency(
     teams, players, nextSeason, mopUpRng, league.meta.userTid, signingOrder, activeLoans,
-    league.progressionModel, MOP_UP_MIN_OVR,
+    league.progressionModel, MOP_UP_MIN_OVR, league.competitions,
   ));
   ceilingTransfers = [
     ...ceilingTransfers,
