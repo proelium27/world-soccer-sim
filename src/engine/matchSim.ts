@@ -14,6 +14,8 @@ import {
   REBOUND_PROB,
   HOME_ATTACK_BONUS,
   FOUL_BASE,
+  FOUL_BASE_DETAILED,
+  FOUL_RATE_MULTIPLIER,
   FREE_KICK_CHANCE_BASE,
   RED_GIVEN_FOUL_SIMPLE,
   YELLOW_GIVEN_FOUL,
@@ -1036,8 +1038,8 @@ export function simMatchDetailed(
       continue;
     }
 
-    if (rng() < FOUL_BASE) {
-      const fouler = pickFouler(rng, onPitch[defSide]);
+    if (rng() < FOUL_BASE_DETAILED) {
+      const fouler = pickFouler(rng, onPitch[defSide], yellowCounts);
       lines.get(fouler.pid)!.foulsCommitted++;
       const cardRoll = rng();
       if (cardRoll < RED_STRAIGHT_GIVEN_FOUL) {
@@ -1079,11 +1081,13 @@ export function simMatchDetailed(
       // Edge-scaled so a fraction of fouls happen "in the box" (penalty) vs the
       // open-play free kick below — same reasoning as the composite-only version.
       const freeKickEdge = off.attack - def.defense;
+      // Divided by FOUL_RATE_MULTIPLIER, clamps included, so penalties per tick
+      // are exactly what they were before foul volume was raised.
       const penaltyP = clamp(
         PENALTY_GIVEN_FOUL * (1 + STRENGTH_K * freeKickEdge),
         0.001,
         0.08,
-      );
+      ) / FOUL_RATE_MULTIPLIER;
       if (rng() < penaltyP) {
         const shooter = pickShooter(rng, onPitch[poss]);
         const shooterLine = lines.get(shooter.pid)!;
@@ -1137,7 +1141,7 @@ export function simMatchDetailed(
         FREE_KICK_CHANCE_BASE * (1 + STRENGTH_K * freeKickEdge),
         0.01,
         0.3,
-      );
+      ) / FOUL_RATE_MULTIPLIER;
       if (rng() < freeKickP) {
         const shooter = pickShooter(rng, onPitch[poss]);
         const shooterLine = lines.get(shooter.pid)!;

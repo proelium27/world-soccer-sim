@@ -8,6 +8,7 @@ import {
   CROSSES_PER_TICK,
   CROSS_NOISE,
   ATTRIBUTION_RATING_EXPONENT,
+  BOOKED_FOUL_WEIGHT,
 } from "./constants.js";
 
 export type MatchPosition =
@@ -198,6 +199,7 @@ function weightedPick(
   posWeights: Record<MatchPosition, number>,
   ratingKey: keyof MatchPlayer,
   exponent = 1,
+  scale?: (p: MatchPlayer) => number,
 ): MatchPlayer {
   let total = 0;
   const weights: number[] = [];
@@ -206,7 +208,7 @@ function weightedPick(
     // forward takes the centre forward's share of the shots even if he's a
     // centre-back doing an emergency job up there.
     const rating = (p[ratingKey] as number) + 10;
-    const w = posWeights[p.slot] * (exponent === 1 ? rating : rating ** exponent);
+    const w = posWeights[p.slot] * (exponent === 1 ? rating : rating ** exponent) * (scale ? scale(p) : 1);
     weights.push(w);
     total += w;
   }
@@ -265,10 +267,23 @@ export function pickInterceptor(rng: () => number, players: MatchPlayer[]): Matc
 }
 
 /** Picks who commits a foul. Weighted toward tackling, like a tackler, but any outfielder can foul. */
-export function pickFouler(rng: () => number, players: MatchPlayer[]): MatchPlayer {
+/**
+ * Picks who commits a foul. A player already on a yellow (`bookings`) is picked
+ * BOOKED_FOUL_WEIGHT as often, because a booked player eases off. Still exactly
+ * one rng draw, so the booking discount reweights who fouls without moving the
+ * stream.
+ */
+export function pickFouler(
+  rng: () => number,
+  players: MatchPlayer[],
+  bookings?: ReadonlyMap<number, number>,
+): MatchPlayer {
   const outfield = players.filter((p) => p.slot !== "GK");
   if (outfield.length === 0) return players[0];
-  return weightedPick(rng, outfield, FOUL_WEIGHTS, "tackling");
+  const scale = bookings
+    ? (p: MatchPlayer) => ((bookings.get(p.pid) ?? 0) > 0 ? BOOKED_FOUL_WEIGHT : 1)
+    : undefined;
+  return weightedPick(rng, outfield, FOUL_WEIGHTS, "tackling", 1, scale);
 }
 
 /** Picks who gets on the end of a corner. Weighted toward heading, favoring CBs/STs at set pieces. */

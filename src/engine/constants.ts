@@ -137,11 +137,30 @@ export const RED_GIVEN_FOUL_SIMPLE = 0.004;
 //   - MORE REDS MEANS MORE MAN-DOWN COMPOSITES, which is a genuine on-pitch
 //     effect, not bookkeeping.
 //
-// Going the rest of the way to a real booking rate would need FOUL_BASE raised
-// too — at 13.0 fouls per match the engine already books a higher share of fouls
-// than referees do, so the shortfall is in fouls, not in cards per foul.
+// The rest of the way to a real booking rate came from foul VOLUME, not from
+// cards per foul (FOUL_RATE_MULTIPLIER below, 2026-09-22): at 13 fouls a match
+// the engine already booked a higher share of fouls than referees do.
 export const YELLOW_GIVEN_FOUL = 0.18;
 export const RED_STRAIGHT_GIVEN_FOUL = 0.003;
+
+// --- Foul volume in simMatchDetailed (2026-09-22) ---
+//
+// The detailed engine committed ~13 fouls a match against a real top flight's
+// ~22-24, which is why it booked ~2.3 players where referees book ~3.5-4.5.
+// FOUL_RATE_MULTIPLIER raises foul volume there and divides the chance that a
+// foul turns into a penalty or a shot from a free kick by the SAME factor, clamps
+// included, so the expected number of set-piece chances per tick is unchanged:
+// more whistles, not more goals. The composite-only simMatch keeps FOUL_BASE and
+// the undivided set-piece constants, because the M1 benchmark bands are
+// calibrated on it (see RED_GIVEN_FOUL_SIMPLE above for the same call).
+export const FOUL_RATE_MULTIPLIER = 1.7;
+export const FOUL_BASE_DETAILED = FOUL_BASE * FOUL_RATE_MULTIPLIER;
+
+// A player already on a yellow is picked as the fouler this much less often.
+// Real booked players ease off; without it, a busier foul count piles second
+// yellows onto the same few men and reds climb with roughly the square of the
+// booking rate. Only reweights who fouls, never how often, and costs no draw.
+export const BOOKED_FOUL_WEIGHT = 0.3;
 
 // Red card man-down penalty: recompute the short side's composites once, per spec §5.
 export const RED_CARD_ATTACK_DELTA = -0.06;
