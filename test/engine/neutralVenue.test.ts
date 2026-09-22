@@ -34,7 +34,14 @@ function makeSquad(pidOffset: number): MatchPlayer[] {
   }));
 }
 
-const MATCHES = 400;
+/**
+ * 3000, not 400. At 400 the home bonus is worth ~1.5 points of goal share and
+ * the share's own sampling error is about the same, so any change that
+ * reshuffles draws could flip the result. Shot zones (one more draw per shot)
+ * did, at 400 and 800, while 20,000 fresh neutral matches read 0.496 (no home
+ * lean). 3000 passes on both that tree and the one before it, in ~6s.
+ */
+const MATCHES = 3000;
 
 /** Total goals each side scores over `MATCHES` seeded matches between equal teams. */
 function aggregate(neutral: boolean): { home: number; away: number } {
