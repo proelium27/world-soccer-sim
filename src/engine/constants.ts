@@ -137,11 +137,124 @@ export const RED_GIVEN_FOUL_SIMPLE = 0.004;
 //   - MORE REDS MEANS MORE MAN-DOWN COMPOSITES, which is a genuine on-pitch
 //     effect, not bookkeeping.
 //
-// Going the rest of the way to a real booking rate would need FOUL_BASE raised
-// too — at 13.0 fouls per match the engine already books a higher share of fouls
-// than referees do, so the shortfall is in fouls, not in cards per foul.
+// The rest of the way to a real booking rate came from foul VOLUME, not from
+// cards per foul (FOUL_RATE_MULTIPLIER below, 2026-09-22): at 13 fouls a match
+// the engine already booked a higher share of fouls than referees do.
 export const YELLOW_GIVEN_FOUL = 0.18;
 export const RED_STRAIGHT_GIVEN_FOUL = 0.003;
+
+// --- Shot location in simMatchDetailed (2026-09-22) ---
+//
+// Every open-play shot is taken from a ZONE: the six-yard box ("close"), the rest
+// of the area ("box") or outside it. The zone sets how likely the shot is to be
+// blocked, to hit the target and to beat the keeper, so a tap-in and a 30-yard
+// effort are no longer the same chance with the same xG.
+//
+// Built from real top-flight figures rather than tuned: shots split ~7/55/38 by
+// zone, and SHOT_ZONE_BY_OUTCOME is real football's share of each OUTCOME by zone
+// (inverted from zone conversion ~32% / ~12.5% / ~3.5% and blocks ~15/25/34%).
+// Bayes turns the two into each zone's outcome mix, and SHOT_ZONE_STAGE divides
+// that by the pooled mix to get a multiplier per stage of resolveShot's cascade.
+// Under exactly SHOT_ZONE_SHARE the zone cascades average back to the pooled
+// one, so league scoring holds only if the engine's shots really land on that
+// share. That is why the share is DERIVED from the outcome table (typing 7/55/38
+// by hand cost 0.7% of goals) and why the draw uses SHOT_ZONE_DRAW_BASE rather
+// than the share itself. `scripts/shotZoneEngineProbe.ts` measures both.
+export type ShotZone = "close" | "box" | "outside";
+export const SHOT_ZONES: readonly ShotZone[] = ["close", "box", "outside"];
+export type ZoneWeights = readonly [close: number, box: number, outside: number];
+
+/** Real-football share of each outcome by zone. */
+export const SHOT_ZONE_BY_OUTCOME: Record<"goal" | "saved" | "blocked" | "off_target", ZoneWeights> = {
+  goal: [21, 66, 13],
+  saved: [8, 57, 35],
+  blocked: [4, 50, 46],
+  off_target: [5, 55, 40],
+};
+
+/** Real-football outcome mix, pooled over every zone (~11% goals). */
+const POOLED_OUTCOME = { goal: 0.11, saved: 0.23, blocked: 0.28, off_target: 0.38 };
+
+/**
+ * Share of shots by zone the outcome table implies (~7.2 / 55.3 / 37.6, i.e.
+ * the real ~7/55/38). The one mix under which SHOT_ZONE_STAGE averages to 1.
+ */
+export const SHOT_ZONE_SHARE: ZoneWeights = SHOT_ZONES.map((_, i) =>
+  100 * (Object.keys(POOLED_OUTCOME) as (keyof typeof POOLED_OUTCOME)[]).reduce(
+    (s, o) => s + (SHOT_ZONE_BY_OUTCOME[o][i] / 100) * POOLED_OUTCOME[o], 0,
+  ),
+) as unknown as ZoneWeights;
+
+/**
+ * Cancels what SHOT_ZONE_BY_SLOT does to the mix. Strikers shade inward but
+ * midfielders take most shots and shade outward, so drawing from the share
+ * itself landed the engine at 6.6 / 54.0 / 39.4 and cost ~2.5% of goals.
+ * Measured, not derived: the ratio of target to realized share with the
+ * uncorrected draw (`scripts/shotZoneEngineProbe.ts`). Re-measure if the slot
+ * shading or the shot-taker weights in attribution.ts change.
+ */
+const SHOT_ZONE_SLOT_CORRECTION: ZoneWeights = [7 / 6.6, 55 / 54.0, 38 / 39.4];
+
+/** Base weights pickShotZone shades by slot. Lands the engine on SHOT_ZONE_SHARE. */
+export const SHOT_ZONE_DRAW_BASE: ZoneWeights = SHOT_ZONE_SHARE.map(
+  (w, i) => w * SHOT_ZONE_SLOT_CORRECTION[i],
+) as unknown as ZoneWeights;
+
+/**
+ * How a position shades the zone odds. A striker lives in the six-yard box, a
+ * holding midfielder shoots from outside it, a centre-back's open-play chances
+ * are mostly knock-downs in the area.
+ */
+export const SHOT_ZONE_BY_SLOT: Partial<Record<string, ZoneWeights>> = {
+  ST: [1.5, 1.15, 0.65],
+  W: [0.8, 1.0, 1.15],
+  AM: [0.7, 0.95, 1.35],
+  CM: [0.6, 0.85, 1.55],
+  DM: [0.5, 0.75, 1.8],
+  FB: [0.6, 1.0, 1.2],
+  CB: [1.6, 1.1, 0.6],
+};
+
+/** Multipliers on resolveShot's block / on-target / save probabilities, per zone. */
+export const SHOT_ZONE_STAGE: Record<ShotZone, { block: number; onTarget: number; save: number }> = (() => {
+  const outcomes = ["goal", "saved", "blocked", "off_target"] as const;
+  const cascade = (p: Record<(typeof outcomes)[number], number>) => {
+    const block = p.blocked;
+    const onTarget = (p.saved + p.goal) / (1 - block);
+    const save = p.saved / (p.saved + p.goal);
+    return { block, onTarget, save };
+  };
+  const pooled = cascade(POOLED_OUTCOME);
+  const out = {} as Record<ShotZone, { block: number; onTarget: number; save: number }>;
+  SHOT_ZONES.forEach((zone, i) => {
+    const zoneShare = outcomes.reduce((s, o) => s + SHOT_ZONE_BY_OUTCOME[o][i] / 100 * POOLED_OUTCOME[o], 0);
+    const mix = Object.fromEntries(
+      outcomes.map((o) => [o, (SHOT_ZONE_BY_OUTCOME[o][i] / 100) * POOLED_OUTCOME[o] / zoneShare]),
+    ) as Record<(typeof outcomes)[number], number>;
+    const c = cascade(mix);
+    out[zone] = { block: c.block / pooled.block, onTarget: c.onTarget / pooled.onTarget, save: c.save / pooled.save };
+  });
+  return out;
+})();
+
+// --- Foul volume in simMatchDetailed (2026-09-22) ---
+//
+// The detailed engine committed ~13 fouls a match against a real top flight's
+// ~22-24, which is why it booked ~2.3 players where referees book ~3.5-4.5.
+// FOUL_RATE_MULTIPLIER raises foul volume there and divides the chance that a
+// foul turns into a penalty or a shot from a free kick by the SAME factor, clamps
+// included, so the expected number of set-piece chances per tick is unchanged:
+// more whistles, not more goals. The composite-only simMatch keeps FOUL_BASE and
+// the undivided set-piece constants, because the M1 benchmark bands are
+// calibrated on it (see RED_GIVEN_FOUL_SIMPLE above for the same call).
+export const FOUL_RATE_MULTIPLIER = 1.7;
+export const FOUL_BASE_DETAILED = FOUL_BASE * FOUL_RATE_MULTIPLIER;
+
+// A player already on a yellow is picked as the fouler this much less often.
+// Real booked players ease off; without it, a busier foul count piles second
+// yellows onto the same few men and reds climb with roughly the square of the
+// booking rate. Only reweights who fouls, never how often, and costs no draw.
+export const BOOKED_FOUL_WEIGHT = 0.3;
 
 // Red card man-down penalty: recompute the short side's composites once, per spec §5.
 export const RED_CARD_ATTACK_DELTA = -0.06;

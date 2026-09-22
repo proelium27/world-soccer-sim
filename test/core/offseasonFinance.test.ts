@@ -98,8 +98,18 @@ describe("simOffseason — finance and renewals", () => {
     // season (would expire at league.season + 1, i.e. the very next
     // offseason, if nothing renews him first) and make him an obvious keep:
     // in his prime, at a position where he's the club's only option.
+    //
+    // He must be a player this club OWNS, not one it is borrowing: a roster
+    // answers "who plays here", never "who belongs here". A loanee is renewed
+    // by his parent and then handed back by processLoanReturns, so the roster
+    // assertion below would fail on correct behaviour. Which player the sort
+    // lands on moves with any rng change, so this cannot be left to luck —
+    // it was picking a borrowed player as of 2026-09-22.
+    const borrowed = new Set(
+      league.activeLoans.filter((l) => l.loaneeTid === aiTid).map((l) => l.pid),
+    );
     const best = league.players
-      .filter((p) => aiTeam.roster.includes(p.pid) && p.pos !== "GK")
+      .filter((p) => aiTeam.roster.includes(p.pid) && p.pos !== "GK" && !borrowed.has(p.pid))
       .sort((a, b) => b.ovr - a.ovr)[0];
     const withExpiring = {
       ...league,
