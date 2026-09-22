@@ -44,6 +44,7 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
       teamStats: cmd.teamStats,
       referencedPids: cmd.referencedPids ? new Set(cmd.referencedPids) : undefined,
       cupChampions: cmd.cupChampions,
+      cupSlots: cmd.cupSlots === undefined ? undefined : cmd.cupSlots && new Map(cmd.cupSlots),
     });
     const response: WorkerResponse = {
       type: "offseasonResult",

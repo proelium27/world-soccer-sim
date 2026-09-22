@@ -38,6 +38,7 @@ import {
   MANAGER_EXPECTATION_SEASON_DECAY,
   MANAGER_EXPECTATION_TIER_SEAM,
 } from "../constants.js";
+import { boardPlayoffGoal } from "./playoffExpectation.js";
 
 export interface ClubExpectation {
   tid: number;
@@ -77,6 +78,14 @@ export interface ClubExpectation {
    * costs a superclub manager far more than it costs a minnow's.
    */
   demand: number;
+  /** The club's league crowns its champion in a playoff (MLS, Liga MX, Argentina). */
+  playoffLeague: boolean;
+  /**
+   * In a playoff league, the stage the board expects ("reach the final"), or
+   * null when it expects the club to finish outside the playoff places and
+   * judges it on the table instead. Always null in a table league.
+   */
+  playoffGoal: string | null;
 }
 
 function ratingOf(team: StoredTeam, byPid: Map<number, Player>): number {
@@ -263,6 +272,9 @@ export function deriveExpectations(
     // 1 for the biggest club in its league, 0 for the smallest.
     const clubWeight = placing.clubs > 1 ? 1 - (placing.rank - 1) / (placing.clubs - 1) : 1;
     const leagueWeight = normalize(compMean.get(team.compId) ?? 0, leagueLo, leagueHi);
+    const { playoffLeague, goal } = boardPlayoffGoal(
+      competitions.find((c) => c.id === team.compId), placing.rank,
+    );
     out.set(team.tid, {
       tid: team.tid,
       compId: team.compId,
@@ -273,6 +285,8 @@ export function deriveExpectations(
       rating: rating.get(team.tid) ?? 0,
       prestige: normalize(prestigeRaw.get(team.tid) ?? 0, prestigeLo, prestigeHi),
       demand: MANAGER_DEMAND_W_CLUB * clubWeight + MANAGER_DEMAND_W_LEAGUE * leagueWeight,
+      playoffLeague,
+      playoffGoal: goal,
     });
   }
   return out;
