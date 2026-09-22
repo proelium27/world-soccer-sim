@@ -16,6 +16,9 @@ import {
   MANAGER_TROPHY_CONFIDENCE,
   MANAGER_RELEGATION_CONFIDENCE,
   MANAGER_PROMOTION_CONFIDENCE,
+  MANAGER_MISSED_PLAYOFFS_CONFIDENCE,
+  MANAGER_CONTINENTAL_RUN_SWING,
+  MANAGER_CONTINENTAL_PLACE_CONFIDENCE,
   MANAGER_DEMAND_PENALTY_SCALE,
   MANAGER_DEMAND_REWARD_DAMPING,
   MANAGER_GRACE_SEASONS,
@@ -25,6 +28,8 @@ import {
   MANAGER_CONFIDENCE_RECOVERY,
   MANAGER_START_CONFIDENCE,
 } from "../constants.js";
+import type { PlayoffJudgement } from "./playoffExpectation.js";
+import type { ContinentalRunJudgement, QualificationJudgement } from "./continentalExpectation.js";
 
 /** What the club achieved, and what the board made of it. */
 export interface SeasonVerdict {
@@ -49,6 +54,16 @@ export interface SeasonVerdict {
   confidence: number;
   /** The board has dismissed you. */
   sacked: boolean;
+  /**
+   * Set in a league whose title is decided by a playoff: the season was judged
+   * on the playoff run rather than the table (see playoffExpectation.ts).
+   * Optional, so a verdict stored before this reads as a table verdict.
+   */
+  playoff?: PlayoffJudgement;
+  /** Continental qualification against what the board expected. Optional: absent on older verdicts. */
+  qualification?: QualificationJudgement;
+  /** This season's continental run against the club's seed, if it played in one. */
+  continentalRun?: ContinentalRunJudgement;
 }
 
 export interface SeasonFacts {
@@ -60,6 +75,10 @@ export interface SeasonFacts {
   trophies: number;
   promoted: boolean;
   relegated: boolean;
+  /** A playoff league's run, which replaces the table as what the board judges. */
+  playoff?: PlayoffJudgement;
+  qualification?: QualificationJudgement;
+  continentalRun?: ContinentalRunJudgement;
 }
 
 const clamp01to100 = (n: number): number => Math.min(100, Math.max(0, n));
@@ -79,8 +98,11 @@ export function judgeSeason(
   sackingEnabled: boolean,
   boardPatience: number,
 ): SeasonVerdict {
-  const { finish, expectedRank, clubs, demand } = facts;
-  const over = clubs > 1 ? (expectedRank - finish) / (clubs - 1) : 0;
+  const { finish, expectedRank, clubs, demand, playoff } = facts;
+  // In a playoff league both sides are playoff places rather than table places.
+  const expectedPlace = playoff ? playoff.expectedPlace : expectedRank;
+  const actualPlace = playoff ? playoff.actualPlace : finish;
+  const over = clubs > 1 ? (expectedPlace - actualPlace) / (clubs - 1) : 0;
 
   // Boards forget, in both directions. Applied before the verdict so a manager
   // who is merely meeting expectations slowly climbs out of a bad patch instead
@@ -93,11 +115,22 @@ export function judgeSeason(
   // treats success as the baseline (damped reward) and failure as a crisis
   // (amplified penalty). That asymmetry is the difficulty knob the user asked
   // to scale with the league.
-  const base = over * MANAGER_CONFIDENCE_SWING;
-  let delta =
-    base >= 0
-      ? base * (1 - demand * MANAGER_DEMAND_REWARD_DAMPING)
-      : base * (1 + demand * MANAGER_DEMAND_PENALTY_SCALE);
+  const withDemand = (v: number): number =>
+    v >= 0
+      ? v * (1 - demand * MANAGER_DEMAND_REWARD_DAMPING)
+      : v * (1 + demand * MANAGER_DEMAND_PENALTY_SCALE);
+  let delta = withDemand(over * MANAGER_CONFIDENCE_SWING);
+
+  // The continental run against the club's seed, with the same asymmetry: a
+  // big club going out early is a crisis, a small one going deep a bonus.
+  const run = facts.continentalRun;
+  if (run && run.field > 1) {
+    delta += withDemand(
+      ((run.expectedPlace - run.actualPlace) / (run.field - 1)) * MANAGER_CONTINENTAL_RUN_SWING,
+    );
+  }
+  // Qualifying, per rung above or below the ask. Flat, like trophies.
+  if (facts.qualification) delta += facts.qualification.rungs * MANAGER_CONTINENTAL_PLACE_CONFIDENCE;
 
   // Trophies and division changes are judged flat, not scaled by demand. A
   // trophy is a trophy: damping a superclub's cup win toward nothing would make
@@ -106,6 +139,7 @@ export function judgeSeason(
   delta += facts.trophies * MANAGER_TROPHY_CONFIDENCE;
   if (facts.promoted) delta += MANAGER_PROMOTION_CONFIDENCE;
   if (facts.relegated) delta += MANAGER_RELEGATION_CONFIDENCE;
+  if (playoff?.missed) delta += MANAGER_MISSED_PLAYOFFS_CONFIDENCE;
 
   // The save's difficulty setting is the global patience knob: an easy board
   // banks your good seasons and shrugs off your bad ones, a brutal one does the
@@ -135,6 +169,9 @@ export function judgeSeason(
     delta,
     confidence: next,
     sacked,
+    ...(playoff ? { playoff } : {}),
+    ...(facts.qualification ? { qualification: facts.qualification } : {}),
+    ...(run ? { continentalRun: run } : {}),
   };
 }
 

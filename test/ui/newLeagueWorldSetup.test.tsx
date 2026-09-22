@@ -177,7 +177,7 @@ describe("the New League screen offers the world editor", () => {
     // picking a club. What has to be present is the way in, plus the summary
     // that says what world you would get without opening it.
     expect(html).toContain('aria-controls="world-setup-body"');
-    expect(html).toContain("16 countries, 48 divisions, 884 clubs");
+    expect(html).toContain("16 countries, 48 divisions, 883 clubs");
     expect(html).not.toContain("Add a league");
   });
 

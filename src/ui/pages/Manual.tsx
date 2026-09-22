@@ -446,6 +446,32 @@ export function Manual() {
             you banked can carry you through. That's the point of a running balance rather than a
             "two bad seasons and you're out" rule.
           </p>
+          <p>
+            <strong>Leagues that crown their champion in a playoff</strong> (MLS, Liga MX and
+            Argentina) are judged on the playoffs instead of the table. If they expect you in the
+            playoff places, the target becomes a playoff run: the club expected to top the league
+            has to win the title, the next one to reach the final, the next two the semi-finals or
+            conference finals, and so on down the bracket. Top the table and go out in the first
+            round and that's a bad season; scrape in and win it and that's a great one. A smaller
+            club they expect to finish outside the places is still measured on the table, since
+            climbing it is a fair ask. <strong>Missing the playoffs costs you with every board
+            there</strong>, however small the club: it's a small fixed hit on top of whatever your
+            finish was worth, so a club that misses out every year sits under pressure without being
+            sacked for it alone.
+          </p>
+          <p>
+            <strong>Continental football counts too.</strong> Two things, every season. First,
+            qualifying: if they expect you to finish inside your league&apos;s continental places,
+            they expect the place that comes with it. The Continental Cup is worth two steps and the
+            Shield one (the Americas Cup counts as two), so a club expected in the Cup that only
+            makes the Shield loses a little, and missing out altogether loses twice that. Getting in
+            when they didn&apos;t expect it, from the table or by winning your domestic cup, earns the
+            same back. Second, your run: in the competition you&apos;re playing, they expect you to
+            go as far as your seed in the draw. The top seed has to win it, the next has to reach
+            the final, the next two the semi-finals, and so on, while a low seed only has to show
+            up. Beat your seed and you bank goodwill, fall short and you lose some, harder at a
+            big club. It&apos;s worth less than your league finish, because the league is the job.
+          </p>
           <h6>Not every board is as patient</h6>
           <p>
             Two things make a board harder to please. The first is <strong>how big a job it
@@ -736,7 +762,7 @@ export function Manual() {
             <strong>Greece</strong>, <strong>Scotland</strong> and <strong>Serbia</strong>) and
             four are in the Americas (<strong>Brazil</strong>, <strong>Argentina</strong>,{" "}
             <strong>Mexico</strong> and the <strong>United States</strong>). Each has its own league
-            pyramid, for 48 leagues and 884 clubs total. You pick any club in any country and
+            pyramid, for 48 leagues and 883 clubs total. You pick any club in any country and
             division when you start.
           </p>
           <p>
@@ -758,11 +784,11 @@ export function Manual() {
             zone. Each half gets its own table on the Standings page, but the overall table is the
             one that counts for prize money, continental places and relegation. Their second
             divisions are split the same way: Argentina&apos;s has its real 36 clubs in two zones
-            of 18, playing 34 games. The US lower divisions copy the USL: a second division of 25
-            in an Eastern Conference of 13 and a Western Conference of 12, each club playing its own
-            conference twice (24 games in the East, 22 in the West), and a third division of 17 in
-            one table, playing 32 with a bye on the rounds a club sits out. Both finish with a
-            playoff of their own: the top eight of each conference in the second division, one-off
+            of 18, playing 34 games. The US lower divisions copy the USL: a second division of 24
+            in an Eastern and a Western Conference of 12, each club playing its own conference
+            twice and then eight games against the other conference for 30 in all, and a third
+            division of 17 in one table, playing 32 with a bye on the rounds a club sits out.
+            Both finish with a playoff of their own: the top eight of each conference in the second division, one-off
             games through each conference and then a final, and the top eight of the table in the
             third.
           </p>
@@ -1554,9 +1580,9 @@ export function Manual() {
           </p>
           <p>
             <strong>The table still counts for everything else.</strong> Prize money, hype,
-            continental places and what your board makes of your season all come from where you
-            finished, so topping the table and going out in the quarter-finals is still a good year,
-            just not a title-winning one. The board does give you credit for the title if you win it.
+            continental places all come from where you finished. <strong>Your board is the
+            exception</strong>: in a league like this it judges you on the playoffs rather than the
+            table (see <a href="#manager">Board confidence</a>).
           </p>
           <p>
             It&apos;s played after the last matchday, before anyone retires or moves clubs, with
@@ -1836,6 +1862,17 @@ export function Manual() {
             match results and every rule in the game were shifted by the same amount at the same
             time, so a player who was worth $40M is still worth $40M and a season that finished
             with 82 points still finishes with 82 points. Only the number on his card changed.
+          </p>
+          <p>
+            <strong>Everything in OVR counts on the pitch.</strong> In a match, each player adds
+            to his side's attacking, defending, ball control and goalkeeping using the same mix
+            of ratings his OVR is built from, so a rating that lifts his OVR also makes his team
+            better. A full-back's pace and crossing help you attack down the flanks and his pace
+            helps you defend, a keeper's positioning helps him keep shots out, and a big
+            striker's strength and aerial ability make your attack more dangerous. How much each
+            position counts is set so that one extra point of OVR is worth about the same to your
+            results wherever the player stands. Keepers are the exception and count for more,
+            because one player does the whole job.
           </p>
           <p>
             One consequence worth knowing: the lower you go, the further the game runs below what

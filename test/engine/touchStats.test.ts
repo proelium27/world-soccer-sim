@@ -165,8 +165,17 @@ const SEASON = simSeason(mulberry32(12345));
  * 26.898 (base 26.947), home-win .4066 -> .4118 (base .4211), champion points
  * 84.30 -> 82.20 (base 82.00). Goals/match 3.1211 -> 3.1116 did not, and sits
  * ~2 SE under the base's 3.1674 with shots flat; the M1/M3 gates band it.
+ *
+ * Rebased again (381020712 -> 3620983212) when composites started reading each
+ * slot's own OVR weights (core/composites.ts, PHASE_WEIGHTS). Before it, a fixed
+ * skill list per phase left 27% of a full-back's OVR, 35% of a keeper's and 23%
+ * of a striker's feeding nothing on the pitch, and +1 OVR on a full-back bought
+ * 0.09 points a season against 0.22-0.29 everywhere else. No rng draw moved;
+ * composite values did. The football is conserved (ovrScaleMatchProbe, 8
+ * seasons, main -> this): goals/match 3.0997 -> 3.1059, home-win .4109 -> .4197,
+ * champion points 80.38 -> 80.00.
  */
-const BASELINE_SCORELINE_HASH = 381020712;
+const BASELINE_SCORELINE_HASH = 3620983212;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");

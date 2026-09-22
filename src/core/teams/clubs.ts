@@ -958,10 +958,12 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Sacramento Assayers", abbrev: "SAR", colors: ["#f1c40f", "#145a32"] },
   { name: "Modesto Blacksmiths", abbrev: "MDS", colors: ["#1a1a1a", "#f4d03f"] },
   { name: "Fresno Wheelwrights", abbrev: "FRS", colors: ["#ffffff", "#1b4f72"] },
-  // US division 2 clubs, same styling as the block above. 25 clubs, ORDERED BY
-  // GEOGRAPHY like the top flight: the first thirteen are the Eastern Conference,
-  // the last twelve the Western (see core/conferences.ts, which gives the odd
-  // club to the first half).
+  // US division 2 clubs, same styling as the block above. 24 clubs, ORDERED BY
+  // GEOGRAPHY like the top flight: the first twelve are the Eastern Conference,
+  // the last twelve the Western (see core/conferences.ts). The even split is
+  // load-bearing rather than cosmetic: only equal halves can play cross-over
+  // games, so an odd one costs the division its whole cross-conference schedule
+  // and leaves the two halves on different season lengths.
   // Eastern Conference
   { name: "Toledo Quarrymen", abbrev: "TOD", colors: ["#27ae60", "#ffffff"] },
   { name: "Grand Rapids Homesteaders", abbrev: "GRD", colors: ["#922b21", "#f7dc6f"] },
@@ -975,7 +977,6 @@ export const CLUBS: ClubIdentity[] = [
   { name: "Greenville Spinners", abbrev: "GVL", colors: ["#117864", "#f5b041"] },
   { name: "Columbia Printers", abbrev: "CMB", colors: ["#5b2c6f", "#ffffff"] },
   { name: "Huntsville Machinists", abbrev: "HSV", colors: ["#ffffff", "#1b4f72"] },
-  { name: "Memphis Keelboats", abbrev: "MEM", colors: ["#873600", "#fdebd0"] },
   // Western Conference
   { name: "Shreveport Riveters", abbrev: "SHR", colors: ["#1a1a1a", "#f4d03f"] },
   { name: "Corpus Christi Drovers", abbrev: "CCH", colors: ["#f1c40f", "#145a32"] },
