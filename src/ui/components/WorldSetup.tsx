@@ -948,18 +948,14 @@ export function LeagueSettings({
     // preset has to CLEAR knobs as well as set them ("As shipped" sets none),
     // and a Partial merge can only ever add. Normalised here for the same
     // reason updateSpec normalises: no preset may produce a league the engine
-    // cannot build. Money follows strength while the switch is on, or a preset
-    // would leave the two disagreeing on the screen that pairs them.
-    const applied = normalizeLeagueSpec(applyLeaguePreset(spec, next, baseline));
-    // Only for a preset that sets a strength of its own. "As shipped" must put
-    // the league back exactly as the game ships it, and England ships with NO
-    // money knob — writing the suggested one here would leave a restored
-    // country carrying a field it never had, which is the difference between
-    // "absent, follow the country table" and "explicitly this number".
-    if (entry.linkMoney && next.shape && applied.strengthOffset !== undefined) {
-      applied.budgetScale = suggestedBudgetScale(applied.strengthOffset);
-    }
-    onEntry({ spec: applied });
+    // cannot build.
+    //
+    // The money-follow switch deliberately does NOT apply here. Every shape
+    // carries the money of the real league it copies, and overwriting that with
+    // suggestedBudgetScale left the league matching no preset (0.65 became
+    // 0.70), so the radio the user had just clicked came back unfilled.
+    // "As shipped" needs it off too: England ships with no money knob at all.
+    onEntry({ spec: normalizeLeagueSpec(applyLeaguePreset(spec, next, baseline)) });
   }
 
   return (

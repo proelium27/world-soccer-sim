@@ -58,6 +58,22 @@ describe("league presets", () => {
     expect(applied.d1Teams).toBe(12);
   });
 
+  it("gives every shape its own money, so the editor never has to guess one", () => {
+    // The editor used to overwrite a preset's money with suggestedBudgetScale
+    // when "keep money in step" was on. That left the league matching no preset
+    // (Mid-tier's 0.65 became 0.70) and the radio just clicked came back empty.
+    // Picking a preset now keeps its money as written, which is only correct
+    // while every shape states one.
+    for (const p of LEAGUE_PRESETS) {
+      if (!p.shape) continue;
+      expect(p.shape.budgetScale, p.id).toBeTypeOf("number");
+      const shipped = shippedSpecs.get("England")!;
+      const applied = normalizeLeagueSpec(applyLeaguePreset(shipped, p, shipped));
+      expect(applied.budgetScale, p.id).toBe(p.shape.budgetScale);
+      expect(matchingLeaguePreset(applied, shipped)?.id, p.id).toBe(p.id);
+    }
+  });
+
   it("offers 'As shipped' only where there is something to go back to", () => {
     expect(leaguePresetsFor(shippedSpecs.get("England")).some((p) => p.id === "shipped")).toBe(true);
     expect(leaguePresetsFor(undefined).some((p) => p.id === "shipped")).toBe(false);
