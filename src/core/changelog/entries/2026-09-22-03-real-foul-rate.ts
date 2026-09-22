@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-19",
+  date: "2026-09-22",
   title: "Matches have as many fouls and cards as the real thing",
   items: [
     "Matches used to have about 13 fouls and 2 yellow cards. A real top flight has closer to 23 fouls and 4 yellows, so I've brought the engine up to that. Reds land at about one every four or five matches.",

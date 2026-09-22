@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-19",
+  date: "2026-09-22",
   title: "Where a shot comes from now matters",
   items: [
     "Every shot in open play is now taken from somewhere: the six-yard box, the rest of the penalty area, or outside it. Until now that was only a description added afterwards, and a tap-in and a 30-yard effort had the same chance of going in.",

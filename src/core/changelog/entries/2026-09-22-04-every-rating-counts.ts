@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-18",
+  date: "2026-09-22",
   title: "Every rating in OVR now counts in matches",
   items: [
     "Some of the ratings that make up a player's OVR weren't doing anything in matches. They still pushed up his wage and his transfer fee, but his team played no better for them. That was over a quarter of a **full-back's** OVR (pace and crossing), about a third of a **keeper's** (positioning and passing) and nearly a quarter of a **striker's** (strength and heading). So a squad built around great full-backs could look strong on paper and still finish mid-table.",

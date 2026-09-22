@@ -279,7 +279,7 @@ describe("touch attribution — realism", () => {
   it("fouls per team match a real top flight (~11-12)", () => {
     // Tied to real FOUL_BASE_DETAILED foul events (not synthesized), so consistent
     // with cards. A real top-flight side commits ~11-12 a match; the engine sat at
-    // ~6.6 until FOUL_RATE_MULTIPLIER (2026-09-19).
+    // ~6.6 until FOUL_RATE_MULTIPLIER (2026-09-22).
     expect(foulMean).toBeGreaterThan(9);
     expect(foulMean).toBeLessThan(14);
   });

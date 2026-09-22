@@ -138,12 +138,12 @@ export const RED_GIVEN_FOUL_SIMPLE = 0.004;
 //     effect, not bookkeeping.
 //
 // The rest of the way to a real booking rate came from foul VOLUME, not from
-// cards per foul (FOUL_RATE_MULTIPLIER below, 2026-09-19): at 13 fouls a match
+// cards per foul (FOUL_RATE_MULTIPLIER below, 2026-09-22): at 13 fouls a match
 // the engine already booked a higher share of fouls than referees do.
 export const YELLOW_GIVEN_FOUL = 0.18;
 export const RED_STRAIGHT_GIVEN_FOUL = 0.003;
 
-// --- Shot location in simMatchDetailed (2026-09-19) ---
+// --- Shot location in simMatchDetailed (2026-09-22) ---
 //
 // Every open-play shot is taken from a ZONE: the six-yard box ("close"), the rest
 // of the area ("box") or outside it. The zone sets how likely the shot is to be
@@ -237,7 +237,7 @@ export const SHOT_ZONE_STAGE: Record<ShotZone, { block: number; onTarget: number
   return out;
 })();
 
-// --- Foul volume in simMatchDetailed (2026-09-19) ---
+// --- Foul volume in simMatchDetailed (2026-09-22) ---
 //
 // The detailed engine committed ~13 fouls a match against a real top flight's
 // ~22-24, which is why it booked ~2.3 players where referees book ~3.5-4.5.

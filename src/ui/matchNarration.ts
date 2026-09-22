@@ -203,7 +203,7 @@ export function cardContext(event: MatchEvent, events: MatchEvent[], lastClock: 
  * open play).
  *
  * Every other open-play shot carries the ZONE the engine rolled for it
- * (`MatchEvent.zone`, 2026-09-19), and that zone is real: it set how likely the
+ * (`MatchEvent.zone`, 2026-09-22), and that zone is real: it set how likely the
  * shot was to be blocked, to hit the target and to beat the keeper, and the xG
  * beside it. The label just reads it.
  *

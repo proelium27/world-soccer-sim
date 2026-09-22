@@ -104,7 +104,7 @@ describe("simOffseason — finance and renewals", () => {
     // by his parent and then handed back by processLoanReturns, so the roster
     // assertion below would fail on correct behaviour. Which player the sort
     // lands on moves with any rng change, so this cannot be left to luck —
-    // it was picking a borrowed player as of 2026-09-19.
+    // it was picking a borrowed player as of 2026-09-22.
     const borrowed = new Set(
       league.activeLoans.filter((l) => l.loaneeTid === aiTid).map((l) => l.pid),
     );
