@@ -1,12 +1,10 @@
 import type { Composites } from "../engine/composites.js";
 import type { Player, Position, SkillKey } from "./players/types.js";
 import { heightScore } from "./players/ovr.js";
+import { OVR_WEIGHTS, type OvrKey } from "./players/templates.js";
 import { familiarityPenalty } from "../engine/positionFit.js";
 import { secondaryPositions } from "./players/positions.js";
 import { COMPOSITE_STAR_CONCENTRATION } from "./constants.js";
-
-const mean = (xs: number[]): number =>
-  xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length;
 
 /**
  * A player together with the formation slot he's filling. Every composite is
@@ -25,18 +23,71 @@ export function withSlots(xi: Player[], slots: Position[]): SlottedPlayer[] {
   return xi.map((player, i) => ({ player, slot: slots[i] ?? player.pos }));
 }
 
-/**
- * A single player's quality on a skill set, 0..1 (average of the raw stats),
- * docked by what it costs him to play this slot. The penalty is in raw rating
- * points, so dividing by 100 puts it on the same scale as the quality itself.
- */
-function playerQuality(sp: SlottedPlayer, skills: SkillKey[]): number {
-  let s = 0;
-  for (const k of skills) s += sp.player.ratings[k];
-  const raw = s / skills.length / 100;
-  const penalty = familiarityPenalty(sp.slot, sp.player.pos, secondaryPositions(sp.player));
-  return Math.max(0, raw - penalty / 100);
+/** The value of one OVR input for a player: a rating, or height on the same 0..100 scale. */
+function inputOf(p: Player, key: OvrKey): number {
+  return key === "height" ? heightScore(p.heightCm) : p.ratings[key];
 }
+
+/**
+ * A player's quality on a weighted skill set, 0..1, docked by what it costs him
+ * to play this slot. The penalty is in raw rating points, so dividing by 100
+ * puts it on the same scale as the quality itself.
+ */
+function weightedQuality(sp: SlottedPlayer, weights: Partial<Record<OvrKey, number>>): number {
+  let acc = 0;
+  let total = 0;
+  for (const [key, w] of Object.entries(weights) as [OvrKey, number][]) {
+    acc += w * inputOf(sp.player, key);
+    total += w;
+  }
+  if (total === 0) return 0;
+  const penalty = familiarityPenalty(sp.slot, sp.player.pos, secondaryPositions(sp.player));
+  return Math.max(0, acc / total / 100 - penalty / 100);
+}
+
+/** Equal-weight quality over a plain skill list (the finishing composite). */
+function playerQuality(sp: SlottedPlayer, skills: SkillKey[]): number {
+  return weightedQuality(sp, Object.fromEntries(skills.map((k) => [k, 1])));
+}
+
+/**
+ * Which OVR inputs belong to each phase of play. A skill can serve more than
+ * one phase (positioning helps you attack, defend and keep the ball).
+ */
+const PHASE_SKILLS: Record<"attack" | "defense" | "control" | "keeping", OvrKey[]> = {
+  attack: ["finishing", "longShot", "dribbling", "speed", "positioning", "crosses", "strength", "jumping", "height"],
+  defense: ["tackling", "interceptions", "positioning", "strength", "jumping", "height", "speed"],
+  control: ["shortPass", "longPass", "dribbling", "positioning"],
+  keeping: ["goalkeeping", "positioning", "jumping", "height"],
+};
+
+/**
+ * How a player in `slot` contributes to `phase`: the slot's own OVR weights,
+ * restricted to that phase's skills.
+ *
+ * This is what keeps OVR honest. Composites used to read a fixed skill list per
+ * phase, so any rating a position's OVR weighted but its phase list omitted
+ * cost wages and transfer fees and did nothing on the pitch: 27% of a
+ * full-back's OVR (speed, crossing), 35% of a keeper's (positioning, passing),
+ * 23% of a striker's (strength, jumping, height). Reading the OVR row means a
+ * rating counts on the pitch in proportion to what it adds to OVR, and a
+ * retune of OVR_WEIGHTS reaches the match engine with no second table to keep
+ * in step.
+ */
+const PHASE_WEIGHTS: Record<Position, Record<keyof typeof PHASE_SKILLS, Partial<Record<OvrKey, number>>>> =
+  Object.fromEntries(
+    (Object.keys(OVR_WEIGHTS) as Position[]).map((slot) => [
+      slot,
+      Object.fromEntries(
+        (Object.keys(PHASE_SKILLS) as (keyof typeof PHASE_SKILLS)[]).map((phase) => [
+          phase,
+          Object.fromEntries(
+            PHASE_SKILLS[phase].filter((k) => OVR_WEIGHTS[slot][k]).map((k) => [k, OVR_WEIGHTS[slot][k]]),
+          ),
+        ]),
+      ),
+    ]),
+  ) as never;
 
 /**
  * Position-weighted average of a per-player quality, then blended toward the
@@ -44,61 +95,67 @@ function playerQuality(sp: SlottedPlayer, skills: SkillKey[]): number {
  * who drives the phase (a striker moves `attack` more than a midfielder); the
  * peak blend lets an elite individual resist being averaged down by weaker
  * teammates, so a standout in the right position genuinely carries a thin
- * group rather than washing out to the mean. Pure — reads only attributes, no
- * rng, so it never perturbs the seeded stream.
+ * group rather than washing out to the mean. A slot with no weight takes no
+ * part. Pure — reads only attributes, no rng, so it never perturbs the seeded
+ * stream.
  */
-function starComposite(
+function phaseComposite(
   players: SlottedPlayer[],
-  skills: SkillKey[],
+  phase: keyof typeof PHASE_SKILLS,
   weightOf: Partial<Record<Position, number>>,
 ): number {
-  if (players.length === 0) return 0.5;
   let acc = 0;
   let wsum = 0;
   let peak = 0;
   for (const sp of players) {
-    const q = playerQuality(sp, skills);
-    const w = weightOf[sp.slot] ?? 0.5;
+    const w = weightOf[sp.slot] ?? 0;
+    if (w === 0) continue;
+    const q = weightedQuality(sp, PHASE_WEIGHTS[sp.slot][phase]);
     acc += w * q;
     wsum += w;
     if (q > peak) peak = q;
   }
-  const weightedMean = wsum === 0 ? 0.5 : acc / wsum;
+  if (wsum === 0) return 0.5;
   const c = COMPOSITE_STAR_CONCENTRATION;
-  return (1 - c) * weightedMean + c * peak;
+  return (1 - c) * (acc / wsum) + c * peak;
 }
-
-/**
- * Aerial ability per player: jumping + height reach, on 0..1. Deliberately NOT
- * docked for playing out of position — a tall player is tall wherever he
- * stands, and reaching a cross is the one thing that doesn't need positional
- * know-how.
- */
-function aerial(p: Player): number {
-  return (p.ratings.jumping + heightScore(p.heightCm)) / 200;
-}
-
-const inSlot = (xi: SlottedPlayer[], ...slots: Position[]): SlottedPlayer[] =>
-  xi.filter((sp) => slots.includes(sp.slot));
 
 /** Weighted expected shot share by position (ST > W > AM > others). */
 const SHOT_SHARE: Partial<Record<Position, number>> = {
   ST: 4, W: 2.5, AM: 2, CM: 1, FB: 0.5, DM: 0.5, CB: 0.3,
 };
 
-/** Who drives chance creation (`attack`): strikers most, wingers, then AM/CM. */
+/**
+ * Who drives chance creation (`attack`): strikers most, then wingers and the
+ * full-backs overlapping outside them, then AM/CM.
+ *
+ * The group weights below are MEASURED, not chosen, and the full-back numbers
+ * are the ones that look odd. The target is that one extra OVR point on any
+ * outfield starter is worth about the same in points, which is what makes OVR
+ * mean one thing at every position. `scripts/deadAttrProbe.ts` measures it:
+ * before this, +1 OVR on a full-back was worth 0.09 points a season against
+ * 0.22-0.29 at every other outfield position. A full-back's OVR is split
+ * between defending and going forward, so to land level he needs a heavy
+ * weight in both phases; 2.5 here and 4.5 in defense put him at 0.21-0.22 on
+ * both a real imported save and a generated world. Re-run the probe before
+ * touching any of these.
+ */
 const ATTACK_WEIGHT: Partial<Record<Position, number>> = {
-  ST: 4, W: 2.5, AM: 2, CM: 1,
+  ST: 4, W: 2.5, FB: 2.5, AM: 2, CM: 1,
 };
 
-/** Who drives possession (`control`): central midfield most, then AM/wide, striker least. */
+/** Who drives possession (`control`): central midfield most, then AM/wide, striker and keeper least. */
 const CONTROL_WEIGHT: Partial<Record<Position, number>> = {
-  CM: 3, DM: 2.5, AM: 2, W: 1, FB: 1, CB: 1, ST: 0.5,
+  CM: 3, DM: 2.5, AM: 2, W: 1, FB: 1, CB: 1, ST: 0.5, GK: 0.5,
 };
 
-/** Who drives defending (`defense`): centre-backs most, then DM, then full-backs. */
+/**
+ * Who drives defending (`defense`): full-backs and centre-backs most, then DM,
+ * then a central midfielder's share. See ATTACK_WEIGHT for why the full-back
+ * figure is what it is.
+ */
 const DEFENSE_WEIGHT: Partial<Record<Position, number>> = {
-  CB: 3, DM: 2, FB: 1.5,
+  FB: 4.5, CB: 3, DM: 2, CM: 0.75,
 };
 
 /**
@@ -116,47 +173,27 @@ const DEFENSE_WEIGHT: Partial<Record<Position, number>> = {
 export function rollupComposites(xi: SlottedPlayer[], teamName: string): Composites {
   const keeper = xi.find((sp) => sp.slot === "GK");
   const outfield = xi.filter((sp) => sp.slot !== "GK");
-  const attackers = inSlot(xi, "ST", "W", "AM", "CM");
-  const defenders = inSlot(xi, "CB", "FB", "DM");
 
-  const attack = starComposite(
-    attackers,
-    ["finishing", "longShot", "dribbling", "speed", "positioning", "crosses"],
-    ATTACK_WEIGHT,
-  );
+  const attack = phaseComposite(outfield, "attack", ATTACK_WEIGHT);
 
   // finishing: shot-share-weighted finishing/longShot/positioning across outfielders
   let fw = 0;
   let fsum = 0;
   for (const sp of outfield) {
     const share = SHOT_SHARE[sp.slot] ?? 0.3;
-    const q = playerQuality(sp, ["finishing", "longShot", "positioning"]);
-    fsum += share * q;
+    fsum += share * playerQuality(sp, ["finishing", "longShot", "positioning"]);
     fw += share;
   }
   const finishing = fw === 0 ? 0.5 : fsum / fw;
 
-  const defenseBase = starComposite(
-    defenders,
-    ["tackling", "interceptions", "positioning", "strength"],
-    DEFENSE_WEIGHT,
-  );
-  const defenseAerial = mean(defenders.map((sp) => aerial(sp.player)));
-  const defense = 0.75 * defenseBase + 0.25 * defenseAerial;
+  const defense = phaseComposite(outfield, "defense", DEFENSE_WEIGHT);
 
-  // An outfielder pressed into goal takes the keeper penalty, which is large
-  // enough to floor his goalkeeping contribution — as it should be.
-  const keeping = keeper
-    ? 0.85 * Math.max(0, keeper.player.ratings.goalkeeping / 100
-        - familiarityPenalty("GK", keeper.player.pos, secondaryPositions(keeper.player)) / 100)
-      + 0.15 * aerial(keeper.player)
-    : 0.5;
+  // An outfielder pressed into goal is measured on a keeper's weights and takes
+  // the keeper penalty, which is large enough to floor his contribution — as it
+  // should be.
+  const keeping = keeper ? weightedQuality(keeper, PHASE_WEIGHTS.GK.keeping) : 0.5;
 
-  const control = starComposite(
-    outfield,
-    ["shortPass", "longPass", "dribbling", "positioning"],
-    CONTROL_WEIGHT,
-  );
+  const control = phaseComposite(xi, "control", CONTROL_WEIGHT);
 
   return { name: teamName, attack, finishing, defense, keeping, control };
 }
