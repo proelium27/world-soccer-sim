@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-19",
+  date: "2026-09-22",
   title: "Boards in playoff leagues care about the playoffs",
   items: [
     "In MLS, Liga MX and Argentina, where the title is decided by a playoff, your board now judges you on the playoffs instead of the table. It never made sense for a favourite to be graded on finishing 1st or 2nd when the trophy is handed out somewhere else.",

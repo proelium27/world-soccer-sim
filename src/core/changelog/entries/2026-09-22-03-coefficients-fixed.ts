@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-19",
+  date: "2026-09-22",
   title: "Continental Cup places now really move between countries",
   items: [
     "Countries are supposed to win and lose Continental Cup places based on how their clubs have done in Europe over the last five seasons. It turns out that never happened in a normal save. The part of the game that hands out the places couldn't see the past cup results, so every country kept its starting number of places forever.",

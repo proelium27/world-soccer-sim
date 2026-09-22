@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-19",
+  date: "2026-09-22",
   title: "Your board now cares about continental football",
   items: [
     "Until now a board only looked at your league finish and counted trophies. A big club crashing out of the Continental Cup early, or a small club going on a run, made no difference unless someone lifted the thing. That's fixed, for every league in the world.",
