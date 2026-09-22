@@ -2885,6 +2885,17 @@ export const PLAYER_WILL_RISE_BONUS = 0.35;
 export const HOME_PULL_K = 0;
 
 /**
+ * Home-country pull in the transfer and loan markets: a multiplier on the
+ * buyer's valuation (see `homeAppeal`). A home club's valuation of a squad
+ * player rises and a foreign club's falls, both scaled by how domestic the
+ * league really is and by how little the player cares about club size. Stars are
+ * exempt, so the weak leagues' upward sales of their best players are untouched.
+ *
+ * 0 = off, the shipped behaviour until tuned.
+ */
+export const HOME_PULL_MARKET = 0;
+
+/**
  * Settling-in friction: a player who has only just joined is much harder to
  * prise away again, scaling his club's keep-value up by this much in his first
  * season and decaying to nothing over PLAYER_SETTLED_SEASONS.

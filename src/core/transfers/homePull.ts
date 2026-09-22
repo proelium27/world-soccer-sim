@@ -68,3 +68,28 @@ export function homePull(player: Player, club: HomeClub | undefined, k: number):
   if (k === 0 || !club || player.nationality !== club.country) return 0;
   return k * club.domesticShare * (1 - statureSensitivity(player.ovr));
 }
+
+/**
+ * Home pull on a move between two clubs, as a multiplier on the buyer's
+ * valuation: above 1 for a move home, below 1 for a move away from home, 1 when
+ * neither club is in his country. The market-side form of `homePull`, used by
+ * `moveAppealBetween` (transfers) and the loan market.
+ *
+ * `m` is HOME_PULL_MARKET: at 1, a squad player in a fully domestic league
+ * would be valued twice as highly by a home club as by a foreign one. Stars feel
+ * none of it (`1 − care`), so the weak leagues' upward sales of their best
+ * players are untouched. Clamped at 0.
+ */
+export function homeAppeal(
+  player: Player,
+  from: HomeClub | undefined,
+  to: HomeClub | undefined,
+  m: number,
+): number {
+  if (m === 0) return 1;
+  const side = (c: HomeClub | undefined) =>
+    c && player.nationality === c.country ? c.domesticShare : 0;
+  const diff = side(to) - side(from);
+  if (diff === 0) return 1;
+  return Math.max(0, 1 + m * (1 - statureSensitivity(player.ovr)) * diff);
+}
