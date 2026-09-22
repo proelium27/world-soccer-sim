@@ -265,8 +265,10 @@ describe("the USL's lower-division title playoffs", () => {
     })),
   ]));
 
-  it("sizes the US second and third divisions at 25 and 17", () => {
-    expect(competitionTeamCount(us2)).toBe(25);
+  it("sizes the US second and third divisions at 24 and 17", () => {
+    // 24 rather than an odd 25 so its conferences are equal halves, which is
+    // what lets them play each other at all (see conferences.test.ts).
+    expect(competitionTeamCount(us2)).toBe(24);
     expect(competitionTeamCount(us3)).toBe(17);
   });
 

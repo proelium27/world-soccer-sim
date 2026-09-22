@@ -63,7 +63,7 @@ describe("the shipped splits", () => {
   it("splits exactly the US and Argentine top two divisions, and nothing below them", () => {
     const split = comps.filter((c) => competitionConferences(c));
     expect(split.map((c) => `${c.country}:${c.tier}:${competitionTeamCount(c)}`)).toEqual([
-      "Argentina:1:30", "Argentina:2:36", "United States:1:30", "United States:2:25",
+      "Argentina:1:30", "Argentina:2:36", "United States:1:30", "United States:2:24",
     ]);
     const top = (country: string) => split.find((c) => c.country === country && c.tier === 1)!;
     expect(competitionTitlePlayoff(top("Argentina"))).toBe("zones");
@@ -76,7 +76,7 @@ describe("the shipped splits", () => {
   });
 
   it("gives each split top flight at least one lower-division club per top-flight club", () => {
-    // Counted across every division below, since the US's USL shape (25 then
+    // Counted across every division below, since the US's USL shape (24 then
     // 17) is smaller than its 30-club top flight a division at a time.
     for (const country of ["Argentina", "United States"]) {
       const chain = comps.filter((c) => c.country === country);
@@ -86,10 +86,14 @@ describe("the shipped splits", () => {
     }
   });
 
-  it("plays Argentina's second division as zones of 18 (34 games) and the US's as conferences of 13 and 12 (up to 24)", () => {
+  it("plays Argentina's second division as zones of 18 (34 games) and the US's as conferences of 12 (30 games)", () => {
     const d2 = (country: string) => comps.find((c) => c.country === country && c.tier === 2)!;
     expect(competitionSeasonGames(d2("Argentina"))).toBe(34);
-    expect(competitionSeasonGames(d2("United States"))).toBe(24);
+    // 22 against its own conference home and away, plus 8 across the divide.
+    // Equal halves are what makes those 8 possible at all: an odd division
+    // falls back to unequalConferenceSchedule, which plays no cross games and
+    // leaves the two halves on different season lengths.
+    expect(competitionSeasonGames(d2("United States"))).toBe(30);
   });
 
   it("puts the eastern US second-division clubs in the Eastern Conference", () => {
@@ -101,7 +105,7 @@ describe("the shipped splits", () => {
     const names = (tids: number[]) => tids.map((tid) => block[tid - blockStart].name);
     expect(names(east)).toContain("Charleston Shipwrights");
     expect(names(east)).toContain("Toledo Quarrymen");
-    expect(east).toHaveLength(13);
+    expect(east).toHaveLength(12);
     expect(west).toHaveLength(12);
     expect(names(west)).toContain("Visalia Growers");
     expect(names(west)).toContain("Bakersfield Flatboatmen");
@@ -155,6 +159,32 @@ describe("conferenceSchedule", () => {
       expect(home.get(tid)).toBe(15);
       expect(west.filter((o) => met(tid, o) === 2)).toHaveLength(1);
     }
+  });
+
+  it("gives the USL Championship its 30: EVEN halves, own conference twice and eight across", () => {
+    // The only shipped split with even halves AND cross rounds, so it is the
+    // only place this branch runs: with no odd club left over there is no
+    // home-and-away rival, and every cross game is a one-off. Each club misses
+    // four of the other conference, and which four rotates down the table.
+    const e = Array.from({ length: 12 }, (_, i) => i);
+    const w = Array.from({ length: 12 }, (_, i) => 100 + i);
+    const games = conferenceSchedule([e, w], 8);
+    noClubTwiceAMatchday(games);
+    const { games: count, home, met } = tally(games);
+    for (const [mine, theirs] of [[e, w], [w, e]]) {
+      for (const tid of mine) {
+        expect(count.get(tid)).toBe(30);
+        expect(home.get(tid)).toBe(15);
+        for (const other of mine) if (other !== tid) expect(met(tid, other)).toBe(2);
+        const across = theirs.map((o) => met(tid, o));
+        expect(across.filter((n) => n === 2)).toHaveLength(0);
+        expect(across.filter((n) => n === 1)).toHaveLength(8);
+      }
+    }
+    // Different clubs miss different opponents, so the eight are a real slice of
+    // the other conference rather than the same eight for everyone.
+    const facedBy = (tid: number) => w.filter((o) => met(tid, o) === 1).join(",");
+    expect(new Set(e.map(facedBy)).size).toBeGreaterThan(1);
   });
 
   it("spreads the cross-conference rounds through the season", () => {
