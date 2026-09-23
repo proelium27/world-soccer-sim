@@ -175,6 +175,18 @@ pending the user's call.
 
 - Add the remaining lines to `clubAppealFor`: reputation, former club (and the
   Americas prestige line if kept).
+- **Free agency becomes the player's choice** (user call, 2026-09-22). Today
+  the club picks and a sub-73 free agent never refuses anyone, so the player's
+  home preference has no channel there and Stage 1 reaches it through the club's
+  ranking instead. Once `clubAppealFor` exists, a free agent chooses among the
+  clubs that want him on that list. Measure it against Stage 1's drift numbers;
+  a player-only preference was measured missing the targets both ways (France
+  +18, Serbia −11), so the foreign quota stays as the backstop unless the new
+  version holds the real mixes without it.
+- Stage 1's two halves are presented as what they model: **Home country** is a
+  line in the player's own reasons; the **foreign quota** is shown as the
+  league's registration rule ("Serbian clubs are close to their foreign-player
+  limit"), a real rule rather than a hidden AI bias.
 - Player profile "How he sees clubs" panel; a Keen / Open / Reluctant / Won't
   talk label on Transfers, Free Agents, Watchlist and loan search (text only,
   for DOM weight); reputation and trend on Club History and the club Database;
