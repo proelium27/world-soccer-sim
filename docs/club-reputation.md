@@ -1,215 +1,146 @@
 # Club reputation and home-country pull
 
-Design doc and work log. Stage 1 (home-country pull) is in progress; later
-stages are planned, not built.
+Design doc and work log. **Stage 1 (nationality realism) is built and being
+tuned; Stages 2-3 are planned.** Decisions are Caleb's (2026-09-22), worked
+out with a Fable review: the goal is realism, free agency is the player's
+choice, playing time is a line, foreign-player rules are real league rules only
+where a real league has one and bind the user too, wages are a later stage, and
+there is no universal hidden AI bias toward domestic players.
 
 ## Why
 
-**The main goal is nationality realism.** Measured on a fresh 898-club world
-(seed 1, spectator save, `scripts/nationalityDriftProbe.ts`), each top flight's
-domestic share:
+**The main goal is nationality realism.** On `main`, a fresh 898-club world
+(spectator save, `scripts/nationalityDriftProbe.ts`) drifts every league toward
+the world's average mix and never levels off:
 
-| League | Real | Generation | After 1 season | After 5 seasons |
+| League | Real | Generation | Season 5 | Season 20 (seed 1 / 2) |
 |---|---|---|---|---|
-| Argentina | 83.7% | 85.2% | 74.4% | 29.9% |
-| Brazil | 74.9% | 78.2% | 67.7% | 26.4% |
-| Serbia | 66.0% | 64.3% | 55.2% | 16.1% |
-| Spain | 60.8% | 61.0% | 57.5% | 24.0% |
-| England | 38.6% | 36.2% | 35.4% | 17.5% |
-| Scotland | 35.8% | 41.3% | 31.7% | 9.4% |
+| Argentina | 83.7% | 85.2% | 29.9% | 18.7% / 19.5% |
+| Brazil | 74.9% | 78.2% | 26.4% | 19.6% / 16.7% |
+| Serbia | 66.0% | 64.3% | 16.1% | 7.5% / 6.1% |
+| Spain | 60.8% | 61.0% | 24.0% | 17.1% / 18.6% |
+| England | 38.6% | 36.2% | 17.5% | 10.2% / 10.2% |
 
-Generation is right; every season after it moves every league toward the
-world's average mix, with no sign of levelling off. Across all divisions it is
-worse (Argentina 84% -> 22%, Serbia 67% -> 9%).
+Youth intake draws from each league's real table, so academies pull toward the
+real share; all the drift is movement. Nothing after generation looked at
+nationality: free agency was one worldwide pool every club ranked on rating
+alone, and the market and loans ignored it. Over the first five seasons the
+foreign arrivals in top flights were 2,360 free agents (23 of them rated 73+),
+1,751 bought from abroad and 444 loans; and the largest single way home players
+left was being sold abroad.
 
-Nothing after generation looks at nationality. Youth intake draws from the
-static real table (`LEAGUE_NATIONALITY_WEIGHTS`, or a custom league's own), so
-academies are a *restoring* force toward the real share. All drift is movement.
-Foreign arrivals in top flights over those five seasons:
+## What Stage 1 builds
 
-| Route | Foreign arrivals | Of which rated 73+ |
+Three mechanisms, each modelling a real thing, none a formula tuned to hit a
+number.
+
+### A player's view of a club (`clubAppealFor`, `transfers/clubAppeal.ts`)
+
+His reasons, line by line. The AI decides on the numbers and the screens show
+the same lines, so the reason on screen is the reason he decided on. Every line
+binds the user exactly as it binds an AI club.
+
+| Line | What | Shape |
 |---|---|---|
-| Free agency | 2,360 | 23 |
-| Bought from abroad | 1,751 | 992 |
-| Loans | 444 | 10 |
+| Level of club | The existing stature rule (`moveAppeal`/`refusesMove`) | Only line that can refuse |
+| Playing time | Would he start? His rating against the weakest man the club's shape fields at his position | `APPEAL_PLAYING_TIME` per point, clamped to −10/+5 points. ~0 for a star; decisive for a squad player |
+| Home country | The club is in his country | `APPEAL_HOME × league domestic share × homeAttachment`. Leaving home costs what arriving gains |
+| Confederation | The club is outside his confederation | `−APPEAL_CONFEDERATION × (1 − care)`, symmetric |
+| Former club | He has played for them | `APPEAL_FORMER_CLUB`; never a refusal |
 
-So over half the drift is ordinary players, and free agency is one worldwide
-pool that every club ranks purely on rating. A player-side preference alone
-could not fix it: below `PLAYER_WILL_CARE_FLOOR` (73) a player never refuses
-anyone, and `runAIFreeAgency` never consults player appeal at all — the club
-picks.
+`homeAttachment` fades the home line for a star (the global care curve) **and
+for a player who has outgrown his home league**: it falls to zero over
+`APPEAL_HOME_FADE_RANGE` points above what his country's best clubs field
+(Caleb, 2026-09-22: a 78-rated American leaves MLS; a 78-rated Englishman has no
+reason to leave). Loans scale home and confederation by `APPEAL_LOAN_FACTOR`.
+Score = sum of lines; as a valuation multiplier, `max(0, 1 + score)`, 0 when
+refused. `moveAppealBetween` (transfer market, inbound offers) and both loan
+loops read it; so does the user's loan search.
 
-The second goal is a transparent, world-scale club reputation, and a
-per-player view of each club that the AI and the screens both read.
+### Free agency is the player's choice (`freeAgencyMatch.ts`)
 
-## Rules for every stage
+Club-proposing deferred acceptance in all three passes (shortfalls, depth
+upgrades, prospects) and the mop-up. Clubs offer for open slots in their own
+order; each player keeps the offer he likes best by his view of the club; a
+rejected club moves on. Stable, terminating, independent of input order. It
+replaces the worst-first queue: a squad player picks where he would play and
+where he is at home, which is the real reason small clubs sign real players,
+and the ladder audit has to confirm that rather than assume it. Free agency
+draws nothing from the shared rng (contract length is seeded per signing).
+Cost: ~3s a pass on the 898-club world against ~1.5s for the greedy loop.
 
-- **Pure, rng-free terms.** New terms are arithmetic on data the save already
-  has. That alone does not keep the random stream in order (see Stage 1), so
-  where it matters it is pinned by a test, not asserted.
-- **Player-side rules bind the user and the AI identically.** Club-side
-  preferences are AI-only; the user picks their own signings.
-- **Every stage that changes AI behaviour is audited**: `weakLeaguesAudit`,
-  20 seasons x 4 seeds, this branch and `origin/main`, pooled by hand; plus the
-  drift probe.
-- **Stars still go abroad.** The weak leagues run on selling their best
-  upward, so home pull is zero at `PLAYER_WILL_CARE_CEILING`.
+### Real foreign-player registration rules (`foreignRules.ts`)
 
-## Stage 1: home-country pull (in progress)
+See the table at the end of this doc.
 
-`homePull(player, club) = K x domesticShare(club.country) x (1 - statureSensitivity(ovr))`
-when the player's nationality is the club's country, else 0. In rating points.
-`src/core/transfers/homePull.ts`, constant `HOME_PULL_K` (currently **0 = off**).
+### What the user sees
 
-- **One K, per-country strength.** `domesticShare` is the league's own real
-  domestic share, so Argentina pulls at 0.84K and Scotland at 0.36K.
-- **Free agency (AI only):** passes 1 and 2 rank by `ovr + homePull`; pass 3
-  (prospects) ranks by `potential + homePull`, i.e. in potential units.
-  Eligibility (`willing`) is untouched and keeps its early exit; the pull is a
-  string compare first, arithmetic only on a match. **Done, K = 0.**
-- **Transfer market:** the same term as a multiplier on the buyer's valuation
-  via `moveAppealBetween`. Selling side (`keepValueToClub`) untouched. *To do.*
-- **Loans:** same term. *To do.*
-- **Confederation term:** a player discounts any club outside his
-  confederation, scaled by `1 - care`, so Argentina's imports stay mostly South
-  American. Symmetric. *To do.*
-- **User side unchanged:** a below-floor player still refuses nobody, so the
-  user's Free Agents screen shows him as available.
-- `clubAppealFor(player, club, league)` returning line items (level match,
-  home country, confederation) is introduced in this stage and read by
-  `refusesMove`, `moveAppeal`, `refusesFreeAgentSigning` and the AI ranking, so
-  later stages only add lines. *To do.*
+A Keen / Open / Reluctant / Won't talk label (his score, text only, reasons on
+hover) on Free Agents, both Transfers tables, the Watchlist and the loan search;
+the league-rule line ("Foreign players 5 / 6") above Free Agents and Recommended
+Transfers where the league has a rule; "League rules" in place of the button
+when a signing would break one. `transfers/userView.ts` is the one helper they
+all read.
 
-### Verified before tuning K
+## Verified along the way
 
-1. **Nationality and country strings share one key space.** Every shipped
-   country is a `LEAGUE_NATIONALITY_WEIGHTS` key with a domestic weight, a name
-   pool and a confederation, and every generated league's players carry its
-   country string (`test/core/homeCountryKeys.test.ts`). This matters because a
-   mismatch fails silently: `pickNationality` falls back to England's table and
-   the compare never matches. A league added in World setup whose country is not
-   a nationality gets no pull, which is correct.
-2. **Pass 1's shared-rng draw count.** Pass 1 draws contract length from the
-   shared rng; passes 2 and 3 use seeded streams. The ranking changes *who*
-   fills a shortfall, not *whether*, so the count holds whenever the pool has a
-   candidate: with a pool ~2x demand, K = 0 and K = 30 consume the shared stream
-   identically while signing different, more domestic players
-   (`test/core/homePullRng.test.ts`). **Caveat:** if a position runs completely
-   dry for late-picking clubs, the counts can differ. That is a property of
-   typical worlds, not a guarantee; it does not block tuning, since Stage 1
-   changes the dynasty anyway.
-3. K = 0 leaves every existing free-agency test unchanged (65 of 65).
+1. Nationality and country strings share one key space for every shipped
+   league (`homeCountryKeys.test.ts`); a mismatch would fail silently.
+2. Free agency consumes no shared-rng draws (`freeAgencyRng.test.ts`).
+3. The matching is stable, order-independent and never double-signs
+   (`freeAgencyMatch.test.ts`); caps count tentative offers.
 
-### Tuning (done, pending the audits)
+## The first shape, and why it was replaced
 
-**Baseline (`main`, 20 seasons, seeds 1 and 2):** every top flight ends 3-20%
-domestic; the worst gap is Argentina, 64-65 points below its real 84%. Two
-seeds agree to within a point or two everywhere.
-
-The shipped shape is three strengths, all scaled by one gap:
-
-- `homeGap = max(0, realShare − clubDomesticNow) / (1 − realShare)` — how far
-  over its league's **foreign allowance** a club is. 0 at the real share.
-- `HOME_PULL_K` 15 — free agency, rating points added to a home player's rank.
-- `HOME_PULL_MARKET` 1.2 — transfers and loans, player side: valuation up for a
-  move home, down for a move away (`homeAppeal`).
-- `HOME_PULL_FOREIGN` 1.5 — transfers and loans, club side, AI only: a soft
-  foreign quota discounting foreign signings (`foreignDiscount`).
-- Every term is scaled by `1 − care`, so stars move on ambition alone.
-
-**Result, 10 seasons:** worst gap 11.6 (seed 1) and 11.4 (seed 2), both Serbia;
-most leagues within 2-6 points.
-
-**What was tried and why it changed** (10 seasons, seed 1 unless noted):
+The first version made clubs prefer domestic players: a free-agency ranking
+bonus, a market multiplier and a soft foreign quota, all scaled by how far over
+its league's foreign allowance a club was. Tuned, it held every league within
+2-11 points of its real share (10 seasons, two seeds), but it was a hidden AI
+bias that bound only the AI, it had to invent the allowance formula to bite, and
+that formula made a sub-73 Argentine at a 60%-domestic club unable to leave at
+all. Findings kept from it:
 
 | Variant | Worst gap | What it showed |
 |---|---|---|
-| Flat pull `K × realShare`, K 6 | +17.9 (France) / −10.9 (Serbia) | One K cannot hit per-league targets: settled share also depends on supply |
-| Feedback `K × (realShare − now)`, K 15 | −16.1 | Every league now errs the same way; a proportional controller's steady offset |
-| Same, K 25 / 40 | −12.6 / −12.7 | Diminishing to nothing: not a gain problem |
-| K 25 with no star exemption in FA | identical to K 25 | Free agents are almost never 73+; the exemption never bound |
-| + soft foreign quota, F 2 / 4 | −14.7 / −14.3 | Foreign transfers fell ~25-60%, but clubs refilled from foreign free agents and loans |
-| Gap over the foreign allowance, K 15 / M 1.2 / F 1.5 | −11.6 (seed 2: −11.4) | Shipped. The residual tracks how domestic a league should be, and this closes most of it |
+| Flat pull by league share | +17.9 (France) / −10.9 (Serbia) | Settled share depends on supply, not just preference |
+| Feedback on the club's gap | −16.1, then −12.7 at 2.7x the gain | A steady offset, not a gain problem |
+| + soft quota | −14.3 | Displaced foreign signings reappear in free agency and loans |
+| Gap over the foreign allowance | −11.4 to −11.6 | Best of the shape; replaced for being a formula, not a mechanism |
 
-**The residual is not supply.** Per-country counts at season 10 (with the
-pull): Serbia has 514 Serbians at home against 618 needed, with 198 more
-abroad and 227 unsigned. The unsigned are mostly released academy players too
-weak to sign over the foreigners on offer; only a hard quota (Argentina's real
-six-foreigner cap) would make clubs field them, at a cost to league strength.
-That is a separate decision.
+Also: the star exemption never binds in free agency (free agents are almost
+never 73+); keeping good Brazilians and Argentines at home compressed the
+country ladder (big four to Brazil 4.95 -> 1.09 on one seed), which is why the
+home line fades for a player who has outgrown his league.
 
-**Measurement notes.** Free agency is where displaced foreign signings reappear:
-any lever that only touches the market moves them there. The probe's "sold
-abroad" out-flow is the largest single way home players leave a top flight
-(1,424 in two seasons on `main`), which is why the market half is required.
+## Stage 2: club reputation (planned)
 
-Next: the ladder and solvency audit (20 seasons x 4 seeds, pull on and off),
-then one ~75-season drift run, since the ladder invariant has failed only at
-that horizon before (`docs/player-save-findings.md`).
+`StoredTeam.reputation` beside hype. Target is a per-season achievement score
+(continental trophy > deep run > league title scaled by league strength >
+domestic cup > finish scaled by league strength > promotion; relegation a
+penalty), with no squad-strength or hype term. Rises ~10% a season toward it,
+falls ~4-5%. Stature becomes 0.65 × squad strength + 0.35 × reputation. Adds a
+Reputation line to `clubAppealFor`. Own audit; expected to slow a newly promoted
+rich club's rise.
 
-## Stage 2: club reputation
+## Stage 3 (planned)
 
-- `StoredTeam.reputation` (0-100), beside hype. Hype stays short-term buzz and
-  keeps driving revenue.
-- **Target is a per-season achievement score**, with no squad-strength or hype
-  term (stature already carries squad strength): continental trophy >
-  continental deep run > league title (scaled by league strength) > domestic
-  cup > league finish (scaled by league strength) > promotion; relegation is a
-  penalty.
-- **Asymmetric movement:** ~10% a season toward the target rising, ~4-5%
-  falling. Fallen giants keep their pull for a generation; a one-off title does
-  not make a club a giant.
-- Stature becomes 0.65 x squad strength + 0.35 x reputation.
-- Seeded at generation; backfilled in `migrate.ts` from squad, hype and titles.
-- Expected ladder effect, stated up front: a newly promoted rich club stays
-  "small" for years and stars refuse it.
+The player-profile "How he sees clubs" panel; reputation and trend on Club
+History and the club Database; personality traits later. Neighbour/language
+pull (Brazil -> Portugal) needs data first.
 
-**Open for the user:** the Americas prestige discount (European and African
-players rating Americas clubs lower) was the user's ask; the review proposed
-dropping it in favour of the symmetric confederation term. They are different
-things — the confederation term is about where a player feels at home, the
-discount is about prestige — so it is kept as a candidate line for Stage 3
-pending the user's call.
+## Tuning and audits (in progress)
 
-## Stages 3-4: the per-player view and the screens
+Levers in order: `APPEAL_HOME` / `APPEAL_CONFEDERATION`, then
+`APPEAL_PLAYING_TIME`, then `APPEAL_FORMER_CLUB`; the league rules are facts,
+not levers. Target: every league within a few points of its real share at
+season 20, foreign blocks staying in-confederation. Read by group: rule leagues
+should land close almost by construction; no-rule leagues (Netherlands,
+Scotland) test the player lines. Scouting reach (a club-side term, AI only) is
+built only if a no-rule group sits well short after the player levers.
 
-- Add the remaining lines to `clubAppealFor`: reputation, former club (and the
-  Americas prestige line if kept).
-- **Free agency becomes the player's choice** (user call, 2026-09-22). Today
-  the club picks and a sub-73 free agent never refuses anyone, so the player's
-  home preference has no channel there and Stage 1 reaches it through the club's
-  ranking instead. Once `clubAppealFor` exists, a free agent chooses among the
-  clubs that want him on that list. Measure it against Stage 1's drift numbers;
-  a player-only preference was measured missing the targets both ways (France
-  +18, Serbia −11), so the foreign quota stays as the backstop unless the new
-  version holds the real mixes without it.
-- Stage 1's two halves are presented as what they model: **Home country** is a
-  line in the player's own reasons; the **foreign quota** is shown as the
-  league's registration rule ("Serbian clubs are close to their foreign-player
-  limit"), a real rule rather than a hidden AI bias.
-- Player profile "How he sees clubs" panel; a Keen / Open / Reluctant / Won't
-  talk label on Transfers, Free Agents, Watchlist and loan search (text only,
-  for DOM weight); reputation and trend on Club History and the club Database;
-  Manual and changelog.
-
-## Later
-
-- Personality traits (Patriot, Glory hunter) that reweight a player's lines,
-  shown on his profile.
-- Neighbour and language pull (Brazil -> Portugal). No data for it yet.
-
-## Risks
-
-| Risk | Check |
-|---|---|
-| Weak leagues stop selling upward and go into debt | Stars feel no pull; pooled solvency audit on both sides |
-| The strength ladder shifts | Pooled 4-seed audit vs `main` |
-| Small countries short of players | Preference, not a filter; watch minimum AI squad size |
-| FA pass 1's draw count shifts | `homePullRng.test.ts` |
-| `willing()` stops being cheap | Early exit preserved; time the offseason on the 898-club world |
-| User's Free Agents screen fills with foreigners the AI passes over before Stage 4's labels | Acceptable; they show as available; note in changelog |
-| Stage 2 slows promoted clubs' rise | Pooled ladder audit, direction stated up front |
-| Free-agent gate regressions | Keep existing tests; add home and confederation cases |
+**Baseline audit (`main`-equivalent, `weakLeaguesAudit`, 20 seasons):** seed 1
+deficit (Serbia −£2.2M, 1 club of 882), seeds 2 and 3 solvent, seed 4 to run
+from a clean `main` checkout.
 
 ## Foreign-player registration rules (Stage 1, step 3)
 

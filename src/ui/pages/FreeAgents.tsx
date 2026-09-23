@@ -16,6 +16,8 @@ import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.
 import { ROSTER_CAP } from "../../core/constants.js";
 import { clubStatures } from "../../core/ai/clubContext.js";
 import { refusesFreeAgentSigningWith } from "../../core/transfers/playerWill.js";
+import { userView } from "../../core/transfers/userView.js";
+import { InterestTag, RuleCounter } from "../components/InterestTag.js";
 import {
   PlayerViewCells, PlayerViewHeaders, PlayerViewSwitch, ViewTableWrap, performanceSeason,
   performanceSeasonOptions, usePlayerView, viewKeepsSort, viewSortAccessors, viewTableClass,
@@ -73,6 +75,9 @@ export function FreeAgents() {
     () => (league ? clubStatures(league.teams, league.players) : new Map<number, number>()),
     [league],
   );
+  // How each player sees your club, and your league's registration rules
+  // (transfers/userView.ts). Built once per league.
+  const clubView = useMemo(() => (league ? userView(league) : null), [league]);
 
   if (!league) {
     return <p className="p-3">Loading...</p>;
@@ -189,6 +194,7 @@ export function FreeAgents() {
           seasons={seasonOptions}
           onSeason={setPickedSeason}
         />
+        <RuleCounter standings={clubView?.standings ?? []} />
         <ViewTableWrap view={view}>
         <table className={`table table-striped table-sm${viewTableClass(view)}`}>
           <thead>
@@ -221,6 +227,7 @@ export function FreeAgents() {
               // Sunk to the bottom of the selection above so they can't crowd
               // signable players past the render cap.
               const refuses = refusesFor(p);
+              const seen = clubView?.of(p) ?? null;
               return (
                 <tr key={p.pid}>
                   <td><WatchToggle pid={p.pid} name={p.name} /></td>
@@ -248,7 +255,13 @@ export function FreeAgents() {
                       <span className="text-muted small text-nowrap">
                         Won&apos;t drop to your level
                       </span>
+                    ) : seen?.blocked ? (
+                      <span className="text-muted small" title={seen.blocked}>
+                        League rules
+                      </span>
                     ) : (
+                      <>
+                      <InterestTag view={seen} />{" "}
                       <button
                         className="btn btn-sm btn-primary text-nowrap"
                         disabled={simming || atCap || unaffordable}
@@ -261,6 +274,7 @@ export function FreeAgents() {
                       >
                         Sign {terms.lengthSeasons}y &middot; {formatWeeklyWage(terms.salary)}
                       </button>
+                      </>
                     )}
                   </td>
                 </tr>

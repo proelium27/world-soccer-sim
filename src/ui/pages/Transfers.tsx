@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { userView } from "../../core/transfers/userView.js";
+import { InterestTag, RuleCounter } from "../components/InterestTag.js";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -290,6 +292,8 @@ export function Transfers() {
   // including on every keystroke in an offer box. `teamNameByTid` also replaces
   // a linear `teams.find` that the club-column sort accessor called once per
   // comparison.
+  // How each player sees your club, and your league's registration rules.
+  const clubView = useMemo(() => (league ? userView(league) : null), [league]);
   const playerMap = useMemo(
     () => new Map((league?.players ?? []).map((p) => [p.pid, p])),
     [league?.players],
@@ -454,6 +458,7 @@ export function Transfers() {
                 Refresh
               </button>
             </div>
+            <RuleCounter standings={clubView?.standings ?? []} />
             <p className="card-text text-muted">
               Players near your team&apos;s level, within budget. The scout
               valuation is your baseline for offers, but the selling club&apos;s
@@ -545,6 +550,7 @@ export function Transfers() {
                         </>
                       )}
                       <td>
+                        <InterestTag view={clubView?.of(p, sellerTid) ?? null} />
                         <NegotiationControls
                           pid={p.pid}
                           negotiation={negotiationByPid.get(p.pid)}
@@ -680,6 +686,8 @@ export function Transfers() {
                       )}
                       <td>
                         {forSale ? (
+                          <>
+                          <InterestTag view={clubView?.of(p, sellerTid) ?? null} />
                           <NegotiationControls
                             pid={p.pid}
                             negotiation={negotiationByPid.get(p.pid)}
@@ -691,6 +699,7 @@ export function Transfers() {
                             onOffer={makeOfferAction}
                             onAcceptCounter={acceptCounterAction}
                           />
+                          </>
                         ) : (
                           <span className="text-muted small">{notForSaleReason}</span>
                         )}
