@@ -2880,8 +2880,14 @@ export const PLAYER_WILL_RISE_BONUS = 0.35;
  * scripts/nationalityDriftProbe.ts and the ladder audit.
  */
 
-/** Home country at full strength, before the league's domestic share and his attachment. */
-export const APPEAL_HOME = 0.3;
+/**
+ * Home country at full strength, before the league's domestic share and his
+ * attachment. Swept on nationalityDriftProbe (20 seasons): 0.3 left the top
+ * flights ~2.6 points too domestic on average (France +15.8 on seed 1), 0.2
+ * ~2.2 too foreign; 0.25 lands the average within half a point (seed 1: mean
+ * absolute gap 3.4, worst 8.4). What is left is league by league, not level.
+ */
+export const APPEAL_HOME = 0.25;
 
 /**
  * How many rating points above his country's best clubs (`HomeClub.homeLevel`)
