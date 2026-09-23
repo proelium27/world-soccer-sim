@@ -167,7 +167,7 @@ takes it below one it meets). Youth intake is exempt. Researched 2026-09-22:
 | Brazil ⚠ | foreigner cap 9 (a matchday limit, applied to the squad) | [Exame](https://exame.com/esporte/cbf-reduz-o-limite-de-estrangeiros-e-amplia-espaco-para-jovens-entenda-a-mudanca/) |
 | Argentina ⚠ | foreigner cap 6 | [El Viejo Var](https://elviejovar.com/cuantos-extranjeros-se-pueden-tener-en-la-liga-argentina/) |
 | Mexico | cap 9 on players not trained in Mexico | [Telediario](https://www.telediario.mx/futbol/liga-mx/extranjeros-en-liga-mx-2025-cuantos-puede-en-un-equipo) |
-| United States | foreigner cap 8 (international slots) | [MLS roster rules](https://www.mlssoccer.com/news/2025-mls-roster-rules-and-regulations) |
+| United States | none in the game: the real 8 international slots count green-card holders as domestic, so they don't limit nationality (the real mix is 39.5% US); by nationality the cap froze all 30 clubs from day one | [MLS roster rules](https://www.mlssoccer.com/news/2025-mls-roster-rules-and-regulations) |
 
 ⚠ = weaker sourcing or a recent change (Turkey's planned cut to 12 not taken;
 Greece rises to 7 in 2026-27; Brazil cuts from 2027; Italy and Argentina have

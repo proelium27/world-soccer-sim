@@ -85,8 +85,13 @@ export const LEAGUE_FOREIGN_RULES: Record<string, ForeignRule[]> = {
   Argentina: [{ kind: "foreignCap", max: 6, basis: "nationality" }],
   // Liga MX: at most 9 players not trained in Mexico.
   Mexico: [{ kind: "foreignCap", max: 9, basis: "trained" }],
-  // MLS: 8 international slots per club.
-  "United States": [{ kind: "foreignCap", max: 8, basis: "nationality" }],
+  // MLS: 8 international slots per club in reality, but green-card holders,
+  // refugees and Homegrown International players count as domestic, so the
+  // real rule does not limit NATIONALITY: the league's own real mix is 39.5%
+  // US nationals (LEAGUE_NATIONALITY_WEIGHTS). Applied by nationality it froze
+  // every club in the league from the first day (30 of 30 over the cap), so it
+  // is not modelled rather than modelled wrongly.
+  "United States": [],
 };
 
 /** Per-tier overrides where a lower division's rule is known to differ. */

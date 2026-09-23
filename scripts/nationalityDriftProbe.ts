@@ -9,8 +9,12 @@
  *
  *   in:  free agent, bought (same country), bought (abroad), loan in,
  *        ceiling sweep (fee-0 move), promoted with club, youth intake, other
- *   out: sold/moved (same country), sold abroad, loaned out, released,
- *        retired or culled, relegated with club
+ *   out: sold/moved (same country), sold abroad, loaned out, released (tagged
+ *        with where he is by the end of the offseason: signed at home, signed
+ *        abroad, or unsigned), retired or culled, relegated with club
+ *
+ * Then, per top flight: clubs at a registration cap, and clubs more than 5
+ * points above their league's real domestic share (overshoot).
  *
  * Losing home players and gaining foreign ones need different fixes, which is
  * why the two directions are kept apart.
@@ -27,6 +31,7 @@ import { simOffseason } from "../src/core/offseason.js";
 import { SPECTATOR_TID } from "../src/core/spectator.js";
 import { APPEAL_HOME } from "../src/core/constants.js";
 import { domesticShare } from "../src/core/transfers/homePull.js";
+import { worldRules, competitionForeignRules } from "../src/core/foreignRules.js";
 import { FREE_AGENT_TID, type CompletedTransfer } from "../src/core/transfers/negotiation.js";
 
 const SEASONS = Number(process.env.SEASONS ?? 20);
@@ -99,6 +104,8 @@ for (let s = 0; s < SEASONS; s++) {
   const alive = new Set(league.players.map((p) => p.pid));
   const nat = new Map(league.players.map((p) => [p.pid, p.nationality]));
   const fresh = league.transfers.filter((t) => !beforeTransfers.has(t));
+  const anywhere = new Map<number, number>();
+  for (const t of league.teams) for (const pid of t.roster) anywhere.set(pid, t.tid);
   const lastInto = new Map<string, CompletedTransfer>();
   const lastOutOf = new Map<string, CompletedTransfer>();
   for (const t of fresh) { lastInto.set(`${t.pid}:${t.toTid}`, t); lastOutOf.set(`${t.pid}:${t.fromTid}`, t); }
@@ -128,7 +135,13 @@ for (let s = 0; s < SEASONS; s++) {
     let route: string;
     if (!alive.has(pid)) route = "out: retired or culled";
     else if (!after.countryOfTid.has(tid) && !tr) route = "out: relegated with club";
-    else if (!tr) route = "out: released";
+    else if (!tr) {
+      // Where a released player is by the end of the offseason: re-signed at
+      // home, signed abroad, or still unsigned.
+      const now = anywhere.get(pid);
+      route = now === undefined ? "out: released, unsigned"
+        : anyCountry.get(now) === country ? "out: released, signed at home" : "out: released, signed abroad";
+    }
     else if (tr.loanSeasons) route = "out: loaned out";
     else route = anyCountry.get(tr.toTid) === country ? "out: moved, same country" : "out: sold abroad";
     bump(country, route, home);
@@ -182,6 +195,28 @@ console.log("country".padEnd(15), "needed", "home", "abroad", "unsigned", "home/
       if (w === undefined) unsigned++; else if (w === c) home++; else abroad++;
     }
     console.log(c.padEnd(15), String(needed).padStart(6), String(home).padStart(5), String(abroad).padStart(6), String(unsigned).padStart(8), (home / needed).toFixed(2).padStart(11));
+  }
+}
+
+// Per league: clubs at a registration cap, and clubs already above their
+// league's real domestic share (overshoot), at the end of the run.
+console.log(`\n=== top flights at season ${SEASONS}: rule limits and overshoot ===`);
+console.log("league".padEnd(15), "clubs", "at cap", "over real share");
+{
+  const byPid = new Map(league.players.map((p) => [p.pid, p]));
+  const rules = worldRules(league.teams, league.competitions, (pid) => byPid.get(pid), league.season);
+  for (const comp of league.competitions.filter((c) => c.tier === 1)) {
+    const clubs = league.teams.filter((t) => t.compId === comp.id);
+    let atCap = 0;
+    let over = 0;
+    for (const t of clubs) {
+      if (rules.standings(t.tid, t.roster).some((s) =>
+        (s.rule.kind === "foreignCap" || s.rule.kind === "nonEuCap") && s.count >= s.limit)) atCap++;
+      const home = t.roster.filter((pid) => byPid.get(pid)?.nationality === comp.country).length;
+      if (t.roster.length > 0 && home / t.roster.length > real.get(comp.country)! + 0.05) over++;
+    }
+    const hasCap = competitionForeignRules(comp).some((r) => r.kind === "foreignCap" || r.kind === "nonEuCap");
+    console.log(comp.country.padEnd(15), String(clubs.length).padStart(5), (hasCap ? String(atCap) : "-").padStart(6), String(over).padStart(15));
   }
 }
 
