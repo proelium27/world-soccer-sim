@@ -2895,20 +2895,20 @@ export const PLAYER_WILL_RISE_BONUS = 0.35;
 export const HOME_PULL_FADE_RANGE = 5;
 
 /** Free agency: rating points a club adds to a home player's ranking, per unit of gap. */
-export const HOME_PULL_K = 15;
+export const HOME_PULL_K = 0;
 
 /**
  * Transfer and loan markets, player side: a multiplier on the buyer's
  * valuation, up for a move home and down for a move away (`homeAppeal`).
  */
-export const HOME_PULL_MARKET = 1.2;
+export const HOME_PULL_MARKET = 0;
 
 /**
  * Transfer and loan markets, club side and AI only: a soft foreign quota that
  * discounts a foreign signing's value (`foreignDiscount`). Needed because the
  * home-side pull alone plateaued: nothing made a foreigner less attractive.
  */
-export const HOME_PULL_FOREIGN = 1.5;
+export const HOME_PULL_FOREIGN = 0;
 
 /**
  * Settling-in friction: a player who has only just joined is much harder to
