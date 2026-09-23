@@ -139,8 +139,38 @@ Scotland) test the player lines. Scouting reach (a club-side term, AI only) is
 built only if a no-rule group sits well short after the player levers.
 
 **Baseline audit (`main`-equivalent, `weakLeaguesAudit`, 20 seasons):** seed 1
-deficit (Serbia −£2.2M, 1 club of 882), seeds 2 and 3 solvent, seed 4 to run
-from a clean `main` checkout.
+deficit (Serbia −£2.2M, 1 club of 882), seeds 2 and 3 solvent, seed 4 not yet
+run (it was started from a clean export of merge base `469aaf2b` and stopped at
+the handoff).
+
+**First measurement, starting values, seed 1, 20 seasons** (APPEAL_HOME 0.3,
+CONFEDERATION 0.15, PLAYING_TIME 0.02/pt, FORMER_CLUB 0.1; this run still had
+the MLS cap, since removed):
+
+| League | Real | `main` s20 | New s20 | Gap |
+|---|---|---|---|---|
+| Argentina | 83.7% | 18.7% | 80.6% | −3.1 |
+| Brazil | 74.9% | 19.6% | 74.7% | −0.2 |
+| Serbia | 66.0% | 7.5% | 60.5% | −5.5 |
+| Spain | 60.8% | 17.1% | 58.9% | −2.0 |
+| Mexico | 62.9% | 8.6% | 61.6% | −1.3 |
+| Turkey | 48.2% | 6.3% | 48.9% | +0.6 |
+| Germany | 45.4% | 10.7% | 48.3% | +2.9 |
+| England | 38.6% | 10.2% | 42.8% | +4.2 |
+| Scotland (no rule) | 35.8% | 3.0% | 37.4% | +1.6 |
+| Netherlands (no rule) | 50.3% | 9.6% | 54.1% | +3.8 |
+| Greece | 45.2% | 3.6% | 41.1% | −4.1 |
+| Belgium | 38.3% | 5.5% | 45.3% | +7.0 |
+| Portugal | 39.8% | 7.6% | 47.2% | +7.3 |
+| Italy | 39.5% | 10.0% | 31.8% | −7.7 |
+| France | 49.6% | 10.7% | 60.1% | +10.5 |
+| United States | 39.5% | 7.9% | 65.8% | +26.2 (MLS cap, now removed) |
+
+The two no-rule leagues, the real test of the player lines, land within 2-4
+points. Next: re-run with the MLS cap removed on seeds 1 and 2; then tune
+France/Portugal/Belgium (overshoot) and Italy (undershoot); then the ladder and
+solvency audit against the merge base, the 75-season drift run, and the Manual
+and changelog.
 
 ## Foreign-player registration rules (Stage 1, step 3)
 
