@@ -100,16 +100,52 @@ when the player's nationality is the club's country, else 0. In rating points.
    changes the dynasty anyway.
 3. K = 0 leaves every existing free-agency test unchanged (65 of 65).
 
-### Tuning
+### Tuning (done, pending the audits)
 
-- Extend the drift probe to report flows per league per season **by channel and
-  direction** (FA passes 1/2/3, mop-up, market, loans, youth, retirement; in and
-  out). Losing Argentines and gaining foreigners need different fixes.
-- Baseline on `main` first (K = 0 on this branch is byte-identical to `main`).
-- Target: every league within ~5 points of its real domestic share at season
-  20, foreign blocks roughly regional. Then one ~75-season drift run, since the
-  ladder invariant has failed only at that horizon before
-  (`docs/player-save-findings.md`).
+**Baseline (`main`, 20 seasons, seeds 1 and 2):** every top flight ends 3-20%
+domestic; the worst gap is Argentina, 64-65 points below its real 84%. Two
+seeds agree to within a point or two everywhere.
+
+The shipped shape is three strengths, all scaled by one gap:
+
+- `homeGap = max(0, realShare − clubDomesticNow) / (1 − realShare)` — how far
+  over its league's **foreign allowance** a club is. 0 at the real share.
+- `HOME_PULL_K` 15 — free agency, rating points added to a home player's rank.
+- `HOME_PULL_MARKET` 1.2 — transfers and loans, player side: valuation up for a
+  move home, down for a move away (`homeAppeal`).
+- `HOME_PULL_FOREIGN` 1.5 — transfers and loans, club side, AI only: a soft
+  foreign quota discounting foreign signings (`foreignDiscount`).
+- Every term is scaled by `1 − care`, so stars move on ambition alone.
+
+**Result, 10 seasons:** worst gap 11.6 (seed 1) and 11.4 (seed 2), both Serbia;
+most leagues within 2-6 points.
+
+**What was tried and why it changed** (10 seasons, seed 1 unless noted):
+
+| Variant | Worst gap | What it showed |
+|---|---|---|
+| Flat pull `K × realShare`, K 6 | +17.9 (France) / −10.9 (Serbia) | One K cannot hit per-league targets: settled share also depends on supply |
+| Feedback `K × (realShare − now)`, K 15 | −16.1 | Every league now errs the same way; a proportional controller's steady offset |
+| Same, K 25 / 40 | −12.6 / −12.7 | Diminishing to nothing: not a gain problem |
+| K 25 with no star exemption in FA | identical to K 25 | Free agents are almost never 73+; the exemption never bound |
+| + soft foreign quota, F 2 / 4 | −14.7 / −14.3 | Foreign transfers fell ~25-60%, but clubs refilled from foreign free agents and loans |
+| Gap over the foreign allowance, K 15 / M 1.2 / F 1.5 | −11.6 (seed 2: −11.4) | Shipped. The residual tracks how domestic a league should be, and this closes most of it |
+
+**The residual is not supply.** Per-country counts at season 10 (with the
+pull): Serbia has 514 Serbians at home against 618 needed, with 198 more
+abroad and 227 unsigned. The unsigned are mostly released academy players too
+weak to sign over the foreigners on offer; only a hard quota (Argentina's real
+six-foreigner cap) would make clubs field them, at a cost to league strength.
+That is a separate decision.
+
+**Measurement notes.** Free agency is where displaced foreign signings reappear:
+any lever that only touches the market moves them there. The probe's "sold
+abroad" out-flow is the largest single way home players leave a top flight
+(1,424 in two seasons on `main`), which is why the market half is required.
+
+Next: the ladder and solvency audit (20 seasons x 4 seeds, pull on and off),
+then one ~75-season drift run, since the ladder invariant has failed only at
+that horizon before (`docs/player-save-findings.md`).
 
 ## Stage 2: club reputation
 
