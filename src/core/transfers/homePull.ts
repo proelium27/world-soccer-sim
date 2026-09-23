@@ -29,6 +29,8 @@ import type { Competition } from "../competitions.js";
 import { competitionNationalities } from "../competitions.js";
 import { LEAGUE_NATIONALITY_WEIGHTS } from "../players/nationalities.js";
 import { statureSensitivity } from "./playerWill.js";
+import { squadStrength } from "../ai/clubContext.js";
+import { HOME_PULL_FADE_RANGE } from "../constants.js";
 
 /**
  * A club's country, how domestic its league really is, and how domestic the
@@ -39,6 +41,39 @@ export interface HomeClub {
   domesticShare: number;
   /** Share of the club's current roster from its own country, [0,1]. */
   domesticNow: number;
+  /**
+   * What the country's best top-flight clubs field: the mean squad strength
+   * (`squadStrength`, the top-16 average) of the top quarter of its top flight.
+   * A player above it has outgrown his home league. Optional so a hand-built
+   * club need not carry it; absent means no one has outgrown it.
+   */
+  homeLevel?: number;
+}
+
+/**
+ * How attached this player is to his home country, [0,1], judged at a club in
+ * that country. 1 is a squad player happy at home; 0 is a player who moves on
+ * ambition alone.
+ *
+ * Two ways to lose it, whichever is stronger:
+ *  - **World-class** (`statureSensitivity`): the global star exemption. The
+ *    weak leagues keep selling their best upward, the receipts they run on.
+ *  - **Outgrown his league**: attachment fades over HOME_PULL_FADE_RANGE points
+ *    above what his country's best clubs field. A 78-rated American is a star
+ *    in MLS and wants a bigger club; a 78-rated Englishman is an ordinary
+ *    Premier League player with no reason to leave.
+ *
+ * The second was added after the first alone compressed the country ladder:
+ * measured (20 seasons, seed 1), good Brazilians and Argentines rated in the
+ * high 70s stayed home instead of being sold to Europe, and the gap from the
+ * big four to Brazil fell 4.95 -> 1.09 and to Argentina 8.35 -> 2.06.
+ */
+export function homeAttachment(player: Player, club: HomeClub): number {
+  const care = statureSensitivity(player.ovr);
+  const outgrown = club.homeLevel === undefined
+    ? 0
+    : Math.max(0, Math.min(1, (player.ovr - club.homeLevel) / HOME_PULL_FADE_RANGE));
+  return 1 - Math.max(care, outgrown);
 }
 
 /**
@@ -78,16 +113,38 @@ export function homeClubs(
   competitions: readonly Competition[],
   players: readonly Player[],
 ): Map<number, HomeClub> {
+  const byPid = new Map(players.map((p) => [p.pid, p]));
+  // Each country's level: the top quarter of its top flight, by squad strength.
+  const topFlightStrengths = new Map<string, number[]>();
+  const tier1 = new Map(competitions.filter((c) => c.tier === 1).map((c) => [c.id, c.country]));
+  for (const t of teams) {
+    const country = tier1.get(t.compId);
+    if (country === undefined) continue;
+    const roster = t.roster.map((pid) => byPid.get(pid)).filter((p): p is Player => p != null);
+    if (roster.length === 0) continue;
+    const list = topFlightStrengths.get(country) ?? [];
+    list.push(squadStrength(roster));
+    topFlightStrengths.set(country, list);
+  }
+  const levelOf = new Map<string, number>();
+  for (const [country, list] of topFlightStrengths) {
+    const top = [...list].sort((a, b) => b - a).slice(0, Math.max(1, Math.round(list.length / 4)));
+    levelOf.set(country, top.reduce((a, b) => a + b, 0) / top.length);
+  }
+
   const byComp = new Map<number, { country: string; domesticShare: number }>();
   for (const c of competitions) byComp.set(c.id, { country: c.country, domesticShare: domesticShare(c) });
-  const nat = new Map(players.map((p) => [p.pid, p.nationality]));
   const out = new Map<number, HomeClub>();
   for (const t of teams) {
     const h = byComp.get(t.compId);
     if (!h) continue;
     let home = 0;
-    for (const pid of t.roster) if (nat.get(pid) === h.country) home++;
-    out.set(t.tid, { ...h, domesticNow: t.roster.length > 0 ? home / t.roster.length : 0 });
+    for (const pid of t.roster) if (byPid.get(pid)?.nationality === h.country) home++;
+    out.set(t.tid, {
+      ...h,
+      domesticNow: t.roster.length > 0 ? home / t.roster.length : 0,
+      homeLevel: levelOf.get(h.country),
+    });
   }
   return out;
 }
@@ -95,7 +152,7 @@ export function homeClubs(
 /** Rating points of home pull between this player and this club. */
 export function homePull(player: Player, club: HomeClub | undefined, k: number): number {
   if (k === 0 || !club || player.nationality !== club.country) return 0;
-  return k * homeGap(club) * (1 - statureSensitivity(player.ovr));
+  return k * homeGap(club) * homeAttachment(player, club);
 }
 
 /**
@@ -117,10 +174,10 @@ export function homeAppeal(
 ): number {
   if (m === 0) return 1;
   const side = (c: HomeClub | undefined) =>
-    c && player.nationality === c.country ? homeGap(c) : 0;
+    c && player.nationality === c.country ? homeGap(c) * homeAttachment(player, c) : 0;
   const diff = side(to) - side(from);
   if (diff === 0) return 1;
-  return Math.max(0, 1 + m * (1 - statureSensitivity(player.ovr)) * diff);
+  return Math.max(0, 1 + m * diff);
 }
 
 /**

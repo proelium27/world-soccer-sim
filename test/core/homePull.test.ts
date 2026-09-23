@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
-  homePull, homeAppeal, foreignDiscount, homeGap, domesticShare, type HomeClub,
+  homePull, homeAppeal, foreignDiscount, homeGap, homeAttachment, domesticShare, type HomeClub,
 } from "../../src/core/transfers/homePull.js";
 import { worldCompetitions } from "../../src/core/competitions.js";
-import { PLAYER_WILL_CARE_CEILING, PLAYER_WILL_CARE_FLOOR } from "../../src/core/constants.js";
+import { statureSensitivity } from "../../src/core/transfers/playerWill.js";
+import {
+  PLAYER_WILL_CARE_CEILING, PLAYER_WILL_CARE_FLOOR, HOME_PULL_FADE_RANGE,
+} from "../../src/core/constants.js";
 import type { Player } from "../../src/core/players/types.js";
 
 const player = (nationality: string, ovr: number) => ({ nationality, ovr }) as Player;
@@ -47,6 +50,29 @@ describe("homePull", () => {
 
   it("stops once the club reaches its league's real share", () => {
     expect(homePull(player("Argentina", 60), { ...argentina, domesticNow: 0.84 }, 6)).toBe(0);
+  });
+});
+
+describe("homeAttachment", () => {
+  // Roughly what each country's best clubs field at generation.
+  const usa: HomeClub = { country: "United States", domesticShare: 0.4, domesticNow: 0.3, homeLevel: 73.7 };
+  const england: HomeClub = { country: "England", domesticShare: 0.39, domesticNow: 0.29, homeLevel: 84.7 };
+
+  it("lets a player who has outgrown his league go, and keeps an ordinary one home", () => {
+    // 78 is a star in MLS: over 4 points above its best clubs.
+    expect(homeAttachment(player("United States", 78), usa)).toBeLessThan(0.15);
+    // 78 is an ordinary Premier League player: only the global curve applies.
+    expect(homeAttachment(player("England", 78), england)).toBeCloseTo(1 - statureSensitivity(78));
+    expect(homeAttachment(player("England", 78), england)).toBeGreaterThan(0.6);
+  });
+
+  it("is gone entirely at the fade range above his league, and full for a squad player", () => {
+    expect(homeAttachment(player("United States", 73.7 + HOME_PULL_FADE_RANGE), usa)).toBe(0);
+    expect(homeAttachment(player("United States", 65), usa)).toBe(1);
+  });
+
+  it("falls back to the global star curve when the club carries no level", () => {
+    expect(homeAttachment(player("Argentina", 80), argentina)).toBeCloseTo(1 - statureSensitivity(80));
   });
 });
 

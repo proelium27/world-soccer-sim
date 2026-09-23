@@ -120,7 +120,7 @@ function mean(xs: number[]): number {
 }
 
 /** A club's squad strength: mean ovr of its best AI_SQUAD_STRENGTH_COUNT players. */
-function squadStrength(roster: Player[]): number {
+export function squadStrength(roster: Player[]): number {
   const top = [...roster].sort((a, b) => b.ovr - a.ovr).slice(0, AI_SQUAD_STRENGTH_COUNT);
   return mean(top.map((p) => p.ovr));
 }

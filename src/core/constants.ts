@@ -2887,6 +2887,13 @@ export const PLAYER_WILL_RISE_BONUS = 0.35;
  * would change.
  */
 
+/**
+ * How many rating points above his country's best clubs (`HomeClub.homeLevel`)
+ * a player can climb before his home attachment is gone. A player who has
+ * outgrown his home league moves on ambition, like a star (`homeAttachment`).
+ */
+export const HOME_PULL_FADE_RANGE = 5;
+
 /** Free agency: rating points a club adds to a home player's ranking, per unit of gap. */
 export const HOME_PULL_K = 15;
 
