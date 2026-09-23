@@ -137,7 +137,8 @@ export function runAIFreeAgency(
   teams: StoredTeam[],
   players: Player[],
   season: number,
-  rng: () => number,
+  /** Unused since free agency left the shared stream; removed with the greedy loop. */
+  _rng: () => number,
   userTid: number,
   signingOrderTids: number[],
   activeLoans: ActiveLoan[] = [],
@@ -206,9 +207,15 @@ export function runAIFreeAgency(
   // offseason.ts) so the player's club-by-season history registers the move.
   const signings: { pid: number; toTid: number }[] = [];
 
+  // Contract length comes from a per-signing seeded stream (tag 7), NOT the
+  // shared rng, like the poach (5) and prospect (6) passes below. Free agency
+  // therefore consumes no shared draws at all, so which players sign where can
+  // change (player-choice free agency, docs/club-reputation.md) without moving
+  // youth intake or anything else downstream.
   const sign = (team: StoredTeam & { roster: number[] }, signing: Player): void => {
+    const lenRng = mulberry32(hashInts(season, team.tid, signing.pid, 7));
     const length = CONTRACT_LENGTH_MIN
-      + Math.floor(rng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
+      + Math.floor(lenRng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
     signing.contract = {
       salary: seasonSalaryForOvr(signing.ovr, signing.pid, season),
       expiresSeason: season + length,
