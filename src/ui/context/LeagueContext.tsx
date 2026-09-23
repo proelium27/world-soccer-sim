@@ -666,6 +666,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       l.phase,
       l.activeLoans,
       userSpendPolicy(l),
+      l.competitions,
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("free_agent_signed");

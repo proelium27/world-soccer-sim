@@ -210,3 +210,44 @@ pending the user's call.
 | User's Free Agents screen fills with foreigners the AI passes over before Stage 4's labels | Acceptable; they show as available; note in changelog |
 | Stage 2 slows promoted clubs' rise | Pooled ladder audit, direction stated up front |
 | Free-agent gate regressions | Keep existing tests; add home and confederation cases |
+
+## Foreign-player registration rules (Stage 1, step 3)
+
+`src/core/foreignRules.ts`. Real league rules, in the shape each league really
+has, binding every club including the user's. Caps are hard (a club at one
+cannot sign another player it counts; nobody is removed for being over).
+Minimums are soft (a club short of one prefers eligible players; trimming never
+takes it below one it meets). Youth intake is exempt. Researched 2026-09-22:
+
+| League | Rule in the game | Source |
+|---|---|---|
+| England | homegrown min 8 | [PL squad lists 2025/26](https://www.premierleague.com/en/news/4407896/202526-premier-league-squad-lists) |
+| Spain | non-EU cap 3 (ACP count as EU) | [DAZN](https://www.dazn.com/es-ES/news/f%C3%BAtbol/cuantos-jugadores-extracomunitarios-puede-tener-un-equipo-de-laliga/1ipeyahvwv5441wvuz3ivs0elp) |
+| Italy ⚠ | homegrown min 8 (4 club + 4 Italy-trained) | [Sky Sport](https://sport.sky.it/calcio/serie-a/2024/05/14/giocatori-extracomunitari-tesseramento-serie-a-2024-2025) |
+| Germany | German nationals min 12, homegrown min 8 | [DFL](https://www.dfl.de/de/hintergrund/transferwesen/local-player-regelung/) |
+| France | non-EU cap 4 (ACP, UK tolerated); Ligue 2: 2 | [LFP 2024-25](https://www.lfp.fr/assets/24_25_Les_joueurs_entraineurs_25_06_2024_824256d416.pdf) |
+| Portugal ⚠ | homegrown min 8 | [Liga Portugal regs](https://www.ligaportugal.pt/backoffice/assets/rc_b78abbb4ce.pdf) |
+| Belgium ⚠ | homegrown min 6 | [RBFA Book P](https://belgianfootball.s3.eu-central-1.amazonaws.com/s3fs-public/rbfa/docs/pdf/reglement/bondsreglement_reglement_federal/URBSFA_Reglement_Livre_P_proleague.pdf) |
+| Turkey ⚠ | foreigner cap 14 | [TFF](https://www.tff.org/Resources/TFF/Auto/e580c59db48141a88e6fdaff05a1b4ed.PDF) |
+| Netherlands | none (salary floor only) | [Everaert](https://www.everaert.nl/en/conditions-for-attracting-international-football-talent-to-be-relaxed/) |
+| Scotland ⚠ | none | no league quota found |
+| Greece ⚠ | non-EU cap 6 | [Inside World Football](https://www.insideworldfootball.com/2026/07/06/greek-super-league-increases-squad-cap-on-foreign-players-to-7/) |
+| Serbia | Serbian nationals min 13 (15 of 30, scaled to 25) | [Mondo](https://mondo.rs/Sport/Fudbal/a1803900/Promenjeno-pravilo-o-strancima-u-Superligi.html) |
+| Brazil ⚠ | foreigner cap 9 (a matchday limit, applied to the squad) | [Exame](https://exame.com/esporte/cbf-reduz-o-limite-de-estrangeiros-e-amplia-espaco-para-jovens-entenda-a-mudanca/) |
+| Argentina ⚠ | foreigner cap 6 | [El Viejo Var](https://elviejovar.com/cuantos-extranjeros-se-pueden-tener-en-la-liga-argentina/) |
+| Mexico | cap 9 on players not trained in Mexico | [Telediario](https://www.telediario.mx/futbol/liga-mx/extranjeros-en-liga-mx-2025-cuantos-puede-en-un-equipo) |
+| United States | foreigner cap 8 (international slots) | [MLS roster rules](https://www.mlssoccer.com/news/2025-mls-roster-rules-and-regulations) |
+
+⚠ = weaker sourcing or a recent change (Turkey's planned cut to 12 not taken;
+Greece rises to 7 in 2026-27; Brazil cuts from 2027; Italy and Argentina have
+unread 2026 revisions; Belgium's 8-of-25 status unclear).
+
+**Approximations, stated:** rules apply to every division of a country except
+where a lower tier is known to differ (France); squad-list numbers are scaled
+to 25; matchday, on-pitch, arrivals-per-season (Italy's two new non-EU a
+season) and salary-floor rules are not modelled; ACP membership is
+approximated from confederations; EU/EEA is an explicit list (Curacao counts,
+being Dutch). **Homegrown** is computed properly from each player's record
+(three seasons aged 15-20 at clubs in the country); a season with no record
+(before the save began, unsigned, or in an academy) is credited to his own
+nationality's country.

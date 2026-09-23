@@ -7,6 +7,7 @@ import { tierOf, competitionOf } from "../competitions.js";
 import { divisionRefusalOvr, ROSTER_CAP, ROSTER_COMPOSITION } from "../constants.js";
 import { trueTransferValue } from "../finance/valuation.js";
 import { clampBudget, financeScale } from "../finance/budget.js";
+import { worldRules } from "../foreignRules.js";
 
 /**
  * The tier a player is swept to from `fromTier`: the deepest division above
@@ -89,6 +90,7 @@ export function enforceDivisionCeilings(
   const scaleByTid = new Map(teams.map((t) => [t.tid, financeScale(competitions, t.compId)]));
   const budgetByTid = new Map(teams.map((t) => [t.tid, t.budget]));
   const hypeByTid = new Map(teams.map((t) => [t.tid, t.hype]));
+  const rules = worldRules(teams, competitions, (pid) => playerByPid.get(pid), season);
   const executed: CompletedTransfer[] = [];
 
   const avgOvrAtPos = (tid: number, pos: Position): number => {
@@ -157,11 +159,17 @@ export function enforceDivisionCeilings(
       // player who provably cannot stay there either way.
       const landingTier = landingTierFor(player.ovr, fromTier);
       const sellerCountry = countryByTid.get(sellerTid);
-      const upCandidates = [...tierByTid.entries()].filter(
+      const allUp = [...tierByTid.entries()].filter(
         ([tid, tier]) =>
           tier === landingTier && tid !== userTid && countryByTid.get(tid) === sellerCountry,
       );
-      if (upCandidates.length === 0) continue;
+      if (allUp.length === 0) continue;
+      // Prefer a club that can register him under its league's rules
+      // (foreignRules.ts). If none can, he still moves: the ceiling is the
+      // invariant here, and a club pushed over a cap is simply frozen for that
+      // kind of signing until it is back under.
+      const eligible = allUp.filter(([tid]) => rules.block(tid, rosterByTid.get(tid)!, player) === null);
+      const upCandidates = eligible.length > 0 ? eligible : allUp;
 
       let buyerTid = upCandidates[0][0];
       let bestNeed = avgOvrAtPos(buyerTid, player.pos);

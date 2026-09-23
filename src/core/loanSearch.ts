@@ -34,6 +34,7 @@ import { teamSlots } from "./lineup/formations.js";
 import { deriveLeagueContexts } from "./ai/clubContext.js";
 import { keepValueToClub, valueToClub } from "./ai/evaluate.js";
 import { appealScore } from "./transfers/clubAppeal.js";
+import { worldRules } from "./foreignRules.js";
 import {
   LOAN_AI_MAX_AGE, LOAN_DURATION_MULTIPLIER, LOAN_FEE_MIN, LOAN_IN_MAX_PER_WINDOW,
   LOAN_MIN_SURPLUS, ROSTER_SAFETY_FLOOR, difficultyProfile,
@@ -191,6 +192,7 @@ export function loanGateFor(
 
   const playerMap = new Map(league.players.map((p) => [p.pid, p]));
   const atCap = loansTakenThisWindow(league) >= LOAN_IN_MAX_PER_WINDOW;
+  const rules = worldRules(league.teams, league.competitions, (pid) => playerMap.get(pid), season);
 
   return (player, team, seasons) => {
     // The user's own situation first. These two are true of *every* row, so
@@ -236,6 +238,9 @@ export function loanGateFor(
     if (player.ovr <= userCtx.posWeakestStarterOvr[player.pos]) {
       return "He wouldn't get a game with you";
     }
+    // Your league's registration rules bind a loan in like any signing.
+    const blocked = rules.block(user.tid, user.roster, player);
+    if (blocked) return blocked;
 
     // The player's own view of the loan binds the user as it binds an AI club
     // (clubAppeal.ts): his reasons scale what he is worth to you, and a refusal

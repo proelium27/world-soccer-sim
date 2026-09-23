@@ -17,6 +17,7 @@ import { teamSlots } from "./lineup/formations.js";
 import { deriveLeagueContexts } from "./ai/clubContext.js";
 import { keepValueToClub, perceivedValueToClub } from "./ai/evaluate.js";
 import { appealMultiplier } from "./transfers/clubAppeal.js";
+import { registrationChecker } from "./foreignRules.js";
 import { mulberry32 } from "../engine/rng.js";
 import {
   ROSTER_CAP, ROSTER_SAFETY_FLOOR, LOAN_MAX_SEASONS,
@@ -215,6 +216,9 @@ export function loanOfferCandidates(league: LeagueStore): LoanOfferCandidate[] {
   if (!userCtx) return [];
 
   const playerMap = new Map(league.players.map((p) => [p.pid, p]));
+  const canRegister = registrationChecker(
+    league.teams, league.competitions, (pid) => playerMap.get(pid), ws.season ?? league.season,
+  );
   const rejectedFor = (pid: number): Set<number> => new Set(
     league.loanRejections
       .filter((r) => r.pid === pid && r.season === ws.season && r.window === ws.window)
@@ -259,6 +263,9 @@ export function loanOfferCandidates(league: LeagueStore): LoanOfferCandidate[] {
       // After the jitter draw, like the other two, so a filtered buyer doesn't
       // shift every later buyer's noise.
       if (player.ovr <= buyerCtx.posWeakestStarterOvr[player.pos]) continue;
+      // A club that could not register him under its league's rules makes no
+      // offer (foreignRules.ts). After the draw, for the same reason.
+      if (canRegister(buyer.tid, buyer.roster, player) !== null) continue;
       if (value < reservation * (1 + LOAN_MIN_SURPLUS)) continue;
       if (!best || value > best.value) best = { tid: buyer.tid, value };
     }
@@ -383,6 +390,7 @@ export function runAILoanMarket(
 ): AILoanResult {
   const contexts = deriveLeagueContexts({ teams, players, season, played, competitions });
   const playerMap = new Map(players.map((p) => [p.pid, p]));
+  const canRegister = registrationChecker(teams, competitions, (pid) => playerMap.get(pid), season);
   const jitter = mulberry32(seed);
   const onLoanPids = new Set(activeLoans.map((l) => l.pid));
   const tierByTid = new Map(teams.map((t) => [t.tid, tierOf(competitions, t.compId)]));
@@ -506,6 +514,9 @@ export function runAILoanMarket(
 
     const buyerRoster = roster.get(c.buyerTid)!;
     if (buyerRoster.length >= ROSTER_CAP) continue;
+    // A loanee counts against the borrower's registration rules like any
+    // signing (foreignRules.ts). Checked on the live roster, after all draws.
+    if (canRegister(c.buyerTid, buyerRoster, playerMap.get(c.pid)!) !== null) continue;
 
     const sellerRoster = roster.get(c.sellerTid)!;
     if (!sellerRoster.includes(c.pid)) continue;

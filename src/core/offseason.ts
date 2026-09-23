@@ -1003,6 +1003,7 @@ export function simOffseasonReporting(
   //    trimming can't orphan a live loan into a duplicate.
   teams = trimRosterSurplus(
     teams, players, league.meta.userTid, nextSeason, activeLoans, league.progressionModel,
+    league.competitions,
   );
 
   // 6.05. AI free agency, a second time, on the pool the trim above just
@@ -1053,6 +1054,7 @@ export function simOffseasonReporting(
   //       should ever be trimmable in the same offseason it was paid for.
   teams = trimRosterSurplus(
     teams, players, league.meta.userTid, nextSeason, activeLoans, league.progressionModel,
+    league.competitions,
   );
 
   // 6.4. AI<->AI transfer market (summer window, cross-division by design —

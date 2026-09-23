@@ -16,6 +16,7 @@ import { mulberry32, hashInts } from "../engine/rng.js";
 import { affordable, type SpendPolicy } from "./finance/debt.js";
 import { refusesFreeAgentSigning, refusesFreeAgentSigningWith } from "./transfers/playerWill.js";
 import { clubStatures } from "./ai/clubContext.js";
+import { worldRules, leagueRegistrationBlock } from "./foreignRules.js";
 import type { Competition } from "./competitions.js";
 
 /**
@@ -161,7 +162,7 @@ export function runAIFreeAgency(
    * The world's competitions, for the player's view of each club once free
    * agency becomes the player's choice (docs/club-reputation.md, step 4).
    */
-  _competitions: readonly Competition[] = [],
+  competitions: readonly Competition[] = [],
 ): { teams: StoredTeam[]; players: Player[]; signings: { pid: number; toTid: number }[] } {
   const prospectPot = potentialBar(AI_PROSPECT_MIN_POT, model);
   const playerMap = new Map(players.map((p) => [p.pid, { ...p }]));
@@ -190,6 +191,9 @@ export function runAIFreeAgency(
    * squad player and every prospect, who are the bulk of what is on offer.
    */
   const statures = clubStatures(teams, players);
+  // The league registration rules (foreignRules.ts), read through per-squad
+  // snapshots in each pass so a signing counts against the next one.
+  const rules = worldRules(teams, competitions, (pid) => playerMap.get(pid), season);
   const willing = (p: Player, tid: number): boolean =>
     !refusesFreeAgentSigningWith(p, statures.get(tid) ?? 0, statures, tid);
   // Each free-agent arrival is logged by the caller as a fee-0 transfer (see
@@ -223,10 +227,15 @@ export function runAIFreeAgency(
     for (const pos of POSITIONS as readonly Position[]) {
       let shortfall = ROSTER_COMPOSITION[pos] - counts[pos];
       while (shortfall > 0) {
+        // The club's league rules (foreignRules.ts): a cap it is at blocks the
+        // players it counts; a minimum it is short of sorts the players who
+        // would help it first.
+        const reg = rules.forSquad(tid, team.roster);
+        const helps = (p: Player) => (reg.helpsMinimum(p) ? 1 : 0);
         const candidates = pool
           .map((pid) => playerMap.get(pid)!)
-          .filter((p) => p.pos === pos && willing(p, tid))
-          .sort((a, b) => b.ovr - a.ovr);
+          .filter((p) => p.pos === pos && willing(p, tid) && reg.block(p) === null)
+          .sort((a, b) => helps(b) - helps(a) || b.ovr - a.ovr);
         const signing = candidates[0];
         if (!signing) break;
         sign(team, signing);
@@ -277,10 +286,12 @@ export function runAIFreeAgency(
       // upgrade; genuine shortfalls were filled in the first pass above.
       if (atPos.length < ROSTER_COMPOSITION[pos]) continue;
       const weakest = Math.min(...atPos.map((p) => p.ovr));
+      const reg = rules.forSquad(tid, team.roster);
+      const helps = (p: Player) => (reg.helpsMinimum(p) ? 1 : 0);
       const best = pool
         .map((pid) => playerMap.get(pid)!)
-        .filter((p) => p.pos === pos && willing(p, tid))
-        .sort((a, b) => b.ovr - a.ovr)[0];
+        .filter((p) => p.pos === pos && willing(p, tid) && reg.block(p) === null)
+        .sort((a, b) => helps(b) - helps(a) || b.ovr - a.ovr)[0];
       if (best && best.ovr > weakest) poachSign(team, best);
     }
   }
@@ -341,11 +352,12 @@ export function runAIFreeAgency(
 
     for (let slot = held; slot < AI_PROSPECT_SLOTS; slot++) {
       if (team.roster.length >= ROSTER_CAP) break;
+      const reg = rules.forSquad(tid, team.roster);
       const best = pool
         .map((pid) => playerMap.get(pid)!)
         .filter(
           (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot
-            && willing(p, tid),
+            && willing(p, tid) && reg.block(p) === null,
         )
         .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid)[0];
       if (!best) break;
@@ -391,10 +403,13 @@ export function trimRosterSurplus(
   activeLoans: ActiveLoan[] = [],
   /** See `runAIFreeAgency`'s `model`, and `potentialBar`. */
   model: ProgressionModel = "random",
+  /** The world's competitions, for registration minimums. Empty = none checked. */
+  competitions: readonly Competition[] = [],
 ): StoredTeam[] {
   const playerMap = new Map(players.map((p) => [p.pid, p]));
   const onLoan = new Set(activeLoans.map((l) => l.pid));
   const prospectPot = potentialBar(AI_PROSPECT_MIN_POT, model);
+  const rules = worldRules(teams, competitions, (pid) => playerMap.get(pid), season);
 
   return teams.map((t) => {
     if (t.tid === userTid) return t;
@@ -449,6 +464,12 @@ export function trimRosterSurplus(
       )
       .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid);
     for (const p of prospects.slice(0, AI_PROSPECT_SLOTS)) kept.add(p.pid);
+
+    // Never trim a club below a registration minimum it met before the trim
+    // (foreignRules.ts): the best-rated players it would lose are kept.
+    for (const pid of rules.keepForMinimums(t.tid, t.roster.filter((p) => !onLoan.has(p)), kept)) {
+      kept.add(pid);
+    }
 
     return { ...t, roster: t.roster.filter((pid) => kept.has(pid) || onLoan.has(pid)) };
   });
@@ -522,6 +543,8 @@ export function signFreeAgent(
   phase: "regular" | "offseason",
   activeLoans: ActiveLoan[] = [],
   spend?: SpendPolicy,
+  /** The world's competitions, for the club's registration rules. Empty = no rules checked. */
+  competitions: readonly Competition[] = [],
 ): { teams: StoredTeam[]; players: Player[] } {
   if (!freeAgentPids(teams, players, activeLoans).has(pid)) {
     return { teams, players };
@@ -542,6 +565,10 @@ export function signFreeAgent(
   // stocked for: trimRosterSurplus releases whoever a club is deepest at, not
   // whoever is worst.
   if (refusesFreeAgentSigning(player, team, teams, players)) return { teams, players };
+  // The club's league registration rules bind the user like any club.
+  if (leagueRegistrationBlock({ teams, competitions, players, season }, tid, player) !== null) {
+    return { teams, players };
+  }
   const wageCharge = phase === "regular" ? contractTerms(player, season).salary : 0;
   if (!affordable(team.budget, wageCharge, spend)) return { teams, players };
 
