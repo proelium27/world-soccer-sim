@@ -162,6 +162,29 @@ for (const m of flows.values()) for (const [k, v] of m) {
 }
 for (const [k, v] of [...total].sort()) console.log(k.padEnd(28), String(v.home).padStart(7), String(v.foreign).padStart(8));
 
+// Supply: can the country even field its real share? Every home-pyramid roster
+// spot times the real share is how many nationals the pyramid needs; set that
+// against where the nation's players actually are.
+console.log(`\n=== supply at season ${SEASONS}: nationals by where they play ===`);
+console.log("country".padEnd(15), "needed", "home", "abroad", "unsigned", "home/needed");
+{
+  const compById = new Map(league.competitions.map((c) => [c.id, c]));
+  const clubCountry = new Map(league.teams.map((t) => [t.tid, compById.get(t.compId)!.country]));
+  const where = new Map<number, string>();
+  for (const t of league.teams) for (const pid of t.roster) where.set(pid, clubCountry.get(t.tid)!);
+  for (const c of countries) {
+    const spots = league.teams.filter((t) => clubCountry.get(t.tid) === c).reduce((a, t) => a + t.roster.length, 0);
+    const needed = Math.round(spots * real.get(c)!);
+    let home = 0, abroad = 0, unsigned = 0;
+    for (const p of league.players) {
+      if (p.nationality !== c) continue;
+      const w = where.get(p.pid);
+      if (w === undefined) unsigned++; else if (w === c) home++; else abroad++;
+    }
+    console.log(c.padEnd(15), String(needed).padStart(6), String(home).padStart(5), String(abroad).padStart(6), String(unsigned).padStart(8), (home / needed).toFixed(2).padStart(11));
+  }
+}
+
 console.log(`\n=== per league: net home players (in - out) and foreign in, by route ===`);
 for (const c of countries) {
   const m = flows.get(c)!;

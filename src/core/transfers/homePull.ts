@@ -8,11 +8,11 @@
  * a fresh 898-club world, Argentina's top flight went 85% domestic at
  * generation to 30% after five seasons, Serbia's 64% to 16%.
  *
- * `homePull = K × domesticShare(country) × (1 − statureSensitivity(ovr))`
+ * `homePull = K × max(0, realShare − clubDomesticNow) × (1 − statureSensitivity(ovr))`
  *
- *  - **One constant, fourteen targets.** Scaling by the league's own real
- *    domestic share lets a single `K` pull Argentina (0.84) far harder than
- *    Scotland (0.36), because the target is already per country.
+ *  - **One constant, every league.** The pull is the club's gap below its
+ *    league's real domestic share, so it is strongest for a club that has
+ *    drifted furthest and fades to nothing at the real share (see `homeGap`).
  *  - **Stars are exempt.** `1 − care` is 0 at `PLAYER_WILL_CARE_CEILING`, so an
  *    elite player still moves on ambition alone, and the weak leagues keep
  *    selling their best upward — the transfer receipts they run on.
@@ -30,10 +30,30 @@ import { competitionNationalities } from "../competitions.js";
 import { LEAGUE_NATIONALITY_WEIGHTS } from "../players/nationalities.js";
 import { statureSensitivity } from "./playerWill.js";
 
-/** A club's country and how domestic its league really is. */
+/**
+ * A club's country, how domestic its league really is, and how domestic the
+ * club's own squad is right now.
+ */
 export interface HomeClub {
   country: string;
   domesticShare: number;
+  /** Share of the club's current roster from its own country, [0,1]. */
+  domesticNow: number;
+}
+
+/**
+ * How far below its league's real domestic share this club sits, [0,1]. The
+ * pull fades to nothing at the real share rather than pushing past it.
+ *
+ * A flat per-league pull was tried first and could not hit the targets:
+ * measured (K = 6, 10 seasons), France overshot its real share by 18 points and
+ * Serbia undershot by 11 at the same K, because how domestic a league settles
+ * also depends on how many of its own players the world supplies. Scaling by
+ * the club's own gap is what lets one constant land every league.
+ */
+export function homeGap(club: HomeClub): number {
+  if (club.domesticShare >= 1) return 0;
+  return Math.max(0, club.domesticShare - club.domesticNow) / (1 - club.domesticShare);
 }
 
 /**
@@ -48,17 +68,26 @@ export function domesticShare(comp: Competition): number {
   return total > 0 ? (table[comp.country] ?? 0) / total : 0;
 }
 
-/** Every club's home country and domestic share, built once per pass. */
+/**
+ * Every club's home country, league domestic share and current squad makeup,
+ * built once per pass (one arrival barely moves a squad's share, and
+ * recomputing per signing would be quadratic over the world).
+ */
 export function homeClubs(
-  teams: readonly { tid: number; compId: number }[],
+  teams: readonly { tid: number; compId: number; roster: readonly number[] }[],
   competitions: readonly Competition[],
+  players: readonly Player[],
 ): Map<number, HomeClub> {
-  const byComp = new Map<number, HomeClub>();
+  const byComp = new Map<number, { country: string; domesticShare: number }>();
   for (const c of competitions) byComp.set(c.id, { country: c.country, domesticShare: domesticShare(c) });
+  const nat = new Map(players.map((p) => [p.pid, p.nationality]));
   const out = new Map<number, HomeClub>();
   for (const t of teams) {
     const h = byComp.get(t.compId);
-    if (h) out.set(t.tid, h);
+    if (!h) continue;
+    let home = 0;
+    for (const pid of t.roster) if (nat.get(pid) === h.country) home++;
+    out.set(t.tid, { ...h, domesticNow: t.roster.length > 0 ? home / t.roster.length : 0 });
   }
   return out;
 }
@@ -66,7 +95,7 @@ export function homeClubs(
 /** Rating points of home pull between this player and this club. */
 export function homePull(player: Player, club: HomeClub | undefined, k: number): number {
   if (k === 0 || !club || player.nationality !== club.country) return 0;
-  return k * club.domesticShare * (1 - statureSensitivity(player.ovr));
+  return k * homeGap(club) * (1 - statureSensitivity(player.ovr));
 }
 
 /**
@@ -88,8 +117,29 @@ export function homeAppeal(
 ): number {
   if (m === 0) return 1;
   const side = (c: HomeClub | undefined) =>
-    c && player.nationality === c.country ? c.domesticShare : 0;
+    c && player.nationality === c.country ? homeGap(c) : 0;
   const diff = side(to) - side(from);
   if (diff === 0) return 1;
   return Math.max(0, 1 + m * (1 - statureSensitivity(player.ovr)) * diff);
+}
+
+/**
+ * A soft foreign-player quota, club side and AI only: a club below its
+ * league's real domestic share values a FOREIGN signing less, in proportion to
+ * how far below it sits. Multiplies the buyer's valuation in the transfer and
+ * loan markets; 1 for a home player, for a club at or above its share, and for
+ * stars (`1 − care`), so the weak leagues' upward sales are untouched.
+ *
+ * Why it exists: `homeAppeal` only ever made home players MORE attractive, and
+ * that plateaued (K 25 and 40 measured identical) with the most domestic leagues
+ * still 10-13 points short, because nothing made a foreigner less attractive —
+ * a club far below its share still bought and borrowed foreigners at full
+ * value. Real leagues answer this with quotas (Argentina allows six foreigners
+ * a squad); this is the soft version. `f` is HOME_PULL_FOREIGN.
+ */
+export function foreignDiscount(player: Player, to: HomeClub | undefined, f: number): number {
+  if (f === 0 || !to || player.nationality === to.country) return 1;
+  const gap = homeGap(to);
+  if (gap === 0) return 1;
+  return Math.max(0, 1 - f * (1 - statureSensitivity(player.ovr)) * gap);
 }

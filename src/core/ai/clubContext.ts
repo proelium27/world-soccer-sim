@@ -288,7 +288,7 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
   // (DIVISION_2_BUDGET_SCALE), so pooling every competition into one range
   // would read every tier-2 club as permanently near-max frugality
   // regardless of how it's actually doing relative to its own competition.
-  const homes = homeClubs(league.teams, league.competitions);
+  const homes = homeClubs(league.teams, league.competitions, league.players);
   for (const comp of league.competitions) {
     const group = raw.filter((r) => r.compId === comp.id);
     if (group.length === 0) continue;

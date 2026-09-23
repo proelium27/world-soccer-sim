@@ -197,7 +197,7 @@ export function runAIFreeAgency(
   // takes, never whether a shortfall is filled, so pass 1's shared-rng draw
   // count holds whenever the pool has a candidate either way
   // (homePullRng.test.ts pins that).
-  const homes = homeClubs(teams, competitions);
+  const homes = homeClubs(teams, competitions, players);
   const rankOvr = (p: Player, tid: number): number => p.ovr + homePull(p, homes.get(tid), homePullK);
   const rankPot = (p: Player, tid: number): number => p.potential + homePull(p, homes.get(tid), homePullK);
   const willing = (p: Player, tid: number): boolean =>

@@ -2872,28 +2872,36 @@ export const PLAYER_WILL_REFUSAL_DROP = 0.18;
  */
 export const PLAYER_WILL_RISE_BONUS = 0.35;
 
-/**
- * Home-country pull, in rating points at full strength: how much more an AI
- * club values a free agent from its own country, before scaling by how
- * domestic that league really is and by how little the player cares about club
- * size (stars feel none of it). See transfers/homePull.ts and
- * docs/club-reputation.md.
+/*
+ * Home-country pull (transfers/homePull.ts, docs/club-reputation.md). Three
+ * strengths, all scaled by the same thing: how far over its league's foreign
+ * allowance a club is (`homeGap`), and how little the player cares about club
+ * size (stars feel none of it). Each is 0 at a club already at its league's
+ * real domestic share.
  *
- * 0 = off, which is the shipped behaviour until it is tuned against the
- * nationality drift probe and the ladder/solvency audit.
+ * Tuned together on scripts/nationalityDriftProbe.ts (10 seasons, seeds 1 and
+ * 2): the world's top flights went from 3-20% domestic with no pull to within
+ * 2-11 points of their real shares. Raising any one of them further was
+ * measured to buy almost nothing — the residual in the most domestic leagues
+ * (Serbia, Mexico) is home players too weak to sign, which only a hard quota
+ * would change.
  */
-export const HOME_PULL_K = 0;
+
+/** Free agency: rating points a club adds to a home player's ranking, per unit of gap. */
+export const HOME_PULL_K = 15;
 
 /**
- * Home-country pull in the transfer and loan markets: a multiplier on the
- * buyer's valuation (see `homeAppeal`). A home club's valuation of a squad
- * player rises and a foreign club's falls, both scaled by how domestic the
- * league really is and by how little the player cares about club size. Stars are
- * exempt, so the weak leagues' upward sales of their best players are untouched.
- *
- * 0 = off, the shipped behaviour until tuned.
+ * Transfer and loan markets, player side: a multiplier on the buyer's
+ * valuation, up for a move home and down for a move away (`homeAppeal`).
  */
-export const HOME_PULL_MARKET = 0;
+export const HOME_PULL_MARKET = 1.2;
+
+/**
+ * Transfer and loan markets, club side and AI only: a soft foreign quota that
+ * discounts a foreign signing's value (`foreignDiscount`). Needed because the
+ * home-side pull alone plateaued: nothing made a foreigner less attractive.
+ */
+export const HOME_PULL_FOREIGN = 1.5;
 
 /**
  * Settling-in friction: a player who has only just joined is much harder to

@@ -1,5 +1,5 @@
 import type { Player } from "../players/types.js";
-import { homeAppeal } from "./homePull.js";
+import { homeAppeal, foreignDiscount } from "./homePull.js";
 import type { StoredTeam } from "../teams/clubs.js";
 import type { ClubContext } from "../ai/clubContext.js";
 import { clubStature, clubStatures } from "../ai/clubContext.js";
@@ -8,7 +8,7 @@ import {
   PLAYER_WILL_DROP_STRENGTH, PLAYER_WILL_REFUSAL_DROP, PLAYER_WILL_RISE_BONUS,
   PLAYER_SETTLED_BONUS, PLAYER_SETTLED_SEASONS,
   STATURE_STRENGTH_HI,
-  HOME_PULL_MARKET,
+  HOME_PULL_MARKET, HOME_PULL_FOREIGN,
 } from "../constants.js";
 
 /**
@@ -273,7 +273,10 @@ export function moveAppealBetween(
   to: ClubContext,
 ): number {
   return moveAppeal(player.ovr, from.stature, to.stature)
-    * homeAppeal(player, from.home, to.home, HOME_PULL_MARKET);
+    * homeAppeal(player, from.home, to.home, HOME_PULL_MARKET)
+    // Club side, not player will: the buyer's soft foreign quota. Rides here
+    // because this is the one multiplier every AI buyer valuation already reads.
+    * foreignDiscount(player, to.home, HOME_PULL_FOREIGN);
 }
 
 /**
