@@ -138,11 +138,6 @@ should land close almost by construction; no-rule leagues (Netherlands,
 Scotland) test the player lines. Scouting reach (a club-side term, AI only) is
 built only if a no-rule group sits well short after the player levers.
 
-**Baseline audit (`main`-equivalent, `weakLeaguesAudit`, 20 seasons):** seed 1
-deficit (Serbia −£2.2M, 1 club of 882), seeds 2 and 3 solvent, seed 4 not yet
-run (it was started from a clean export of merge base `469aaf2b` and stopped at
-the handoff).
-
 **First measurement, starting values, seed 1, 20 seasons** (APPEAL_HOME 0.3,
 CONFEDERATION 0.15, PLAYING_TIME 0.02/pt, FORMER_CLUB 0.1; this run still had
 the MLS cap, since removed):
@@ -167,10 +162,39 @@ the MLS cap, since removed):
 | United States | 39.5% | 7.9% | 65.8% | +26.2 (MLS cap, now removed) |
 
 The two no-rule leagues, the real test of the player lines, land within 2-4
-points. Next: re-run with the MLS cap removed on seeds 1 and 2; then tune
-France/Portugal/Belgium (overshoot) and Italy (undershoot); then the ladder and
-solvency audit against the merge base, the 75-season drift run, and the Manual
-and changelog.
+points.
+
+**Home-line sweep (MLS cap removed, 20 seasons, seeds 1 and 2).** Gap to the
+real share at season 20, summarised over all 16 top flights:
+
+| APPEAL_HOME | Mean absolute gap (s1 / s2) | Worst (s1 / s2) | Mean signed gap |
+|---|---|---|---|
+| 0.3 | 4.5 / 4.5 | 15.8 France / 12.9 France | about +2.6 (too domestic) |
+| **0.25 (shipped)** | 3.4 / 3.8 | 8.4 Serbia / 11.3 France | about +0.5 |
+| 0.2 | 2.8 / 4.5 | 9.1 Serbia / 9.8 Scotland | about −2.2 (too foreign) |
+
+0.2 and 0.25 tie on the mean absolute gap across both seeds; 0.25 is the one
+centred on the real level. What is left does not move with the home line and is
+the same on both seeds: France (+7.8 / +11.3) and Portugal (+6.0 / +6.6) run too
+domestic, Italy (−6.3 / −8.3), Serbia (−8.4 / −4.9) and Argentina (−5.4 / −3.6)
+too foreign.
+
+- **France is not the non-EU cap.** Only 4 of 18 clubs sit at it at season 20.
+  France has the largest surplus of its own nationals in the world (1.36
+  French players at home per top-flight place its real share needs), so its
+  clubs simply find French players. Supply does not explain everything,
+  though: Italy has a surplus (1.09) and still runs short.
+- **Italy** is the candidate for its real flow rule (at most two new non-EU
+  arrivals from abroad per club per season), which the game does not model.
+- Open, for review: whether to accept these league-level gaps, add the Italian
+  rule, or look at where the surpluses and shortfalls of nationals come from.
+
+**Baseline audit (`origin/main` 2b6b67fd, `weakLeaguesAudit`, 20 seasons, one
+seed per run):** ladder OK on seeds 1-3. Solvency: seed 1 −£0.1M (Serbia s18),
+seed 2 −£0.5M (Serbia s21), seed 3 solvent. Single-seed "BROKEN" flags land on
+a different converged rung each seed (seed 1 Belgium→Mexico −1.08 and
+US→Greece −1.30, seed 2 Scotland→Serbia −1.29, seed 3 Belgium→Mexico −1.97) and
+are pooled by hand before being read.
 
 ## Foreign-player registration rules (Stage 1, step 3)
 
