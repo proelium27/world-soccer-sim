@@ -12,6 +12,22 @@ import {
   type PlayoffFormat, type ContinentalRegion, type TitlePlayoffFormat, type ConferenceFormat,
 } from "../../core/constants.js";
 import { REGION_LABELS, REGION_ORDER, groupByRegion } from "../continents.js";
+import {
+  leaguePresetsFor, matchingLeaguePreset, applyLeaguePreset, describeStrength,
+  type LeaguePreset,
+} from "../../core/worldPresets.js";
+
+/**
+ * A shipped country's own spec, which is what "As shipped" goes back to.
+ *
+ * Built once: `worldLeagueSpecs()` derives itself from the competitions table
+ * on every call, and this is read per league per render.
+ */
+const SHIPPED_SPECS = new Map(worldLeagueSpecs().map((s) => [s.country, s]));
+
+function shippedSpecFor(country: string): LeagueSpec | undefined {
+  return SHIPPED_SPECS.get(country);
+}
 
 /** What the code box suggests when left empty — the same rule competitionAbbrev uses. */
 function defaultAbbrev(country: string): string {
@@ -920,9 +936,42 @@ export function LeagueSettings({
 }) {
   const spec = entry.spec;
   const resolved = resolveLeagueSpec(spec);
+  const baseline = entry.shipped ? shippedSpecFor(spec.country) : undefined;
+  const preset = matchingLeaguePreset(spec, baseline);
+  // Open the raw controls on arrival only for a league no preset describes —
+  // the same rule the Awards tab's Fine-tune disclosure follows. Read once, so
+  // picking a preset doesn't snap the panel shut under the cursor.
+  const [tuningOpen] = useState(() => preset === undefined);
+
+  function choosePreset(next: LeaguePreset) {
+    // Straight onto the entry rather than through onSpec, because applying a
+    // preset has to CLEAR knobs as well as set them ("As shipped" sets none),
+    // and a Partial merge can only ever add. Normalised here for the same
+    // reason updateSpec normalises: no preset may produce a league the engine
+    // cannot build.
+    //
+    // The money-follow switch deliberately does NOT apply here. Every shape
+    // carries the money of the real league it copies, and overwriting that with
+    // suggestedBudgetScale left the league matching no preset (0.65 became
+    // 0.70), so the radio the user had just clicked came back unfilled.
+    // "As shipped" needs it off too: England ships with no money knob at all.
+    onEntry({ spec: normalizeLeagueSpec(applyLeaguePreset(spec, next, baseline)) });
+  }
 
   return (
     <>
+      <LeaguePresetPicker
+        entry={entry}
+        presets={leaguePresetsFor(baseline)}
+        preset={preset}
+        onChoose={choosePreset}
+      />
+      <LeaguePreview entry={entry} resolved={resolved} />
+
+      <details className="gm-panel mb-3" open={tuningOpen || undefined}>
+        <summary className="gm-panel-title" style={{ cursor: "pointer" }}>
+          Fine-tune this league
+        </summary>
       <Slider
         label="Strength"
         min={0}
@@ -1117,6 +1166,117 @@ export function LeagueSettings({
           });
         }}
       />
+      </details>
     </>
   );
 }
+
+/**
+ * The named shapes, as radios.
+ *
+ * Radios rather than buttons because a preset is a statement about what the
+ * league currently IS, not an action you fire — reopening a league you shaped
+ * last week should show you which one you picked. `matchingLeaguePreset` is
+ * what answers that, so the control is checked off the spec rather than off
+ * remembered click state.
+ */
+function LeaguePresetPicker({
+  entry,
+  presets,
+  preset,
+  onChoose,
+}: {
+  entry: WorldEntry;
+  presets: readonly LeaguePreset[];
+  preset: LeaguePreset | undefined;
+  onChoose: (next: LeaguePreset) => void;
+}) {
+  return (
+    <div className="mb-3">
+      {presets.map((p) => (
+        <div className="form-check" key={p.id}>
+          <input
+            className="form-check-input"
+            type="radio"
+            name={`league-preset-${entry.id}`}
+            id={`league-preset-${entry.id}-${p.id}`}
+            checked={preset?.id === p.id}
+            onChange={() => onChoose(p)}
+          />
+          <label className="form-check-label" htmlFor={`league-preset-${entry.id}-${p.id}`}>
+            <span className="fw-semibold">{p.name}</span>
+            <span className="d-block text-muted small">{p.blurb}</span>
+          </label>
+        </div>
+      ))}
+      {preset === undefined && (
+        <p className="small text-warning mb-0 mt-1">
+          Custom: your own shape, set under Fine-tune below.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What the league you have described would actually be.
+ *
+ * Every line is read off `resolveLeagueSpec`, i.e. off what the engine will
+ * build, rather than off the spec's own fields — which is the only way it can
+ * describe a shipped country truthfully, since most of its knobs are absent and
+ * answered by the country tables.
+ *
+ * The strength line quotes a measured rating (see STRENGTH_ANCHORS) instead of
+ * the slider's number, which is the whole reason this panel exists: "Strength
+ * 14" says nothing, "about as strong as Turkey" is the question people are
+ * actually asking.
+ */
+function LeaguePreview({ entry, resolved }: { entry: WorldEntry; resolved: ResolvedLeagueSpec }) {
+  const sizes = [resolved.d1Teams, resolved.d2Teams, resolved.d3Teams].slice(0, resolved.divisions);
+  const clubs = sizes.reduce((n, s) => n + s, 0);
+  const country = entry.spec.country || "This country";
+
+  const shape = resolved.divisions === 1
+    ? `One division of ${sizes[0]} clubs.`
+    : `${resolved.divisions === 2 ? "Two" : "Three"} divisions (${sizes.join(", ")} clubs), ${clubs} in all.`;
+
+  const split = resolved.conferences.some((c) => c !== null)
+    ? " Split into two halves that mostly play among themselves."
+    : "";
+
+  const swap = resolved.promotionSpots === 0
+    ? "Closed: nobody is promoted or relegated."
+    : `${resolved.promotionSpots} up and ${resolved.promotionSpots} down` + (
+      resolved.playoffFormat === "none"
+        ? ", settled on the table."
+        : `, plus a ${PLAYOFF_WORDS[resolved.playoffFormat]} for one more place.`
+    );
+
+  const champion = resolved.titlePlayoff === "none"
+    ? "The club that tops the table is champion."
+    : "The champion is decided in playoffs.";
+
+  const places = resolved.region === "americas"
+    ? `${AMERICAS_CUP_LEAGUE_SLOTS} clubs go into the Americas Cup.`
+    : `${resolved.cupSlots} into the Continental Cup, ${resolved.shieldSlots} into the Shield.`;
+
+  return (
+    <div className="gm-panel mb-3">
+      <div className="gm-panel-title">What this builds</div>
+      <p className="small mb-1">{describeStrength(resolved.strengthOffset, entry.spec.country)}</p>
+      <p className="small mb-1">{shape}{split}</p>
+      <p className="small mb-1">{swap} {champion}</p>
+      <p className="small text-muted mb-0">
+        {places} {country} plays in {resolved.region === "americas" ? "the Americas" : "Europe"}.
+      </p>
+    </div>
+  );
+}
+
+/** How each promotion playoff reads in a sentence. */
+const PLAYOFF_WORDS: Record<PlayoffFormat, string> = {
+  none: "",
+  english: "four-club playoff",
+  german: "playoff against the club above",
+  french: "playoff ladder against the club above",
+};

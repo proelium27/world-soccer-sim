@@ -700,14 +700,15 @@ export function Manual() {
             recognised as one rather than guessed at.
           </p>
           <p>
-            Shot locations have one honest limit: the match engine doesn't track where anyone is on
-            the pitch. Penalties, corner headers and free kicks are real, because the engine really
-            played them. For every other shot the game picks a spot that fits how the shot ended,
-            so goals mostly come from inside the box, blocked shots more often from outside it, and
-            a striker's efforts sit closer to goal than a holding midfielder's. Over a season that
-            lands on the same split real top flights have. The location is a description, though,
-            not a cause: it doesn't change the xG. It's all worked out from the match itself, not
-            stored, so old box scores have it too, right back to your first season.
+            Where a shot comes from matters. Every open-play shot is taken from the six-yard box,
+            the rest of the area, or outside it, and that decides how good the chance is: a shot
+            from close in converts about a third of the time, one from the rest of the box about one
+            in eight, and one from distance only a few percent of the time, and long shots get blocked far
+            more often. A striker takes more of his shots close in and a holding midfielder more of
+            his from range, and the split over a season (about 7 / 55 / 38) is the same one real top
+            flights have. Penalties, corner headers and free kicks are read straight off the match.
+            Matches played before this was added didn't record where shots were taken, so on those
+            the game picks a spot that fits how the shot ended, and there it's only a description.
           </p>
           <p>After matchday 38, the offseason runs on its own, in this order:</p>
           <ol>
@@ -961,6 +962,19 @@ export function Manual() {
             of countries you weren't going to change. Hit <strong>Customize</strong> on it to open
             it up. If you loaded a roster file it opens on its own, because adding or renaming a
             league in there is usually the thing that makes your file apply.
+          </p>
+          <p>
+            <strong>Each league opens on a set of ready-made shapes</strong>, so you don&apos;t have
+            to work out what a strength of 14 means before you can build anything. Pick
+            &quot;Small European&quot; and you get a 12-club top flight with two up and two down,
+            around the standard of Scotland or Greece; &quot;Closed league&quot; gets you the MLS
+            arrangement, 30 clubs in two conferences with nobody going up or down and the title
+            settled in playoffs. Under the shapes, a short summary tells you what the league you
+            have described would actually be, including roughly what its best club would rate, so
+            you can see where it lands against the leagues already in the game. Every individual
+            control is still there, under <strong>Fine-tune this league</strong>, and it opens by
+            itself if you&apos;ve already set something no shape describes. On a country the game
+            ships, <strong>As shipped</strong> puts it back exactly as it was.
           </p>
           <p>
             <strong>Every setting works on the countries the game ships, too.</strong> Hit{" "}
@@ -2058,7 +2072,7 @@ export function Manual() {
             <li><strong>Who gets credited</strong>. Every event is pinned on a real player, picked from who's on the pitch using both his position and how good he is at that particular thing. Goals lean on finishing, assists on passing, tackles and interceptions on tackling and reading the game, corners on heading. Ability counts for a lot in that pick, so your best defender really does top your tackles chart and your playmaker really does rack up the assists, rather than them landing on whoever happened to be nearby. Fouls are the deliberate exception: they're spread by position and not sharpened by ability, because "best defender" and "most booked" shouldn't be the same list. Around a quarter of goals are scored with no assist at all.</li>
             <li><strong>The position each player played</strong>. The Pos column on a box score is the job he actually did that afternoon, not the position listed on his profile. A winger who filled in at full-back reads as a full-back for that match, which is also what his rating was judged against. It's the same information the lineups on the watch screen are built from.</li>
             <li><strong>Passes, crosses &amp; fouls</strong>. Every box score also carries per-player passing (completed / attempted), crosses, and fouls committed. Central and deep players move the ball most, wide players do most of the crossing. These are just stat-sheet detail, they don't change the scoreline.</li>
-            <li><strong>Cards</strong>. Yellows, second yellows, and straight reds. Going a man down is a real hit to your side's strength for the rest of the match, and cards now carry a cost past the final whistle too (see Suspensions below).</li>
+            <li><strong>Cards</strong>. Yellows, second yellows, and straight reds. A match has about as many fouls and bookings as a real top-flight game: roughly 23 fouls, 4 yellows and a red every four or five matches. Most fouls just stop play; only a few give away a dangerous free kick or a penalty. A player already on a yellow eases off, so he commits fewer fouls for the rest of the game, which is why second yellows stay fairly rare. Going a man down is a real hit to your side's strength for the rest of the match, and cards carry a cost past the final whistle too (see Suspensions below).</li>
             <li><strong>Set pieces</strong>. Corners, and penalty kicks resolved as a duel between the taker and the keeper (saved, scored, or dragged wide).</li>
             <li><strong>Fatigue &amp; substitutions</strong>. Players tire as the match runs, and the coach has five substitutions to spend. Like real football, they're limited by <em>opportunities</em> rather than one at a time: he gets three chances to make changes during play, and he can bring on up to three players at a single one of them, so a triple change costs him one chance and not three. Half-time is a free extra chance that doesn't count against those three. That's why you'll see two or three players go on together around the hour, and why a coach who's already used all three chances has nothing left to respond with late on. Managers pick their own minutes rather than every club in the world changing its team at the same moment. Most sides end up making four or five changes, some fewer, which is roughly what a real top-flight team does. Subs aren't automatic anymore: the coach weighs how good the fresh bench player is against the tired starter he'd replace, and also how that starter is actually playing on the day. A close-quality bench refreshes freely, but he won't pull a good starter for a much weaker reserve unless that starter is genuinely gassed, so a shallow bench leaves your tired legs on. A starter tearing the game up is harder to justify hooking than one having a stinker, even at the same fitness. The coach also cares where a replacement would have to play: he's filling a specific hole in the shape, so a bench striker who'd have to cover at centre-back has to be a lot better to be worth it, and if nobody on the bench fits, the tired starter stays on rather than the shape getting wrecked. The one exception is the chase-the-game sub late on when you're losing, where the coach deliberately changes shape instead, pulling a defender for an attacker who plays his own position. He also gets less fussy as the clock runs down. A player brought on with five minutes left only has five minutes to be worse in, so a drop in quality that would be daft at half-time costs almost nothing at 85 minutes, and that's where the familiar late run-out for a fringe player comes from. Half-time is the opposite: nobody is tired yet and there's a whole half to play, so he only makes one when the bench is a genuine upgrade, usually on someone having a poor half. And if you've spent all five and then someone gets injured, you finish the game with ten men. Your matches use the same in-match sub logic. You can also flag any bench player for <strong>More minutes</strong> on the Roster page, which tips the coach toward bringing him on more often.</li>
             <li><strong>Suspensions</strong>. Cards follow a player around. Pick up 5 yellows over the league season and he misses the next match; get sent off for a second yellow and he misses 1; get a straight red and he misses 3. If a sending-off and your fifth yellow land in the same game you serve the longer of the two, not both. Bans only cover league matches, so a suspended player is still available for the Continental Cup, and only league cards count toward them. He shows a red card marker on your Roster and his profile, your Dashboard lists everyone banned, and he's left out of your XI automatically until he's served it. Everything resets when the season does.</li>
@@ -2280,7 +2294,8 @@ export function Manual() {
           </p>
           <p>
             <strong>xG (expected goals).</strong> Every shot's chance of going in before you know
-            the outcome, based on the defense and keeper it's taken against, tallied up per player
+            the outcome, based on where it was taken from and the defense and keeper it's taken
+            against (a tap-in is worth far more than a 30-yard effort), tallied up per player
             and per team, shown next to the score on the Box Score page and as a column on Stat
             Leaders. It deliberately ignores the shooter's own finishing skill (an elite finisher's
             shots don't get marked as better chances just because he's elite), so comparing a

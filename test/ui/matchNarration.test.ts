@@ -161,6 +161,45 @@ describe("matchNarration — the honesty rule", () => {
     expect(share(cmGoals)).toBeLessThan(0.5);
   });
 
+  it("reads the zone the engine rolled rather than fitting one", () => {
+    // An off-target shot fitted from its outcome lands outside the box ~40% of
+    // the time; stamped "close", it must say so every time.
+    for (let clock = 100; clock < 5400; clock += 37) {
+      const shot = ev({ type: "shot_off_target", clock, zone: 0 });
+      expect(shotLocation(shot, [], "CM", false).origin).toBe("close");
+    }
+    // A stamped zone is open play by construction, so a card on the tick does
+    // not turn it into a free kick.
+    const card = ev({ type: "yellow_card", side: "away" });
+    const shot = ev({ type: "shot_saved", zone: 2 });
+    expect(shotLocation(shot, [card], "ST", false).origin).toBe("outside");
+  });
+
+  it("stamps a zone on open-play shots only, and conversion falls with distance", () => {
+    const shots = [0, 0, 0];
+    const goals = [0, 0, 0];
+    let setPieceStamped = 0;
+    for (let seed = 1; seed <= 250; seed++) {
+      const events = simMatchDetailed(
+        mulberry32(seed), makeTeam("Home"), makeTeam("Away"), makeSquad(0), makeSquad(100),
+      ).boxScore.events;
+      events.forEach((e, at) => {
+        if (!["goal", "shot_saved", "shot_blocked", "shot_off_target"].includes(e.type)) return;
+        const setPiece = events.some(
+          (x, k) => x.clock === e.clock && (x.type === "penalty" || (x.type === "corner" && k < at)),
+        );
+        if (setPiece && e.zone !== undefined) setPieceStamped++;
+        if (e.zone === undefined) return;
+        shots[e.zone]++;
+        if (e.type === "goal") goals[e.zone]++;
+      });
+    }
+    expect(setPieceStamped).toBe(0);
+    const rate = shots.map((n, i) => goals[i] / n);
+    expect(rate[0]).toBeGreaterThan(rate[1]);
+    expect(rate[1]).toBeGreaterThan(rate[2]);
+  });
+
   it("labels real engine corner ticks correctly", () => {
     let checked = 0;
     // Corners are rare off these even-strength squads (~1 in 13 matches), hence
