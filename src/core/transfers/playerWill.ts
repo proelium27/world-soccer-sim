@@ -1,5 +1,5 @@
 import type { Player } from "../players/types.js";
-import { homeAppeal, foreignDiscount } from "./homePull.js";
+import { appealMultiplier } from "./clubAppeal.js";
 import type { StoredTeam } from "../teams/clubs.js";
 import type { ClubContext } from "../ai/clubContext.js";
 import { clubStature, clubStatures } from "../ai/clubContext.js";
@@ -8,7 +8,6 @@ import {
   PLAYER_WILL_DROP_STRENGTH, PLAYER_WILL_REFUSAL_DROP, PLAYER_WILL_RISE_BONUS,
   PLAYER_SETTLED_BONUS, PLAYER_SETTLED_SEASONS,
   STATURE_STRENGTH_HI,
-  HOME_PULL_MARKET, HOME_PULL_FOREIGN,
 } from "../constants.js";
 
 /**
@@ -266,17 +265,18 @@ export function refusesFreeAgentSigningWith(
   return refusesMove(player.ovr, from, buyerStature);
 }
 
-/** `moveAppeal` for a concrete pair of clubs. */
+/**
+ * The player's view of a move between a concrete pair of clubs, as a
+ * multiplier on the buyer's valuation: `clubAppealFor` with "from" the seller
+ * (clubAppeal.ts). Level of club, playing time, home country, confederation and
+ * former club, all his reasons and nothing of the club's. 0 when he refuses.
+ */
 export function moveAppealBetween(
   player: Player,
   from: ClubContext,
   to: ClubContext,
 ): number {
-  return moveAppeal(player.ovr, from.stature, to.stature)
-    * homeAppeal(player, from.home, to.home, HOME_PULL_MARKET)
-    // Club side, not player will: the buyer's soft foreign quota. Rides here
-    // because this is the one multiplier every AI buyer valuation already reads.
-    * foreignDiscount(player, to.home, HOME_PULL_FOREIGN);
+  return appealMultiplier(player, to, { stature: from.stature, club: from });
 }
 
 /**

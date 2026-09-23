@@ -2873,42 +2873,38 @@ export const PLAYER_WILL_REFUSAL_DROP = 0.18;
 export const PLAYER_WILL_RISE_BONUS = 0.35;
 
 /*
- * Home-country pull (transfers/homePull.ts, docs/club-reputation.md). Three
- * strengths, all scaled by the same thing: how far over its league's foreign
- * allowance a club is (`homeGap`), and how little the player cares about club
- * size (stars feel none of it). Each is 0 at a club already at its league's
- * real domestic share.
- *
- * Tuned together on scripts/nationalityDriftProbe.ts (10 seasons, seeds 1 and
- * 2): the world's top flights went from 3-20% domestic with no pull to within
- * 2-11 points of their real shares. Raising any one of them further was
- * measured to buy almost nothing — the residual in the most domestic leagues
- * (Serbia, Mexico) is home players too weak to sign, which only a hard quota
- * would change.
+ * A player's view of a club (`clubAppealFor`, transfers/clubAppeal.ts,
+ * docs/club-reputation.md). Each is one line of his reasons, in the units of
+ * the appeal score, where 0 is indifference and the score multiplies a buyer's
+ * valuation as `1 + score`. First values, to be tuned on
+ * scripts/nationalityDriftProbe.ts and the ladder audit.
  */
+
+/** Home country at full strength, before the league's domestic share and his attachment. */
+export const APPEAL_HOME = 0.3;
 
 /**
  * How many rating points above his country's best clubs (`HomeClub.homeLevel`)
  * a player can climb before his home attachment is gone. A player who has
  * outgrown his home league moves on ambition, like a star (`homeAttachment`).
  */
-export const HOME_PULL_FADE_RANGE = 5;
+export const APPEAL_HOME_FADE_RANGE = 5;
 
-/** Free agency: rating points a club adds to a home player's ranking, per unit of gap. */
-export const HOME_PULL_K = 0;
+/** A club outside his confederation, at full strength (stars feel none of it). */
+export const APPEAL_CONFEDERATION = 0.15;
 
-/**
- * Transfer and loan markets, player side: a multiplier on the buyer's
- * valuation, up for a move home and down for a move away (`homeAppeal`).
- */
-export const HOME_PULL_MARKET = 0;
+/** Playing time, per rating point above (or below) the weakest starter at his position. */
+export const APPEAL_PLAYING_TIME = 0.02;
+/** How far below the weakest starter still counts: a bench role costs at most LO points' worth. */
+export const APPEAL_PLAYING_TIME_LO = 10;
+/** How far above counts: a sure starter gains at most HI points' worth. */
+export const APPEAL_PLAYING_TIME_HI = 5;
 
-/**
- * Transfer and loan markets, club side and AI only: a soft foreign quota that
- * discounts a foreign signing's value (`foreignDiscount`). Needed because the
- * home-side pull alone plateaued: nothing made a foreigner less attractive.
- */
-export const HOME_PULL_FOREIGN = 0;
+/** A club he has played for before. Never a refusal. */
+export const APPEAL_FORMER_CLUB = 0.1;
+
+/** A loan is a season, not a career: home and confederation count this much on one. */
+export const APPEAL_LOAN_FACTOR = 0.5;
 
 /**
  * Settling-in friction: a player who has only just joined is much harder to

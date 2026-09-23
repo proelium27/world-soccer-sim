@@ -1,0 +1,98 @@
+import { describe, it, expect } from "vitest";
+import {
+  clubAppealFor, appealScore, appealMultiplier, type AppealClub,
+} from "../../src/core/transfers/clubAppeal.js";
+import { POSITIONS, type Player, type Position } from "../../src/core/players/types.js";
+import type { HomeClub } from "../../src/core/transfers/homePull.js";
+import { APPEAL_FORMER_CLUB, APPEAL_LOAN_FACTOR } from "../../src/core/constants.js";
+
+const player = (nationality: string, ovr: number, extra: Partial<Player> = {}) =>
+  ({ pid: 1, nationality, ovr, pos: "CM", stats: [], ...extra }) as unknown as Player;
+
+const weakest = (ovr: number) =>
+  Object.fromEntries(POSITIONS.map((p) => [p, ovr])) as Record<Position, number>;
+
+const home = (country: string, confederation: HomeClub["confederation"], share = 0.8): HomeClub =>
+  ({ country, domesticShare: share, confederation, homeLevel: 80 });
+
+const club = (tid: number, stature: number, h: HomeClub, weakestStarter: number): AppealClub =>
+  ({ tid, stature, home: h, posWeakestStarterOvr: weakest(weakestStarter) });
+
+const argentina = home("Argentina", "South America", 0.84);
+const spain = home("Spain", "Europe", 0.61);
+
+// A free agent: no club, only the stature he measures offers against.
+const freeAgent = (stature = 0.3) => ({ stature });
+
+describe("clubAppealFor", () => {
+  it("a squad player takes the club where he would start over a bigger one where he would not", () => {
+    const p = player("Brazil", 60);
+    const bigBench = club(1, 0.5, spain, 70);  // 10 points short of the XI
+    const smallXI = club(2, 0.3, spain, 55);   // walks in
+    expect(appealScore(p, smallXI, freeAgent()).score).toBeGreaterThan(appealScore(p, bigBench, freeAgent()).score);
+  });
+
+  it("a star picks the bigger club: playing time barely moves him", () => {
+    const p = player("Brazil", 88);
+    const big = club(1, 0.75, spain, 80);
+    const small = club(2, 0.55, spain, 60);
+    expect(appealScore(p, big, freeAgent(0.7)).score).toBeGreaterThan(appealScore(p, small, freeAgent(0.7)).score);
+  });
+
+  it("between otherwise equal offers, a squad player goes home", () => {
+    const p = player("Argentina", 60);
+    const atHome = club(1, 0.3, argentina, 60);
+    const abroad = club(2, 0.3, spain, 60);
+    expect(appealScore(p, atHome, freeAgent()).score).toBeGreaterThan(appealScore(p, abroad, freeAgent()).score);
+  });
+
+  it("leaving home costs what arriving home gains", () => {
+    const p = player("Argentina", 60);
+    const atHome = club(1, 0.3, argentina, 60);
+    const abroad = club(2, 0.3, { ...spain, confederation: "South America" }, 60);
+    const leaving = clubAppealFor(p, abroad, { stature: 0.3, club: atHome }).lines.find((l) => l.id === "home")!;
+    const arriving = clubAppealFor(p, atHome, { stature: 0.3, club: abroad }).lines.find((l) => l.id === "home")!;
+    expect(leaving.value).toBeCloseTo(-arriving.value);
+    expect(arriving.value).toBeGreaterThan(0);
+  });
+
+  it("counts a club outside his confederation against it, symmetrically, and not for a star", () => {
+    const within = club(1, 0.3, home("Uruguay", "South America"), 60);
+    const outside = club(2, 0.3, spain, 60);
+    const conf = (p: Player, to: AppealClub, from: AppealClub) =>
+      clubAppealFor(p, to, { stature: 0.3, club: from }).lines.find((l) => l.id === "confederation")?.value ?? 0;
+    expect(conf(player("Argentina", 60), outside, within)).toBeLessThan(0);
+    expect(conf(player("Argentina", 60), within, outside)).toBeCloseTo(-conf(player("Argentina", 60), outside, within));
+    expect(conf(player("Argentina", 90), outside, within)).toBe(0);
+  });
+
+  it("likes a former club and never refuses to go back to one", () => {
+    const p = player("Brazil", 60, { career: { seasons: [{ season: 1, tid: 7, ovr: 55, apps: 20 }] } } as Partial<Player>);
+    const former = club(7, 0.3, spain, 60);
+    const line = clubAppealFor(p, former, freeAgent()).lines.find((l) => l.id === "formerClub");
+    expect(line?.value).toBe(APPEAL_FORMER_CLUB);
+  });
+
+  it("refuses a big step down, and a refusal zeroes the multiplier", () => {
+    const star = player("Brazil", 90);
+    const tiny = club(3, 0.05, spain, 50);
+    const a = clubAppealFor(star, tiny, { stature: 0.8 });
+    expect(a.refused).toBe(true);
+    expect(appealMultiplier(star, tiny, { stature: 0.8 })).toBe(0);
+  });
+
+  it("scales home and confederation on a loan", () => {
+    const p = player("Argentina", 60);
+    const atHome = club(1, 0.3, argentina, 60);
+    const abroad = club(2, 0.3, spain, 60);
+    const full = clubAppealFor(p, atHome, { stature: 0.3, club: abroad }).lines.find((l) => l.id === "home")!.value;
+    const loan = clubAppealFor(p, atHome, { stature: 0.3, club: abroad }, { loan: true }).lines.find((l) => l.id === "home")!.value;
+    expect(loan).toBeCloseTo(full * APPEAL_LOAN_FACTOR);
+  });
+
+  it("the score is the sum of the lines", () => {
+    const p = player("Argentina", 62);
+    const a = clubAppealFor(p, club(1, 0.4, argentina, 58), { stature: 0.3, club: club(2, 0.3, spain, 66) });
+    expect(a.score).toBeCloseTo(a.lines.reduce((s, l) => s + l.value, 0));
+  });
+});

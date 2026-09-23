@@ -16,14 +16,13 @@ import { resolveXI } from "./lineup/resolveXI.js";
 import { teamSlots } from "./lineup/formations.js";
 import { deriveLeagueContexts } from "./ai/clubContext.js";
 import { keepValueToClub, perceivedValueToClub } from "./ai/evaluate.js";
-import { homeAppeal, foreignDiscount } from "./transfers/homePull.js";
+import { appealMultiplier } from "./transfers/clubAppeal.js";
 import { mulberry32 } from "../engine/rng.js";
 import {
   ROSTER_CAP, ROSTER_SAFETY_FLOOR, LOAN_MAX_SEASONS,
   LOAN_FEE_RATE, LOAN_DURATION_MULTIPLIER, LOAN_AI_MAX_AGE,
   LOAN_MIN_SURPLUS, LOAN_OFFERS_MAX, AI_LOAN_MAX_MOVES,
   divisionRefusalOvr,
-  HOME_PULL_MARKET, HOME_PULL_FOREIGN,
 } from "./constants.js";
 
 /** A player's loan-out choice, before any club has agreed to take him. */
@@ -244,9 +243,9 @@ export function loanOfferCandidates(league: LeagueStore): LoanOfferCandidate[] {
       if (buyer.roster.length >= ROSTER_CAP) continue;
       const buyerCtx = contexts.get(buyer.tid);
       if (!buyerCtx) continue;
+      // The player's own view of the loan (clubAppeal.ts), as on a transfer.
       const value = perceivedValueToClub(player, buyerCtx, jitter)
-        * homeAppeal(player, userCtx.home, buyerCtx.home, HOME_PULL_MARKET)
-        * foreignDiscount(player, buyerCtx.home, HOME_PULL_FOREIGN);
+        * appealMultiplier(player, buyerCtx, { stature: userCtx.stature, club: userCtx }, { loan: true });
       // Only a club that would actually play him, the same rule the AI↔AI
       // market and the user's borrowing side both enforce. This is the half
       // that matters most to the user, because it is his own stated reason for
@@ -444,9 +443,9 @@ export function runAILoanMarket(
         if (buyer.tid === seller.tid || buyer.tid === userTid) continue;
         const buyerCtx = contexts.get(buyer.tid);
         if (!buyerCtx) continue;
+        // The player's own view of the loan (clubAppeal.ts), as on a transfer.
         const value = perceivedValueToClub(player, buyerCtx, jitter)
-          * homeAppeal(player, sellerCtx.home, buyerCtx.home, HOME_PULL_MARKET)
-          * foreignDiscount(player, buyerCtx.home, HOME_PULL_FOREIGN);
+          * appealMultiplier(player, buyerCtx, { stature: sellerCtx.stature, club: sellerCtx }, { loan: true });
         // A tier-2 club never takes an at-or-over-threshold player, on loan or
         // otherwise — the same prevention guard the two buy paths carry. It
         // matters more here than there: a bought player the sweep can reclaim

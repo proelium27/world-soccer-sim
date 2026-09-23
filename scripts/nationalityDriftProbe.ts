@@ -16,7 +16,7 @@
  * why the two directions are kept apart.
  *
  * Headless and a spectator save, so no unmanaged user club skews anything.
- * HOME_PULL_K is read from constants; edit it to tune.
+ * APPEAL_HOME is read from constants; edit it to tune.
  *
  * Run: SEASONS=20 SEED=1 npx tsx scripts/nationalityDriftProbe.ts
  */
@@ -25,7 +25,7 @@ import { createLeagueState, type LeagueStore } from "../src/core/leagueState.js"
 import { simThrough } from "../src/core/simThrough.js";
 import { simOffseason } from "../src/core/offseason.js";
 import { SPECTATOR_TID } from "../src/core/spectator.js";
-import { HOME_PULL_K } from "../src/core/constants.js";
+import { APPEAL_HOME } from "../src/core/constants.js";
 import { domesticShare } from "../src/core/transfers/homePull.js";
 import { FREE_AGENT_TID, type CompletedTransfer } from "../src/core/transfers/negotiation.js";
 
@@ -141,7 +141,7 @@ for (let s = 0; s < SEASONS; s++) {
 }
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
-console.log(`\n=== top-flight domestic share (HOME_PULL_K=${HOME_PULL_K}, seed ${SEED}) ===`);
+console.log(`\n=== top-flight domestic share (APPEAL_HOME=${APPEAL_HOME}, seed ${SEED}) ===`);
 const cols = [0, ...Array.from({ length: Math.floor(SEASONS / EVERY) }, (_, i) => (i + 1) * EVERY)];
 if (cols[cols.length - 1] !== SEASONS) cols.push(SEASONS);
 console.log("league".padEnd(15), "real".padStart(6), ...cols.map((c) => `s${c}`.padStart(6)), "  gap");
