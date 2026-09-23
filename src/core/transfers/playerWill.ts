@@ -247,6 +247,8 @@ export function refusesFreeAgentSigningWith(
   buyerStature: number,
   statureByTid: Map<number, number>,
   buyerTid?: number,
+  /** The world's strongest stature, when the caller loops: working it out is O(clubs). */
+  worldMax?: number,
 ): boolean {
   if (statureSensitivity(player.ovr) <= 0) return false;
   const lastTid = lastClubTid(player);
@@ -258,11 +260,24 @@ export function refusesFreeAgentSigningWith(
   // an AI club would. Forgetting to extend a contract is ordinary play, not an
   // edge case — it is why the "Extend all" button exists.
   if (buyerTid != null && lastTid === buyerTid) return false;
-  const worldMax = statureByTid.size > 0 ? Math.max(...statureByTid.values()) : 1;
-  const from = freeAgentFromStature(
+  return refusesMove(player.ovr, freeAgentStature(player, statureByTid, worldMax), buyerStature);
+}
+
+/**
+ * The stature a free agent measures every offer against (`freeAgentFromStature`
+ * with his last club looked up), for the refusal above and for his view of an
+ * offer in player-choice free agency (clubAppeal.ts). Pass a precomputed
+ * `worldMax` when calling in a loop; working it out is O(clubs).
+ */
+export function freeAgentStature(
+  player: Player,
+  statureByTid: Map<number, number>,
+  worldMax = statureByTid.size > 0 ? Math.max(...statureByTid.values()) : 1,
+): number {
+  const lastTid = lastClubTid(player);
+  return freeAgentFromStature(
     player, lastTid == null ? null : statureByTid.get(lastTid) ?? null, worldMax,
   );
-  return refusesMove(player.ovr, from, buyerStature);
 }
 
 /**

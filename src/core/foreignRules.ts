@@ -359,10 +359,18 @@ export function worldRules(
     }
   }
   const squad = (pids: readonly number[]) => pids.map(playerById).filter((p): p is Player => p != null);
+  const hasCap = new Map([...rulesByTid].map(([tid, e]) =>
+    [tid, e.rules.some((r) => r.kind === "foreignCap" || r.kind === "nonEuCap")]));
   return {
     block(tid, pids, incoming) {
       const e = rulesByTid.get(tid);
-      return e ? registrationBlock(squad(pids), incoming, e.rules, e.ctx) : null;
+      if (!e || !hasCap.get(tid)) return null;
+      // Only a player the cap counts can be blocked by it; checked before the
+      // squad is built, since most offers are not to such players.
+      if (!e.rules.some((r) => (r.kind === "foreignCap" || r.kind === "nonEuCap") && countsToward(incoming, r, e.ctx))) {
+        return null;
+      }
+      return registrationBlock(squad(pids), incoming, e.rules, e.ctx);
     },
     helpsMinimum(tid, pids, incoming) {
       const e = rulesByTid.get(tid);

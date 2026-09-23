@@ -14,8 +14,10 @@ import {
 } from "./contracts.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
 import { affordable, type SpendPolicy } from "./finance/debt.js";
-import { refusesFreeAgentSigning, refusesFreeAgentSigningWith } from "./transfers/playerWill.js";
-import { clubStatures } from "./ai/clubContext.js";
+import { refusesFreeAgentSigning, refusesFreeAgentSigningWith, freeAgentStature } from "./transfers/playerWill.js";
+import { clubStatures, deriveLeagueContexts } from "./ai/clubContext.js";
+import { matchFreeAgents, type MatchSlot } from "./freeAgencyMatch.js";
+import { appealScore } from "./transfers/clubAppeal.js";
 import { worldRules, leagueRegistrationBlock } from "./foreignRules.js";
 import type { Competition } from "./competitions.js";
 
@@ -122,11 +124,21 @@ export function freeAgencySigningOrder(
 }
 
 /**
- * AI free-agent signing: each team in `signingOrderTids` (skips `userTid`)
- * fills positional shortfalls against ROSTER_COMPOSITION by greedily signing
- * the best available free agent at that position. Contract terms are a
- * placeholder (ovr-based salary, 1-3 season length) pending real finances.
- * Mutates neither input; returns updated teams and players.
+ * AI free-agent signing, as the player's choice (freeAgencyMatch.ts). Each club
+ * in `signingOrderTids` (skipping `userTid`) offers for its open slots, in
+ * three passes: positional shortfalls against ROSTER_COMPOSITION, one depth
+ * upgrade per position, and prospect slots. Each player takes the offer he
+ * likes best (clubAppeal.ts). `signingOrderTids` now only says which clubs
+ * take part: the match does not depend on their order, and the worst-first
+ * queue it used to be is replaced by the player choosing where he would play
+ * and where he is at home. Registration rules (foreignRules.ts) bind every
+ * club. Contract terms are a placeholder (ovr-based salary, 1-3 season length)
+ * pending real finances. Mutates neither input; returns updated teams and
+ * players.
+ *
+ * Measured cost: ~3s a pass on the 898-club world with a ~2,600-player pool,
+ * against ~1.5s for the greedy loop it replaced, because every club with an
+ * open slot starts by offering for the best free agent at the position.
  *
  * Has no Division 2 concept of its own — Division 2's strength ceiling is
  * enforced separately and deterministically by enforceDivisionCeilings
@@ -190,179 +202,158 @@ export function runAIFreeAgency(
    * is 0 below the care floor, so the check returns on its first line for every
    * squad player and every prospect, who are the bulk of what is on offer.
    */
+  // Each club's view of itself, once per pass: stature, home country, and the
+  // weakest man its shape fields at each position (the playing-time line). A
+  // club's stature is its top-16 mean blended with hype, which one arrival
+  // barely moves, so recomputing per signing would buy nothing.
+  const contexts = deriveLeagueContexts({ teams, players, season, played: [], competitions: [...competitions] });
+  // Stature from the squads directly (the same figure a context carries), so a
+  // caller that passes no competitions still gets real statures.
   const statures = clubStatures(teams, players);
-  // The league registration rules (foreignRules.ts), read through per-squad
-  // snapshots in each pass so a signing counts against the next one.
+  const worldMax = statures.size > 0 ? Math.max(...statures.values()) : 1;
+  // The league registration rules (foreignRules.ts). Caps are checked against
+  // each club's squad plus what it is holding and offering in the match.
   const rules = worldRules(teams, competitions, (pid) => playerMap.get(pid), season);
+  // A free agent has a say, exactly as when the user signs him: a player who
+  // would refuse a club (playerWill.ts) is never on its list. The AI was once
+  // the one actor exempt from that, and with worst-first order the weakest club
+  // in the world got first pick of every elite free agent.
   const willing = (p: Player, tid: number): boolean =>
-    !refusesFreeAgentSigningWith(p, statures.get(tid) ?? 0, statures, tid);
+    !refusesFreeAgentSigningWith(p, statures.get(tid) ?? 0, statures, tid, worldMax);
+  // His view of an offer (clubAppeal.ts), measured from the stature he expects.
+  const liked = new Map<number, number>();
+  const preference = (p: Player, tid: number): number => {
+    const key = p.pid * 65536 + tid;
+    let v = liked.get(key);
+    if (v === undefined) {
+      const ctx = contexts.get(tid);
+      v = ctx ? appealScore(p, ctx, { stature: freeAgentStature(p, statures, worldMax) }).score : 0;
+      liked.set(key, v);
+    }
+    return v;
+  };
   // Each free-agent arrival is logged by the caller as a fee-0 transfer (see
   // offseason.ts) so the player's club-by-season history registers the move.
   const signings: { pid: number; toTid: number }[] = [];
+  const clubs = [...new Set(signingOrderTids)].filter((tid) => tid !== userTid && teamMap.has(tid))
+    .sort((a, b) => a - b);
 
-  // Contract length comes from a per-signing seeded stream (tag 7), NOT the
-  // shared rng, like the poach (5) and prospect (6) passes below. Free agency
-  // therefore consumes no shared draws at all, so which players sign where can
-  // change (player-choice free agency, docs/club-reputation.md) without moving
-  // youth intake or anything else downstream.
-  const sign = (team: StoredTeam & { roster: number[] }, signing: Player): void => {
-    const lenRng = mulberry32(hashInts(season, team.tid, signing.pid, 7));
+  // Contract length comes from a per-signing seeded stream, NOT the shared rng,
+  // one tag per pass (7 shortfalls, 5 depth upgrades, 6 prospects). Free agency
+  // therefore consumes no shared draws at all.
+  const sign = (tid: number, pid: number, tag: number): void => {
+    const team = teamMap.get(tid)!;
+    const signing = playerMap.get(pid)!;
+    const lenRng = mulberry32(hashInts(season, tid, pid, tag));
     const length = CONTRACT_LENGTH_MIN
       + Math.floor(lenRng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
     signing.contract = {
-      salary: seasonSalaryForOvr(signing.ovr, signing.pid, season),
+      salary: seasonSalaryForOvr(signing.ovr, pid, season),
       expiresSeason: season + length,
     };
-    team.roster.push(signing.pid);
-    signings.push({ pid: signing.pid, toTid: team.tid });
-    pool = pool.filter((pid) => pid !== signing.pid);
+    team.roster.push(pid);
+    signings.push({ pid, toTid: tid });
   };
 
-  for (const tid of signingOrderTids) {
-    if (tid === userTid) continue;
-    const team = teamMap.get(tid);
-    if (!team) continue;
+  // One pass: build every club's slots, match, sign. `pool` shrinks as passes sign.
+  const runPass = (slots: MatchSlot[], tag: number): void => {
+    const held = matchFreeAgents(slots, {
+      preference,
+      stature: (tid) => statures.get(tid) ?? 0,
+      mayRegister: (tid, tentative, p) =>
+        rules.block(tid, [...teamMap.get(tid)!.roster, ...tentative], p) === null,
+    });
+    const taken = new Set<number>();
+    held.forEach((pid, i) => {
+      if (pid === null) return;
+      sign(slots[i].tid, pid, tag);
+      taken.add(pid);
+    });
+    pool = pool.filter((pid) => !taken.has(pid));
+  };
+  const poolPlayers = () => pool.map((pid) => playerMap.get(pid)!);
+  // A club short of a registration minimum (soft) ranks the players who would
+  // help it first; otherwise by rating.
+  const rankFor = (tid: number, list: Player[], key: (p: Player) => number): Player[] => {
+    const reg = rules.forSquad(tid, teamMap.get(tid)!.roster);
+    // Worked out once per candidate, not inside the comparison.
+    const helps = new Map(list.map((p) => [p.pid, reg.helpsMinimum(p) ? 1 : 0]));
+    return list.sort((a, b) => helps.get(b.pid)! - helps.get(a.pid)! || key(b) - key(a) || a.pid - b.pid);
+  };
 
-    const counts = positionCounts(team.roster, playerMap);
-    for (const pos of POSITIONS as readonly Position[]) {
-      let shortfall = ROSTER_COMPOSITION[pos] - counts[pos];
-      while (shortfall > 0) {
-        // The club's league rules (foreignRules.ts): a cap it is at blocks the
-        // players it counts; a minimum it is short of sorts the players who
-        // would help it first.
-        const reg = rules.forSquad(tid, team.roster);
-        const helps = (p: Player) => (reg.helpsMinimum(p) ? 1 : 0);
-        const candidates = pool
-          .map((pid) => playerMap.get(pid)!)
-          .filter((p) => p.pos === pos && willing(p, tid) && reg.block(p) === null)
-          .sort((a, b) => helps(b) - helps(a) || b.ovr - a.ovr);
-        const signing = candidates[0];
-        if (!signing) break;
-        sign(team, signing);
-        shortfall--;
+  // Pass 1: positional shortfalls against ROSTER_COMPOSITION.
+  {
+    const byPos = new Map<Position, Player[]>();
+    for (const p of poolPlayers()) {
+      const list = byPos.get(p.pos);
+      if (list) list.push(p); else byPos.set(p.pos, [p]);
+    }
+    const slots: MatchSlot[] = [];
+    for (const tid of clubs) {
+      const team = teamMap.get(tid)!;
+      const counts = positionCounts(team.roster, playerMap);
+      for (const pos of POSITIONS as readonly Position[]) {
+        const shortfall = ROSTER_COMPOSITION[pos] - counts[pos];
+        if (shortfall <= 0) continue;
+        const candidates = rankFor(tid, (byPos.get(pos) ?? []).filter((p) => willing(p, tid)), (p) => p.ovr);
+        for (let k = 0; k < shortfall; k++) slots.push({ tid, candidates });
       }
     }
+    runPass(slots, 7);
   }
 
-  // Second pass: AI clubs poach the best remaining quality free agents to
-  // upgrade a position they're already stocked at (same worst-first order, so
-  // weaker clubs improve most). Each club adds at most one player per position
-  // — a genuine upgrade over its current weakest there — taking that position
-  // to ROSTER_COMPOSITION + 1. trimRosterSurplus (run later in the offseason)
-  // then keeps the best complement and releases the now-weakest, so the net
-  // effect is that the strongest free agents get pulled out of the pool and a
-  // weaker player is returned in their place. That drains quality from the
-  // market the user shops in — most good free agents are gone before the user
-  // gets to them — without ballooning AI squad sizes or their wage bills (trim
-  // caps size; wages are charged on the post-trim roster at season start).
-  //
-  // Contract length is drawn from a per-signing seeded stream, NOT the shared
-  // rng, so this pass consumes no shared draws and youth generation downstream
-  // stays bit-identical (the RNG-stream-order invariant).
-  const poachSign = (team: StoredTeam & { roster: number[] }, signing: Player): void => {
-    const lenRng = mulberry32(hashInts(season, team.tid, signing.pid, 5));
-    const length = CONTRACT_LENGTH_MIN
-      + Math.floor(lenRng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
-    signing.contract = {
-      salary: seasonSalaryForOvr(signing.ovr, signing.pid, season),
-      expiresSeason: season + length,
-    };
-    team.roster.push(signing.pid);
-    signings.push({ pid: signing.pid, toTid: team.tid });
-    pool = pool.filter((pid) => pid !== signing.pid);
-  };
-
-  for (const tid of signingOrderTids) {
-    if (tid === userTid) continue;
-    const team = teamMap.get(tid);
-    if (!team) continue;
-
-    for (const pos of POSITIONS as readonly Position[]) {
-      if (team.roster.length >= ROSTER_CAP) break;
-      const atPos = team.roster
-        .map((pid) => playerMap.get(pid)!)
-        .filter((p) => p.pos === pos);
-      // Only positions already at target depth are eligible for a depth
-      // upgrade; genuine shortfalls were filled in the first pass above.
-      if (atPos.length < ROSTER_COMPOSITION[pos]) continue;
-      const weakest = Math.min(...atPos.map((p) => p.ovr));
-      const reg = rules.forSquad(tid, team.roster);
-      const helps = (p: Player) => (reg.helpsMinimum(p) ? 1 : 0);
-      const best = pool
-        .map((pid) => playerMap.get(pid)!)
-        .filter((p) => p.pos === pos && willing(p, tid) && reg.block(p) === null)
-        .sort((a, b) => helps(b) - helps(a) || b.ovr - a.ovr)[0];
-      if (best && best.ovr > weakest) poachSign(team, best);
+  // Pass 2: depth upgrades. A club at target depth at a position offers for one
+  // free agent better than its weakest there, taking it to ROSTER_COMPOSITION +
+  // 1; trimRosterSurplus later keeps the best and releases the now-weakest, so
+  // the strongest free agents leave the pool without squads ballooning.
+  {
+    const byPos = new Map<Position, Player[]>();
+    for (const p of poolPlayers()) {
+      const list = byPos.get(p.pos);
+      if (list) list.push(p); else byPos.set(p.pos, [p]);
     }
+    const slots: MatchSlot[] = [];
+    for (const tid of clubs) {
+      const team = teamMap.get(tid)!;
+      let room = ROSTER_CAP - team.roster.length;
+      for (const pos of POSITIONS as readonly Position[]) {
+        if (room <= 0) break;
+        const atPos = team.roster.map((pid) => playerMap.get(pid)!).filter((p) => p.pos === pos);
+        if (atPos.length < ROSTER_COMPOSITION[pos]) continue;
+        const weakest = Math.min(...atPos.map((p) => p.ovr));
+        const candidates = rankFor(
+          tid, (byPos.get(pos) ?? []).filter((p) => p.ovr > weakest && willing(p, tid)), (p) => p.ovr,
+        );
+        if (candidates.length === 0) continue;
+        slots.push({ tid, candidates });
+        room--;
+      }
+    }
+    runPass(slots, 5);
   }
 
-  // Third pass: prospects. The two passes above rank purely on current ovr, so
-  // no AI club had any reason to sign a 16-year-old — measured, that left the
-  // unsigned under-22 pool growing without bound (1,485 in season 2 to 3,072 by
-  // season 7 on a fresh world) with the user the only actor in the world that
-  // valued potential. Each club fills its AI_PROSPECT_SLOTS from the pool,
-  // worst-first like the passes above so weak clubs get first pick at the next
-  // generation, which is also the upward-mobility direction the country ladder
-  // depends on.
-  //
-  // These sign ON TOP of the depth chart and trimRosterSurplus protects exactly
-  // the same count on exactly the same rule, so a club signs a prospect and
-  // keeps him rather than churning him straight back out next offseason.
-  //
-  // Ordering note: free agency is offseason step 4 and youth intake is step 5,
-  // so a club fills its slots here without knowing what its own academy is
-  // about to produce, and step 6's trim then keeps the best AI_PROSPECT_SLOTS
-  // across both. A signing can therefore be released in the same offseason it
-  // was made — harmless (he returns to the pool, and the club keeps the better
-  // player either way), and rare in practice because supply is the binding
-  // constraint: ~275 POT>=70 players are generated a year against 320 clubs'
-  // worth of slots, so clubs sit well short of full. Measured, rosters settle
-  // ~1 player above the depth chart, not five.
-  //
-  // Contract length comes from a per-signing seeded stream (tag 6, distinct
-  // from the poach pass's 5), NOT the shared rng — so this pass consumes no
-  // shared draws and youth generation downstream stays bit-identical, the same
-  // RNG-stream-order invariant the poach pass above preserves.
-  const prospectSign = (team: StoredTeam & { roster: number[] }, signing: Player): void => {
-    const lenRng = mulberry32(hashInts(season, team.tid, signing.pid, 6));
-    const length = CONTRACT_LENGTH_MIN
-      + Math.floor(lenRng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
-    signing.contract = {
-      salary: seasonSalaryForOvr(signing.ovr, signing.pid, season),
-      expiresSeason: season + length,
-    };
-    team.roster.push(signing.pid);
-    signings.push({ pid: signing.pid, toTid: team.tid });
-    pool = pool.filter((pid) => pid !== signing.pid);
-  };
-
-  for (const tid of signingOrderTids) {
-    if (tid === userTid) continue;
-    const team = teamMap.get(tid);
-    if (!team) continue;
-
-    // How many prospect slots this club has spare. Counted against the same
-    // bar trimRosterSurplus retains on, so the two agree on who is a prospect;
-    // a club that already developed five wonderkids signs none.
-    const held = team.roster
-      .map((pid) => playerMap.get(pid)!)
-      .filter(
-        (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot,
-      ).length;
-
-    for (let slot = held; slot < AI_PROSPECT_SLOTS; slot++) {
-      if (team.roster.length >= ROSTER_CAP) break;
-      const reg = rules.forSquad(tid, team.roster);
-      const best = pool
+  // Pass 3: prospects. The passes above rank on current ovr, so without this no
+  // AI club had a reason to sign a 16-year-old and the unsigned under-22 pool
+  // grew without bound. Each club offers for its spare AI_PROSPECT_SLOTS, on top
+  // of the depth chart, on the same bar trimRosterSurplus retains on, so a
+  // prospect signed here is kept rather than churned straight back out.
+  {
+    const prospects = poolPlayers().filter(
+      (p) => season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot,
+    );
+    const slots: MatchSlot[] = [];
+    for (const tid of clubs) {
+      const team = teamMap.get(tid)!;
+      const held = team.roster
         .map((pid) => playerMap.get(pid)!)
-        .filter(
-          (p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot
-            && willing(p, tid) && reg.block(p) === null,
-        )
-        .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid)[0];
-      if (!best) break;
-      prospectSign(team, best);
+        .filter((p) => p && season - p.born <= AI_PROSPECT_MAX_AGE && p.potential >= prospectPot).length;
+      const room = Math.min(AI_PROSPECT_SLOTS - held, ROSTER_CAP - team.roster.length);
+      if (room <= 0) continue;
+      const candidates = prospects.filter((p) => willing(p, tid))
+        .sort((a, b) => b.potential - a.potential || b.ovr - a.ovr || a.pid - b.pid);
+      for (let k = 0; k < room; k++) slots.push({ tid, candidates });
     }
+    runPass(slots, 6);
   }
 
   return {
