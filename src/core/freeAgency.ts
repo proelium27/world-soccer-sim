@@ -5,7 +5,7 @@ import type { ActiveLoan } from "./loans.js";
 import { isBorrowed } from "./loanOwnership.js";
 import {
   ROSTER_COMPOSITION, ROSTER_CAP, CONTRACT_LENGTH_MIN, CONTRACT_LENGTH_MAX,
-  ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, PROSPECT_AGE_MAX,
+  ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR, ACADEMY_GRADUATION_AGE,
   AI_PROSPECT_SLOTS, AI_PROSPECT_MAX_AGE, AI_PROSPECT_MIN_POT,
   potentialBar, type ProgressionModel,
 } from "./constants.js";
@@ -582,11 +582,12 @@ export function signFreeAgent(
 }
 
 /**
- * Sign a free agent into a team's academy pool (used by Incoming Talent for
- * young prospects). No-op if the pid isn't a free agent, isn't age-eligible
- * (PROSPECT_AGE_MAX — enforced here too, not just by Incoming Talent's UI
- * filter, so the action itself can't park an expensive older free agent at
- * the academy's near-zero stipend), the academy is already at
+ * Sign a free agent into a team's academy pool (the Free Agents page's Academy
+ * button). No-op if the pid isn't a free agent, is already at or past
+ * ACADEMY_GRADUATION_AGE (the academy's professional cut — enforced here too,
+ * not just by the page, so the action itself can't park an older free agent at
+ * the academy's near-zero stipend, outside the checkpoints that would ever
+ * move him on), the academy is already at
  * ACADEMY_ROSTER_CAP, or (mid-season) the club can't afford it. Academy
  * contracts are a flat stipend (academyContractTerms), not the normal
  * ovr-cubic wage, but the same wage-timing convention as
@@ -617,7 +618,7 @@ export function signToAcademy(
     return { teams, players };
   }
   const player = players.find((p) => p.pid === pid);
-  if (!player || season - player.born > PROSPECT_AGE_MAX) {
+  if (!player || season - player.born >= ACADEMY_GRADUATION_AGE) {
     return { teams, players };
   }
   if (leagueRegistrationBlock({ teams, competitions, players, season }, tid, player) !== null) {
