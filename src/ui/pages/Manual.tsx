@@ -2823,13 +2823,15 @@ export function Manual() {
           </p>
           <ul>
             <li>
-              <strong>Level of club.</strong> Good players want good clubs. A squad player will go
-              anywhere, a star won&apos;t drop far below where he is, and a big enough step down is a flat
-              no. This is the only reason that can turn a player down outright.
+              <strong>Level of club.</strong> Good players want good clubs, and how good a club is
+              means how strong its squad is and how rich it is (money stands in for the wages it can
+              pay). A good player is drawn to a bigger club well before he&apos;s a star. Only a star
+              refuses to drop down, though, and a big enough step down is a flat no. This is the only
+              reason that can turn a player down outright.
             </li>
             <li>
-              <strong>Reputation.</strong> Part of how big a club looks is its squad, and part is its
-              name. A club&apos;s reputation is built from what it has won and where it plays: finishing
+              <strong>Reputation.</strong> The rest of how big a club looks is its name. A club&apos;s
+              reputation is built from what it has won and where it plays: finishing
               high in a strong league, titles, cups and runs in the continental competitions all push it
               up, and relegation pulls it down. Everything is on one world scale, so a struggling club in
               a big league still has more of a name than the champion of a small one. It moves slowly. It

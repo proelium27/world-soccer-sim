@@ -154,21 +154,45 @@ replaced) and migration of an old save give each club the finish score its squad
 strength ranks it at within its division. Same scale as the target, so there is
 no opening transient. A seed, not a reconstruction of an old save's history.
 
-**Stature** is `0.65 × squad strength + 0.35 × reputation / 100`
-(`STATURE_W_REPUTATION`, was `STATURE_W_HYPE`). Every stature reader
-(`clubStature`, `clubStatures`, the club contexts, `refusesMoveToClub`) reads
-`teamReputation`. `ClubContext.statureParts` carries the two weighted halves.
+**Stature reads how good a club is.** `0.45 × squad strength + 0.2 ×
+reputation / 100 + 0.35 × wealth` (`STATURE_W_STRENGTH`, `STATURE_W_REPUTATION`,
+`STATURE_W_WEALTH`), where wealth is the club's own income scale
+(`clubWealth` = `financeScale`, 1 at a big-four top-flight club), the stand-in
+for wages until wages exist. All three are the club's own; there is no
+regional term (user rule: players are pulled to good clubs, and good clubs
+happen to be in Europe). The first shape, `0.65 × squad + 0.35 × reputation`,
+still rated Brazil's best club (0.67) above a median big-four club (0.56),
+because squads there really are comparable and the reputation seed puts
+Brazil's champion level with a mid-table English club; with wealth at 0.35 the
+median big-four club reads 0.71 against Brazil's best 0.67
+(`scripts/statureGapProbe.ts`). Every stature reader (`clubStature`,
+`clubStatures`, the contexts, `refusesMoveToClub`, `refusesFreeAgentSigning`)
+now REQUIRES the competitions, so no screen can compute a different stature
+from the AI's. `ClubContext.statureParts` carries the three weighted parts.
+
+**Ambition for good players.** The step-up bonus used the star-only care curve
+(ovr 73 → 89) at `PLAYER_WILL_RISE_BONUS` 0.35, so a 76-rated player gained
+~0.02 for a move from Brazil to a mid-table big-four club against a home pull of
+~0.17. A step up now reads `playerAmbition`, ramping from
+`PLAYER_WILL_AMBITION_FLOOR` (ovr 66) to the care ceiling, at a rise bonus of
+1.2. Refusals still read the care curve, so who refuses a step down is
+unchanged. `scripts/appealCheck.ts` prints the line-by-line view of that move.
 
 **Reputation line.** `clubAppealFor` shows the level line as two: "Level of
-club" and "Reputation", apportioned by each half's share of the stature gap
-(a free agent's own stature is split in the 0.65/0.35 proportion). Display only:
-`appealScore`/`appealMultiplier` read the unsplit value, so no decision moves
-because of the split. A refusal stays whole on the level line.
+club" (squad and wealth) and "Reputation", apportioned by each part's share of
+the stature gap (a free agent's own stature is split in the weights'
+proportion). Display only: `appealScore`/`appealMultiplier` read the unsplit
+value. A refusal stays whole on the level line.
 
-**Behaviour change to know about:** hype started every club at `HYPE_INITIAL`,
-so stature's second half was flat in a new world; the reputation seed is not,
-so from season 1 big-league clubs read bigger to players than before. Needs its
-own audit (not yet run); expected to slow a newly promoted rich club's rise.
+**Measured (20 seasons, seeds 1-2, against Stage 1 at the same seeds):**
+Brazil 66.1 / 66.3 (Stage 1 67.9 / 67.6, main ~63), big four 71.6 / 71.1
+(69.0 / 68.6), France 66.3 / 68.7. France→Brazil +0.16 / +2.38 (Stage 1
+−0.09 / −0.62); BIG4→France +5.38 / +2.47; BIG4→Serbia 13.3 / 13.2 (main ~10):
+good players everywhere now move up to the best clubs, so the ladder widens.
+0 of 882 clubs in deficit at any sample on either seed. Nationality: worst gap
+8.5 / 9.6, mean absolute 3.6 / 3.8 (Stage 1 about the same); the big-four
+leagues run a few points more foreign, as their clubs import more talent.
+Seeds 3-4 running.
 
 ## Stage 3 (planned)
 
