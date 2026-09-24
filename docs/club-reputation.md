@@ -236,6 +236,28 @@ the big four's 67.8 / 68.2, where `main` has Brazil at 63.1 / 63.5. Argentina
   different level removes Brazil's excess and destroys nationality realism with
   it, because the pull toward home is what keeps every league domestic. Leaving
   home free on a step up alone does nothing.
+- **Four-seed audit at the shipped settings, pooled by hand** (seeds 1-2 from
+  the confederation-off runs, 3-4 on the final tree), against `origin/main`:
+  solvency **4/4 seeds, 0 of 882 clubs in deficit at any of 42 samples** (main:
+  small Serbian dips on seeds 1-2). Rung means, branch / main: BIG4→France
+  +1.80 / +3.66, **France→Brazil −1.27 / +2.51 (fails the ±1 mean gate)**,
+  Brazil→Netherlands +4.63 / −0.19, Netherlands→Argentina −0.82 / +1.54,
+  Argentina→Portugal +3.09 / −0.07, Portugal→Belgium +0.50 / +1.96,
+  Belgium→Mexico +1.43 / −0.96, Mexico→Turkey +0.65 / +1.24, Turkey→US −0.02 /
+  +0.90, US→Greece −0.50 / −0.29, Greece→Scotland −0.43 / +0.17,
+  Scotland→Serbia +0.10 / −0.37. Brazil at season 21 by seed: 67.9, 67.6, 69.3,
+  67.9 against the big four's 69.0, 68.6, 68.8, 68.5.
+- **Why good Brazilians stay: a club's stature does not know how good it is.**
+  `scripts/statureGapProbe.ts` at generation: Brazil's best club 0.620 against a
+  median big-four club 0.512-0.530, so to a player a move from Brazil's best
+  club to a mid-table Premier League side reads as a step DOWN. Stature is squad
+  strength plus hype, and hype is ranked within a club's own league, so the top
+  of any league looks equally famous. Deferred to Stage 2 as a stature fix,
+  with a design rule from the user: players are pulled to good clubs, never by
+  continent; good clubs happen to be in Europe. So stature should read what
+  makes a club good (squad, earned reputation on one world scale, its own
+  wealth), plus a real pull up for good players, not only stars. PR #401 merges
+  with the France→Brazil rung open for that.
 - Nationality with the confederation line off, both seeds: mean absolute gap
   3.5 / 4.4, worst 7.0 / 8.5, mean signed gap about −2 (slightly too foreign).
   Raising APPEAL_HOME would re-centre it but is the same pull that holds Brazil
