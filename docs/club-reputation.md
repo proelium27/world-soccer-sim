@@ -192,7 +192,17 @@ good players everywhere now move up to the best clubs, so the ladder widens.
 0 of 882 clubs in deficit at any sample on either seed. Nationality: worst gap
 8.5 / 9.6, mean absolute 3.6 / 3.8 (Stage 1 about the same); the big-four
 leagues run a few points more foreign, as their clubs import more talent.
-Seeds 3-4 running.
+
+**Four seeds pooled by hand** (Stage 2 / Stage 1 / main): every rung within the
+±1 mean gate. BIG4→France +3.49 / +1.80 / +3.66, **France→Brazil +0.84** /
+−1.27 / +2.51, Brazil→Netherlands +2.60 / +4.63 / −0.19, Netherlands→Argentina
+−0.34 / −0.82 / +1.54, Argentina→Portugal +3.08 / +3.09 / −0.07,
+Portugal→Belgium +1.54, Belgium→Mexico +1.30, Mexico→Turkey +1.37, Turkey→US
+−0.53, US→Greece +0.13, Greece→Scotland −0.49, Scotland→Serbia −0.02.
+BIG4→Serbia 12.95 (main ~10): the ladder widens as good players move up to the
+best clubs, the big four ending ~71 against main's ~69.5. Brazil averages 66.7
+against France's 67.5. Solvency 4/4 seeds, 0 of 882 clubs in deficit at any of
+42 samples.
 
 ## Stage 3 (planned)
 
