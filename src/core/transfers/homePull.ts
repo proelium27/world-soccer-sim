@@ -13,12 +13,12 @@
  */
 import type { Player } from "../players/types.js";
 import type { Competition } from "../competitions.js";
-import { competitionNationalities } from "../competitions.js";
+import { competitionNationalities, competitionStrengthOffset } from "../competitions.js";
 import { LEAGUE_NATIONALITY_WEIGHTS } from "../players/nationalities.js";
 import { confederationOf, type Confederation } from "../international/confederations.js";
 import { statureSensitivity } from "./playerWill.js";
 import { squadStrength } from "../ai/clubContext.js";
-import { APPEAL_HOME_FADE_RANGE } from "../constants.js";
+import { APPEAL_HOME_FADE_RANGE, APPEAL_HOME_LEVEL_PER_OFFSET } from "../constants.js";
 
 export interface HomeClub {
   country: string;
@@ -27,10 +27,12 @@ export interface HomeClub {
   /** The confederation the club's country plays in; null if the game has none for it. */
   confederation: Confederation | null;
   /**
-   * What the country's best top-flight clubs field: the mean squad strength
-   * (`squadStrength`, the top-16 average) of the top quarter of its top flight.
-   * A player above it has outgrown his home league. Optional so a hand-built
-   * club need not carry it; absent means no one has outgrown it.
+   * The stage the country offers, in current rating units: what the strongest
+   * countries' best clubs field today (the mean `squadStrength` of the top
+   * quarter of their top flights), less APPEAL_HOME_LEVEL_PER_OFFSET per point of
+   * this country's strength offset. A player above it has outgrown his home
+   * league. Optional so a hand-built club need not carry it; absent means no one
+   * has outgrown it.
    */
   homeLevel?: number;
 }
@@ -74,9 +76,10 @@ export function domesticShare(comp: Competition): number {
 }
 
 /**
- * Every club's `HomeClub`, built once per pass. A country's level is computed
- * from its top flight's current squads, so it follows the league as it rises or
- * falls over a dynasty rather than being fixed at generation.
+ * Every club's `HomeClub`, built once per pass. A country's level follows the
+ * world's ratings as they drift over a dynasty but not its own squads: it is
+ * pinned to its place on the ladder (APPEAL_HOME_LEVEL_PER_OFFSET), since a
+ * level read off its own squads rose whenever it kept its players.
  */
 export function homeClubs(
   teams: readonly { tid: number; compId: number; roster: readonly number[] }[],
@@ -95,10 +98,24 @@ export function homeClubs(
     list.push(squadStrength(roster));
     topFlightStrengths.set(country, list);
   }
-  const levelOf = new Map<string, number>();
+  // A country's own level today, then its stage: the strongest countries'
+  // level minus its place on the ladder. The own level is only read for the
+  // strongest countries, so a league that keeps its players cannot raise its
+  // own stage (see APPEAL_HOME_LEVEL_PER_OFFSET).
+  const ownLevel = new Map<string, number>();
   for (const [country, list] of topFlightStrengths) {
     const top = [...list].sort((a, b) => b - a).slice(0, Math.max(1, Math.round(list.length / 4)));
-    levelOf.set(country, top.reduce((a, b) => a + b, 0) / top.length);
+    ownLevel.set(country, top.reduce((a, b) => a + b, 0) / top.length);
+  }
+  const offsetOf = new Map<string, number>();
+  for (const c of competitions) if (c.tier === 1) offsetOf.set(c.country, competitionStrengthOffset(c));
+  const measured = [...ownLevel.keys()].filter((c) => offsetOf.has(c));
+  const minOffset = Math.min(...measured.map((c) => offsetOf.get(c)!));
+  const reference = measured.filter((c) => offsetOf.get(c) === minOffset);
+  const referenceLevel = reference.reduce((a, c) => a + ownLevel.get(c)!, 0) / Math.max(1, reference.length);
+  const levelOf = new Map<string, number>();
+  for (const country of measured) {
+    levelOf.set(country, referenceLevel - APPEAL_HOME_LEVEL_PER_OFFSET * (offsetOf.get(country)! - minOffset));
   }
 
   const byComp = new Map<number, HomeClub>();

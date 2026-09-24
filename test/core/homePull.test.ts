@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { homeAttachment, domesticShare, type HomeClub } from "../../src/core/transfers/homePull.js";
-import { worldCompetitions } from "../../src/core/competitions.js";
+import { homeAttachment, domesticShare, homeClubs, type HomeClub } from "../../src/core/transfers/homePull.js";
+import { worldCompetitions, competitionStrengthOffset } from "../../src/core/competitions.js";
 import { statureSensitivity } from "../../src/core/transfers/playerWill.js";
-import { APPEAL_HOME_FADE_RANGE } from "../../src/core/constants.js";
+import { APPEAL_HOME_FADE_RANGE, APPEAL_HOME_LEVEL_PER_OFFSET } from "../../src/core/constants.js";
 import type { Player } from "../../src/core/players/types.js";
 
 const player = (nationality: string, ovr: number) => ({ nationality, ovr }) as Player;
@@ -44,5 +44,36 @@ describe("domesticShare", () => {
   it("is 0 for a league whose country is not a nationality", () => {
     const [base] = worldCompetitions();
     expect(domesticShare({ ...base, country: "Neverland", nationalities: undefined })).toBe(0);
+  });
+});
+
+describe("homeClubs", () => {
+  // One top-flight club each for England (the top of the ladder) and Brazil,
+  // each fielding a squad of identical players.
+  const comps = worldCompetitions().filter((c) => c.tier === 1 && (c.country === "England" || c.country === "Brazil"));
+  const england = comps.find((c) => c.country === "England")!;
+  const brazil = comps.find((c) => c.country === "Brazil")!;
+  const squad = (from: number, ovr: number) =>
+    Array.from({ length: 20 }, (_, i) => ({ pid: from + i, ovr }) as Player);
+  const levels = (brazilOvr: number) => {
+    const players = [...squad(0, 80), ...squad(100, brazilOvr)];
+    const teams = [
+      { tid: 0, compId: england.id, roster: players.slice(0, 20).map((p) => p.pid) },
+      { tid: 1, compId: brazil.id, roster: players.slice(20).map((p) => p.pid) },
+    ];
+    const homes = homeClubs(teams, comps, players);
+    return { england: homes.get(0)!.homeLevel!, brazil: homes.get(1)!.homeLevel! };
+  };
+
+  it("sets a country's stage by its place on the ladder, not by its own squads", () => {
+    const weak = levels(60);
+    const strong = levels(79);
+    // Brazil keeping better players does not raise its own stage: that loop is
+    // what let it finish above the big four.
+    expect(strong.brazil).toBe(weak.brazil);
+    const gap = competitionStrengthOffset(brazil) - competitionStrengthOffset(england);
+    expect(gap).toBeGreaterThan(0);
+    expect(weak.brazil).toBeCloseTo(80 - APPEAL_HOME_LEVEL_PER_OFFSET * gap, 6);
+    expect(weak.england).toBe(80);
   });
 });

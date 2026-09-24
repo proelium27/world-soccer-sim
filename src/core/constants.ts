@@ -2896,6 +2896,18 @@ export const APPEAL_HOME = 0.25;
  */
 export const APPEAL_HOME_FADE_RANGE = 5;
 
+/**
+ * Rating points of home level per point of a league's strength offset
+ * (`homeClubs`). A country's stage is set by its place on the ladder, not by
+ * its current squads: the strongest countries' level today, minus this per
+ * offset point. 0.94 is the measured ovr a league's starters lose per offset
+ * point at generation. Tied to the ladder rather than to the league's own
+ * squads because the self-referential version fed itself: a league that kept
+ * its players raised its own level, so fewer counted as outgrown and more
+ * stayed, until Brazil finished above the big four (20 seasons, seeds 1-2).
+ */
+export const APPEAL_HOME_LEVEL_PER_OFFSET = 0.94;
+
 /** A club outside his confederation, at full strength (stars feel none of it). */
 export const APPEAL_CONFEDERATION = 0.15;
 
