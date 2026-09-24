@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { makeLeague } from "../helpers/league.js";
-import { ACADEMY_ROSTER_CAP, PROSPECT_AGE_MAX } from "../../src/core/constants.js";
+import { ACADEMY_GRADUATION_AGE, ACADEMY_ROSTER_CAP } from "../../src/core/constants.js";
 import { freeAgentPids } from "../../src/core/freeAgency.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
 
@@ -37,7 +37,7 @@ function youngPool(): LeagueStore {
   const donor = league.teams.find((t) => t.tid !== league.meta.userTid)!;
   const young = donor.roster
     .map((pid) => league.players.find((p) => p.pid === pid)!)
-    .filter((p) => league.season - p.born <= PROSPECT_AGE_MAX)
+    .filter((p) => league.season - p.born < ACADEMY_GRADUATION_AGE)
     .slice(0, 3)
     .map((p) => p.pid);
   const keep = new Set(young);
@@ -55,7 +55,7 @@ describe("Free Agents academy signing", () => {
   it("offers an Academy button to players young enough", () => {
     const html = render(youngPool());
     expect(html).toContain("Academy ·");
-    expect(html).toContain(`Academy age (${PROSPECT_AGE_MAX} and under)`);
+    expect(html).toContain(`Academy age (under ${ACADEMY_GRADUATION_AGE})`);
   });
 
   it("says so when the academy is full", () => {

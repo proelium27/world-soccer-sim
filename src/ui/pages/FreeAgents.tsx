@@ -13,7 +13,7 @@ import { WatchToggle } from "../components/WatchToggle.js";
 import { PotDisplay } from "../components/PotDisplay.js";
 import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
-import { ACADEMY_ROSTER_CAP, PROSPECT_AGE_MAX, ROSTER_CAP } from "../../core/constants.js";
+import { ACADEMY_GRADUATION_AGE, ACADEMY_ROSTER_CAP, ROSTER_CAP } from "../../core/constants.js";
 import { clubStatures } from "../../core/ai/clubContext.js";
 import { refusesFreeAgentSigningWith } from "../../core/transfers/playerWill.js";
 import { userView } from "../../core/transfers/userView.js";
@@ -93,8 +93,9 @@ export function FreeAgents() {
   const userTeam = league.teams.find((t) => t.tid === league.meta.userTid);
   const atCap = (userTeam?.roster.length ?? 0) >= ROSTER_CAP;
   const academyFull = (userTeam?.academyRoster.length ?? 0) >= ACADEMY_ROSTER_CAP;
-  // The same age bar signToAcademy enforces; the button is only offered below it.
-  const academyEligible = (p: Player) => league.season - p.born <= PROSPECT_AGE_MAX;
+  // The same age bar signToAcademy enforces: under the academy's pro cut at
+  // 18, so a signing lands inside the 16/18 checkpoints like his own intake.
+  const academyEligible = (p: Player) => league.season - p.born < ACADEMY_GRADUATION_AGE;
   // Wages are paid up front each season, so a mid-season signing charges the
   // contract's full season salary at signing; offseason signings are covered
   // by the next season-start charge.
@@ -172,7 +173,7 @@ export function FreeAgents() {
           rating. Released veterans and youngsters nobody kept both end up here. Your own academy's
           kids are on the Academy page. A free transfer still has to appeal to the player:
           someone who was a regular at a much bigger club won't drop to you just because there's no
-          fee, so build the club up and he'll take the call. Anyone {PROSPECT_AGE_MAX} or younger can
+          fee, so build the club up and he'll take the call. Anyone under {ACADEMY_GRADUATION_AGE} can
           also go straight into your academy on its flat stipend instead of a senior wage.
         </HelpHint>
       </h4>
@@ -202,7 +203,7 @@ export function FreeAgents() {
           onChange={(e) => setAgeFilter(e.target.value as "ALL" | "academy")}
         >
           <option value="ALL">All ages</option>
-          <option value="academy">Academy age ({PROSPECT_AGE_MAX} and under)</option>
+          <option value="academy">Academy age (under {ACADEMY_GRADUATION_AGE})</option>
         </select>
       </div>
       {availablePlayers.length === 0 ? (
@@ -210,7 +211,7 @@ export function FreeAgents() {
       ) : filtered.length === 0 ? (
         <p>
           No available players
-          {ageFilter === "academy" ? ` aged ${PROSPECT_AGE_MAX} or under` : ""}
+          {ageFilter === "academy" ? ` under ${ACADEMY_GRADUATION_AGE}` : ""}
           {posFilter === "ALL" ? "" : ` at ${posFilter}`}.
         </p>
       ) : (
