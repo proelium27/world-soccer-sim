@@ -7,13 +7,13 @@ import type { Competition } from "../competitions.js";
 import { homeClubs, type HomeClub } from "../transfers/homePull.js";
 import { computeStandings } from "../standings.js";
 import { teamReputation } from "../teams/reputation.js";
-import { financeScale, budgetCap } from "../finance/budget.js";
+import { financeScale } from "../finance/budget.js";
 import {
   AI_SQUAD_STRENGTH_COUNT,
   AI_AMBITION_W_STRENGTH, AI_AMBITION_W_WEALTH, AI_AMBITION_W_FAME, AI_AMBITION_W_FORM,
   AI_AMBITION_HIGH, AI_AMBITION_LOW, AI_YOUNG_SQUAD_AGE,
   STATURE_STRENGTH_LO, STATURE_STRENGTH_HI, STATURE_W_STRENGTH, STATURE_W_REPUTATION, STATURE_W_WEALTH,
-  REPUTATION_MAX, MAX_BUDGET,
+  REPUTATION_MAX,
 } from "../constants.js";
 
 /**
@@ -194,13 +194,17 @@ export interface StatureParts {
  * competition isn't in `competitions` reads 0, which only a hand-built fixture
  * with no competitions reaches (every club then reads the same).
  */
-export function clubWealth(competitions: readonly Competition[], compId: number, hype: number): number {
+export function clubWealth(competitions: readonly Competition[], compId: number, reputation: number): number {
   if (!competitions.some((c) => c.id === compId)) return 0;
-  // The club's own money ceiling (budgetCap: its league's money scale times its
-  // fame), against the biggest there can be. Club-level, so a famous club reads
-  // richer than a newly promoted one in the same division, and a big fanbase
-  // (hype) still counts toward how big a club looks.
-  return clamp01(budgetCap(financeScale([...competitions], compId), hype) / MAX_BUDGET);
+  // Its league's money scale, times how big a name it is on the WORLD scale
+  // (reputation, 0-100), between half and all of it. Club-level, so a famous
+  // club reads richer than an unknown one in the same division, and never
+  // ranked within its own league: players shop clubs across the whole world.
+  // Hype is deliberately not used: it is ranked within a club's own division
+  // (points and finish there), so the top of every league would read equally
+  // rich, which is the bug stature had before reputation.
+  const name = clamp01(reputation / REPUTATION_MAX);
+  return clamp01(financeScale([...competitions], compId) * (0.5 + 0.5 * name));
 }
 
 /** The weighted, normalized parts of a club's stature. */
@@ -263,7 +267,7 @@ export function clubStatures(
     const roster = t.roster
       .map((pid) => byPid.get(pid))
       .filter((p): p is Player => p != null);
-    out.set(t.tid, clubStature(roster, teamReputation(t), clubWealth(competitions, t.compId, t.hype)));
+    out.set(t.tid, clubStature(roster, teamReputation(t), clubWealth(competitions, t.compId, teamReputation(t))));
   }
   return out;
 }
@@ -400,8 +404,8 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
         posSecondBestOvr: r.secondBest,
         posWeakestStarterOvr: r.weakestStarter,
         hype: r.hype,
-        stature: statureOf(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId, r.hype)),
-        statureParts: statureParts(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId, r.hype)),
+        stature: statureOf(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId, r.reputation)),
+        statureParts: statureParts(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId, r.reputation)),
         home: homes.get(r.tid),
         ambition,
         frugality,

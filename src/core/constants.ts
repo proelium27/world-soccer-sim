@@ -2839,10 +2839,12 @@ export const STATURE_W_STRENGTH = 0.45;
 /** Weight on club reputation (core/teams/reputation.ts): the name, not this season's hype. */
 export const STATURE_W_REPUTATION = 0.2;
 /**
- * Weight on the club's own wealth (`clubWealth`): its money ceiling, which is
- * its league's money scale times its own fame (`budgetCap`), against the
- * biggest there can be. Club-level, so a famous club reads richer than a newly
- * promoted one in the same division. The stand-in for the wages it can pay
+ * Weight on the club's own wealth (`clubWealth`): its league's money scale
+ * times how big a name it is on the world scale (reputation), between half and
+ * all of it. Club-level, so a famous club reads richer than an unknown one in
+ * the same division, and never ranked within its own league (a first version
+ * used hype, which is ranked within the club's division, and made the top of
+ * every league look equally rich again). The stand-in for the wages it can pay
  * until wages are modelled.
  */
 export const STATURE_W_WEALTH = 0.35;
