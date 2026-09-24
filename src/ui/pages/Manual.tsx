@@ -2839,16 +2839,12 @@ export function Manual() {
               smaller league wants a bigger stage.
             </li>
             <li>
-              <strong>Far from home.</strong> A club outside his own part of the world counts a little
-              against it.
-            </li>
-            <li>
               <strong>Former club.</strong> He&apos;s a bit warmer on a club he&apos;s played for, and
               he&apos;ll never refuse to go back to one.
             </li>
           </ul>
           <p>
-            On a loan the home and far-from-home reasons count for half, since it&apos;s only a season.
+            On a loan the home reason counts for half, since it&apos;s only a season.
           </p>
           <p>
             <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent

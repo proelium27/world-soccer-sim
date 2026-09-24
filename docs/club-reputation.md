@@ -194,7 +194,46 @@ seed per run):** ladder OK on seeds 1-3. Solvency: seed 1 −£0.1M (Serbia s18)
 seed 2 −£0.5M (Serbia s21), seed 3 solvent. Single-seed "BROKEN" flags land on
 a different converged rung each seed (seed 1 Belgium→Mexico −1.08 and
 US→Greece −1.30, seed 2 Scotland→Serbia −1.29, seed 3 Belgium→Mexico −1.97) and
-are pooled by hand before being read.
+are pooled by hand before being read. Seed 4: solvent, ladder OK.
+
+**The ladder: Brazil and Argentina stopped exporting.** The first branch audits
+(APPEAL_HOME 0.25, confederation 0.15) were solvent on every seed with zero
+deficits, but Brazil held its generated level for 20 seasons while every other
+league slipped: season-21 strength (seed 1 / seed 2) Brazil 69.5 / 70.6 against
+the big four's 67.8 / 68.2, where `main` has Brazil at 63.1 / 63.5. Argentina
++3.7 on `main`, the United States −1.5. Each part was then switched off in turn
+(20 seasons, seed 1, Brazil at season 21):
+
+| Variant | Brazil | France | Big four | Worst nationality gap |
+|---|---|---|---|---|
+| `main` | 63.1 | 66.2 | 69.5 | the original drift |
+| Home level read off own squads | 69.5 | 64.3 | 67.8 | 9.1 |
+| Home level pinned to the ladder | 69.9 | 65.8 | 68.7 | 8.6 |
+| + confederation line off | **67.9** (s2 67.6) | 67.8 | 69.0 | **7.0** |
+| + leaving home free on a step up | 68.4 | 67.3 | 69.2 | 8.8 |
+| + registration rules off | 66.0 | 66.1 | 69.3 | not run |
+| home line off (rules on) | 65.1 | 65.1 | 68.2 | not run; Serbia 55.6, US 62.6 |
+| home line faded both ways over 0.15 / 0.35 | 64.8 / 65.9 | 65.1 / 66.4 | 68.1 / 67.7 | 23.9 / 21.7 |
+
+- The self-referential home level was a real loop but not the cause: pinning a
+  country's stage to its ladder place (APPEAL_HOME_LEVEL_PER_OFFSET) kept, as
+  the cleaner rule, moved nothing.
+- The **confederation line** was the wrong shape: it taxed a South American
+  twice going to Europe and held France, Portugal and Belgium (whose real
+  foreign blocks are mostly non-European) too domestic. Off, both measures
+  improve. It stays in the code at 0 for a language-corridor version.
+- The rest splits between the **registration rules** (~2.4: every Brazilian and
+  Argentine counts as non-EU, so Spain's, France's and Greece's caps stop
+  European clubs buying them; in reality many hold Italian or Spanish passports)
+  and the **home line** (~3). Fading the home line on moves between clubs of
+  different level removes Brazil's excess and destroys nationality realism with
+  it, because the pull toward home is what keeps every league domestic. Leaving
+  home free on a step up alone does nothing.
+- Shipped: confederation off. Brazil ends level with France and about a point
+  below the big four (Opta's real league rankings put the Brasileirao around
+  Ligue 1). Open: second passports as a real rule (the Spanish two-year route
+  for Ibero-Americans, Italian oriundi), which would take roughly two points
+  more off Brazil and Argentina.
 
 ## Foreign-player registration rules (Stage 1, step 3)
 

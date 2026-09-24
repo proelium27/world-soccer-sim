@@ -2908,8 +2908,17 @@ export const APPEAL_HOME_FADE_RANGE = 5;
  */
 export const APPEAL_HOME_LEVEL_PER_OFFSET = 0.94;
 
-/** A club outside his confederation, at full strength (stars feel none of it). */
-export const APPEAL_CONFEDERATION = 0.15;
+/**
+ * A club outside his confederation, at full strength (stars feel none of it).
+ * OFF (0) after measurement, the line kept for a language/corridor version
+ * (docs/club-reputation.md). At 0.15 it was the wrong shape for the leagues
+ * whose real foreign blocks come from other continents: France, Portugal and
+ * Belgium ran 6-11 points too domestic, and a South American moving to Europe
+ * paid it on top of the home line, so Brazil stopped exporting and finished
+ * above the big four (20 seasons, seeds 1-2). Off: worst nationality gap 8.6 ->
+ * 7.0, Brazil 69.9 -> 67.9 / 67.6, level with France.
+ */
+export const APPEAL_CONFEDERATION = 0;
 
 /** Playing time, per rating point above (or below) the weakest starter at his position. */
 export const APPEAL_PLAYING_TIME = 0.02;
