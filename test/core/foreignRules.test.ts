@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   registrationBlock, helpsShortMinimum, breaksMinimum, isHomegrown, isNonEu, isAcp,
-  competitionForeignRules, worldRules, LEAGUE_FOREIGN_RULES, type ForeignRule, type RuleContext,
+  competitionForeignRules, worldRules, LEAGUE_FOREIGN_RULES, leagueRegistrationBlock, type ForeignRule, type RuleContext,
 } from "../../src/core/foreignRules.js";
 import { worldCompetitions } from "../../src/core/competitions.js";
 import { signFreeAgent, signToAcademy, trimRosterSurplus } from "../../src/core/freeAgency.js";
@@ -148,9 +148,12 @@ describe("on a real world", () => {
     const players = [...league.players, ...extra, target];
     const out = signFreeAgent(teams, players, argClub.tid, target.pid, league.season, "offseason", [], undefined, league.competitions);
     expect(out.teams).toBe(teams);
+    // A home player takes no foreign slot. Checked against the rules directly:
+    // whether he'd sign also depends on his view of the club (playerChoice.ts),
+    // which is not what this case is about.
     const home = player("Argentina", { born: 0, pos: "CM", contract: { salary: 0, expiresSeason: 0 } } as Partial<Player>);
-    const ok = signFreeAgent(teams, [...players, home], argClub.tid, home.pid, league.season, "offseason", [], undefined, league.competitions);
-    expect(ok.teams.find((t) => t.tid === argClub.tid)!.roster).toContain(home.pid);
+    expect(leagueRegistrationBlock({ teams, competitions: league.competitions, players: [...players, home], season: league.season }, argClub.tid, home)).toBeNull();
+    expect(leagueRegistrationBlock({ teams, competitions: league.competitions, players, season: league.season }, argClub.tid, target)).not.toBeNull();
   });
 
   it("the academy is no way round a cap", () => {

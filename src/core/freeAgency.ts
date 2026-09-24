@@ -19,6 +19,7 @@ import { clubStatures, deriveLeagueContexts } from "./ai/clubContext.js";
 import { matchFreeAgents, type MatchSlot } from "./freeAgencyMatch.js";
 import { appealScore } from "./transfers/clubAppeal.js";
 import { worldRules, leagueRegistrationBlock } from "./foreignRules.js";
+import { playerChoice } from "./transfers/playerChoice.js";
 import type { Competition } from "./competitions.js";
 
 /**
@@ -206,7 +207,17 @@ export function runAIFreeAgency(
   // weakest man its shape fields at each position (the playing-time line). A
   // club's stature is its top-16 mean blended with hype, which one arrival
   // barely moves, so recomputing per signing would buy nothing.
-  const contexts = deriveLeagueContexts({ teams, players, season, played: [], competitions: [...competitions] });
+  let contexts = deriveLeagueContexts({ teams, players, season, played: [], competitions: [...competitions] });
+  // Rebuilt between passes: a club that filled a hole in one pass must not
+  // still read as having nobody there in the next, or free agents see a
+  // guaranteed start (the playing-time line) at a club that just signed for it.
+  const refreshContexts = (): void => {
+    contexts = deriveLeagueContexts({
+      teams: [...teamMap.values()], players: [...playerMap.values()], season, played: [],
+      competitions: [...competitions],
+    });
+    liked.clear();
+  };
   // Stature from the squads directly (the same figure a context carries), so a
   // caller that passes no competitions still gets real statures.
   const statures = clubStatures(teams, players, competitions);
@@ -300,6 +311,7 @@ export function runAIFreeAgency(
       }
     }
     runPass(slots, 7);
+    refreshContexts();
   }
 
   // Pass 2: depth upgrades. A club at target depth at a position offers for one
@@ -330,6 +342,7 @@ export function runAIFreeAgency(
       }
     }
     runPass(slots, 5);
+    refreshContexts();
   }
 
   // Pass 3: prospects. The passes above rank on current ovr, so without this no
@@ -534,8 +547,15 @@ export function signFreeAgent(
   phase: "regular" | "offseason",
   activeLoans: ActiveLoan[] = [],
   spend?: SpendPolicy,
-  /** The world's competitions, for the club's registration rules. Empty = no rules checked. */
+  /**
+   * The world's competitions, for the club's registration rules and for club
+   * wealth in the refusal check. Empty = no rules checked and every club reads
+   * wealth 0; only fixtures do that, since every game caller passes the real
+   * list (defaulted rather than required because it follows optional params).
+   */
   competitions: readonly Competition[] = [],
+  /** The save's development model, for the prospect bar in playerChoice. */
+  model: ProgressionModel = "random",
 ): { teams: StoredTeam[]; players: Player[] } {
   if (!freeAgentPids(teams, players, activeLoans).has(pid)) {
     return { teams, players };
@@ -558,6 +578,13 @@ export function signFreeAgent(
   if (refusesFreeAgentSigning(player, team, teams, players, competitions)) return { teams, players };
   // The club's league registration rules bind the user like any club.
   if (leagueRegistrationBlock({ teams, competitions, players, season }, tid, player) !== null) {
+    return { teams, players };
+  }
+  // He chooses, as he does between AI clubs: an AI club he'd rather join takes
+  // him instead (playerChoice.ts). Only with the real competitions, which every
+  // game caller passes.
+  if (competitions.length > 0
+    && playerChoice({ teams, players, competitions, season, model }, tid).freeAgentRival(player)) {
     return { teams, players };
   }
   const wageCharge = phase === "regular" ? contractTerms(player, season).salary : 0;
@@ -612,6 +639,8 @@ export function signToAcademy(
    * signing). The club's own youth intake is still exempt. Empty = no rules.
    */
   competitions: readonly Competition[] = [],
+  /** The save's development model, for the prospect bar in playerChoice. */
+  model: ProgressionModel = "random",
 ): { teams: StoredTeam[]; players: Player[] } {
   if (!freeAgentPids(teams, players, activeLoans).has(pid)) {
     return { teams, players };
@@ -632,6 +661,12 @@ export function signToAcademy(
   // academy is a cheaper door to the identical exploit — a 21-year-old free
   // agent of any rating parked on a flat stipend instead of an ovr-cubic wage.
   if (refusesFreeAgentSigning(player, team, teams, players, competitions)) return { teams, players };
+  // He chooses here too: an AI club that wants him as a prospect and that he'd
+  // rather join takes him instead (playerChoice.ts).
+  if (competitions.length > 0
+    && playerChoice({ teams, players, competitions, season, model }, tid).freeAgentRival(player)) {
+    return { teams, players };
+  }
   const wageCharge = phase === "regular" ? academyContractTerms(season).salary : 0;
   // Payable out of the overdraft, and deliberately NOT gated on the embargo:
   // a club barred from the transfer market can still run its own academy, which

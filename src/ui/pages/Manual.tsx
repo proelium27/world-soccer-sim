@@ -2817,9 +2817,9 @@ export function Manual() {
             Transfers tables, the Watchlist and the loan search, each player carries a label for how he
             feels about joining you: <strong>Keen</strong>, <strong>Open</strong>,{" "}
             <strong>Reluctant</strong> or <strong>Won&apos;t talk</strong>. Hover it for his reasons.
-            It&apos;s the same view every club gets. When AI clubs compete for a player, it decides
-            where he goes. On your own offers only <strong>Won&apos;t talk</strong> stops a deal. The
-            rest tells you how he feels about you, which matters when others want him too.
+            It&apos;s the same view every club gets, and it decides where he goes, yours included. A
+            player who won&apos;t talk to you or is <strong>Reluctant</strong> turns your transfer bid
+            down.
           </p>
           <ul>
             <li>
@@ -2862,8 +2862,10 @@ export function Manual() {
           </p>
           <p>
             <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent
-            takes the one he likes best, rather than the worst club in the world getting first pick. When
-            you sign a free agent yourself he&apos;ll take your offer unless he won&apos;t talk to you.
+            takes the one he likes best, rather than the worst club in the world getting first pick. That
+            goes for you too: a free agent signs for you only if your club suits him at least as well as
+            the best AI club that wants him. If one suits him better, the Free Agents page says which club
+            he&apos;d rather join.
           </p>
           <p>
             <strong>League registration rules.</strong> Leagues have real rules on who a club can

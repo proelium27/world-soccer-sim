@@ -11,6 +11,7 @@ import { keepsDepthFloor } from "../freeAgency.js";
 import { wouldRefuseExtension } from "../ai/breakoutRefusal.js";
 import { isProtectedStar, lastCompletedSeason, userProtectedStarBar } from "./protectedStars.js";
 import { refusesMoveToClub } from "./playerWill.js";
+import { playerChoice } from "./playerChoice.js";
 import { leagueRegistrationBlock } from "../foreignRules.js";
 import type { ProposedClause } from "./clauses.js";
 import {
@@ -471,6 +472,12 @@ export function makeTransferOffer(
   // player won't drop to a much smaller club, whoever is managing it (see
   // playerWill.ts). The user is gated here exactly like an AI buyer.
   if (refusesMoveToClub(player, seller, user, league.players, league.competitions)) return league;
+  // A player who'd rather not come (Reluctant, playerChoice.ts) turns the bid
+  // down, as he'd turn down an AI club he doesn't fancy.
+  if (playerChoice({
+    teams: league.teams, players: league.players, competitions: league.competitions,
+    season: league.season, played: league.played,
+  }, user.tid).reluctant(player, seller.tid)) return league;
   // The user's league registration rules bind him like any club (foreignRules.ts).
   if (leagueRegistrationBlock(league, user.tid, player) !== null) return league;
   if (departsAtRollover(league, player)) return league;
@@ -577,6 +584,12 @@ export function acceptCounterOffer(
   // player won't drop to a much smaller club, whoever is managing it (see
   // playerWill.ts). The user is gated here exactly like an AI buyer.
   if (refusesMoveToClub(player, seller, user, league.players, league.competitions)) return league;
+  // A player who'd rather not come (Reluctant, playerChoice.ts) turns the bid
+  // down, as he'd turn down an AI club he doesn't fancy.
+  if (playerChoice({
+    teams: league.teams, players: league.players, competitions: league.competitions,
+    season: league.season, played: league.played,
+  }, user.tid).reluctant(player, seller.tid)) return league;
   // The user's league registration rules bind him like any club (foreignRules.ts).
   if (leagueRegistrationBlock(league, user.tid, player) !== null) return league;
   if (departsAtRollover(league, player)) return league;

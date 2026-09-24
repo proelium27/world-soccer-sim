@@ -117,8 +117,8 @@ export function refusesMoveToClub(
     t.roster.map((pid) => byPid.get(pid)).filter((p): p is Player => p != null);
   return refusesMove(
     player.ovr,
-    clubStature(rosterOf(seller), teamReputation(seller), clubWealth(competitions, seller.compId)),
-    clubStature(rosterOf(buyer), teamReputation(buyer), clubWealth(competitions, buyer.compId)),
+    clubStature(rosterOf(seller), teamReputation(seller), clubWealth(competitions, seller.compId, seller.hype)),
+    clubStature(rosterOf(buyer), teamReputation(buyer), clubWealth(competitions, buyer.compId, buyer.hype)),
   );
 }
 

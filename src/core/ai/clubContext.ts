@@ -7,13 +7,13 @@ import type { Competition } from "../competitions.js";
 import { homeClubs, type HomeClub } from "../transfers/homePull.js";
 import { computeStandings } from "../standings.js";
 import { teamReputation } from "../teams/reputation.js";
-import { financeScale } from "../finance/budget.js";
+import { financeScale, budgetCap } from "../finance/budget.js";
 import {
   AI_SQUAD_STRENGTH_COUNT,
   AI_AMBITION_W_STRENGTH, AI_AMBITION_W_WEALTH, AI_AMBITION_W_FAME, AI_AMBITION_W_FORM,
   AI_AMBITION_HIGH, AI_AMBITION_LOW, AI_YOUNG_SQUAD_AGE,
   STATURE_STRENGTH_LO, STATURE_STRENGTH_HI, STATURE_W_STRENGTH, STATURE_W_REPUTATION, STATURE_W_WEALTH,
-  REPUTATION_MAX,
+  REPUTATION_MAX, MAX_BUDGET,
 } from "../constants.js";
 
 /**
@@ -77,8 +77,9 @@ export interface ClubContext {
   /** Fame/popularity, 0-100, straight off the club. */
   hype: number;
   /**
-   * How big this club is in *world* terms, [0,1] — squad quality blended with
-   * fame, measured against absolute bands rather than league-relative ones.
+   * How big this club is in *world* terms, [0,1]: how good a club it is, read
+   * from its squad, its reputation and its own wealth (`statureOf`), measured
+   * against absolute bands rather than league-relative ones.
    *
    * Deliberately NOT normalized within a competition, unlike ambition and
    * frugality. Those answer "how does this club compare to its rivals", which
@@ -90,9 +91,9 @@ export interface ClubContext {
    */
   stature: number;
   /**
-   * The two weighted, normalized halves of `stature` (they sum to it): the
-   * squad's strength and the club's reputation. Lets a screen say how much of
-   * a step up or down is the squad and how much is the name.
+   * The weighted, normalized parts of `stature` (they sum to it): the squad's
+   * strength, the club's reputation and its wealth. Lets a screen say how much
+   * of a step up or down is the club's size and how much is its name.
    */
   statureParts: StatureParts;
   /**
@@ -193,9 +194,13 @@ export interface StatureParts {
  * competition isn't in `competitions` reads 0, which only a hand-built fixture
  * with no competitions reaches (every club then reads the same).
  */
-export function clubWealth(competitions: readonly Competition[], compId: number): number {
+export function clubWealth(competitions: readonly Competition[], compId: number, hype: number): number {
   if (!competitions.some((c) => c.id === compId)) return 0;
-  return clamp01(financeScale([...competitions], compId));
+  // The club's own money ceiling (budgetCap: its league's money scale times its
+  // fame), against the biggest there can be. Club-level, so a famous club reads
+  // richer than a newly promoted one in the same division, and a big fanbase
+  // (hype) still counts toward how big a club looks.
+  return clamp01(budgetCap(financeScale([...competitions], compId), hype) / MAX_BUDGET);
 }
 
 /** The weighted, normalized parts of a club's stature. */
@@ -258,7 +263,7 @@ export function clubStatures(
     const roster = t.roster
       .map((pid) => byPid.get(pid))
       .filter((p): p is Player => p != null);
-    out.set(t.tid, clubStature(roster, teamReputation(t), clubWealth(competitions, t.compId)));
+    out.set(t.tid, clubStature(roster, teamReputation(t), clubWealth(competitions, t.compId, t.hype)));
   }
   return out;
 }
@@ -395,8 +400,8 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
         posSecondBestOvr: r.secondBest,
         posWeakestStarterOvr: r.weakestStarter,
         hype: r.hype,
-        stature: statureOf(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId)),
-        statureParts: statureParts(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId)),
+        stature: statureOf(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId, r.hype)),
+        statureParts: statureParts(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId, r.hype)),
         home: homes.get(r.tid),
         ambition,
         frugality,
