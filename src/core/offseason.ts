@@ -77,6 +77,9 @@ import { reviewNationalCampaign } from "./nationalManager/index.js";
 import { carryIntlInjuries } from "./injuries.js";
 import { hashInts, mulberry32 } from "../engine/rng.js";
 import {
+  reputationTarget, finishScore, continentalScore, stepReputation, teamReputation,
+} from "./teams/reputation.js";
+import {
   NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, AMERICAS_CUP_FORMAT, difficultyProfile,
   USER_ACADEMY_INTAKE_MIN, USER_ACADEMY_INTAKE_MAX, USER_ACADEMY_ENTRY_AGE,
   YOUTH_TRIAL_STREAM, MOP_UP_FA_STREAM, MOP_UP_MIN_OVR,
@@ -749,6 +752,41 @@ export function simOffseasonReporting(
   // one carries nothing into a single table (see core/conferences.ts).
   teams = assignConferences(teams, league.competitions);
   teams = stepAcademyBaseConvergence(teams, league.competitions);
+
+  // 3.61. Club reputation (core/teams/reputation.ts): each club moves part of
+  //       the way toward what the season just finished earned it — its finish
+  //       in the division it played in (pre-swap), a title, the domestic cup,
+  //       its continental runs, promotion or relegation. Run here because the
+  //       swap has just decided promotion/relegation and the cups are still the
+  //       finished ones. Zero rng draws: every input is a table or a result.
+  {
+    const compById = new Map(league.competitions.map((c) => [c.id, c]));
+    const rankIn = new Map<number, { rank: number; size: number }>();
+    for (const [, table] of tablesByCompId) {
+      table.forEach((row, i) => rankIn.set(row.tid, { rank: i + 1, size: table.length }));
+    }
+    const domesticWinners = new Set(
+      (league.domesticCups ?? []).map((c) => c.championTid).filter((t): t is number => t != null),
+    );
+    const continental = [league.cup, league.shield, league.americasCup ?? null];
+    teams = teams.map((t) => {
+      const before = compById.get(compIdBeforeSwaps.get(t.tid) ?? t.compId);
+      const after = compById.get(t.compId);
+      const place = rankIn.get(t.tid);
+      if (!before || !place) return t;
+      const beforeId = before.id;
+      const target = reputationTarget({
+        finish: finishScore(before, place.rank, place.size),
+        champion: championTidByCompId[beforeId] === t.tid
+          || lowerChampionTidByCompId[beforeId] === t.tid,
+        domesticCup: domesticWinners.has(t.tid),
+        continental: continental.reduce((sum, cup) => sum + continentalScore(cup, t.tid), 0),
+        promoted: !!after && after.tier < before.tier,
+        relegated: !!after && after.tier > before.tier,
+      });
+      return { ...t, reputation: stepReputation(teamReputation(t), target) };
+    });
+  }
 
   // 3.7. Guaranteed ceiling on Division 2 quality, first pass: any
   //      AI-controlled player at or above DIVISION_2_REFUSAL_OVR_THRESHOLD

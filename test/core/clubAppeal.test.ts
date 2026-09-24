@@ -96,3 +96,49 @@ describe("clubAppealFor", () => {
     expect(a.score).toBeCloseTo(a.lines.reduce((s, l) => s + l.value, 0));
   });
 });
+
+describe("the reputation line", () => {
+  // A club with its stature split into squad and name, so the level line can be apportioned.
+  const parted = (tid: number, strength: number, reputation: number): AppealClub => ({
+    ...club(tid, strength + reputation, spain, 60),
+    statureParts: { strength, reputation },
+  });
+  const unsplit = (c: AppealClub): AppealClub => ({ ...c, statureParts: undefined });
+  const lineOf = (a: ReturnType<typeof clubAppealFor>, id: string) => a.lines.find((l) => l.id === id)?.value ?? 0;
+
+  it("level and reputation together equal the unsplit level value, and the score does not move", () => {
+    const p = player("Brazil", 80);
+    const to = parted(1, 0.4, 0.3);
+    const fromClub = parted(2, 0.35, 0.15);
+    const split = clubAppealFor(p, to, { stature: 0.5, club: fromClub });
+    const whole = clubAppealFor(p, unsplit(to), { stature: 0.5, club: unsplit(fromClub) });
+    expect(lineOf(split, "level") + lineOf(split, "reputation")).toBeCloseTo(lineOf(whole, "level"));
+    expect(lineOf(split, "reputation")).toBeGreaterThan(0);
+    expect(split.score).toBeCloseTo(whole.score);
+    expect(split.score).toBeCloseTo(appealScore(p, to, { stature: 0.5, club: fromClub }).score);
+  });
+
+  it("a refusal stays whole on the level line", () => {
+    const p = player("Brazil", 90);
+    const a = clubAppealFor(p, parted(1, 0.05, 0.05), { stature: 0.9, club: parted(2, 0.6, 0.3) });
+    expect(a.refused).toBe(true);
+    expect(lineOf(a, "level")).toBe(-1);
+    expect(lineOf(a, "reputation")).toBe(0);
+  });
+
+  it("splits a free agent's stature in the weights' proportion", () => {
+    const p = player("Brazil", 80);
+    const to = parted(1, 0.4, 0.3);
+    const a = clubAppealFor(p, to, freeAgent(0.5));
+    const whole = clubAppealFor(p, unsplit(to), freeAgent(0.5));
+    expect(lineOf(a, "level") + lineOf(a, "reputation")).toBeCloseTo(lineOf(whole, "level"));
+    expect(a.score).toBeCloseTo(whole.score);
+  });
+
+  it("shows no reputation line when the name is the same at both clubs", () => {
+    const p = player("Brazil", 80);
+    const a = clubAppealFor(p, parted(1, 0.5, 0.2), { stature: 0.6, club: parted(2, 0.4, 0.2) });
+    expect(lineOf(a, "reputation")).toBe(0);
+    expect(lineOf(a, "level")).toBeGreaterThan(0);
+  });
+});

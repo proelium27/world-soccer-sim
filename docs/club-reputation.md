@@ -112,15 +112,55 @@ never 73+); keeping good Brazilians and Argentines at home compressed the
 country ladder (big four to Brazil 4.95 -> 1.09 on one seed), which is why the
 home line fades for a player who has outgrown his league.
 
-## Stage 2: club reputation (planned)
+## Stage 2: club reputation (built)
 
-`StoredTeam.reputation` beside hype. Target is a per-season achievement score
-(continental trophy > deep run > league title scaled by league strength >
-domestic cup > finish scaled by league strength > promotion; relegation a
-penalty), with no squad-strength or hype term. Rises ~10% a season toward it,
-falls ~4-5%. Stature becomes 0.65 × squad strength + 0.35 × reputation. Adds a
-Reputation line to `clubAppealFor`. Own audit; expected to slow a newly promoted
-rich club's rise.
+`StoredTeam.reputation` (optional, 0-100) sits beside hype. Hype stays what it
+was, a finance channel; reputation is what players see. Code:
+`src/core/teams/reputation.ts` (pure, rng-free) and
+`src/core/teams/reputationSeed.ts`. Constants: the `REPUTATION_*` block after
+`APPEAL_LOAN_FACTOR`, all first values, to be tuned.
+
+**One world scale.** A finish scores `leagueCeiling − SPREAD × (rank−1)/(size−1)`,
+where the ceiling is `FINISH_TOP (80) − PER_OFFSET (2.5) × strength offset −
+PER_TIER (25) × (tier − 1)`. Bottom of the Premier League (50) outranks the
+Serbian champion (42.5) by construction.
+
+**Target, from that season only.** Finish in the division the club played in,
+plus title (8, a top flight's recorded champion or a lower division's playoff
+winner), domestic cup (6), every continental run (won 25; lost final 18, SF 14,
+QF 11, earlier 9; playoff 7; league phase 5; × 1 / 0.5 / 0.7 for Cup / Shield /
+Americas Cup), promotion (+5), relegation (−8), clamped to [0, 100]. No squad
+strength and no hype term: a club cannot buy a name, it has to win with the
+squad. Stepped at offseason step 3.61 (after the promotion swap, while the cups
+are still the finished ones): 10% of the gap a season upward, 4.5% downward.
+Zero rng draws.
+
+**Ordering the constants give** (from an 8th-place finish in England): Cup win
+> league title > Cup semi-final > domestic cup > nothing. The plan listed a
+deep continental run above a strong-league title; with these values a title
+(climb to first plus the bonus, ~19) beats a semi-final (14) and even a lost
+final (18). A tuning question, pinned as-is by `test/core/reputation.test.ts`.
+
+**Seeding.** A new world, a roster import (forced reseed, since squads are
+replaced) and migration of an old save give each club the finish score its squad
+strength ranks it at within its division. Same scale as the target, so there is
+no opening transient. A seed, not a reconstruction of an old save's history.
+
+**Stature** is `0.65 × squad strength + 0.35 × reputation / 100`
+(`STATURE_W_REPUTATION`, was `STATURE_W_HYPE`). Every stature reader
+(`clubStature`, `clubStatures`, the club contexts, `refusesMoveToClub`) reads
+`teamReputation`. `ClubContext.statureParts` carries the two weighted halves.
+
+**Reputation line.** `clubAppealFor` shows the level line as two: "Level of
+club" and "Reputation", apportioned by each half's share of the stature gap
+(a free agent's own stature is split in the 0.65/0.35 proportion). Display only:
+`appealScore`/`appealMultiplier` read the unsplit value, so no decision moves
+because of the split. A refusal stays whole on the level line.
+
+**Behaviour change to know about:** hype started every club at `HYPE_INITIAL`,
+so stature's second half was flat in a new world; the reputation seed is not,
+so from season 1 big-league clubs read bigger to players than before. Needs its
+own audit (not yet run); expected to slow a newly promoted rich club's rise.
 
 ## Stage 3 (planned)
 

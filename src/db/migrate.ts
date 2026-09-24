@@ -16,6 +16,7 @@ import {
 import { GEN_OFFSETS } from "../core/players/templates.js";
 import { chargeSeasonStart, wageBill, financeScale } from "../core/finance/budget.js";
 import { englandCompetitions } from "../core/competitions.js";
+import { seedReputations } from "../core/teams/reputationSeed.js";
 import { cullOnLoad } from "../core/players/freeAgentCull.js";
 import { summaryOf, ovrLookup } from "../core/players/careerSummary.js";
 import { computeOvr } from "../core/players/ovr.js";
@@ -513,7 +514,11 @@ function migrateFields(league: LeagueStore): LeagueStore {
   return {
     ...league,
     competitions,
-    teams: (league.teams as StoredTeamAnyVersion[]).map((legacy) => {
+    // Club reputation (added with Stage 2 of club reputation): a club without one
+    // is given the seed a new world would, read off where its squad ranks in its
+    // division. A seed, not a reconstruction of history — the save's past
+    // trophies are not replayed into it. A no-op once every club has a value.
+    teams: seedReputations((league.teams as StoredTeamAnyVersion[]).map((legacy) => {
       // Spread-then-override keeps every field this list doesn't name, so the
       // retired trial-group fields have to be taken out explicitly or they ride
       // along on the club record forever.
@@ -556,7 +561,7 @@ function migrateFields(league: LeagueStore): LeagueStore {
         // fresh save's initial squad, an accepted one-time re-fog on load.
         scoutingObserved: t.scoutingObserved ?? {},
       };
-    }),
+    }) as StoredTeam[], competitions, migratedPlayers),
     players: migratedPlayers,
     played: league.played.map((m) => {
       const boxScore = (m as PlayedMatchAnyVersion).boxScore;

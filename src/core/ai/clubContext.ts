@@ -6,12 +6,13 @@ import type { PlayedMatch } from "../standings.js";
 import type { Competition } from "../competitions.js";
 import { homeClubs, type HomeClub } from "../transfers/homePull.js";
 import { computeStandings } from "../standings.js";
+import { teamReputation } from "../teams/reputation.js";
 import {
   AI_SQUAD_STRENGTH_COUNT,
   AI_AMBITION_W_STRENGTH, AI_AMBITION_W_WEALTH, AI_AMBITION_W_FAME, AI_AMBITION_W_FORM,
   AI_AMBITION_HIGH, AI_AMBITION_LOW, AI_YOUNG_SQUAD_AGE,
-  STATURE_STRENGTH_LO, STATURE_STRENGTH_HI, STATURE_W_STRENGTH, STATURE_W_HYPE,
-  HYPE_MAX,
+  STATURE_STRENGTH_LO, STATURE_STRENGTH_HI, STATURE_W_STRENGTH, STATURE_W_REPUTATION,
+  REPUTATION_MAX,
 } from "../constants.js";
 
 /**
@@ -87,6 +88,12 @@ export interface ClubContext {
    * drifting with whatever the league's current extremes happen to be.
    */
   stature: number;
+  /**
+   * The two weighted, normalized halves of `stature` (they sum to it): the
+   * squad's strength and the club's reputation. Lets a screen say how much of
+   * a step up or down is the squad and how much is the name.
+   */
+  statureParts: StatureParts;
   /**
    * The club's country and how domestic its league really is, for home-country
    * pull (transfers/homePull.ts). Optional so hand-built contexts need not carry
@@ -172,17 +179,33 @@ function positionalDepthAndBest(
   return { depth, best, secondBest, weakestStarter };
 }
 
-/**
- * A club's world stature, [0,1]: squad quality against an absolute band,
- * blended with fame. See ClubContext.stature for why this one normalization is
- * global rather than per-competition.
- */
-function statureOf(strength: number, hype: number): number {
+/** The two weighted halves of a club's stature; `strength + reputation` is the stature. */
+export interface StatureParts {
+  strength: number;
+  reputation: number;
+}
+
+/** The weighted, normalized halves of a club's stature. */
+export function statureParts(strength: number, reputation: number): StatureParts {
   const strengthNorm = clamp01(
     (strength - STATURE_STRENGTH_LO) / (STATURE_STRENGTH_HI - STATURE_STRENGTH_LO),
   );
-  const hypeNorm = clamp01(hype / HYPE_MAX);
-  return STATURE_W_STRENGTH * strengthNorm + STATURE_W_HYPE * hypeNorm;
+  const reputationNorm = clamp01(reputation / REPUTATION_MAX);
+  return {
+    strength: STATURE_W_STRENGTH * strengthNorm,
+    reputation: STATURE_W_REPUTATION * reputationNorm,
+  };
+}
+
+/**
+ * A club's world stature, [0,1]: squad quality against an absolute band,
+ * blended with club reputation (core/teams/reputation.ts). See
+ * ClubContext.stature for why this one normalization is global rather than
+ * per-competition.
+ */
+export function statureOf(strength: number, reputation: number): number {
+  const parts = statureParts(strength, reputation);
+  return parts.strength + parts.reputation;
 }
 
 /** Clamp into [0,1]. */
@@ -196,8 +219,8 @@ function clamp01(x: number): number {
  * league-wide context map would be wasteful. Identical result to the `stature`
  * field on that club's ClubContext.
  */
-export function clubStature(roster: Player[], hype: number): number {
-  return statureOf(squadStrength(roster), hype);
+export function clubStature(roster: Player[], reputation: number): number {
+  return statureOf(squadStrength(roster), reputation);
 }
 
 /**
@@ -216,7 +239,7 @@ export function clubStatures(teams: StoredTeam[], players: Player[]): Map<number
     const roster = t.roster
       .map((pid) => byPid.get(pid))
       .filter((p): p is Player => p != null);
-    out.set(t.tid, clubStature(roster, t.hype));
+    out.set(t.tid, clubStature(roster, teamReputation(t)));
   }
   return out;
 }
@@ -272,6 +295,7 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
       compId: t.compId,
       budget: t.budget,
       hype: t.hype,
+      reputation: teamReputation(t),
       strength: squadStrength(roster),
       avgAge: mean(roster.map((p) => league.season - p.born)),
       depth,
@@ -352,7 +376,8 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
         posSecondBestOvr: r.secondBest,
         posWeakestStarterOvr: r.weakestStarter,
         hype: r.hype,
-        stature: statureOf(r.strength, r.hype),
+        stature: statureOf(r.strength, r.reputation),
+        statureParts: statureParts(r.strength, r.reputation),
         home: homes.get(r.tid),
         ambition,
         frugality,

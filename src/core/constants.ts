@@ -2818,7 +2818,7 @@ export const AI_NEED_MAX = 1.8;
 
 /**
  * Club stature, [0,1] — "how big a club is this in world terms". Squad quality
- * measured against an ABSOLUTE band, blended with fame. See ClubContext.stature
+ * measured against an ABSOLUTE band, blended with club reputation. See ClubContext.stature
  * for why this is the one normalization that isn't scoped to a competition.
  *
  * The band is set so a bottom-of-a-weak-league squad sits near 0 and a genuine
@@ -2827,7 +2827,8 @@ export const AI_NEED_MAX = 1.8;
 export const STATURE_STRENGTH_LO = 55 + OVR_SCALE_SHIFT;
 export const STATURE_STRENGTH_HI = 78 + OVR_SCALE_SHIFT;
 export const STATURE_W_STRENGTH = 0.65;
-export const STATURE_W_HYPE = 0.35;
+/** Weight on club reputation (core/teams/reputation.ts): the name, not this season's hype. */
+export const STATURE_W_REPUTATION = 0.35;
 
 /**
  * Player will: how much a player's own preference gates where he'll move
@@ -2923,6 +2924,53 @@ export const APPEAL_FORMER_CLUB = 0.1;
 
 /** A loan is a season, not a career: home and confederation count this much on one. */
 export const APPEAL_LOAN_FACTOR = 0.5;
+
+/**
+ * Club reputation (core/teams/reputation.ts, docs/club-reputation.md Stage 2):
+ * a slow-moving 0-100 record of what a club has won and where it plays. It is
+ * ONE world scale, so a bottom-of-the-table Premier League club outranks the
+ * Serbian champion. Each offseason a target is built from that season's
+ * achievements only (league finish scaled by league strength and tier, title,
+ * domestic cup, continental run, promotion/relegation) with no squad-strength
+ * and no hype term, and reputation moves part of the way toward it: quickly
+ * up, slowly down. First values, to be tuned.
+ */
+/** Top of the scale. */
+export const REPUTATION_MAX = 100;
+/** Share of the gap closed in a season when the target is above reputation. */
+export const REPUTATION_RISE_RATE = 0.1;
+/** Share of the gap closed in a season when the target is below reputation. */
+export const REPUTATION_FALL_RATE = 0.045;
+/** Finish score for top of a top flight at strength offset 0, before the title bonus. */
+export const REPUTATION_FINISH_TOP = 80;
+/** How far the finish score falls from top to bottom of any division. */
+export const REPUTATION_FINISH_SPREAD = 30;
+/** Finish score lost per point of a league's strength offset. */
+export const REPUTATION_PER_OFFSET = 2.5;
+/** Finish score lost per division below the top flight. */
+export const REPUTATION_PER_TIER = 25;
+/** Added for winning the league (a top flight's champion or a lower division's playoff winner). */
+export const REPUTATION_TITLE_BONUS = 8;
+/** Added for winning the domestic cup. */
+export const REPUTATION_DOMESTIC_CUP_BONUS = 6;
+/** Added for being promoted. */
+export const REPUTATION_PROMOTION_BONUS = 5;
+/** Taken off for being relegated. */
+export const REPUTATION_RELEGATION_PENALTY = 8;
+/** Added for winning the Continental Cup (scaled for the other competitions). */
+export const REPUTATION_CONTINENTAL_WON = 25;
+/** Added for a knockout exit, by rounds from the final: lost the final, SF, QF, R16 and earlier. */
+export const REPUTATION_CONTINENTAL_BY_ROUNDS_FROM_FINAL = [18, 14, 11, 9] as const;
+/** Added for going out in the playoff round. */
+export const REPUTATION_CONTINENTAL_PLAYOFF = 7;
+/** Added for taking part and going out in the league phase or opening stage. */
+export const REPUTATION_CONTINENTAL_OPENING = 5;
+/** How much each continental competition's run counts, relative to the Continental Cup. */
+export const REPUTATION_COMPETITION_SCALE: Record<CupCompetitionId, number> = {
+  continental: 1,
+  shield: 0.5,
+  americas: 0.7,
+};
 
 /**
  * Settling-in friction: a player who has only just joined is much harder to

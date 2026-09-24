@@ -2826,6 +2826,16 @@ export function Manual() {
               no. This is the only reason that can turn a player down outright.
             </li>
             <li>
+              <strong>Reputation.</strong> Part of how big a club looks is its squad, and part is its
+              name. A club&apos;s reputation is built from what it has won and where it plays: finishing
+              high in a strong league, titles, cups and runs in the continental competitions all push it
+              up, and relegation pulls it down. Everything is on one world scale, so a struggling club in
+              a big league still has more of a name than the champion of a small one. It moves slowly. It
+              climbs faster than it falls, so a famous club keeps some of its pull through a bad spell,
+              and a club that has just come into money has to win things before stars take it seriously.
+              When you hover a player&apos;s reasons, the level of the club is split into these two lines.
+            </li>
+            <li>
               <strong>Playing time.</strong> Would he start? A player who&apos;d walk into your eleven
               likes you more than a bigger club where he&apos;d sit on the bench. It barely matters to a
               star, who starts anywhere, and it matters a lot to everyone else, which is why smaller clubs

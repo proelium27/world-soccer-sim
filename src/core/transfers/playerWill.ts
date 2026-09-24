@@ -3,6 +3,7 @@ import { appealMultiplier } from "./clubAppeal.js";
 import type { StoredTeam } from "../teams/clubs.js";
 import type { ClubContext } from "../ai/clubContext.js";
 import { clubStature, clubStatures } from "../ai/clubContext.js";
+import { teamReputation } from "../teams/reputation.js";
 import {
   PLAYER_WILL_CARE_FLOOR, PLAYER_WILL_CARE_CEILING,
   PLAYER_WILL_DROP_STRENGTH, PLAYER_WILL_REFUSAL_DROP, PLAYER_WILL_RISE_BONUS,
@@ -102,8 +103,8 @@ export function refusesMoveToClub(
     t.roster.map((pid) => byPid.get(pid)).filter((p): p is Player => p != null);
   return refusesMove(
     player.ovr,
-    clubStature(rosterOf(seller), seller.hype),
-    clubStature(rosterOf(buyer), buyer.hype),
+    clubStature(rosterOf(seller), teamReputation(seller)),
+    clubStature(rosterOf(buyer), teamReputation(buyer)),
   );
 }
 
