@@ -13,10 +13,14 @@
  *     if a new offer is better. A rejected slot reopens.
  *  3. Repeat until no slot makes a new offer. Held offers become signings.
  *
- * Properties: stable (no club and player both prefer each other to what they
- * ended with), terminates (a club offers each player at most once), and does
- * not depend on input order (slots run in tid order, players in pid order, ties
- * break on stature then tid).
+ * Properties: terminates (a club offers each player at most once) and is
+ * deterministic (slots run in tid order, players in pid order, ties break on
+ * stature then tid). Without registration caps it is also stable and
+ * independent of processing order. With them it is only close to that: a slot
+ * that skips a player because the club's cap was full never comes back to him,
+ * even if a held offer is later rejected and frees the place, so which of a
+ * club's slots ran first can occasionally decide a signing. Rare (a club has to
+ * sit exactly at a cap mid-match) and deterministic either way.
  *
  * What replaces the old worst-first signing order: a squad player with offers
  * from a strong club and a weak one picks where he would PLAY (the playing-time

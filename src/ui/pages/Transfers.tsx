@@ -729,6 +729,10 @@ export function Transfers() {
                 {orphaned.map((n) => {
                   const p = playerMap.get(n.pid);
                   if (!p) return null;
+                  // Your league's rules can start blocking a player mid-talks
+                  // (you signed someone else he'd count against). The deal can't
+                  // go through, so say why rather than show buttons that do nothing.
+                  const blocked = clubView?.of(p, n.sellerTid)?.blocked ?? null;
                   return (
                     <tr key={n.pid}>
                       <td>
@@ -738,6 +742,9 @@ export function Transfers() {
                         <Flag nationality={p.nationality} /> ({p.pos}, <ClubLink tid={n.sellerTid} />)
                       </td>
                       <td>
+                        {blocked ? (
+                          <span className="text-muted small" title={blocked}>League rules</span>
+                        ) : (
                         <NegotiationControls
                           pid={n.pid}
                           negotiation={n}
@@ -749,6 +756,7 @@ export function Transfers() {
                           onOffer={makeOfferAction}
                           onAcceptCounter={acceptCounterAction}
                         />
+                        )}
                       </td>
                     </tr>
                   );

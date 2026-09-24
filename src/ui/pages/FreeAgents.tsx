@@ -108,11 +108,23 @@ export function FreeAgents() {
   // page with no pagination — verbatim the mistake CLAUDE.md records from the
   // loan-in panel, where the top 40 rows were refused every time. They are sunk
   // rather than dropped so the reason stays visible when there is room for it.
+  // A player your league's registration rules block is sunk for the same
+  // reason: at a binding cap the pool is mostly foreign to you, and those rows
+  // would fill the list and hide the nationals you can actually sign.
   const refusesFor = (p: Player) =>
     userTeam != null
     && refusesFreeAgentSigningWith(p, statures.get(userTeam.tid) ?? 0, statures, userTeam.tid);
+  const unsignable = new Map<number, boolean>();
+  const unsignableFor = (p: Player) => {
+    let v = unsignable.get(p.pid);
+    if (v === undefined) {
+      v = refusesFor(p) || !!clubView?.of(p)?.blocked;
+      unsignable.set(p.pid, v);
+    }
+    return v;
+  };
   availablePlayers.sort((a, b) =>
-    Number(refusesFor(a)) - Number(refusesFor(b))
+    Number(unsignableFor(a)) - Number(unsignableFor(b))
     || b.ovr + potView.ceiling(b) - (a.ovr + potView.ceiling(a)));
   const filtered =
     posFilter === "ALL"

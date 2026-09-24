@@ -101,12 +101,18 @@ const TIER_OVERRIDES: Record<string, Record<number, ForeignRule[]>> = {
 };
 
 /**
- * A competition's rules: its own if the world set any (a custom league in World
- * setup), else the shipped table for its country and tier. A country with no
- * entry has no rules.
+ * A competition's rules: its own if the world set any, else the shipped table
+ * for its country and tier. A country with no entry has no rules.
+ *
+ * A league the player added (it carries its own `nationalities` table; shipped
+ * leagues never do) takes no shipped rules even when its name matches a real
+ * country's. Its squads come from its own table, not the real league's mix, so
+ * the real caps would freeze it on day one: an added "Argentina" drawn mostly
+ * from the rest of the world would start every club over the 6-foreigner cap.
  */
 export function competitionForeignRules(comp: Competition): ForeignRule[] {
   if (comp.foreignRules) return comp.foreignRules;
+  if (comp.nationalities) return [];
   return TIER_OVERRIDES[comp.country]?.[comp.tier] ?? LEAGUE_FOREIGN_RULES[comp.country] ?? [];
 }
 

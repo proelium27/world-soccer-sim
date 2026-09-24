@@ -604,12 +604,23 @@ export function signToAcademy(
   phase: "regular" | "offseason",
   activeLoans: ActiveLoan[] = [],
   spend?: SpendPolicy,
+  /**
+   * The world's competitions, for the club's registration rules. A player the
+   * rules would stop the club signing to the senior squad can't come in through
+   * the academy either, or a cap would be a door with a side entrance (the
+   * academy has an age cap and no rating cap, and promotion is not a new
+   * signing). The club's own youth intake is still exempt. Empty = no rules.
+   */
+  competitions: readonly Competition[] = [],
 ): { teams: StoredTeam[]; players: Player[] } {
   if (!freeAgentPids(teams, players, activeLoans).has(pid)) {
     return { teams, players };
   }
   const player = players.find((p) => p.pid === pid);
   if (!player || season - player.born > PROSPECT_AGE_MAX) {
+    return { teams, players };
+  }
+  if (leagueRegistrationBlock({ teams, competitions, players, season }, tid, player) !== null) {
     return { teams, players };
   }
   const team = teams.find((t) => t.tid === tid);

@@ -4,7 +4,7 @@ import {
   competitionForeignRules, worldRules, LEAGUE_FOREIGN_RULES, type ForeignRule, type RuleContext,
 } from "../../src/core/foreignRules.js";
 import { worldCompetitions } from "../../src/core/competitions.js";
-import { signFreeAgent, trimRosterSurplus } from "../../src/core/freeAgency.js";
+import { signFreeAgent, signToAcademy, trimRosterSurplus } from "../../src/core/freeAgency.js";
 import type { Player } from "../../src/core/players/types.js";
 import { makeLeague } from "../helpers/league.js";
 
@@ -99,6 +99,12 @@ describe("the shipped table", () => {
     expect(competitionForeignRules(fra2)[0]).toMatchObject({ kind: "nonEuCap", max: 2 });
     expect(competitionForeignRules({ ...fra1, foreignRules: [] })).toEqual([]);
   });
+
+  it("a league the player added takes no shipped rules, even named after a real country", () => {
+    const arg = worldCompetitions().find((c) => c.country === "Argentina" && c.tier === 1)!;
+    expect(competitionForeignRules(arg).length).toBeGreaterThan(0);
+    expect(competitionForeignRules({ ...arg, nationalities: { __REST__: 100 } })).toEqual([]);
+  });
 });
 
 describe("on a real world", () => {
@@ -135,6 +141,20 @@ describe("on a real world", () => {
     const home = player("Argentina", { born: 0, pos: "CM", contract: { salary: 0, expiresSeason: 0 } } as Partial<Player>);
     const ok = signFreeAgent(teams, [...players, home], argClub.tid, home.pid, league.season, "offseason", [], undefined, league.competitions);
     expect(ok.teams.find((t) => t.tid === argClub.tid)!.roster).toContain(home.pid);
+  });
+
+  it("the academy is no way round a cap", () => {
+    const extra = Array.from({ length: 6 }, () => player("Brazil", { born: 0, pos: "CM" }));
+    const kid = player("Chile", { born: league.season - 19, pos: "CM", contract: { salary: 0, expiresSeason: 0 } } as Partial<Player>);
+    const teams = league.teams.map((t) => t.tid === argClub.tid
+      ? { ...t, roster: [...t.roster.filter((pid) => !foreigner(pid)).slice(0, 18), ...extra.map((p) => p.pid)], academyRoster: [], budget: 1e12 }
+      : t);
+    const players = [...league.players, ...extra, kid];
+    const blocked = signToAcademy(teams, players, argClub.tid, kid.pid, league.season, "offseason", [], undefined, league.competitions);
+    expect(blocked.teams).toBe(teams);
+    // With no competitions passed (no rules checked), the same kid signs: the refusal above is the cap's.
+    const open = signToAcademy(teams, players, argClub.tid, kid.pid, league.season, "offseason", [], undefined, []);
+    expect(open.teams.find((t) => t.tid === argClub.tid)!.academyRoster).toContain(kid.pid);
   });
 
   it("the trim never takes a club below a minimum it met", () => {

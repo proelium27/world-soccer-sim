@@ -62,7 +62,9 @@ loops read it; so does the user's loan search.
 Club-proposing deferred acceptance in all three passes (shortfalls, depth
 upgrades, prospects) and the mop-up. Clubs offer for open slots in their own
 order; each player keeps the offer he likes best by his view of the club; a
-rejected club moves on. Stable, terminating, independent of input order. It
+rejected club moves on. Terminating and deterministic; stable and
+order-independent except at a registration cap, where a slot that skipped a
+player for a full cap never revisits him (rare, noted in freeAgencyMatch.ts). It
 replaces the worst-first queue: a squad player picks where he would play and
 where he is at home, which is the real reason small clubs sign real players,
 and the ladder audit has to confirm that rather than assume it. Free agency
@@ -87,8 +89,12 @@ all read.
 1. Nationality and country strings share one key space for every shipped
    league (`homeCountryKeys.test.ts`); a mismatch would fail silently.
 2. Free agency consumes no shared-rng draws (`freeAgencyRng.test.ts`).
-3. The matching is stable, order-independent and never double-signs
-   (`freeAgencyMatch.test.ts`); caps count tentative offers.
+3. The matching never double-signs and is stable and order-independent without
+   caps (`freeAgencyMatch.test.ts`); caps count tentative offers, and at a cap
+   the order-independence is only approximate (see freeAgencyMatch.ts).
+   Known small quirk: in AI free agency a player's preference for his own last
+   club is scored without the exemption that lets him re-sign there, so he may
+   rank it lower than he should.
 
 ## The first shape, and why it was replaced
 
