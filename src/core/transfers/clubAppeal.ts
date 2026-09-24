@@ -141,10 +141,14 @@ function lineValues(
   from: AppealFrom,
   options: AppealOptions,
 ): { refused: boolean; level: number; playingTime: number; home: number; confederation: number; formerClub: number } {
-  const refused = refusesMove(player.ovr, from.stature, to.stature);
-  const level = refused ? -1 : moveAppeal(player.ovr, from.stature, to.stature) - 1;
-  const care = statureSensitivity(player.ovr);
   const away = options.loan ? APPEAL_LOAN_FACTOR : 1;
+  // A loan is a season, not a career, so it counts as that fraction of the move
+  // for the club's level too, refusal included: a benched youngster at a giant
+  // goes down on loan to play, where he'd never sign there for good.
+  const toStature = from.stature + (to.stature - from.stature) * away;
+  const refused = refusesMove(player.ovr, from.stature, toStature);
+  const level = refused ? -1 : moveAppeal(player.ovr, from.stature, toStature) - 1;
+  const care = statureSensitivity(player.ovr);
   const playingTime = playingTimeAt(player, to) - (from.club ? playingTimeAt(player, from.club) : 0);
   const home = away * (homeAt(player, to) - homeAt(player, from.club));
   const confederation = away * (confederationAt(player, to, care) - confederationAt(player, from.club, care));

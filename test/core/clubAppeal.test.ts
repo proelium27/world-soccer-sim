@@ -81,6 +81,16 @@ describe("clubAppealFor", () => {
     expect(appealMultiplier(star, tiny, { stature: 0.8 })).toBe(0);
   });
 
+  it("lets a young star go down on loan where he'd refuse a permanent move", () => {
+    // 85-rated at a giant (0.9) to a club at 0.6: a drop past his refusal line
+    // for good, but a loan counts as half the move.
+    const p = player("Brazil", 85);
+    const giant = club(1, 0.9, spain, 90);
+    const smaller = club(2, 0.6, spain, 70);
+    expect(appealScore(p, smaller, { stature: 0.9, club: giant }).refused).toBe(true);
+    expect(appealScore(p, smaller, { stature: 0.9, club: giant }, { loan: true }).refused).toBe(false);
+  });
+
   it("scales home and confederation on a loan", () => {
     const p = player("Argentina", 60);
     const atHome = club(1, 0.3, argentina, 60);

@@ -2976,12 +2976,17 @@ export const REPUTATION_RISE_RATE = 0.1;
 export const REPUTATION_FALL_RATE = 0.045;
 /** Finish score for top of a top flight at strength offset 0, before the title bonus. */
 export const REPUTATION_FINISH_TOP = 80;
-/** How far the finish score falls from top to bottom of any division. */
-export const REPUTATION_FINISH_SPREAD = 30;
-/** Finish score lost per point of a league's strength offset. */
-export const REPUTATION_PER_OFFSET = 2.5;
-/** Finish score lost per division below the top flight. */
-export const REPUTATION_PER_TIER = 25;
+/**
+ * How far the finish score falls from top to bottom of a division, as a share
+ * of that division's ceiling (30 of 80 in a big-four top flight). Proportional
+ * rather than a flat 30 so a weak lower division's scores stay above zero and
+ * still tell its clubs apart: flat, Serbia's third tier seeded at −7 to −37.
+ */
+export const REPUTATION_FINISH_SPREAD_SHARE = 0.375;
+/** Share of the ceiling lost per point of a league's strength offset (2.5 of 80). */
+export const REPUTATION_PER_OFFSET_SHARE = 0.03125;
+/** Each division below the top flight keeps this share of the one above's ceiling. */
+export const REPUTATION_TIER_FACTOR = 0.7;
 /** Added for winning the league (a top flight's champion or a lower division's playoff winner). */
 export const REPUTATION_TITLE_BONUS = 8;
 /** Added for winning the domestic cup. */

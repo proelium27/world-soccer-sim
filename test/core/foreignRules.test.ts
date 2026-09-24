@@ -74,6 +74,16 @@ describe("isHomegrown", () => {
     expect(isHomegrown(p, "Spain", countryOfTid, 5)).toBe(false);
   });
 
+  it("counts Welsh training for England's rule, as the Premier League does", () => {
+    const p = player("Wales", { born: -30 });
+    expect(isHomegrown(p, "England", countryOfTid, 5)).toBe(true);
+    expect(isHomegrown(p, "Spain", countryOfTid, 5)).toBe(false);
+  });
+
+  it("registers a Swiss player as EU", () => {
+    expect(isNonEu("Switzerland", {})).toBe(false);
+  });
+
   it("drives a 'trained' cap like Mexico's", () => {
     const rule: ForeignRule = { kind: "foreignCap", max: 1, basis: "trained" };
     const mx = (nationality: string) => player(nationality, { born: -30 });

@@ -26,7 +26,7 @@ import { clubCupRun, koFinalRound, CUP_STAGE_PLAYOFF, CUP_STAGE_LEAGUE_PHASE } f
 import type { StoredTeam } from "./clubs.js";
 import {
   REPUTATION_MAX, REPUTATION_RISE_RATE, REPUTATION_FALL_RATE, REPUTATION_FINISH_TOP,
-  REPUTATION_FINISH_SPREAD, REPUTATION_PER_OFFSET, REPUTATION_PER_TIER, REPUTATION_TITLE_BONUS,
+  REPUTATION_FINISH_SPREAD_SHARE, REPUTATION_PER_OFFSET_SHARE, REPUTATION_TIER_FACTOR, REPUTATION_TITLE_BONUS,
   REPUTATION_DOMESTIC_CUP_BONUS, REPUTATION_PROMOTION_BONUS, REPUTATION_RELEGATION_PENALTY,
   REPUTATION_CONTINENTAL_WON, REPUTATION_CONTINENTAL_BY_ROUNDS_FROM_FINAL,
   REPUTATION_CONTINENTAL_PLAYOFF, REPUTATION_CONTINENTAL_OPENING, REPUTATION_COMPETITION_SCALE,
@@ -35,15 +35,15 @@ import {
 /** The finish score for top of this division: lower for a weaker league and for each tier down. */
 export function leagueCeiling(comp: Competition): number {
   return REPUTATION_FINISH_TOP
-    - REPUTATION_PER_OFFSET * competitionStrengthOffset(comp)
-    - REPUTATION_PER_TIER * (comp.tier - 1);
+    * Math.max(0, 1 - REPUTATION_PER_OFFSET_SHARE * competitionStrengthOffset(comp))
+    * REPUTATION_TIER_FACTOR ** (comp.tier - 1);
 }
 
 /** The finish score for `rank` (1 = top) in a division of `size` clubs. */
 export function finishScore(comp: Competition, rank: number, size: number): number {
   const ceiling = leagueCeiling(comp);
   if (size <= 1) return ceiling;
-  return ceiling - REPUTATION_FINISH_SPREAD * (rank - 1) / (size - 1);
+  return ceiling * (1 - REPUTATION_FINISH_SPREAD_SHARE * (rank - 1) / (size - 1));
 }
 
 /**
@@ -76,7 +76,7 @@ export function continentalScore(cup: CupState | null | undefined, tid: number):
 export interface ReputationSeason {
   /** `finishScore` for where the club finished, in the division it played in. */
   finish: number;
-  /** Won the league: a top flight's champion or a lower division's playoff winner. */
+  /** Won the league: a top flight's champion, a lower division's title-playoff winner, else its table-topper. */
   champion: boolean;
   domesticCup: boolean;
   /** Sum of `continentalScore` over every continental competition. */

@@ -777,8 +777,12 @@ export function simOffseasonReporting(
       const beforeId = before.id;
       const target = reputationTarget({
         finish: finishScore(before, place.rank, place.size),
-        champion: championTidByCompId[beforeId] === t.tid
-          || lowerChampionTidByCompId[beforeId] === t.tid,
+        // Every division has a champion: a top flight's recorded one, a lower
+        // division's title-playoff winner, else whoever topped its table (the
+        // Championship is a title as well as a promotion).
+        champion: before.tier === 1
+          ? championTidByCompId[beforeId] === t.tid
+          : (lowerChampionTidByCompId[beforeId] ?? tablesByCompId.get(beforeId)?.[0]?.tid) === t.tid,
         domesticCup: domesticWinners.has(t.tid),
         continental: continental.reduce((sum, cup) => sum + continentalScore(cup, t.tid), 0),
         promoted: !!after && after.tier < before.tier,
