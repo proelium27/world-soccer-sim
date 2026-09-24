@@ -2826,9 +2826,24 @@ export const AI_NEED_MAX = 1.8;
  */
 export const STATURE_STRENGTH_LO = 55 + OVR_SCALE_SHIFT;
 export const STATURE_STRENGTH_HI = 78 + OVR_SCALE_SHIFT;
-export const STATURE_W_STRENGTH = 0.65;
+/**
+ * A club's stature reads how good a club is: its squad, its earned name and
+ * its own wealth, all club-level, never a regional label (user rule: players
+ * are pulled to good clubs, and good clubs happen to be in Europe). Without
+ * wealth, Brazil's best club (0.67) outranked a median big-four club (0.56) and
+ * a move to Europe read as a step down, so good Brazilians stayed home
+ * (scripts/statureGapProbe.ts). With it at 0.35 the median big-four club reads
+ * 0.71 against 0.67. First values, audited in docs/club-reputation.md.
+ */
+export const STATURE_W_STRENGTH = 0.45;
 /** Weight on club reputation (core/teams/reputation.ts): the name, not this season's hype. */
-export const STATURE_W_REPUTATION = 0.35;
+export const STATURE_W_REPUTATION = 0.2;
+/**
+ * Weight on the club's own wealth: its income scale (`financeScale`, 1 at a
+ * big-four top-flight club), the stand-in for the wages it can pay until wages
+ * are modelled.
+ */
+export const STATURE_W_WEALTH = 0.35;
 
 /**
  * Player will: how much a player's own preference gates where he'll move
@@ -2866,12 +2881,21 @@ export const PLAYER_WILL_DROP_STRENGTH = 1.6;
  */
 export const PLAYER_WILL_REFUSAL_DROP = 0.18;
 /**
- * A genuine step *up* is its own draw: a fully-caring player moving to a club
+ * A genuine step *up* is its own draw: a fully ambitious player moving to a club
  * this much bigger gives the buyer this much of a valuation bonus per 1.0 of
- * stature gained. Deliberately far weaker than the drop penalty — ambition
- * nudges a move along, it doesn't manufacture one out of nothing.
+ * stature gained. Was 0.35 on the star-only care curve, which left a good but
+ * not great player nearly indifferent to a bigger club (a 76 gained ~0.02 for a
+ * move from Brazil to a mid-table big-four club, against a home pull of ~0.17).
+ * Raised with the ambition curve below; a first value, audited.
  */
-export const PLAYER_WILL_RISE_BONUS = 0.35;
+export const PLAYER_WILL_RISE_BONUS = 1.2;
+/**
+ * Below this ovr a player feels no pull toward a bigger club; he climbs to full
+ * ambition at PLAYER_WILL_CARE_CEILING. Deliberately lower than
+ * PLAYER_WILL_CARE_FLOOR: a good player wants a bigger stage long before he is
+ * good enough to refuse a smaller one. Refusals still read the care curve.
+ */
+export const PLAYER_WILL_AMBITION_FLOOR = 55 + OVR_SCALE_SHIFT;
 
 /*
  * A player's view of a club (`clubAppealFor`, transfers/clubAppeal.ts,

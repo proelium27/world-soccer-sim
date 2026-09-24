@@ -72,7 +72,7 @@ export function FreeAgents() {
   // rebuilds a league-wide player index on every call, which on a 25-row table
   // over a 19,000-player pool is the quadratic case clubStatures warns about.
   const statures = useMemo(
-    () => (league ? clubStatures(league.teams, league.players) : new Map<number, number>()),
+    () => (league ? clubStatures(league.teams, league.players, league.competitions) : new Map<number, number>()),
     [league],
   );
   // How each player sees your club, and your league's registration rules

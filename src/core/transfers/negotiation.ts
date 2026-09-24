@@ -470,7 +470,7 @@ export function makeTransferOffer(
   // ...and even a selling club's willingness isn't enough on its own: a good
   // player won't drop to a much smaller club, whoever is managing it (see
   // playerWill.ts). The user is gated here exactly like an AI buyer.
-  if (refusesMoveToClub(player, seller, user, league.players)) return league;
+  if (refusesMoveToClub(player, seller, user, league.players, league.competitions)) return league;
   // The user's league registration rules bind him like any club (foreignRules.ts).
   if (leagueRegistrationBlock(league, user.tid, player) !== null) return league;
   if (departsAtRollover(league, player)) return league;
@@ -576,7 +576,7 @@ export function acceptCounterOffer(
   // ...and even a selling club's willingness isn't enough on its own: a good
   // player won't drop to a much smaller club, whoever is managing it (see
   // playerWill.ts). The user is gated here exactly like an AI buyer.
-  if (refusesMoveToClub(player, seller, user, league.players)) return league;
+  if (refusesMoveToClub(player, seller, user, league.players, league.competitions)) return league;
   // The user's league registration rules bind him like any club (foreignRules.ts).
   if (leagueRegistrationBlock(league, user.tid, player) !== null) return league;
   if (departsAtRollover(league, player)) return league;

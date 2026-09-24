@@ -101,7 +101,7 @@ describe("the reputation line", () => {
   // A club with its stature split into squad and name, so the level line can be apportioned.
   const parted = (tid: number, strength: number, reputation: number): AppealClub => ({
     ...club(tid, strength + reputation, spain, 60),
-    statureParts: { strength, reputation },
+    statureParts: { strength, reputation, wealth: 0 },
   });
   const unsplit = (c: AppealClub): AppealClub => ({ ...c, statureParts: undefined });
   const lineOf = (a: ReturnType<typeof clubAppealFor>, id: string) => a.lines.find((l) => l.id === id)?.value ?? 0;

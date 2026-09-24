@@ -16,8 +16,9 @@
  *
  *  - **Level match** — the existing stature rule (`moveAppeal`/`refusesMove`)
  *    expressed as a line. The only line that can refuse. On screen it is shown
- *    as two lines, "Level of club" (the squad) and "Reputation" (the club's
- *    name), apportioned by how much of the stature gap each half makes up.
+ *    as two lines, "Level of club" (the squad and the club's wealth) and
+ *    "Reputation" (the club's name), apportioned by how much of the stature
+ *    gap each makes up.
  *    That split is display only: the score reads the one unsplit value, so the
  *    markets decide exactly as before.
  *  - **Playing time** — would he start? His rating against the weakest man the
@@ -48,7 +49,7 @@ import type { StatureParts } from "../ai/clubContext.js";
 import {
   APPEAL_HOME, APPEAL_CONFEDERATION, APPEAL_PLAYING_TIME, APPEAL_PLAYING_TIME_LO,
   APPEAL_PLAYING_TIME_HI, APPEAL_FORMER_CLUB, APPEAL_LOAN_FACTOR,
-  STATURE_W_STRENGTH, STATURE_W_REPUTATION,
+  STATURE_W_STRENGTH, STATURE_W_REPUTATION, STATURE_W_WEALTH,
 } from "../constants.js";
 
 /** What the appeal reads about a club. `ClubContext` satisfies it. */
@@ -180,25 +181,28 @@ export function appealMultiplier(
  */
 function fromParts(from: AppealFrom): StatureParts {
   if (from.club?.statureParts) return from.club.statureParts;
-  const total = STATURE_W_STRENGTH + STATURE_W_REPUTATION;
+  const total = STATURE_W_STRENGTH + STATURE_W_REPUTATION + STATURE_W_WEALTH;
   return {
     strength: from.stature * STATURE_W_STRENGTH / total,
     reputation: from.stature * STATURE_W_REPUTATION / total,
+    wealth: from.stature * STATURE_W_WEALTH / total,
   };
 }
 
 /**
- * The level value split into its squad and reputation parts, for display. Each
- * part gets the level value in proportion to its share of the stature gap; the
- * two always sum to the unsplit value. A refusal stays whole on the level line,
- * and so does everything when the gap is zero or the club carries no parts.
+ * The level value split into its size and reputation parts, for display: "Level
+ * of club" is the squad and the club's wealth (how big a club it is), and
+ * "Reputation" is its earned name. Each part gets the level value in proportion
+ * to its share of the stature gap; the two always sum to the unsplit value. A
+ * refusal stays whole on the level line, and so does everything when the gap is
+ * zero or the club carries no parts.
  */
 function splitLevel(level: number, refused: boolean, to: AppealClub, from: AppealFrom): { level: number; reputation: number } {
   if (refused || !to.statureParts || level === 0) return { level, reputation: 0 };
   const f = fromParts(from);
-  const dStrength = to.statureParts.strength - f.strength;
+  const dSize = (to.statureParts.strength + to.statureParts.wealth) - (f.strength + f.wealth);
   const dReputation = to.statureParts.reputation - f.reputation;
-  const delta = dStrength + dReputation;
+  const delta = dSize + dReputation;
   if (delta === 0) return { level, reputation: 0 };
   const reputation = level * dReputation / delta;
   return { level: level - reputation, reputation };

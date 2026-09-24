@@ -209,7 +209,7 @@ export function runAIFreeAgency(
   const contexts = deriveLeagueContexts({ teams, players, season, played: [], competitions: [...competitions] });
   // Stature from the squads directly (the same figure a context carries), so a
   // caller that passes no competitions still gets real statures.
-  const statures = clubStatures(teams, players);
+  const statures = clubStatures(teams, players, competitions);
   const worldMax = statures.size > 0 ? Math.max(...statures.values()) : 1;
   // The league registration rules (foreignRules.ts). Caps are checked against
   // each club's squad plus what it is holding and offering in the match.
@@ -555,7 +555,7 @@ export function signFreeAgent(
   // module (see refusesFreeAgentSigning), and it is the route the pool is
   // stocked for: trimRosterSurplus releases whoever a club is deepest at, not
   // whoever is worst.
-  if (refusesFreeAgentSigning(player, team, teams, players)) return { teams, players };
+  if (refusesFreeAgentSigning(player, team, teams, players, competitions)) return { teams, players };
   // The club's league registration rules bind the user like any club.
   if (leagueRegistrationBlock({ teams, competitions, players, season }, tid, player) !== null) {
     return { teams, players };
@@ -631,7 +631,7 @@ export function signToAcademy(
   // reason: this route has an age cap and NO rating cap, so without it the
   // academy is a cheaper door to the identical exploit — a 21-year-old free
   // agent of any rating parked on a flat stipend instead of an ovr-cubic wage.
-  if (refusesFreeAgentSigning(player, team, teams, players)) return { teams, players };
+  if (refusesFreeAgentSigning(player, team, teams, players, competitions)) return { teams, players };
   const wageCharge = phase === "regular" ? academyContractTerms(season).salary : 0;
   // Payable out of the overdraft, and deliberately NOT gated on the embargo:
   // a club barred from the transfer market can still run its own academy, which

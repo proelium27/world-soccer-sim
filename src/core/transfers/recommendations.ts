@@ -120,7 +120,7 @@ export function recommendedTransfers(
   );
 
   // Precomputed once — see clubStatures; calling per player would be quadratic.
-  const statures = clubStatures(league.teams, league.players);
+  const statures = clubStatures(league.teams, league.players, league.competitions);
   const userStature = statures.get(user.tid) ?? 0;
   const reg = worldRules(league.teams, league.competitions, (pid) => playerMap.get(pid), league.season)
     .forSquad(user.tid, user.roster);
@@ -279,7 +279,7 @@ export function saleGateFor(
     userProtectedStarBar(league.difficulty),
   );
   const protectedReason = protectedStarReason(league.difficulty);
-  const statures = clubStatures(league.teams, league.players);
+  const statures = clubStatures(league.teams, league.players, league.competitions);
   const userStature = statures.get(user.tid) ?? 0;
   // The user's squad against its league's registration rules, counted once.
   const reg = worldRules(league.teams, league.competitions, (pid) => playerMap.get(pid), league.season)
