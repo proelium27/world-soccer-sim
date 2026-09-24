@@ -15,6 +15,7 @@ import type { ProposedClause } from "./clauses.js";
 import { clauseExpectedValue, clausesAreValid } from "./clauses.js";
 import { keepValueToClub, valueToClub, perceivedValueToClub } from "../ai/evaluate.js";
 import { moveAppealBetween, settledMultiplier, joinedSeasons } from "./playerWill.js";
+import { registrationChecker } from "../foreignRules.js";
 import { mulberry32 } from "../../engine/rng.js";
 import { tierOf } from "../competitions.js";
 import {
@@ -128,6 +129,9 @@ export function inboundOfferCandidates(league: LeagueStore): InboundOfferCandida
   if (!userCtx) return [];
 
   const playerMap = new Map(league.players.map((p) => [p.pid, p]));
+  const canRegister = registrationChecker(
+    league.teams, league.competitions, (pid) => playerMap.get(pid), ws.season ?? league.season,
+  );
   const listedSet = new Set(user.transferListed);
 
   const usedBuyers = new Set(
@@ -188,6 +192,9 @@ export function inboundOfferCandidates(league: LeagueStore): InboundOfferCandida
       if (
         player.ovr >= divisionRefusalOvr(tierOf(league.competitions, buyer.compId))
       ) continue;
+      // Nor does a club that could not register him under its league's rules
+      // (foreignRules.ts). After the draw, for the same reason.
+      if (canRegister(buyer.tid, buyer.roster, player) !== null) continue;
       // A buyer only shows up as a candidate if it can actually pay a fair
       // fee without dipping into its cash reserve — otherwise the offer
       // would just fail affordability at accept time (see buyerSpendable).

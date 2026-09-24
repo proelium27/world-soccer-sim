@@ -2872,6 +2872,67 @@ export const PLAYER_WILL_REFUSAL_DROP = 0.18;
  */
 export const PLAYER_WILL_RISE_BONUS = 0.35;
 
+/*
+ * A player's view of a club (`clubAppealFor`, transfers/clubAppeal.ts,
+ * docs/club-reputation.md). Each is one line of his reasons, in the units of
+ * the appeal score, where 0 is indifference and the score multiplies a buyer's
+ * valuation as `1 + score`. First values, to be tuned on
+ * scripts/nationalityDriftProbe.ts and the ladder audit.
+ */
+
+/**
+ * Home country at full strength, before the league's domestic share and his
+ * attachment. Swept on nationalityDriftProbe (20 seasons): 0.3 left the top
+ * flights ~2.6 points too domestic on average (France +15.8 on seed 1), 0.2
+ * ~2.2 too foreign; 0.25 lands the average within half a point (seed 1: mean
+ * absolute gap 3.4, worst 8.4). What is left is league by league, not level.
+ */
+export const APPEAL_HOME = 0.25;
+
+/**
+ * How many rating points above his country's best clubs (`HomeClub.homeLevel`)
+ * a player can climb before his home attachment is gone. A player who has
+ * outgrown his home league moves on ambition, like a star (`homeAttachment`).
+ */
+export const APPEAL_HOME_FADE_RANGE = 5;
+
+/**
+ * Rating points of home level per point of a league's strength offset
+ * (`homeClubs`). A country's stage is set by its place on the ladder, not by
+ * its current squads: the strongest countries' level today, minus this per
+ * offset point. 0.94 is the measured ovr a league's starters lose per offset
+ * point at generation. Tied to the ladder rather than to the league's own
+ * squads because the self-referential version fed itself: a league that kept
+ * its players raised its own level, so fewer counted as outgrown and more
+ * stayed, until Brazil finished above the big four (20 seasons, seeds 1-2).
+ */
+export const APPEAL_HOME_LEVEL_PER_OFFSET = 0.94;
+
+/**
+ * A club outside his confederation, at full strength (stars feel none of it).
+ * OFF (0) after measurement, the line kept for a language/corridor version
+ * (docs/club-reputation.md). At 0.15 it was the wrong shape for the leagues
+ * whose real foreign blocks come from other continents: France, Portugal and
+ * Belgium ran 6-11 points too domestic, and a South American moving to Europe
+ * paid it on top of the home line, so Brazil stopped exporting and finished
+ * above the big four (20 seasons, seeds 1-2). Off: worst nationality gap 8.6 ->
+ * 7.0, Brazil 69.9 -> 67.9 / 67.6, level with France.
+ */
+export const APPEAL_CONFEDERATION = 0;
+
+/** Playing time, per rating point above (or below) the weakest starter at his position. */
+export const APPEAL_PLAYING_TIME = 0.02;
+/** How far below the weakest starter still counts: a bench role costs at most LO points' worth. */
+export const APPEAL_PLAYING_TIME_LO = 10;
+/** How far above counts: a sure starter gains at most HI points' worth. */
+export const APPEAL_PLAYING_TIME_HI = 5;
+
+/** A club he has played for before. Never a refusal. */
+export const APPEAL_FORMER_CLUB = 0.1;
+
+/** A loan is a season, not a career: home and confederation count this much on one. */
+export const APPEAL_LOAN_FACTOR = 0.5;
+
 /**
  * Settling-in friction: a player who has only just joined is much harder to
  * prise away again, scaling his club's keep-value up by this much in his first

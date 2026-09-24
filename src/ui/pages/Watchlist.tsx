@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { userView } from "../../core/transfers/userView.js";
+import { InterestTag } from "../components/InterestTag.js";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { watchlistEntries } from "../../core/watchlist.js";
@@ -41,6 +43,8 @@ export function Watchlist() {
   const { league } = useLeague();
 
   const entries = useMemo(() => (league ? watchlistEntries(league) : []), [league]);
+  // How each player sees your club (transfers/userView.ts).
+  const clubView = useMemo(() => (league ? userView(league) : null), [league]);
 
   const { sort, toggle, setSort } = useTableSort<SortKey>("ovr");
   const potView = usePotentialView();
@@ -249,7 +253,10 @@ export function Watchlist() {
                       ) : r.notForSaleReason ? (
                         <span className="text-muted">{r.notForSaleReason}</span>
                       ) : (
-                        <Link to="/transfers">Make an offer</Link>
+                        <>
+                          <InterestTag view={clubView?.of(p, r.tid) ?? null} />{" "}
+                          <Link to="/transfers">Make an offer</Link>
+                        </>
                       )}
                     </td>
                   </tr>
