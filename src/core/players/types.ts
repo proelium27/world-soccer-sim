@@ -52,7 +52,18 @@ export interface SeasonStats {
   ratingSum: number;
   /** Kept alongside ratingSum (rather than derived on read) so Leaders.tsx can sort/index it like any other stat. */
   avgRating: number;
+  /**
+   * The season split by club, present only when he played for more than one
+   * club this season (a mid-season transfer or loan). The row itself stays the
+   * whole season, with `tid` the latest club; each stint is one spell's line.
+   * Read one club's share through `statsAtClub` / `clubLines` in
+   * `seasonStints.ts`, never off the row directly. Absent = one club all season.
+   */
+  stints?: SeasonStatLine[];
 }
+
+/** One club's line within a season: a season row minus its breakdown. */
+export type SeasonStatLine = Omit<SeasonStats, "stints">;
 
 export function emptySeasonStats(season: number, tid: number = -1): SeasonStats {
   return {

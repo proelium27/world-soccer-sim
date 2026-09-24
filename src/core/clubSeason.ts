@@ -1,5 +1,6 @@
 import type { LeagueStore } from "./leagueState.js";
-import type { Position, SeasonStats } from "./players/types.js";
+import type { Position, SeasonStatLine } from "./players/types.js";
+import { statsAtClub } from "./players/seasonStints.js";
 import type { StandingsRow } from "./standings.js";
 import { computeStandings } from "./standings.js";
 import { tierOf, competitionSplit, competitionOf } from "./competitions.js";
@@ -37,7 +38,7 @@ export interface ClubSeasonPlayer {
    * stat, but not a row per season, so his goals and assists that year are
    * genuinely gone rather than merely unfetched.
    */
-  stats: SeasonStats | null;
+  stats: SeasonStatLine | null;
   /** He is gone from the live pool and this row was rebuilt from the retiree archive. */
   fromArchive: boolean;
 }
@@ -114,18 +115,18 @@ export interface ClubSeason {
  * squad-membership record; `ArchivedPlayer.seasons` is the same line kept for a
  * retiree after the player object is deleted.
  *
- * Two limits are inherent and are stated on the page rather than papered over.
- * `SeasonStats.tid` is the club he *finished* the season at (open decision #4),
- * so a winter signing appears only at his new club and a winter departure only
- * at his old one — this is the end-of-season squad. And the retiree archive is
- * quality-gated and hard-capped, so a squad from the distant past is missing
- * whoever fell out of it.
+ * A season split by a mid-season move lists him at every club he played for,
+ * each with only his own share (`statsAtClub`, seasonStints.ts), so a January
+ * departure still shows at the club he left. One limit is inherent and stated
+ * on the page rather than papered over: the retiree archive is quality-gated
+ * and hard-capped, and keeps one club per season (the one he finished at), so a
+ * squad from the distant past is missing whoever fell out of it.
  */
 function historicSquad(league: LeagueStore, tid: number, season: number): ClubSeasonPlayer[] {
   const squad: ClubSeasonPlayer[] = [];
 
   for (const p of league.players) {
-    const stats = p.stats.find((s) => s.season === season && s.tid === tid);
+    const stats = statsAtClub(p, season, tid);
     if (!stats) continue;
     squad.push({
       pid: p.pid,
@@ -170,7 +171,8 @@ function liveSquad(league: LeagueStore, tid: number, season: number): ClubSeason
   for (const pid of team.roster) {
     const p = byPid.get(pid);
     if (!p) continue;
-    const stats = p.stats.find((s) => s.season === season) ?? null;
+    // His line for THIS club: a January signing's goals for his old club aren't ours.
+    const stats = statsAtClub(p, season, tid) ?? null;
     squad.push({
       pid: p.pid,
       name: p.name,

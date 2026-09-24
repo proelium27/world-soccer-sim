@@ -1,4 +1,4 @@
-import type { SeasonStats } from "../core/players/types.js";
+import type { SeasonStatLine } from "../core/players/types.js";
 import { RATING_LEADER_QUALIFY_FRACTION } from "../core/constants.js";
 import { per90, per90QualifyingMinutes, PER90_STAT_KEYS } from "../core/stats/per90.js";
 
@@ -63,7 +63,7 @@ export function supportsPer90(stat: StatKey): boolean {
  * rate is asked for and no minutes are recorded.
  */
 export function leaderValue(
-  stats: SeasonStats,
+  stats: SeasonStatLine,
   stat: StatKey,
   mode: LeaderMode,
 ): number | null {
@@ -82,7 +82,7 @@ function ratingQualifyingAppearances(matchesPlayed: number): number {
 }
 
 function qualifies(
-  stats: SeasonStats,
+  stats: SeasonStatLine,
   stat: StatKey,
   mode: LeaderMode,
   matchesPlayed: number,
@@ -109,7 +109,7 @@ export interface RankLeadersOptions {
  * The board's top rows: qualified players, ranked by `leaderValue` descending,
  * ties broken by pid so the order is stable across renders.
  */
-export function rankLeaders<T extends { player: { pid: number }; stats: SeasonStats }>(
+export function rankLeaders<T extends { player: { pid: number }; stats: SeasonStatLine }>(
   rows: readonly T[],
   { stat, mode, matchesPlayed, limit = LEADER_ROW_LIMIT }: RankLeadersOptions,
 ): T[] {
