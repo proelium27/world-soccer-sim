@@ -220,6 +220,7 @@ the big four's 67.8 / 68.2, where `main` has Brazil at 63.1 / 63.5. Argentina
 | + registration rules off | 66.0 | 66.1 | 69.3 | not run |
 | home line off (rules on) | 65.1 | 65.1 | 68.2 | not run; Serbia 55.6, US 62.6 |
 | home line faded both ways over 0.15 / 0.35 | 64.8 / 65.9 | 65.1 / 66.4 | 68.1 / 67.7 | 23.9 / 21.7 |
+| rules, home and confederation all off (only the new free agency and playing time) | 65.0 | 65.9 | 69.0 | not run; Argentina 62.1 |
 
 - The self-referential home level was a real loop but not the cause: pinning a
   country's stage to its ladder place (APPEAL_HOME_LEVEL_PER_OFFSET) kept, as
