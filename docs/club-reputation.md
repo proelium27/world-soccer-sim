@@ -62,7 +62,9 @@ loops read it; so does the user's loan search.
 Club-proposing deferred acceptance in all three passes (shortfalls, depth
 upgrades, prospects) and the mop-up. Clubs offer for open slots in their own
 order; each player keeps the offer he likes best by his view of the club; a
-rejected club moves on. Stable, terminating, independent of input order. It
+rejected club moves on. Terminating and deterministic; stable and
+order-independent except at a registration cap, where a slot that skipped a
+player for a full cap never revisits him (rare, noted in freeAgencyMatch.ts). It
 replaces the worst-first queue: a squad player picks where he would play and
 where he is at home, which is the real reason small clubs sign real players,
 and the ladder audit has to confirm that rather than assume it. Free agency
@@ -87,8 +89,12 @@ all read.
 1. Nationality and country strings share one key space for every shipped
    league (`homeCountryKeys.test.ts`); a mismatch would fail silently.
 2. Free agency consumes no shared-rng draws (`freeAgencyRng.test.ts`).
-3. The matching is stable, order-independent and never double-signs
-   (`freeAgencyMatch.test.ts`); caps count tentative offers.
+3. The matching never double-signs and is stable and order-independent without
+   caps (`freeAgencyMatch.test.ts`); caps count tentative offers, and at a cap
+   the order-independence is only approximate (see freeAgencyMatch.ts).
+   Known small quirk: in AI free agency a player's preference for his own last
+   club is scored without the exemption that lets him re-sign there, so he may
+   rank it lower than he should.
 
 ## The first shape, and why it was replaced
 
@@ -236,7 +242,73 @@ seed per run):** ladder OK on seeds 1-3. Solvency: seed 1 −£0.1M (Serbia s18)
 seed 2 −£0.5M (Serbia s21), seed 3 solvent. Single-seed "BROKEN" flags land on
 a different converged rung each seed (seed 1 Belgium→Mexico −1.08 and
 US→Greece −1.30, seed 2 Scotland→Serbia −1.29, seed 3 Belgium→Mexico −1.97) and
-are pooled by hand before being read.
+are pooled by hand before being read. Seed 4: solvent, ladder OK.
+
+**The ladder: Brazil and Argentina stopped exporting.** The first branch audits
+(APPEAL_HOME 0.25, confederation 0.15) were solvent on every seed with zero
+deficits, but Brazil held its generated level for 20 seasons while every other
+league slipped: season-21 strength (seed 1 / seed 2) Brazil 69.5 / 70.6 against
+the big four's 67.8 / 68.2, where `main` has Brazil at 63.1 / 63.5. Argentina
++3.7 on `main`, the United States −1.5. Each part was then switched off in turn
+(20 seasons, seed 1, Brazil at season 21):
+
+| Variant | Brazil | France | Big four | Worst nationality gap |
+|---|---|---|---|---|
+| `main` | 63.1 | 66.2 | 69.5 | the original drift |
+| Home level read off own squads | 69.5 | 64.3 | 67.8 | 9.1 |
+| Home level pinned to the ladder | 69.9 | 65.8 | 68.7 | 8.6 |
+| + confederation line off | **67.9** (s2 67.6) | 67.8 | 69.0 | **7.0** |
+| + leaving home free on a step up | 68.4 | 67.3 | 69.2 | 8.8 |
+| + registration rules off | 66.0 | 66.1 | 69.3 | not run |
+| home line off (rules on) | 65.1 | 65.1 | 68.2 | not run; Serbia 55.6, US 62.6 |
+| home line faded both ways over 0.15 / 0.35 | 64.8 / 65.9 | 65.1 / 66.4 | 68.1 / 67.7 | 23.9 / 21.7 |
+| rules, home and confederation all off (only the new free agency and playing time) | 65.0 | 65.9 | 69.0 | not run; Argentina 62.1 |
+
+- The self-referential home level was a real loop but not the cause: pinning a
+  country's stage to its ladder place (APPEAL_HOME_LEVEL_PER_OFFSET) kept, as
+  the cleaner rule, moved nothing.
+- The **confederation line** was the wrong shape: it taxed a South American
+  twice going to Europe and held France, Portugal and Belgium (whose real
+  foreign blocks are mostly non-European) too domestic. Off, both measures
+  improve. It stays in the code at 0 for a language-corridor version.
+- The rest splits between the **registration rules** (~2.4: every Brazilian and
+  Argentine counts as non-EU, so Spain's, France's and Greece's caps stop
+  European clubs buying them; in reality many hold Italian or Spanish passports)
+  and the **home line** (~3). Fading the home line on moves between clubs of
+  different level removes Brazil's excess and destroys nationality realism with
+  it, because the pull toward home is what keeps every league domestic. Leaving
+  home free on a step up alone does nothing.
+- **Four-seed audit at the shipped settings, pooled by hand** (seeds 1-2 from
+  the confederation-off runs, 3-4 on the final tree), against `origin/main`:
+  solvency **4/4 seeds, 0 of 882 clubs in deficit at any of 42 samples** (main:
+  small Serbian dips on seeds 1-2). Rung means, branch / main: BIG4→France
+  +1.80 / +3.66, **France→Brazil −1.27 / +2.51 (fails the ±1 mean gate)**,
+  Brazil→Netherlands +4.63 / −0.19, Netherlands→Argentina −0.82 / +1.54,
+  Argentina→Portugal +3.09 / −0.07, Portugal→Belgium +0.50 / +1.96,
+  Belgium→Mexico +1.43 / −0.96, Mexico→Turkey +0.65 / +1.24, Turkey→US −0.02 /
+  +0.90, US→Greece −0.50 / −0.29, Greece→Scotland −0.43 / +0.17,
+  Scotland→Serbia +0.10 / −0.37. Brazil at season 21 by seed: 67.9, 67.6, 69.3,
+  67.9 against the big four's 69.0, 68.6, 68.8, 68.5.
+- **Why good Brazilians stay: a club's stature does not know how good it is.**
+  `scripts/statureGapProbe.ts` at generation: Brazil's best club 0.620 against a
+  median big-four club 0.512-0.530, so to a player a move from Brazil's best
+  club to a mid-table Premier League side reads as a step DOWN. Stature is squad
+  strength plus hype, and hype is ranked within a club's own league, so the top
+  of any league looks equally famous. Deferred to Stage 2 as a stature fix,
+  with a design rule from the user: players are pulled to good clubs, never by
+  continent; good clubs happen to be in Europe. So stature should read what
+  makes a club good (squad, earned reputation on one world scale, its own
+  wealth), plus a real pull up for good players, not only stars. PR #401 merges
+  with the France→Brazil rung open for that.
+- Nationality with the confederation line off, both seeds: mean absolute gap
+  3.5 / 4.4, worst 7.0 / 8.5, mean signed gap about −2 (slightly too foreign).
+  Raising APPEAL_HOME would re-centre it but is the same pull that holds Brazil
+  up, so it was left at 0.25.
+- Shipped: confederation off. Brazil ends level with France and about a point
+  below the big four (Opta's real league rankings put the Brasileirao around
+  Ligue 1). Open: second passports as a real rule (the Spanish two-year route
+  for Ibero-Americans, Italian oriundi), which would take roughly two points
+  more off Brazil and Argentina.
 
 ## Foreign-player registration rules (Stage 1, step 3)
 

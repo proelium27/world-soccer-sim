@@ -4,7 +4,7 @@ import {
 } from "../../src/core/transfers/clubAppeal.js";
 import { POSITIONS, type Player, type Position } from "../../src/core/players/types.js";
 import type { HomeClub } from "../../src/core/transfers/homePull.js";
-import { APPEAL_FORMER_CLUB, APPEAL_LOAN_FACTOR } from "../../src/core/constants.js";
+import { APPEAL_FORMER_CLUB, APPEAL_LOAN_FACTOR, APPEAL_CONFEDERATION } from "../../src/core/constants.js";
 
 const player = (nationality: string, ovr: number, extra: Partial<Player> = {}) =>
   ({ pid: 1, nationality, ovr, pos: "CM", stats: [], ...extra }) as unknown as Player;
@@ -56,14 +56,14 @@ describe("clubAppealFor", () => {
     expect(arriving.value).toBeGreaterThan(0);
   });
 
-  it("counts a club outside his confederation against it, symmetrically, and not for a star", () => {
+  it("shows no far-from-home line while APPEAL_CONFEDERATION is off", () => {
+    // Switched off after measurement (see the constant); the line stays in the
+    // code for a language-corridor version and must not show while it is 0.
+    expect(APPEAL_CONFEDERATION).toBe(0);
     const within = club(1, 0.3, home("Uruguay", "South America"), 60);
     const outside = club(2, 0.3, spain, 60);
-    const conf = (p: Player, to: AppealClub, from: AppealClub) =>
-      clubAppealFor(p, to, { stature: 0.3, club: from }).lines.find((l) => l.id === "confederation")?.value ?? 0;
-    expect(conf(player("Argentina", 60), outside, within)).toBeLessThan(0);
-    expect(conf(player("Argentina", 60), within, outside)).toBeCloseTo(-conf(player("Argentina", 60), outside, within));
-    expect(conf(player("Argentina", 90), outside, within)).toBe(0);
+    const lines = clubAppealFor(player("Argentina", 60), outside, { stature: 0.3, club: within }).lines;
+    expect(lines.find((l) => l.id === "confederation")).toBeUndefined();
   });
 
   it("likes a former club and never refuses to go back to one", () => {

@@ -2817,7 +2817,9 @@ export function Manual() {
             Transfers tables, the Watchlist and the loan search, each player carries a label for how he
             feels about joining you: <strong>Keen</strong>, <strong>Open</strong>,{" "}
             <strong>Reluctant</strong> or <strong>Won&apos;t talk</strong>. Hover it for his reasons.
-            The AI clubs weigh players on exactly the same reasons, so what you read is what decides.
+            It&apos;s the same view every club gets. When AI clubs compete for a player, it decides
+            where he goes. On your own offers only <strong>Won&apos;t talk</strong> stops a deal. The
+            rest tells you how he feels about you, which matters when others want him too.
           </p>
           <ul>
             <li>
@@ -2849,16 +2851,12 @@ export function Manual() {
               smaller league wants a bigger stage.
             </li>
             <li>
-              <strong>Far from home.</strong> A club outside his own part of the world counts a little
-              against it.
-            </li>
-            <li>
-              <strong>Former club.</strong> He&apos;s a bit warmer on a club he&apos;s played for, and
-              he&apos;ll never refuse to go back to one.
+              <strong>Former club.</strong> He&apos;s a bit warmer on a club he&apos;s played for. A
+              free agent will always talk to the club he last played for, however far it has fallen.
             </li>
           </ul>
           <p>
-            On a loan the home and far-from-home reasons count for half, since it&apos;s only a season.
+            On a loan the home reason counts for half, since it&apos;s only a season.
           </p>
           <p>
             <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent
