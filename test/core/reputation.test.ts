@@ -68,18 +68,20 @@ describe("club reputation", () => {
     expect(continentalScore(cup("shield"), 1)).toBe(REPUTATION_CONTINENTAL_WON * REPUTATION_COMPETITION_SCALE.shield);
   });
 
-  // From an eighth-place finish, a title in a strong league (the climb to first
-  // plus the title bonus) is worth more than a semi-final run and less than
-  // winning the Continental Cup. docs/club-reputation.md, Stage 2.
-  it("orders seasons: continental winner > title in a strong league > deep run > domestic cup > plain finish", () => {
+  // From an eighth-place finish in England: winning the Continental Cup, then
+  // losing its final, then a semi-final, all beat climbing to first and taking
+  // the title, which beats the domestic cup. docs/club-reputation.md, Stage 2.
+  it("orders seasons: cup win > final > semi-final > league title > domestic cup > plain finish", () => {
     const winner = reputationTarget(season({ continental: REPUTATION_CONTINENTAL_WON }));
-    const deepRun = reputationTarget(season({ continental: REPUTATION_CONTINENTAL_BY_ROUNDS_FROM_FINAL[1] }));
+    const final = reputationTarget(season({ continental: REPUTATION_CONTINENTAL_BY_ROUNDS_FROM_FINAL[0] }));
+    const semi = reputationTarget(season({ continental: REPUTATION_CONTINENTAL_BY_ROUNDS_FROM_FINAL[1] }));
     const title = reputationTarget(season({ finish: finishScore(england, 1, 20), champion: true }));
     const cupWin = reputationTarget(season({ domesticCup: true }));
     const plain = reputationTarget(season());
-    expect(winner).toBeGreaterThan(title);
-    expect(title).toBeGreaterThan(deepRun);
-    expect(deepRun).toBeGreaterThan(cupWin);
+    expect(winner).toBeGreaterThan(final);
+    expect(final).toBeGreaterThan(semi);
+    expect(semi).toBeGreaterThan(title);
+    expect(title).toBeGreaterThan(cupWin);
     expect(cupWin).toBeGreaterThan(plain);
   });
 

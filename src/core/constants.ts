@@ -2958,13 +2958,13 @@ export const REPUTATION_PROMOTION_BONUS = 5;
 /** Taken off for being relegated. */
 export const REPUTATION_RELEGATION_PENALTY = 8;
 /** Added for winning the Continental Cup (scaled for the other competitions). */
-export const REPUTATION_CONTINENTAL_WON = 25;
+export const REPUTATION_CONTINENTAL_WON = 35;
 /** Added for a knockout exit, by rounds from the final: lost the final, SF, QF, R16 and earlier. */
-export const REPUTATION_CONTINENTAL_BY_ROUNDS_FROM_FINAL = [18, 14, 11, 9] as const;
+export const REPUTATION_CONTINENTAL_BY_ROUNDS_FROM_FINAL = [28, 23, 17, 12] as const;
 /** Added for going out in the playoff round. */
-export const REPUTATION_CONTINENTAL_PLAYOFF = 7;
+export const REPUTATION_CONTINENTAL_PLAYOFF = 8;
 /** Added for taking part and going out in the league phase or opening stage. */
-export const REPUTATION_CONTINENTAL_OPENING = 5;
+export const REPUTATION_CONTINENTAL_OPENING = 6;
 /** How much each continental competition's run counts, relative to the Continental Cup. */
 export const REPUTATION_COMPETITION_SCALE: Record<CupCompetitionId, number> = {
   continental: 1,

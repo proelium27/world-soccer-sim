@@ -127,19 +127,21 @@ Serbian champion (42.5) by construction.
 
 **Target, from that season only.** Finish in the division the club played in,
 plus title (8, a top flight's recorded champion or a lower division's playoff
-winner), domestic cup (6), every continental run (won 25; lost final 18, SF 14,
-QF 11, earlier 9; playoff 7; league phase 5; × 1 / 0.5 / 0.7 for Cup / Shield /
+winner), domestic cup (6), every continental run (won 35; lost final 28, SF 23,
+QF 17, earlier 12; playoff 8; league phase 6; × 1 / 0.5 / 0.7 for Cup / Shield /
 Americas Cup), promotion (+5), relegation (−8), clamped to [0, 100]. No squad
 strength and no hype term: a club cannot buy a name, it has to win with the
 squad. Stepped at offseason step 3.61 (after the promotion swap, while the cups
 are still the finished ones): 10% of the gap a season upward, 4.5% downward.
 Zero rng draws.
 
-**Ordering the constants give** (from an 8th-place finish in England): Cup win
-> league title > Cup semi-final > domestic cup > nothing. The plan listed a
-deep continental run above a strong-league title; with these values a title
-(climb to first plus the bonus, ~19) beats a semi-final (14) and even a lost
-final (18). A tuning question, pinned as-is by `test/core/reputation.test.ts`.
+**Ordering** (from an 8th-place finish in England, the agreed design order):
+Cup win (+35) > lost final (+28) > semi-final (+23) > league title (climb to
+first plus the bonus, ~+19) > domestic cup (+6) > nothing. The continental
+values were raised from a first draft (25 / 18 / 14 / 11 / 9 / 7 / 5) under
+which a title beat a lost final. Pinned by `test/core/reputation.test.ts`.
+A lower-division club that tops its table is not a champion here (only a
+lower division's title-playoff winner is); the promotion bonus credits it.
 
 **Seeding.** A new world, a roster import (forced reseed, since squads are
 replaced) and migration of an old save give each club the finish score its squad
