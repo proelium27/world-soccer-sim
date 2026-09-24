@@ -235,6 +235,10 @@ the big four's 67.8 / 68.2, where `main` has Brazil at 63.1 / 63.5. Argentina
   different level removes Brazil's excess and destroys nationality realism with
   it, because the pull toward home is what keeps every league domestic. Leaving
   home free on a step up alone does nothing.
+- Nationality with the confederation line off, both seeds: mean absolute gap
+  3.5 / 4.4, worst 7.0 / 8.5, mean signed gap about −2 (slightly too foreign).
+  Raising APPEAL_HOME would re-centre it but is the same pull that holds Brazil
+  up, so it was left at 0.25.
 - Shipped: confederation off. Brazil ends level with France and about a point
   below the big four (Opta's real league rankings put the Brasileirao around
   Ligue 1). Open: second passports as a real rule (the Spanish two-year route
