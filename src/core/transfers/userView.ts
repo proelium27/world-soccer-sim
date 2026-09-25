@@ -4,20 +4,18 @@
  * the loan search) reads the same answer the AI decides with.
  * docs/club-reputation.md, A7.
  *
- * Pure; builds the league's club contexts once, then answers per player.
+ * Pure; builds the league's club contexts once (through `playerChoice`, which
+ * the signing actions read too), then answers per player.
  */
 import type { Player } from "../players/types.js";
 import type { LeagueStore } from "../leagueState.js";
-import { deriveLeagueContexts } from "../ai/clubContext.js";
 import { clubAppealFor, type ClubAppeal } from "./clubAppeal.js";
-import { freeAgentStature, lastClubTid } from "./playerWill.js";
 import { worldRules, type RuleStanding } from "../foreignRules.js";
+import { playerChoice, INTEREST_KEEN, INTEREST_RELUCTANT } from "./playerChoice.js";
+
+export { INTEREST_KEEN, INTEREST_RELUCTANT };
 
 export type Interest = "Keen" | "Open" | "Reluctant" | "Won't talk";
-
-/** Score above which he is keen, and below which he is reluctant. */
-export const INTEREST_KEEN = 0.15;
-export const INTEREST_RELUCTANT = -0.05;
 
 export function interestOf(appeal: ClubAppeal): Interest {
   if (appeal.refused) return "Won't talk";
@@ -47,6 +45,11 @@ export interface UserView {
    * leave (a transfer or loan); omit it for a free agent.
    */
   of(player: Player, fromTid?: number, loan?: boolean): UserSigningView | null;
+  /**
+   * The AI club a free agent would sign for instead of the user, or null when
+   * the user's club is at least as good a fit (`playerChoice`).
+   */
+  freeAgentRival(player: Player): number | null;
   /** Where the user's squad stands against its league's rules; empty if it has none. */
   standings: RuleStanding[];
 }
@@ -54,32 +57,25 @@ export interface UserView {
 export function userView(league: LeagueStore): UserView {
   const userTid = league.meta.userTid;
   const user = league.teams.find((t) => t.tid === userTid);
-  const contexts = deriveLeagueContexts({
-    teams: league.teams, players: league.players, season: league.season,
-    played: league.played, competitions: league.competitions,
-  });
-  const userCtx = contexts.get(userTid);
+  const choice = playerChoice({
+    teams: league.teams, players: league.players, competitions: league.competitions,
+    season: league.season, played: league.played, model: league.progressionModel,
+  }, userTid);
+  const userCtx = choice.contexts.get(userTid);
   const byPid = new Map(league.players.map((p) => [p.pid, p]));
   const rules = worldRules(league.teams, league.competitions, (pid) => byPid.get(pid), league.season);
   const squad = rules.forSquad(userTid, user?.roster ?? []);
-  const statures = new Map([...contexts].map(([tid, c]) => [tid, c.stature]));
-  const worldMax = statures.size > 0 ? Math.max(...statures.values()) : 1;
   return {
     standings: user ? rules.standings(userTid, user.roster) : [],
     of(player, fromTid, loan) {
       if (!userCtx) return null;
-      const fromCtx = fromTid === undefined ? undefined : contexts.get(fromTid);
-      // A free agent weighs an offer against the stature he expects, and never
-      // refuses to return to the club he last played for.
-      const from = fromCtx
-        ? { stature: fromCtx.stature, club: fromCtx }
-        : {
-          stature: lastClubTid(player) === userTid
-            ? Math.min(freeAgentStature(player, statures, worldMax), userCtx.stature)
-            : freeAgentStature(player, statures, worldMax),
-        };
+      const fromCtx = fromTid === undefined ? undefined : choice.contexts.get(fromTid);
+      const from = fromCtx ? { stature: fromCtx.stature, club: fromCtx } : choice.freeAgentFrom(player);
       const appeal = clubAppealFor(player, userCtx, from, { loan });
       return { appeal, interest: interestOf(appeal), blocked: squad.block(player) };
+    },
+    freeAgentRival(player) {
+      return choice.freeAgentRival(player)?.tid ?? null;
     },
   };
 }

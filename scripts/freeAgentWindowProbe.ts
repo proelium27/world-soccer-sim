@@ -45,7 +45,7 @@ function pool(l: LeagueStore): Player[] {
 
 function line(tag: string, l: LeagueStore): string {
   const fa = pool(l);
-  const statures = clubStatures(l.teams, l.players);
+  const statures = clubStatures(l.teams, l.players, l.competitions);
   const n = (lo: number, hi: number) => fa.filter((p) => p.ovr >= lo && p.ovr < hi).length;
   const best = BANDS.map(([label, s]) => {
     const top = fa

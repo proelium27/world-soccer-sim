@@ -618,7 +618,7 @@ describe("runAIFreeAgency player will", () => {
   // the pyramid was the one pass that never asked him.
   it("does not let the weakest club in the world sign an elite free agent", () => {
     const league = makeLeague(0, 1);
-    const statures = clubStatures(league.teams, league.players);
+    const statures = clubStatures(league.teams, league.players, league.competitions);
     const ranked = [...league.teams].sort(
       (a, b) => (statures.get(a.tid) ?? 0) - (statures.get(b.tid) ?? 0),
     );

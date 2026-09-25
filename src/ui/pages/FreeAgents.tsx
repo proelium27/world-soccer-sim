@@ -10,6 +10,7 @@ import { formatWeeklyWage } from "../format.js";
 import { Flag } from "../components/Flag.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { WatchToggle } from "../components/WatchToggle.js";
+import { ClubLink } from "../components/ClubLink.js";
 import { PotDisplay } from "../components/PotDisplay.js";
 import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
@@ -72,7 +73,7 @@ export function FreeAgents() {
   // rebuilds a league-wide player index on every call, which on a 25-row table
   // over a 19,000-player pool is the quadratic case clubStatures warns about.
   const statures = useMemo(
-    () => (league ? clubStatures(league.teams, league.players) : new Map<number, number>()),
+    () => (league ? clubStatures(league.teams, league.players, league.competitions) : new Map<number, number>()),
     [league],
   );
   // How each player sees your club, and your league's registration rules
@@ -114,11 +115,32 @@ export function FreeAgents() {
   const refusesFor = (p: Player) =>
     userTeam != null
     && refusesFreeAgentSigningWith(p, statures.get(userTeam.tid) ?? 0, statures, userTeam.tid);
+  // And a player who'd sign for an AI club instead (playerChoice.ts). That
+  // check walks every club, so it runs only for the players good enough to be
+  // listed at all (the top RIVAL_WINDOW by OVR + ceiling); below that the page
+  // cap would hide them either way.
+  const RIVAL_WINDOW = 200;
+  const inRivalWindow = new Set(
+    [...availablePlayers]
+      .sort((a, b) => b.ovr + potView.ceiling(b) - (a.ovr + potView.ceiling(a)))
+      .slice(0, RIVAL_WINDOW)
+      .map((p) => p.pid),
+  );
+  const rivals = new Map<number, number | null>();
+  const rivalFor = (p: Player): number | null => {
+    if (!inRivalWindow.has(p.pid)) return null;
+    let v = rivals.get(p.pid);
+    if (v === undefined) {
+      v = clubView?.freeAgentRival(p) ?? null;
+      rivals.set(p.pid, v);
+    }
+    return v;
+  };
   const unsignable = new Map<number, boolean>();
   const unsignableFor = (p: Player) => {
     let v = unsignable.get(p.pid);
     if (v === undefined) {
-      v = refusesFor(p) || !!clubView?.of(p)?.blocked;
+      v = refusesFor(p) || !!clubView?.of(p)?.blocked || rivalFor(p) !== null;
       unsignable.set(p.pid, v);
     }
     return v;
@@ -270,6 +292,10 @@ export function FreeAgents() {
                     ) : seen?.blocked ? (
                       <span className="text-muted small" title={seen.blocked}>
                         League rules
+                      </span>
+                    ) : rivalFor(p) !== null ? (
+                      <span className="text-muted small text-nowrap" title="He'd rather sign for this club">
+                        Prefers <ClubLink tid={rivalFor(p)!} />
                       </span>
                     ) : (
                       <>

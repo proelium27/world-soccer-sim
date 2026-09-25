@@ -2,9 +2,11 @@ import type { Player } from "../players/types.js";
 import { appealMultiplier } from "./clubAppeal.js";
 import type { StoredTeam } from "../teams/clubs.js";
 import type { ClubContext } from "../ai/clubContext.js";
-import { clubStature, clubStatures } from "../ai/clubContext.js";
+import { clubStature, clubStatures, clubWealth } from "../ai/clubContext.js";
+import type { Competition } from "../competitions.js";
+import { teamReputation } from "../teams/reputation.js";
 import {
-  PLAYER_WILL_CARE_FLOOR, PLAYER_WILL_CARE_CEILING,
+  PLAYER_WILL_CARE_FLOOR, PLAYER_WILL_CARE_CEILING, PLAYER_WILL_AMBITION_FLOOR,
   PLAYER_WILL_DROP_STRENGTH, PLAYER_WILL_REFUSAL_DROP, PLAYER_WILL_RISE_BONUS,
   PLAYER_SETTLED_BONUS, PLAYER_SETTLED_SEASONS,
   STATURE_STRENGTH_HI,
@@ -73,13 +75,25 @@ export function refusesMove(playerOvr: number, fromStature: number, toStature: n
  * and a grudging move doesn't get bid up into a headline fee.
  */
 export function moveAppeal(playerOvr: number, fromStature: number, toStature: number): number {
-  const care = statureSensitivity(playerOvr);
-  if (care <= 0) return 1;
   if (refusesMove(playerOvr, fromStature, toStature)) return 0;
-
   const delta = toStature - fromStature;
-  if (delta >= 0) return 1 + care * PLAYER_WILL_RISE_BONUS * delta;
+  // A step up reads ambition, which starts lower than care: a good player wants
+  // a bigger stage well before he'd refuse a smaller one.
+  if (delta >= 0) return 1 + playerAmbition(playerOvr) * PLAYER_WILL_RISE_BONUS * delta;
+  const care = statureSensitivity(playerOvr);
   return Math.max(0, 1 - care * PLAYER_WILL_DROP_STRENGTH * -delta);
+}
+
+/**
+ * How strongly this player is drawn to a bigger club, [0,1]. Ramps from
+ * PLAYER_WILL_AMBITION_FLOOR to PLAYER_WILL_CARE_CEILING, so a good player feels
+ * the pull of a bigger stage while only a star refuses a smaller one.
+ */
+export function playerAmbition(playerOvr: number): number {
+  return clamp01(
+    (playerOvr - PLAYER_WILL_AMBITION_FLOOR) /
+      (PLAYER_WILL_CARE_CEILING - PLAYER_WILL_AMBITION_FLOOR),
+  );
 }
 
 /**
@@ -96,14 +110,15 @@ export function refusesMoveToClub(
   seller: StoredTeam,
   buyer: StoredTeam,
   players: Player[],
+  competitions: readonly Competition[],
 ): boolean {
   const byPid = new Map(players.map((p) => [p.pid, p]));
   const rosterOf = (t: StoredTeam): Player[] =>
     t.roster.map((pid) => byPid.get(pid)).filter((p): p is Player => p != null);
   return refusesMove(
     player.ovr,
-    clubStature(rosterOf(seller), seller.hype),
-    clubStature(rosterOf(buyer), buyer.hype),
+    clubStature(rosterOf(seller), teamReputation(seller), clubWealth(competitions, seller.compId, teamReputation(seller))),
+    clubStature(rosterOf(buyer), teamReputation(buyer), clubWealth(competitions, buyer.compId, teamReputation(buyer))),
   );
 }
 
@@ -221,11 +236,12 @@ export function refusesFreeAgentSigning(
   buyer: StoredTeam,
   teams: StoredTeam[],
   players: Player[],
+  competitions: readonly Competition[],
 ): boolean {
   // Checked before any index is built: most of a real pool is below the care
   // floor, and this is on the click path of a page listing thousands.
   if (statureSensitivity(player.ovr) <= 0) return false;
-  const statures = clubStatures(teams, players);
+  const statures = clubStatures(teams, players, competitions);
   return refusesFreeAgentSigningWith(player, statures.get(buyer.tid) ?? 0, statures, buyer.tid);
 }
 
