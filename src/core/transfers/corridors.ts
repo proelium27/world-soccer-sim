@@ -49,7 +49,7 @@ export const CORRIDORS: readonly Corridor[] = [
   { to: "Netherlands", from: ["Morocco"], strength: 0.5, reason: "Family ties" },
   { to: "Spain", from: SPANISH_SPEAKING_AMERICAS, strength: 0.5, reason: "Language" },
   { to: "Italy", from: ["Argentina", "Uruguay"], strength: 0.4, reason: "Italian roots" },
-  { to: "Mexico", from: SPANISH_SPEAKING_AMERICAS, strength: 0.75, reason: "Language" },
+  { to: "Mexico", from: SPANISH_SPEAKING_AMERICAS, strength: 0.3, reason: "Language" },
   { to: "Scotland", from: ENGLISH_SPEAKING_ABROAD, strength: 1, reason: "Language" },
   { to: "England", from: ENGLISH_SPEAKING_ABROAD, strength: 0.5, reason: "Language" },
   { to: "United States", from: ["Canada"], strength: 0.75, reason: "Neighbours" },
