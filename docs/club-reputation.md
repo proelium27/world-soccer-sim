@@ -228,9 +228,15 @@ the ±1 mean gate. BIG4→France +2.90, **France→Brazil +1.20**, Brazil→Neth
 +1.97, Belgium→Mexico −0.05, Mexico→Turkey +2.00, Turkey→US −0.32, US→Greece
 +0.14, Greece→Scotland +0.33, Scotland→Serbia −0.90. BIG4→Serbia ~12.4. 0 of
 882 clubs in deficit at any sample on any seed. Nationality (seeds 1-2): worst
-gap 9.1 / 10.5, mean absolute 4.6 / 4.2; Spain and Italy run ~9-10 points too
-foreign as their clubs attract more talent, the one place Stage 2 is worse than
-Stage 1.
+gap 9.1 / 10.5 / 11.1 (seeds 1-3), mean absolute 4.6 / 4.2 / 4.3. Spain
+(−9 to −11), Italy (−9 to −11) and England (−4 to −8) run too foreign as their
+clubs attract talent from everywhere; Brazil, Mexico and the US land within ~2
+points and most smaller leagues within ~6 (Serbia −7 to −8 the furthest).
+**Accepted by the user (2026-09-24): the goal is talent flowing to the big
+European leagues and the smaller leagues staying realistically domestic, so the
+big four running a little more foreign than real life is fine.** Raising
+APPEAL_HOME would pull them back but is the same pull that held Brazil up, so
+it was deliberately left at 0.25.
 
 ## Stage 3 (planned)
 
