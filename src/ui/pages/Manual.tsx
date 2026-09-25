@@ -2853,12 +2853,20 @@ export function Manual() {
               smaller league wants a bigger stage.
             </li>
             <li>
+              <strong>Language and family ties.</strong> Some countries feel familiar to a player who
+              wasn&apos;t born there: Brazilians settle in Portugal, French-speaking Africans in France and
+              Belgium, Surinamese and Curacaoans in the Netherlands, Spanish-speaking South Americans in
+              Mexico and Spain, Australians and Canadians in Scotland. These are the real routes football
+              follows, and they pull the same way home does, weaker for stars. His reasons name the tie,
+              such as &quot;Language&quot; or &quot;Family ties&quot;.
+            </li>
+            <li>
               <strong>Former club.</strong> He&apos;s a bit warmer on a club he&apos;s played for. A
               free agent will always talk to the club he last played for, however far it has fallen.
             </li>
           </ul>
           <p>
-            On a loan the home reason counts for half, since it&apos;s only a season.
+            On a loan the home and language reasons count for half, since it&apos;s only a season.
           </p>
           <p>
             <strong>How he sees clubs.</strong> Every player&apos;s profile has a card with his view of

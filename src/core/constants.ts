@@ -2949,6 +2949,15 @@ export const APPEAL_HOME_LEVEL_PER_OFFSET = 0.94;
  */
 export const APPEAL_CONFEDERATION = 0;
 
+/**
+ * A country he finds familiar although he wasn't born there (a shared language
+ * or family ties, transfers/corridors.ts), per unit of the route's strength, at
+ * full strength (stars feel less of it, like the home line). Symmetric: leaving
+ * a familiar country costs what arriving pays. First value, to be tuned on
+ * scripts/nationalityDriftProbe.ts.
+ */
+export const APPEAL_LANGUAGE = 0.08;
+
 /** Playing time, per rating point above (or below) the weakest starter at his position. */
 export const APPEAL_PLAYING_TIME = 0.02;
 /** How far below the weakest starter still counts: a bench role costs at most LO points' worth. */
