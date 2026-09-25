@@ -2861,6 +2861,13 @@ export function Manual() {
             On a loan the home reason counts for half, since it&apos;s only a season.
           </p>
           <p>
+            <strong>How he sees clubs.</strong> Every player&apos;s profile has a card with his view of
+            your club and his reasons, the five clubs he&apos;d most like to join, the five best clubs
+            where he&apos;d actually get games, and how many clubs he wouldn&apos;t talk to at all. For a
+            good player the first list is mostly the world&apos;s biggest clubs; the second is where he
+            could realistically end up. Hover a club for his full reasons.
+          </p>
+          <p>
             <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent
             takes the one he likes best, rather than the worst club in the world getting first pick. That
             goes for you too: a free agent signs for you only if your club suits him at least as well as
