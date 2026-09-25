@@ -156,9 +156,10 @@ no opening transient. A seed, not a reconstruction of an old save's history.
 
 **Stature reads how good a club is.** `0.45 × squad strength + 0.2 ×
 reputation / 100 + 0.35 × wealth` (`STATURE_W_STRENGTH`, `STATURE_W_REPUTATION`,
-`STATURE_W_WEALTH`), where wealth is the club's own income scale
-(`clubWealth` = `financeScale`, 1 at a big-four top-flight club), the stand-in
-for wages until wages exist. All three are the club's own; there is no
+`STATURE_W_WEALTH`), where wealth is `clubWealth`: the league's money scale
+(`financeScale`, 1 at a big-four top flight) times how big a name the club is on
+the world scale, `0.5 + 0.5 × reputation / 100`. It is the stand-in for wages
+until wages exist. All three are the club's own; there is no
 regional term (user rule: players are pulled to good clubs, and good clubs
 happen to be in Europe). The first shape, `0.65 × squad + 0.35 × reputation`,
 still rated Brazil's best club (0.67) above a median big-four club (0.56),
@@ -193,7 +194,7 @@ good players everywhere now move up to the best clubs, so the ladder widens.
 8.5 / 9.6, mean absolute 3.6 / 3.8 (Stage 1 about the same); the big-four
 leagues run a few points more foreign, as their clubs import more talent.
 
-**Four seeds pooled by hand** (Stage 2 / Stage 1 / main): every rung within the
+**First four-seed audit, before the review fixes** (Stage 2 / Stage 1 / main): every rung within the
 ±1 mean gate. BIG4→France +3.49 / +1.80 / +3.66, **France→Brazil +0.84** /
 −1.27 / +2.51, Brazil→Netherlands +2.60 / +4.63 / −0.19, Netherlands→Argentina
 −0.34 / −0.82 / +1.54, Argentina→Portugal +3.08 / +3.09 / −0.07,
@@ -203,6 +204,33 @@ BIG4→Serbia 12.95 (main ~10): the ladder widens as good players move up to the
 best clubs, the big four ending ~71 against main's ~69.5. Brazil averages 66.7
 against France's 67.5. Solvency 4/4 seeds, 0 of 882 clubs in deficit at any of
 42 samples.
+
+**Review fixes (a /code-review pass on Stage 2), and one that went wrong.**
+Wealth was a league label (every club in a division read the same), so it was
+first rebuilt from the club's money ceiling (`budgetCap`: league money × hype).
+Hype is ranked within a club's own division, so that made the top of every league
+read equally rich again: four seeds pooled, France→Brazil fell to **−0.92** and
+Italy ran 10-13 points too foreign. The user's objection, "players shop clubs
+across the entire world", is the rule: nothing in stature may be ranked within a
+league. Wealth now reads reputation (world-scaled) instead. The other review
+fixes, all in: a player's view decides whether an AI deal happens but not the
+fee; a loan counts as half a move for the level line and refusals; AI free
+agency rebuilds contexts between passes; every division's champion earns the
+title bonus; reputation's finish scale is proportional (positive everywhere);
+Swiss players register as EU; Welsh training counts for England; and players
+choose the user as they choose AI clubs (`playerChoice.ts`: a free agent signs
+only if the user suits him at least as well as the best AI club that wants him,
+and a Reluctant player turns the user's bid down).
+
+**Four seeds pooled, final shape (wealth from reputation):** every rung within
+the ±1 mean gate. BIG4→France +2.90, **France→Brazil +1.20**, Brazil→Netherlands
++2.41, Netherlands→Argentina +0.80, Argentina→Portugal +1.98, Portugal→Belgium
++1.97, Belgium→Mexico −0.05, Mexico→Turkey +2.00, Turkey→US −0.32, US→Greece
++0.14, Greece→Scotland +0.33, Scotland→Serbia −0.90. BIG4→Serbia ~12.4. 0 of
+882 clubs in deficit at any sample on any seed. Nationality (seeds 1-2): worst
+gap 9.1 / 10.5, mean absolute 4.6 / 4.2; Spain and Italy run ~9-10 points too
+foreign as their clubs attract more talent, the one place Stage 2 is worse than
+Stage 1.
 
 ## Stage 3 (planned)
 
