@@ -37,7 +37,7 @@ import { wouldRefuseExtension } from "../../core/ai/breakoutRefusal.js";
 import { applyTeamIdentities, type TeamIdentityEdit } from "../../core/teams/customize.js";
 import {
   movePlayerToClub, detachPlayer, applyPlayerEdit, createCustomPlayer, setClubFinances,
-  type PlayerEdit, type NewPlayerSpec,
+  unretirePlayer, type PlayerEdit, type NewPlayerSpec,
 } from "../../core/godMode.js";
 import { switchClub } from "../../core/manager/switchClub.js";
 import { takeNationalJob, leaveNationalJob, setNationInterest } from "../../core/nationalManager/index.js";
@@ -189,6 +189,8 @@ interface LeagueContextValue {
   releasePlayerGodModeAction: (pid: number) => Promise<void>;
   editPlayerAction: (pid: number, edit: PlayerEdit) => Promise<void>;
   createPlayerAction: (spec: NewPlayerSpec) => Promise<void>;
+  /** God Mode: bring an archived retiree back as a free agent. */
+  unretirePlayerAction: (pid: number) => Promise<void>;
   setClubFinancesAction: (tid: number, budget: number, hype: number) => Promise<void>;
   simming: boolean;
   saveToDb: () => Promise<void>;
@@ -1271,6 +1273,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     [mutate],
   );
 
+  const unretirePlayerAction = useCallback(
+    (pid: number) => mutate((l) => (l.godMode ? unretirePlayer(l, pid) : null)),
+    [mutate],
+  );
+
   const setClubFinancesAction = useCallback(
     (tid: number, budget: number, hype: number) =>
       mutate((l) => ({ ...l, teams: setClubFinances(l.teams, tid, budget, hype) })),
@@ -1385,6 +1392,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     releasePlayerGodModeAction,
     editPlayerAction,
     createPlayerAction,
+    unretirePlayerAction,
     setClubFinancesAction,
     // The live viewer blocks other actions the same way the sim overlay does:
     // its matchday is simmed but uncommitted, so anything else acting on the
@@ -1422,7 +1430,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     takeNationalJobAction, leaveNationalJobAction, declineNationalOffersAction,
     setNationalSackingEnabledAction, setNationalSquadAction, setNationalLineupAction,
     setNationalFormationAction, autoPickNationalXIAction,
-    editPlayerAction, createPlayerAction, setClubFinancesAction,
+    editPlayerAction, createPlayerAction, unretirePlayerAction, setClubFinancesAction,
     simming, simOverlayOpen, watchable, jumpOpen, busy, saveToDb, doExport, doImport,
   ]);
 
