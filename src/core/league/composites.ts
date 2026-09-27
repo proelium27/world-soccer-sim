@@ -1,12 +1,12 @@
 import type { Composites } from "../../engine/composites.js";
 import type { Player, Position } from "../players/types.js";
 import type { MatchPlayer } from "../../engine/attribution.js";
-import type { League } from "./generate.js";
+import type { League, LeagueTeam } from "./generate.js";
 import { resolveXI } from "../lineup/resolveXI.js";
 import { teamSlots } from "../lineup/formations.js";
 import { rollupComposites, withSlots } from "../composites.js";
 import { normalizeLeague, computeNormStats, normalizeWith } from "./normalize.js";
-import { toMatchPlayers } from "./matchPlayers.js";
+import { toMatchPlayers, type SetPieceTakers } from "./matchPlayers.js";
 import { BENCH_SIZE } from "../constants.js";
 
 export interface TeamMatchData {
@@ -39,6 +39,12 @@ export interface MatchDataOptions {
  * Injured players (gamesRemaining > 0) are excluded from both XI and bench selection,
  * as is anyone `opts.unavailable` rejects.
  */
+function takersFor(t: LeagueTeam): SetPieceTakers | undefined {
+  return t.penaltyTaker != null || t.setPieceTaker != null
+    ? { penalty: t.penaltyTaker, setPiece: t.setPieceTaker }
+    : undefined;
+}
+
 export function leagueMatchData(league: League, opts: MatchDataOptions = {}): TeamMatchData[] {
   const byPid = new Map<number, Player>(league.players.map((p) => [p.pid, p]));
   const unavailable = opts.unavailable;
@@ -67,8 +73,8 @@ export function leagueMatchData(league: League, opts: MatchDataOptions = {}): Te
   const normalized = normalizeLeague(raw);
   return normalized.map((c, i) => ({
     composites: c,
-    xi: toMatchPlayers(xis[i], undefined, slotsByTeam[i]),
-    bench: toMatchPlayers(benches[i], boostSets[i]),
+    xi: toMatchPlayers(xis[i], undefined, slotsByTeam[i], takersFor(league.teams[i])),
+    bench: toMatchPlayers(benches[i], boostSets[i], undefined, takersFor(league.teams[i])),
     // After a sub or a red card the on-pitch group no longer lines up with the
     // formation array, so each MatchPlayer carries the slot it is currently
     // filling (a substitute inherits the slot of the man he replaced).

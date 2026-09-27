@@ -64,6 +64,16 @@ export interface MatchPlayer {
    * subbed on more readily. Only ever set on the user's own bench players.
    */
   minutesBoost?: boolean;
+  /**
+   * The user named him penalty taker (StoredTeam.penaltyTaker): he takes every
+   * penalty while he's on the pitch, and the sub logic is slow to take him off.
+   */
+  penaltyTaker?: boolean;
+  /**
+   * The user named him set-piece taker (StoredTeam.setPieceTaker): he delivers
+   * the corners and shoots from free kicks while he's on the pitch.
+   */
+  setPieceTaker?: boolean;
 }
 
 export type MatchEventType =
@@ -324,6 +334,50 @@ export function pickHeader(rng: () => number, players: MatchPlayer[]): MatchPlay
   const outfield = players.filter((p) => p.slot !== "GK");
   if (outfield.length === 0) return players[0];
   return weightedPick(rng, outfield, HEADER_WEIGHTS, "heading", ATTRIBUTION_RATING_EXPONENT);
+}
+
+/**
+ * The best outfielder on the pitch by `score`, or null with none. Ties go to
+ * whoever is listed first, so the answer is the same every time it's asked:
+ * a side has one taker, not a fresh draw per kick.
+ */
+function bestOutfielder(
+  players: MatchPlayer[],
+  score: (p: MatchPlayer) => number,
+): MatchPlayer | null {
+  let best: MatchPlayer | null = null;
+  for (const p of players) {
+    if (p.slot === "GK") continue;
+    if (!best || score(p) > score(best)) best = p;
+  }
+  return best;
+}
+
+/**
+ * Who steps up for a penalty: the user's named taker while he's on the pitch,
+ * otherwise the side's best finisher. Deterministic (no rng draw), which is the
+ * whole point: a real side has one regular taker, where a weighted draw per
+ * kick handed a club's penalties to three or four different players a season.
+ */
+export function penaltyTakerOf(players: MatchPlayer[]): MatchPlayer | null {
+  return players.find((p) => p.penaltyTaker && p.slot !== "GK")
+    ?? bestOutfielder(players, (p) => p.shooting);
+}
+
+/**
+ * Who delivers a corner: the user's named set-piece taker while he's on the
+ * pitch, otherwise the side's best passer. `exclude` is the man attacking the
+ * ball, who can't also be the one crossing it.
+ */
+export function cornerTakerOf(players: MatchPlayer[], exclude?: number): MatchPlayer | null {
+  const pool = exclude === undefined ? players : players.filter((p) => p.pid !== exclude);
+  return pool.find((p) => p.setPieceTaker && p.slot !== "GK")
+    ?? bestOutfielder(pool, (p) => p.passing);
+}
+
+/** The user's named set-piece taker, if he's on the pitch. Free kicks go to him. */
+export function namedSetPieceTakerOf(players: MatchPlayer[]): MatchPlayer | null {
+  return players.find((p) => p.setPieceTaker && p.slot !== "GK") ?? null;
 }
 
 /** Picks who was carrying the ball when tackled, weighted toward ball-playing positions. */

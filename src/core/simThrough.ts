@@ -230,6 +230,8 @@ export function simThrough(
       starters: t.starters,
       formation: t.formation,
       moreMinutes: t.moreMinutes,
+      penaltyTaker: t.penaltyTaker,
+      setPieceTaker: t.setPieceTaker,
     }));
 
   // Team state can change mid-batch (the winter transfer market moves players

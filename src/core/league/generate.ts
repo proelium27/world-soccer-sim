@@ -51,6 +51,9 @@ export interface LeagueTeam {
    * bringing them on. Only ever set for the user's own team.
    */
   moreMinutes?: number[];
+  /** StoredTeam.penaltyTaker / setPieceTaker, carried over the same way as moreMinutes. */
+  penaltyTaker?: number | null;
+  setPieceTaker?: number | null;
 }
 
 export interface League {

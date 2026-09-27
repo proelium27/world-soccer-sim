@@ -82,7 +82,7 @@ export function beginAutopilot(league: LeagueStore): LeagueStore {
     meta: { ...league.meta, userTid: AUTOPILOT_TID, autopilotTid: userTid },
     teams: league.teams.map((t): StoredTeam =>
       t.tid === userTid
-        ? { ...t, starters: null, transferListed: [], moreMinutes: [] }
+        ? { ...t, starters: null, transferListed: [], moreMinutes: [], penaltyTaker: null, setPieceTaker: null }
         : t,
     ),
     negotiations: [],

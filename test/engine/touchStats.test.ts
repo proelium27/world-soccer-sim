@@ -187,8 +187,17 @@ const SEASON = simSeason(mulberry32(12345));
  * zone that sets their block/on-target/save odds (SHOT_ZONE_STAGE): one more
  * draw per shot. Scoring held (shotZoneEngineProbe, 3 seasons): goals/match
  * 3.134 -> 3.132, shots 26.66 -> 26.94, on target 9.31 -> 9.31.
+ *
+ * And again (3471481401 -> 3272621592) when penalties went to one fixed taker
+ * (penaltyTakerOf: the user's named taker, else the best finisher on the pitch)
+ * and a corner header's assist to the man who took the corner. Both keep the
+ * old weighted draw and discard it, so no draw moved; the taker's shooting
+ * moves conversion, and the assist moves match ratings, hence subs. The cleared
+ * corners that came in with it run on their own stream: with the two overrides
+ * switched off the hash is still 3471481401. Measured (setPieceProbe, 6
+ * seasons): goals/match 3.08 -> 3.07, shots 26.8 -> 26.7.
  */
-const BASELINE_SCORELINE_HASH = 3471481401;
+const BASELINE_SCORELINE_HASH = 3272621592;
 
 function scorelineHash(matches: typeof SEASON.matches): number {
   const s = matches.map((m) => `${m.home}:${m.homeGoals}-${m.awayGoals}:${m.away}`).join("|");

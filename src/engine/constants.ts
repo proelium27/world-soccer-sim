@@ -428,6 +428,31 @@ export const SUB_MINUTES_BOOST = 6;
 // from step 1 that compressed the table-spread gate).
 export const CORNER_FROM_MISS_PROB = 0.008;
 
+// Corners that produce no shot (2026-09-27, user report "I regularly get 0
+// corner games"). The engine corner above is really "a corner that led to a
+// header", and at 0.8% of misses it came to ~0.15 a match, so 86% of matches
+// had none; real top-flight football averages ~10 (~5 a side). These are the
+// other ~95% of corners, the ones the defence heads clear: a blocked shot
+// deflected behind, a save pushed round the post, and pressure in the final
+// third (a cross cleared for a corner), the last edge-scaled like a chance so
+// the side on top wins more of them.
+//
+// They're rolled on their OWN stream (CORNER_STREAM, seeded off match
+// intrinsics like SUB_WINDOW_STREAM) and never bump stoppage, so the shared
+// rng, the clock and every scoreline are untouched: they are a count and a
+// line in the timeline, not football. Measured with scripts/setPieceProbe.ts.
+export const CORNER_STREAM = 91;
+export const CORNER_FROM_BLOCKED_PROB = 0.35;
+export const CORNER_FROM_SAVED_PROB = 0.2;
+export const CORNER_PRESSURE_PER_TICK = 0.0075;
+
+// How far a user-designated penalty taker is pushed down the who-comes-off
+// order (see matchSim's subPriority, whose scale is energy deficit, 0-0.4,
+// plus a ±0.2 form term). Big enough that he's the last outfielder hooked for
+// being tired; small enough that an exhausted taker having a shocker can still
+// come off. Injuries and red cards take him off regardless.
+export const PENALTY_TAKER_SUB_SHIELD = 0.25;
+
 // Fraction of fouls that are "in the box" -> penalty instead of an ordinary free
 // kick. Edge-scaled by the same attack-vs-defense edge as the main chance gate,
 // for the same reason as above.

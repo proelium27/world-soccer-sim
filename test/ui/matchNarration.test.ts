@@ -212,9 +212,21 @@ describe("matchNarration — the honesty rule", () => {
         if (c.type !== "corner") return;
         const before = events[i - 1];
         const after = events[i + 1];
-        expect(eventDetail(before, events, -120)).not.toBe("header from the corner");
-        expect(eventDetail(after, events, -120)).toBe("header from the corner");
-        checked++;
+        // The shot that won it, on the same tick. (The event before a corner
+        // can also be the previous tick's header, rightly labelled one.)
+        if (before && before.clock === c.clock) {
+          expect(eventDetail(before, events, -120)).not.toBe("header from the corner");
+        }
+        // Most corners are cleared and end the tick; only a same-tick shot by
+        // the same side is the header, and nothing else may read as one.
+        const header = after && after.clock === c.clock && after.side === c.side;
+        if (!after) return;
+        if (header) {
+          expect(eventDetail(after, events, -120)).toBe("header from the corner");
+          checked++;
+        } else {
+          expect(eventDetail(after, events, -120)).not.toBe("header from the corner");
+        }
       });
     }
     expect(checked).toBeGreaterThanOrEqual(8);

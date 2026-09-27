@@ -18,6 +18,7 @@ import { formatWeeklyWage, seasonYear } from "../format.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { PotDisplay } from "../components/PotDisplay.js";
 import { PitchField } from "../components/PitchField.js";
+import { SetPieceTakers } from "../components/SetPieceTakers.js";
 import { ExtendControl } from "../components/ExtendControl.js";
 import { ExtendAllButton } from "../components/ExtendAllButton.js";
 import { renewalsDue } from "../../core/contractRenewal.js";
@@ -303,7 +304,7 @@ function RosterTable({
 export function Roster() {
   const {
     league, releasePlayerAction, extendContractAction, extendAllContractsAction,
-    setTransferListedAction, setMoreMinutesAction,
+    setTransferListedAction, setMoreMinutesAction, setSetPieceTakerAction,
     setLineupAction, setFormationAction, autoPickBestXIAction,
     listPlayerForLoanAction, unlistPlayerForLoanAction,
   } = useLeague();
@@ -550,6 +551,14 @@ export function Roster() {
             Changing formation resets your Starting XI to the auto-picked best fit for the new shape.
             Best XI picks the formation that fields your strongest eleven and fills it for you.
           </p>
+          <SetPieceTakers
+            xi={xi}
+            slots={slots}
+            players={players}
+            penaltyTaker={userTeam.penaltyTaker ?? null}
+            setPieceTaker={userTeam.setPieceTaker ?? null}
+            onChange={(role, pid) => void setSetPieceTakerAction(role, pid)}
+          />
           <div className="form-check form-switch mb-2">
             <input
               className="form-check-input"
