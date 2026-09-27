@@ -341,11 +341,20 @@ export const DEFAULT_CONTINENTAL_REGION: ContinentalRegion = "europe";
  *  - `single` — the top `TITLE_PLAYOFF_TEAMS` contest a single-leg knockout
  *    (higher seed at home, 1v8 / 4v5 / 2v7 / 3v6), the way MLS Cup and
  *    Argentina's knockout phase work.
- *  - `two-legged` — Mexico's Liguilla: the same bracket, every round over two
- *    legs with the higher seed hosting the second. In the quarter-finals and
- *    semi-finals a tie level on aggregate goes to the higher seed outright (no
- *    extra time, no penalties, no away goals); only the final goes to extra
- *    time and penalties.
+ *  - `two-legged` — Mexico's Liguilla (Liga MX and Liga de Expansión alike): the
+ *    top eight, every round over two legs with the higher seed hosting the
+ *    second. In the quarter-finals and semi-finals a tie level on aggregate goes
+ *    to the higher seed outright (no extra time, no penalties, no away goals);
+ *    only the final goes to extra time and penalties. The bracket is RESEEDED
+ *    after the quarter-finals: the best seed left plays the worst, the other two
+ *    meet.
+ *  - `liguilla` — the same behind Liga MX's old play-in (played up to Apertura
+ *    2025; the owners abolished it for good from Clausura 2026), for
+ *    the last two places among 7th to 10th (`LIGUILLA_PLAY_IN_TEAMS`). 7th hosts
+ *    8th and the winner is the seventh seed; 9th hosts 10th and the loser is
+ *    out; then the loser of 7 v 8 hosts the winner of 9 v 10 for the eighth
+ *    seed. One game each, a level game straight to penalties. Offered in World
+ *    setup; no shipped league plays it.
  *
  *  - `conference` — MLS. The top `CONFERENCE_PLAYOFF_TEAMS` of EACH conference:
  *    a one-off wild card (8th v 9th), a best-of-three first round, then one-off
@@ -356,8 +365,8 @@ export const DEFAULT_CONTINENTAL_REGION: ContinentalRegion = "europe";
  *  - `zones` — Argentina. The top `ZONE_PLAYOFF_TEAMS` of each zone meet in a
  *    cross-zone round of 16 (1st in one zone v 8th in the other), then fixed
  *    quarter-finals and semi-finals, all one-off at the better-placed club's
- *    ground and straight to penalties if level, and a final at a neutral ground
- *    that goes to extra time first.
+ *    ground, and a final at a neutral ground. A level game goes to extra time,
+ *    then penalties, in every round (the 2026 rules).
  *
  * `conference` and `zones` need a division split in two (see ConferenceFormat);
  * a league set to either without one plays `single` instead.
@@ -367,10 +376,19 @@ export const DEFAULT_CONTINENTAL_REGION: ContinentalRegion = "europe";
  * with playoffs do (MLS qualifies for the Champions Cup partly on the table).
  */
 export type TitlePlayoffFormat =
-  | "none" | "single" | "two-legged" | "conference" | "zones" | "conference-single";
+  | "none" | "single" | "two-legged" | "liguilla" | "conference" | "zones" | "conference-single";
 
 /** How many clubs a title playoff seats. Eight: quarter-finals, semi-finals, final. */
 export const TITLE_PLAYOFF_TEAMS = 8;
+
+/**
+ * Clubs in a `liguilla`'s play-in: Liga MX's 7th to 10th, of whom two go on as
+ * the seventh and eighth seeds. The whole playoff seats ten.
+ */
+export const LIGUILLA_PLAY_IN_TEAMS = 4;
+
+/** Clubs a `liguilla` seats: six straight into the quarter-finals and the play-in's four. */
+export const LIGUILLA_TEAMS = TITLE_PLAYOFF_TEAMS - 2 + LIGUILLA_PLAY_IN_TEAMS;
 
 /** Clubs per conference in a `conference` title playoff: MLS's real nine. */
 export const CONFERENCE_PLAYOFF_TEAMS = 9;
@@ -390,6 +408,11 @@ export const CONFERENCE_SINGLE_PLAYOFF_TEAMS = 8;
  */
 export const COUNTRY_LOWER_TITLE_PLAYOFF: Readonly<Record<string, Readonly<Record<number, TitlePlayoffFormat>>>> = {
   "United States": { 2: "conference-single", 3: "single" },
+  // Liga de Expansión MX plays Liga MX's Liguilla, top eight straight into
+  // two-legged quarter-finals. The real third tier (Liga Premier Serie A) runs
+  // two regional groups of ten whose top four each go into a liguilla; one
+  // table's top eight is the same eight-club knockout.
+  Mexico: { 2: "two-legged", 3: "two-legged" },
 };
 
 /**

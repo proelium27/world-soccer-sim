@@ -280,9 +280,9 @@ describe("the USL's lower-division title playoffs", () => {
     expect(f2.conferences!.map((h) => h.length)).toEqual([8, 8]);
     expect(f3.format).toBe("single");
     expect(f3.teams).toHaveLength(8);
-    // No other lower division holds one.
+    // The only other lower divisions that hold one are Mexico's.
     expect(fields.filter((f) => league.competitions.find((c) => c.id === f.compId)!.tier > 1))
-      .toHaveLength(2);
+      .toHaveLength(4);
   });
 
   it("plays each conference to a winner, then a final between the two", () => {
