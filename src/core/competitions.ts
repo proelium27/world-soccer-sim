@@ -49,6 +49,7 @@ import {
   CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS,
   COUNTRY_LOWER_TITLE_PLAYOFF, COUNTRY_SEASON_FORMAT, type SeasonFormat,
 } from "./constants.js";
+import type { ForeignRule } from "./foreignRules.js";
 import { MAX_DIVISION_TEAMS, MIN_DIVISION_TEAMS, SEASON_MATCHDAYS } from "./calendar.js";
 import {
   LEAGUE_NATIONALITY_WEIGHTS, sanitizeNationalityWeights, type NationalityWeights,
@@ -114,6 +115,12 @@ export interface Competition {
    * so the fields cannot overlap or leave a gap whatever these are set to.
    */
   continentalSlots?: Partial<Record<string, number>>;
+  /**
+   * This league's foreign-player registration rules. Absent → the shipped
+   * `LEAGUE_FOREIGN_RULES` entry for its country (and tier). An empty array
+   * means none. Resolve through `competitionForeignRules`, never the field.
+   */
+  foreignRules?: ForeignRule[];
   /**
    * How many clubs play in this division. Absent → the shipped default for the
    * tier (NUM_TEAMS / NUM_TEAMS_D2).

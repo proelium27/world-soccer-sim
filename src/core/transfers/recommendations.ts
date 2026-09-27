@@ -18,6 +18,7 @@ import {
   protectedStarPids, lastCompletedSeason, userProtectedStarBar,
 } from "./protectedStars.js";
 import { refusesMove } from "./playerWill.js";
+import { worldRules } from "../foreignRules.js";
 import { clubStatures } from "../ai/clubContext.js";
 import {
   RECOMMENDED_TRANSFERS_MIN, RECOMMENDED_TRANSFERS_MAX,
@@ -121,6 +122,8 @@ export function recommendedTransfers(
   // Precomputed once — see clubStatures; calling per player would be quadratic.
   const statures = clubStatures(league.teams, league.players);
   const userStature = statures.get(user.tid) ?? 0;
+  const reg = worldRules(league.teams, league.competitions, (pid) => playerMap.get(pid), league.season)
+    .forSquad(user.tid, user.roster);
 
   // Nor is anyone who has already moved clubs this window — the offer engine
   // would refuse him, and a recommendation it refuses is a dead end.
@@ -143,6 +146,8 @@ export function recommendedTransfers(
       // Nor does anyone who'd simply turn this club down (see playerWill.ts) —
       // recommending a target the offer engine will refuse is just a dead end.
       if (refusesMove(player.ovr, statures.get(team.tid) ?? 0, userStature)) continue;
+      // Nor anyone the user's league rules would stop him registering.
+      if (reg.block(player) !== null) continue;
       if (!isForSale(team, playerMap, pid) && !wouldRefuseExtension(player, team, league.competitions)) continue;
       if (departsAtRollover(league, player)) continue;
       const value = scoutedValue(
@@ -276,6 +281,9 @@ export function saleGateFor(
   const protectedReason = protectedStarReason(league.difficulty);
   const statures = clubStatures(league.teams, league.players);
   const userStature = statures.get(user.tid) ?? 0;
+  // The user's squad against its league's registration rules, counted once.
+  const reg = worldRules(league.teams, league.competitions, (pid) => playerMap.get(pid), league.season)
+    .forSquad(user.tid, user.roster);
 
   return (player, team) => {
     if (loanedPids.has(player.pid)) return "Out on loan";
@@ -293,6 +301,9 @@ export function saleGateFor(
     if (refusesMove(player.ovr, statures.get(team.tid) ?? 0, userStature)) {
       return "Wouldn't drop to a club this size";
     }
+    // Mirrors makeTransferOffer's registration gate (foreignRules.ts).
+    const blocked = reg.block(player);
+    if (blocked) return blocked;
     return null;
   };
 }

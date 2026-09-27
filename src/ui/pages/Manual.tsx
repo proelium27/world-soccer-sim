@@ -34,6 +34,7 @@ const SECTIONS: [id: string, title: string][] = [
   ["transfers", "Transfers & Negotiation"],
   ["loans", "Loans"],
   ["contracts", "Contracts, Wages & Free Agents"],
+  ["player-choice", "Where Players Want to Play & League Rules"],
   ["finance", "Finance"],
   ["debt", "Debt & Sanctions"],
   ["youth", "The Youth Academy"],
@@ -569,7 +570,7 @@ export function Manual() {
             <li><strong>Incoming Offers</strong>. AI clubs bidding for <em>your</em> players. Accept, reject, or counter to push the fee upward.</li>
             <li><strong>Loans</strong>. List your own players for a fixed-length loan, look over AI clubs' incoming loan offers, borrow other clubs' young players, and keep track of who's out on loan and who you have in.</li>
             <li><strong>Finance</strong>. Budget, the full wage-bill table, a projected (or final) season settlement, your transfer history, and a league-wide money table.</li>
-            <li><strong>Free Agents</strong>. Every other unsigned player, sign straight to your senior team. The default view shows the best across every position but caps how many of any one position it lists, so a spot that always has lots of free agents (defensive and attacking mids only get two roster spots per club, so their good extras spill into free agency more often) can't crowd out the rest. Pick a position from the dropdown to see that position's full list.</li>
+            <li><strong>Free Agents</strong>. Every other unsigned player. Sign him straight to your senior team, or, if he's under 18, into your academy on its flat stipend instead (an Age filter narrows the list to those players). The default view shows the best across every position but caps how many of any one position it lists, so a spot that always has lots of free agents (defensive and attacking mids only get two roster spots per club, so their good extras spill into free agency more often) can't crowd out the rest. Pick a position from the dropdown to see that position's full list.</li>
             <li><strong>Academy</strong>. Your club's youth academy. Kids join at 14 every summer; your scouts decide who stays at 16 and who turns pro at 18, and a Next rollover column lets you change any of those calls. Release or promote anyone early. Also where you set your scout directions: which countries your scouts look in, and which positions they look for. Sorting by potential ranks kids on the top of each scouting estimate, not on what they'll really become: nobody has told you that yet.</li>
             <li><strong>Box Score</strong>. Per-match detail, in three parts. The scoreboard at the top names the competition and matchday and starts the Man of the Match, the highest-rated player among those who actually played. Under it, a head-to-head strip compares the two sides on possession, shots, shots on target, xG, corners and fouls. Then a full-width stat table per club (xG, passes completed/attempted, crosses and fouls, goals against and xG against on the goalkeeper's row, and a 0&ndash;10 match rating for everyone who appeared), grouped into attacking, keeping, defending, passing and discipline blocks. The play-by-play at the bottom runs down a timeline with one club on each side, showing goals, cards, substitutions, penalties and injuries by default; switch it to "Every event" to add every shot and corner too.</li>
             <li><strong>Leagues</strong>. Your saved leagues. Create, enter, or delete saves. Each one is fully independent. Every save is named after the club you took over, so the row also shows the season it's reached and when you started it, which is how you tell two saves of the same club apart.</li>
@@ -717,7 +718,7 @@ export function Manual() {
             <li>Every player ages a year and develops (or declines) per the <a href="#development">development model</a>.</li>
             <li>Retirements: veterans from the mid-30s onward, plus players nobody has signed (<a href="#development">details</a>).</li>
             <li>The youth academy delivers each club's new intake (<a href="#youth">details</a>).</li>
-            <li>AI clubs sign free agents, both to fill holes and to poach any that upgrade a spot they're already stocked at, then trim their squads back to 25. Then they go round the pool a second time, because that trim is what puts most of the year's free agents there in the first place.</li>
+            <li>AI clubs make offers to free agents, both to fill holes and for any that upgrade a spot they're already stocked at, and each player takes the offer he likes best (<a href="#player-choice">details</a>). Then clubs trim their squads back to 25. Then they go round the pool a second time, because that trim is what puts most of the year's free agents there in the first place.</li>
             <li>The summer transfer window opens and the AI-to-AI market runs.</li>
             <li>New season: budgets get settled, base allocation in and the full season's wages out (<a href="#finance">details</a>).</li>
           </ol>
@@ -932,9 +933,10 @@ export function Manual() {
           <p>
             <strong>One global transfer market.</strong> The AI transfer market, free agency,
             recommended transfers, and inbound offers for your own players all run across every
-            country with no home-country bias. An Italian club can and will buy a Spanish player,
-            sign an English free agent, or bid on one of yours, exactly like they're all in one
-            league. A strong Division 2 player anywhere in the world can also get pulled up to a
+            country. An Italian club can and will buy a Spanish player, sign an English free agent,
+            or bid on one of yours. What holds each league to its own character is the players
+            themselves (most would rather play at home) and each league&apos;s real registration
+            rules; see <a href="#player-choice">Where Players Want to Play</a>. A strong Division 2 player anywhere in the world can also get pulled up to a
             Division 1 club by the same thing that already applies at home (there's a "Wants a move
             to Division 1" note in <a href="#ai">How AI Clubs Think</a>), and it isn't limited to
             his own country.
@@ -2808,6 +2810,84 @@ export function Manual() {
           </p>
         </Section>
 
+        <Section id="player-choice" title="Where Players Want to Play & League Rules">
+          <p>
+            A transfer is two decisions: a club has to want the player, and the player has to want the
+            club. Every player weighs a move on a few reasons, and you can see them. On Free Agents, both
+            Transfers tables, the Watchlist and the loan search, each player carries a label for how he
+            feels about joining you: <strong>Keen</strong>, <strong>Open</strong>,{" "}
+            <strong>Reluctant</strong> or <strong>Won&apos;t talk</strong>. Hover it for his reasons.
+            It&apos;s the same view every club gets. When AI clubs compete for a player, it decides
+            where he goes. On your own offers only <strong>Won&apos;t talk</strong> stops a deal. The
+            rest tells you how he feels about you, which matters when others want him too.
+          </p>
+          <ul>
+            <li>
+              <strong>Level of club.</strong> Good players want good clubs. A squad player will go
+              anywhere, a star won&apos;t drop far below where he is, and a big enough step down is a flat
+              no. This is the only reason that can turn a player down outright.
+            </li>
+            <li>
+              <strong>Playing time.</strong> Would he start? A player who&apos;d walk into your eleven
+              likes you more than a bigger club where he&apos;d sit on the bench. It barely matters to a
+              star, who starts anywhere, and it matters a lot to everyone else, which is why smaller clubs
+              still land decent players.
+            </li>
+            <li>
+              <strong>Home country.</strong> Most players would rather play at home, and leaving home costs
+              them as much as coming home pleases them. How strong the pull is follows how domestic the
+              league really is, so an Argentine is far more attached to Argentina than a Scot is to
+              Scotland. It fades for stars, and for anyone who has outgrown his home league: a star in a
+              smaller league wants a bigger stage.
+            </li>
+            <li>
+              <strong>Former club.</strong> He&apos;s a bit warmer on a club he&apos;s played for. A
+              free agent will always talk to the club he last played for, however far it has fallen.
+            </li>
+          </ul>
+          <p>
+            On a loan the home reason counts for half, since it&apos;s only a season.
+          </p>
+          <p>
+            <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent
+            takes the one he likes best, rather than the worst club in the world getting first pick. When
+            you sign a free agent yourself he&apos;ll take your offer unless he won&apos;t talk to you.
+          </p>
+          <p>
+            <strong>League registration rules.</strong> Leagues have real rules on who a club can
+            register, and they apply to you exactly as they do to everyone else. Where your league has one,
+            Free Agents and Transfers show where you stand, and a signing the rules won&apos;t allow says
+            so instead of offering a button.
+          </p>
+          <ul>
+            <li>
+              <strong>Caps on foreign players</strong> (Turkey, Brazil, Argentina, and Mexico, which counts
+              players not trained in Mexico) and <strong>caps on non-EU players</strong> (Spain, France,
+              Greece; Spain and France also count players from African, Caribbean and Pacific countries as
+              EU). A club at its cap can&apos;t add another player it counts. Nobody is released for being
+              over one; the club just can&apos;t sign that kind of player until it&apos;s back under.
+            </li>
+            <li>
+              <strong>Homegrown minimums</strong> (England, Italy, Germany, Portugal, Belgium) and{" "}
+              <strong>home-nationals minimums</strong> (Germany, Serbia). These never block a signing.
+              Clubs short of one lean toward eligible players, and nobody trims a squad below one it
+              meets. A player is homegrown in a country after three seasons at clubs there between the ages
+              of 15 and 20.
+            </li>
+            <li>
+              The Netherlands, Scotland and MLS have no numeric rule here. MLS really does have
+              international slots, but green-card holders count as domestic there, so the rule doesn&apos;t
+              limit nationality and the game leaves it out.
+            </li>
+          </ul>
+          <p>
+            Together this is what keeps leagues looking like themselves. Before it, every league slowly
+            drifted to the same worldwide mix: Argentina&apos;s top flight went from about 84% Argentine
+            to under 20% over twenty seasons. Now the leagues hold roughly to their real nationality
+            makeup.
+          </p>
+        </Section>
+
         <Section id="finance" title="Finance">
           <p>
             Every club starts each season with the same base allocation (<strong>$88M</strong>),
@@ -3051,8 +3131,11 @@ export function Manual() {
           <p>
             Unsigned players of any age, youngsters included, live on the <strong>Free Agents</strong>{" "}
             page. Don't expect to find a future star there: clubs keep their best young players now,
-            so what reaches it is genuinely what nobody wanted. Your own academy is the reliable
-            route to a homegrown star.
+            so what reaches it is genuinely what nobody wanted. Anyone under 18 there can go
+            straight into your academy on the academy stipend rather than a senior wage, as long as
+            the academy has one of its 20 places free and he's willing to join you. From then on he's
+            treated like your own kids: the same cuts at 16 and 18. Your own academy
+            is still the reliable route to a homegrown star.
           </p>
         </Section>
 

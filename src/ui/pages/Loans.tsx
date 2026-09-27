@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { userView } from "../../core/transfers/userView.js";
+import { InterestTag } from "../components/InterestTag.js";
 import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
@@ -62,6 +64,8 @@ export function Loans() {
   const targetSort = useTableSort<TargetSortKey>("default", "desc");
 
   const rawOffers = useMemo(() => (league ? loanOfferCandidates(league) : []), [league]);
+  // How each player sees your club (transfers/userView.ts).
+  const clubView = useMemo(() => (league ? userView(league) : null), [league]);
 
   // Walks every roster in the world and derives a club context for each, so it
   // runs off *debounced* filter state (typing stays instant) and is memoized to
@@ -392,6 +396,8 @@ export function Loans() {
                     <td className="text-end">{currency.format(t.fee)}</td>
                     <td className="text-end">
                       {t.available ? (
+                        <>
+                        <InterestTag view={clubView?.of(t.player, t.parentTid, true) ?? null} />{" "}
                         <button
                           className="btn btn-sm btn-primary"
                           disabled={simming}
@@ -399,6 +405,7 @@ export function Loans() {
                         >
                           Loan him in
                         </button>
+                        </>
                       ) : (
                         <span className="text-muted small fst-italic text-nowrap">
                           {t.unavailableReason}

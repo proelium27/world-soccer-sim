@@ -666,6 +666,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       l.phase,
       l.activeLoans,
       userSpendPolicy(l),
+      l.competitions,
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("free_agent_signed");
@@ -768,7 +769,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const signToAcademyAction = useCallback((pid: number) => mutate((l) => {
     const { teams, players } = signToAcademy(
       l.teams, l.players, l.meta.userTid, pid, l.season, l.phase, l.activeLoans,
-      userSpendPolicy(l),
+      userSpendPolicy(l), l.competitions,
     );
     if (teams === l.teams && players === l.players) return null;
     trackEvent("player_signed_to_academy");

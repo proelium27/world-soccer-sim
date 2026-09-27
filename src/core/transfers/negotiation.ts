@@ -11,6 +11,7 @@ import { keepsDepthFloor } from "../freeAgency.js";
 import { wouldRefuseExtension } from "../ai/breakoutRefusal.js";
 import { isProtectedStar, lastCompletedSeason, userProtectedStarBar } from "./protectedStars.js";
 import { refusesMoveToClub } from "./playerWill.js";
+import { leagueRegistrationBlock } from "../foreignRules.js";
 import type { ProposedClause } from "./clauses.js";
 import {
   settleClausesOnSale, materializeClauses, clauseExpectedValue, clausesAreValid,
@@ -470,6 +471,8 @@ export function makeTransferOffer(
   // player won't drop to a much smaller club, whoever is managing it (see
   // playerWill.ts). The user is gated here exactly like an AI buyer.
   if (refusesMoveToClub(player, seller, user, league.players)) return league;
+  // The user's league registration rules bind him like any club (foreignRules.ts).
+  if (leagueRegistrationBlock(league, user.tid, player) !== null) return league;
   if (departsAtRollover(league, player)) return league;
 
   const existing = league.negotiations.find(
@@ -574,6 +577,8 @@ export function acceptCounterOffer(
   // player won't drop to a much smaller club, whoever is managing it (see
   // playerWill.ts). The user is gated here exactly like an AI buyer.
   if (refusesMoveToClub(player, seller, user, league.players)) return league;
+  // The user's league registration rules bind him like any club (foreignRules.ts).
+  if (leagueRegistrationBlock(league, user.tid, player) !== null) return league;
   if (departsAtRollover(league, player)) return league;
 
   const accepted: TransferNegotiation = { ...negotiation, status: "accepted" };

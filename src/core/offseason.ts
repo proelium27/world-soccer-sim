@@ -774,7 +774,7 @@ export function simOffseasonReporting(
   let faSignings: { pid: number; toTid: number }[];
   ({ teams, players, signings: faSignings } = runAIFreeAgency(
     teams, players, nextSeason, rng, league.meta.userTid, signingOrder, activeLoans,
-    league.progressionModel,
+    league.progressionModel, 0, league.competitions,
   ));
   // Log each free-agent arrival as a fee-0 transfer FROM the sentinel so the
   // player's club-by-season history registers the move (an unrecorded free
@@ -1003,6 +1003,7 @@ export function simOffseasonReporting(
   //    trimming can't orphan a live loan into a duplicate.
   teams = trimRosterSurplus(
     teams, players, league.meta.userTid, nextSeason, activeLoans, league.progressionModel,
+    league.competitions,
   );
 
   // 6.05. AI free agency, a second time, on the pool the trim above just
@@ -1033,7 +1034,7 @@ export function simOffseasonReporting(
   let mopUpSignings: { pid: number; toTid: number }[];
   ({ teams, players, signings: mopUpSignings } = runAIFreeAgency(
     teams, players, nextSeason, mopUpRng, league.meta.userTid, signingOrder, activeLoans,
-    league.progressionModel, MOP_UP_MIN_OVR,
+    league.progressionModel, MOP_UP_MIN_OVR, league.competitions,
   ));
   ceilingTransfers = [
     ...ceilingTransfers,
@@ -1053,6 +1054,7 @@ export function simOffseasonReporting(
   //       should ever be trimmable in the same offseason it was paid for.
   teams = trimRosterSurplus(
     teams, players, league.meta.userTid, nextSeason, activeLoans, league.progressionModel,
+    league.competitions,
   );
 
   // 6.4. AI<->AI transfer market (summer window, cross-division by design —

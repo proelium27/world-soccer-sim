@@ -5,7 +5,7 @@ import { HelpHint, PotHelp } from "../components/HelpHint.js";
 import { freeAgentPids } from "../../core/freeAgency.js";
 import type { Player, Position } from "../../core/players/types.js";
 import { POSITIONS } from "../../core/players/types.js";
-import { contractTerms } from "../../core/contracts.js";
+import { academyContractTerms, contractTerms } from "../../core/contracts.js";
 import { formatWeeklyWage } from "../format.js";
 import { Flag } from "../components/Flag.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
@@ -13,9 +13,11 @@ import { WatchToggle } from "../components/WatchToggle.js";
 import { PotDisplay } from "../components/PotDisplay.js";
 import { usePotentialView } from "../potentialView.js";
 import { SortableTh, useTableSort, sortRows } from "../components/SortableTable.js";
-import { ROSTER_CAP } from "../../core/constants.js";
+import { ACADEMY_GRADUATION_AGE, ACADEMY_ROSTER_CAP, ROSTER_CAP } from "../../core/constants.js";
 import { clubStatures } from "../../core/ai/clubContext.js";
 import { refusesFreeAgentSigningWith } from "../../core/transfers/playerWill.js";
+import { userView } from "../../core/transfers/userView.js";
+import { InterestTag, RuleCounter } from "../components/InterestTag.js";
 import {
   PlayerViewCells, PlayerViewHeaders, PlayerViewSwitch, ViewTableWrap, performanceSeason,
   performanceSeasonOptions, usePlayerView, viewKeepsSort, viewSortAccessors, viewTableClass,
@@ -48,8 +50,12 @@ const OVERVIEW_ONLY: readonly FaSortKey[] = ["pot"];
  * nobody wanted — the user's own youth joins his Academy automatically.
  */
 export function FreeAgents() {
-  const { league, signFreeAgentAction, simming } = useLeague();
+  const { league, signFreeAgentAction, signToAcademyAction, simming } = useLeague();
   const [posFilter, setPosFilter] = useState<Position | "ALL">("ALL");
+  // "academy" narrows to players young enough to sign into the academy. Without
+  // it the OVR-ranked 25-row cap is mostly filled by older players, so the
+  // youngsters the academy button is for rarely make the list at all.
+  const [ageFilter, setAgeFilter] = useState<"ALL" | "academy">("ALL");
   const { sort, toggle, setSort } = useTableSort<FaSortKey>("ovr", "desc");
   const [view, setView] = usePlayerView();
   const seasonOptions = useMemo(
@@ -73,6 +79,9 @@ export function FreeAgents() {
     () => (league ? clubStatures(league.teams, league.players) : new Map<number, number>()),
     [league],
   );
+  // How each player sees your club, and your league's registration rules
+  // (transfers/userView.ts). Built once per league.
+  const clubView = useMemo(() => (league ? userView(league) : null), [league]);
 
   if (!league) {
     return <p className="p-3">Loading...</p>;
@@ -83,6 +92,10 @@ export function FreeAgents() {
 
   const userTeam = league.teams.find((t) => t.tid === league.meta.userTid);
   const atCap = (userTeam?.roster.length ?? 0) >= ROSTER_CAP;
+  const academyFull = (userTeam?.academyRoster.length ?? 0) >= ACADEMY_ROSTER_CAP;
+  // The same age bar signToAcademy enforces: under the academy's pro cut at
+  // 18, so a signing lands inside the 16/18 checkpoints like his own intake.
+  const academyEligible = (p: Player) => league.season - p.born < ACADEMY_GRADUATION_AGE;
   // Wages are paid up front each season, so a mid-season signing charges the
   // contract's full season salary at signing; offseason signings are covered
   // by the next season-start charge.
@@ -103,16 +116,27 @@ export function FreeAgents() {
   // page with no pagination — verbatim the mistake CLAUDE.md records from the
   // loan-in panel, where the top 40 rows were refused every time. They are sunk
   // rather than dropped so the reason stays visible when there is room for it.
+  // A player your league's registration rules block is sunk for the same
+  // reason: at a binding cap the pool is mostly foreign to you, and those rows
+  // would fill the list and hide the nationals you can actually sign.
   const refusesFor = (p: Player) =>
     userTeam != null
     && refusesFreeAgentSigningWith(p, statures.get(userTeam.tid) ?? 0, statures, userTeam.tid);
+  const unsignable = new Map<number, boolean>();
+  const unsignableFor = (p: Player) => {
+    let v = unsignable.get(p.pid);
+    if (v === undefined) {
+      v = refusesFor(p) || !!clubView?.of(p)?.blocked;
+      unsignable.set(p.pid, v);
+    }
+    return v;
+  };
   availablePlayers.sort((a, b) =>
-    Number(refusesFor(a)) - Number(refusesFor(b))
+    Number(unsignableFor(a)) - Number(unsignableFor(b))
     || b.ovr + potView.ceiling(b) - (a.ovr + potView.ceiling(a)));
-  const filtered =
-    posFilter === "ALL"
-      ? availablePlayers
-      : availablePlayers.filter((p) => p.pos === posFilter);
+  const filtered = availablePlayers.filter((p) =>
+    (posFilter === "ALL" || p.pos === posFilter)
+    && (ageFilter === "ALL" || academyEligible(p)));
   // Select the shown set first (by OVR+POT): the "all positions" view diversifies
   // by capping each position; a specific position is already narrowed, so show its
   // depth uncapped. The column sort below only reorders this already-selected set,
@@ -149,7 +173,8 @@ export function FreeAgents() {
           rating. Released veterans and youngsters nobody kept both end up here. Your own academy's
           kids are on the Academy page. A free transfer still has to appeal to the player:
           someone who was a regular at a much bigger club won't drop to you just because there's no
-          fee, so build the club up and he'll take the call.
+          fee, so build the club up and he'll take the call. Anyone under {ACADEMY_GRADUATION_AGE} can
+          also go straight into your academy on its flat stipend instead of a senior wage.
         </HelpHint>
       </h4>
       {atCap && (
@@ -170,17 +195,32 @@ export function FreeAgents() {
             <option key={pos} value={pos}>{pos}</option>
           ))}
         </select>
+        <label htmlFor="fa-age" className="text-muted small mb-0 ms-2">Age</label>
+        <select
+          id="fa-age"
+          className="form-select form-select-sm w-auto"
+          value={ageFilter}
+          onChange={(e) => setAgeFilter(e.target.value as "ALL" | "academy")}
+        >
+          <option value="ALL">All ages</option>
+          <option value="academy">Academy age (under {ACADEMY_GRADUATION_AGE})</option>
+        </select>
       </div>
       {availablePlayers.length === 0 ? (
         <p>No available players.</p>
       ) : filtered.length === 0 ? (
-        <p>No available players at {posFilter}.</p>
+        <p>
+          No available players
+          {ageFilter === "academy" ? ` under ${ACADEMY_GRADUATION_AGE}` : ""}
+          {posFilter === "ALL" ? "" : ` at ${posFilter}`}.
+        </p>
       ) : (
         <>
         <p className="text-muted">
           {posFilter === "ALL"
             ? `Showing the top ${shownPlayers.length} across every position (up to ${PER_POSITION_CAP} per position so one spot can't crowd out the rest) of ${availablePlayers.length} free agents by OVR + POT. Pick a position to see its full list.`
             : `Showing top ${shownPlayers.length} of ${filtered.length} ${posFilter}s by OVR + POT.`}
+          {academyFull && ` Your academy is full (${ACADEMY_ROSTER_CAP}/${ACADEMY_ROSTER_CAP}), so nobody can join it until a place opens.`}
         </p>
         <PlayerViewSwitch
           value={view}
@@ -189,6 +229,7 @@ export function FreeAgents() {
           seasons={seasonOptions}
           onSeason={setPickedSeason}
         />
+        <RuleCounter standings={clubView?.standings ?? []} />
         <ViewTableWrap view={view}>
         <table className={`table table-striped table-sm${viewTableClass(view)}`}>
           <thead>
@@ -215,12 +256,16 @@ export function FreeAgents() {
             {shownPlayers.map((p) => {
               const terms = contractTerms(p, league.season);
               const unaffordable = midSeason && terms.salary > (userTeam?.budget ?? 0);
+              const academyTerms = academyEligible(p) ? academyContractTerms(league.season) : null;
+              const academyUnaffordable =
+                midSeason && (academyTerms?.salary ?? 0) > (userTeam?.budget ?? 0);
               // Shown rather than hidden, so the reason a good player is out of
               // reach is legible instead of the list just being mysteriously
               // short — same call the Transfers page makes for a protected star.
               // Sunk to the bottom of the selection above so they can't crowd
               // signable players past the render cap.
               const refuses = refusesFor(p);
+              const seen = clubView?.of(p) ?? null;
               return (
                 <tr key={p.pid}>
                   <td><WatchToggle pid={p.pid} name={p.name} /></td>
@@ -248,7 +293,13 @@ export function FreeAgents() {
                       <span className="text-muted small text-nowrap">
                         Won&apos;t drop to your level
                       </span>
+                    ) : seen?.blocked ? (
+                      <span className="text-muted small" title={seen.blocked}>
+                        League rules
+                      </span>
                     ) : (
+                      <>
+                      <InterestTag view={seen} />{" "}
                       <button
                         className="btn btn-sm btn-primary text-nowrap"
                         disabled={simming || atCap || unaffordable}
@@ -261,6 +312,26 @@ export function FreeAgents() {
                       >
                         Sign {terms.lengthSeasons}y &middot; {formatWeeklyWage(terms.salary)}
                       </button>
+                      {academyTerms && (
+                        <>
+                          {" "}
+                          <button
+                            className="btn btn-sm btn-outline-primary text-nowrap"
+                            disabled={simming || academyFull || academyUnaffordable}
+                            title={
+                              academyFull
+                                ? `Your academy is full (${ACADEMY_ROSTER_CAP}/${ACADEMY_ROSTER_CAP})`
+                                : academyUnaffordable
+                                  ? "Mid-season signings charge the season's stipend up front"
+                                  : "Sign him into your academy on the flat stipend"
+                            }
+                            onClick={() => signToAcademyAction(p.pid)}
+                          >
+                            Academy &middot; {formatWeeklyWage(academyTerms.salary)}
+                          </button>
+                        </>
+                      )}
+                      </>
                     )}
                   </td>
                 </tr>

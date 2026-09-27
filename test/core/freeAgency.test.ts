@@ -8,7 +8,7 @@ import {
 } from "../../src/core/freeAgency.js";
 import {
   ROSTER_COMPOSITION, ROSTER_CAP, ACADEMY_ROSTER_CAP, ROSTER_SAFETY_FLOOR,
-  PROSPECT_AGE_MAX,
+  PROSPECT_AGE_MAX, ACADEMY_GRADUATION_AGE,
 } from "../../src/core/constants.js";
 import type { Player } from "../../src/core/players/types.js";
 import { clubStatures } from "../../src/core/ai/clubContext.js";
@@ -300,7 +300,7 @@ describe("academy", () => {
     const pid = league.teams[1].roster[0];
     const player = league.players.find((p) => p.pid === pid)!;
     player.contract.expiresSeason = 1;
-    player.born = 1 - 20; // age 20 at season 1, within PROSPECT_AGE_MAX
+    player.born = 1 - 16; // age 16 at season 1, under the academy's pro cut
     const teams = releaseExpiredContracts(league.teams, league.players, 1);
 
     const { teams: signedTeams, players: signedPlayers } = signToAcademy(
@@ -318,7 +318,7 @@ describe("academy", () => {
     const pid = league.teams[1].roster[0];
     const player = league.players.find((p) => p.pid === pid)!;
     player.contract.expiresSeason = 1;
-    player.born = 1 - 20;
+    player.born = 1 - 16;
     let teams = releaseExpiredContracts(league.teams, league.players, 1);
     teams = teams.map((t) =>
       t.tid === 0
@@ -336,7 +336,7 @@ describe("academy", () => {
     const pid = league.teams[1].roster[0];
     const player = league.players.find((p) => p.pid === pid)!;
     player.contract.expiresSeason = 1;
-    player.born = 1 - 20;
+    player.born = 1 - 16;
     const teams = releaseExpiredContracts(league.teams, league.players, 1);
     const budgetBefore = teams.find((t) => t.tid === 0)!.budget;
 
@@ -346,12 +346,12 @@ describe("academy", () => {
     expect(userTeam.budget).toBeLessThan(budgetBefore);
   });
 
-  it("signToAcademy is a no-op for a prospect older than PROSPECT_AGE_MAX", () => {
+  it("signToAcademy is a no-op for a prospect at or past ACADEMY_GRADUATION_AGE", () => {
     const league = makeLeague(0, 1);
     const pid = league.teams[1].roster[0];
     const player = league.players.find((p) => p.pid === pid)!;
     player.contract.expiresSeason = 1;
-    player.born = 1 - 25; // age 25, over PROSPECT_AGE_MAX
+    player.born = 1 - ACADEMY_GRADUATION_AGE; // exactly 18: past the pro cut
     const teams = releaseExpiredContracts(league.teams, league.players, 1);
 
     const result = signToAcademy(teams, league.players, 0, pid, 1, "offseason");

@@ -1,5 +1,6 @@
 import type { Player } from "../players/types.js";
 import type { StoredTeam } from "../teams/clubs.js";
+import { registrationChecker } from "../foreignRules.js";
 import type { PlayedMatch } from "../standings.js";
 import type { CompletedTransfer } from "../transfers/negotiation.js";
 import type { TransferWindowKind } from "../transfers/window.js";
@@ -119,6 +120,7 @@ export function runAITransferMarket(
   let clauses = clauseCtx?.clauses ?? [];
   const contexts = deriveLeagueContexts({ teams, players, season, played, competitions });
   const playerMap = new Map(players.map((p) => [p.pid, p]));
+  const canRegister = registrationChecker(teams, competitions, (pid) => playerMap.get(pid), season);
   const jitter = mulberry32(seed);
   const tierByTid = new Map(teams.map((t) => [t.tid, tierOf(competitions, t.compId)]));
 
@@ -288,6 +290,11 @@ export function runAITransferMarket(
 
     const buyerRoster = roster.get(c.buyerTid)!;
     if (buyerRoster.length >= ROSTER_CAP) continue;
+    // The buyer's league registration rules (foreignRules.ts), against its live
+    // roster, so a sale earlier this window frees a slot and two buys that each
+    // fit alone can't together break a cap. Here, after every jitter draw, so
+    // it can't move the stream.
+    if (canRegister(c.buyerTid, buyerRoster, playerMap.get(c.pid)!) !== null) continue;
 
     // Re-check the seller's depth floor against the live roster (an earlier
     // sale this window may have already thinned this position).

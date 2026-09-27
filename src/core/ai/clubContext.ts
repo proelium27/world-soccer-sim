@@ -4,6 +4,7 @@ import type { StoredTeam } from "../teams/clubs.js";
 import { teamSlots } from "../lineup/formations.js";
 import type { PlayedMatch } from "../standings.js";
 import type { Competition } from "../competitions.js";
+import { homeClubs, type HomeClub } from "../transfers/homePull.js";
 import { computeStandings } from "../standings.js";
 import {
   AI_SQUAD_STRENGTH_COUNT,
@@ -87,6 +88,12 @@ export interface ClubContext {
    */
   stature: number;
   /**
+   * The club's country and how domestic its league really is, for home-country
+   * pull (transfers/homePull.ts). Optional so hand-built contexts need not carry
+   * it; absent means no pull.
+   */
+  home?: HomeClub;
+  /**
    * Win-now pressure, [0,1]. High for rich, famous, strong, in-form clubs;
    * low for poor, weak, struggling ones. Tilts value toward prime-age
    * readiness (high) or youth/upside (low).
@@ -113,7 +120,7 @@ function mean(xs: number[]): number {
 }
 
 /** A club's squad strength: mean ovr of its best AI_SQUAD_STRENGTH_COUNT players. */
-function squadStrength(roster: Player[]): number {
+export function squadStrength(roster: Player[]): number {
   const top = [...roster].sort((a, b) => b.ovr - a.ovr).slice(0, AI_SQUAD_STRENGTH_COUNT);
   return mean(top.map((p) => p.ovr));
 }
@@ -281,6 +288,7 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
   // (DIVISION_2_BUDGET_SCALE), so pooling every competition into one range
   // would read every tier-2 club as permanently near-max frugality
   // regardless of how it's actually doing relative to its own competition.
+  const homes = homeClubs(league.teams, league.competitions, league.players);
   for (const comp of league.competitions) {
     const group = raw.filter((r) => r.compId === comp.id);
     if (group.length === 0) continue;
@@ -345,6 +353,7 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
         posWeakestStarterOvr: r.weakestStarter,
         hype: r.hype,
         stature: statureOf(r.strength, r.hype),
+        home: homes.get(r.tid),
         ambition,
         frugality,
         direction: label(ambition, form, r.avgAge),
