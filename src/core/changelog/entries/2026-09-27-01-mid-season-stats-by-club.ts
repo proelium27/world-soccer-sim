@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-24",
+  date: "2026-09-27",
   title: "Mid-season movers keep their stats at the right club",
   items: [
     "When a player moved in the winter window, his whole season went with him. Buy a striker in January and your Roster showed every goal he'd scored for his old club as if he'd scored them for you.",
