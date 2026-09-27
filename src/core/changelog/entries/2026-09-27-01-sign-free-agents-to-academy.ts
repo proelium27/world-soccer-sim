@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-09-24",
+  date: "2026-09-27",
   title: "Sign young free agents into your academy",
   items: [
     "You can sign a free agent under 18 straight into your academy again. The Free Agents page has an **Academy** button next to the usual Sign button, and it puts him on the academy's flat stipend instead of a senior wage.",
