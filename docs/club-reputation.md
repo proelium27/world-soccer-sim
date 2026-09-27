@@ -238,11 +238,81 @@ big four running a little more foreign than real life is fine.** Raising
 APPEAL_HOME would pull them back but is the same pull that held Brazil up, so
 it was deliberately left at 0.25.
 
-## Stage 3 (planned)
+## Stage 3: the "How he sees clubs" card and language ties (built)
 
-The player-profile "How he sees clubs" panel; reputation and trend on Club
-History and the club Database; personality traits later. Neighbour/language
-pull (Brazil -> Portugal) needs data first.
+User calls (2026-09-25): build the panel and language ties; no passports,
+no personality traits yet.
+
+### How he sees clubs (`transfers/playerView.ts`, `HowHeSeesClubs.tsx`)
+
+A card on every Player Profile: his view of the user's club with the reasons,
+his five favourite clubs, the five best clubs where the playing-time line is
+not against him, and a count of clubs he'd refuse. It reads `clubAppealFor`
+measured from where he stands (his club; his parent while on loan; for a free
+agent, his expected stature for AI clubs and `freeAgentFrom` for the user's),
+so it agrees with the transfer pages to the last decimal (pinned by a test
+against `userView`). Club contexts are built once per league object (a
+WeakMap, the `usePlayerRefs` pattern): ~19 ms the first time, 0.4 ms per
+further profile on the 883-club world. For a good player the favourites are
+mostly the world's biggest clubs, which is true; the second list is where he
+could actually end up.
+
+### Language and family ties (`transfers/corridors.ts`)
+
+A new appeal line, `language`, labelled with the route's own reason
+("Language", "Family ties", "Italian roots", "Neighbours"):
+`APPEAL_LANGUAGE (0.08) x strength x (1 - care)`, symmetric like the home
+line (leaving a familiar country costs what arriving pays), half on a loan,
+nothing for a star. The routes are a hand-authored table of the real
+cross-confederation corridors, each with a reason: Brazil (1.5) and
+Portuguese-speaking Africa to Portugal, French-speaking Africa to France and
+Belgium (DR Congo 1.25 as family ties), Suriname/Curacao/Indonesia (and
+Morocco, 0.5) to the Netherlands, Spanish-speaking South America to Mexico
+(0.3) and Spain (0.5), Argentina/Uruguay to Italy (0.4), Australia/New
+Zealand/Canada to Scotland (1) and England (0.5), Canada to the US (0.75).
+Deliberately not derived from the nationality tables, which are the target
+the probe measures against; routes inside a confederation are left to the
+level and playing-time lines.
+
+**Why it was needed.** In Stage 2 the leagues running too domestic on every
+seed were France (+4.4 to +7.5), Portugal (+1.3 to +7.6) and Belgium (+2.5 to
++5.7), exactly the destinations of the biggest real routes, which nothing in
+a player's view could produce: the home line only knows his own country.
+
+**Measured (`nationalityDriftProbe`, 20 seasons, seeds 1/2/3), gap to the
+real domestic share at season 20:**
+
+| League | Stage 2 | Mexico route 0.75 | shipped (Mexico 0.3) |
+|---|---|---|---|
+| France | +6.0 / +7.5 / +4.4 | -1.9 / +0.5 / +0.4 | +1.3 / -1.7 / -2.6 |
+| Portugal | +1.3 / +7.6 / +3.3 | -1.8 / +0.7 / -0.4 | +1.5 / -3.5 / -2.6 |
+| Belgium | +5.3 / +2.5 / +5.7 | +1.9 / +5.1 / +3.3 | +4.8 / +1.3 / -1.5 |
+| Scotland | +6.8 / +1.5 / -1.7 | +0.5 / -0.4 / -0.8 | +0.8 / -1.3 / +3.1 |
+| Netherlands | -6.6 / -4.7 / +1.0 | -2.6 / +2.2 / +0.6 | -1.0 / +0.6 / +0.2 |
+| Mexico | -1.5 / +0.6 / 0.0 | -6.4 / -5.9 / -5.5 | -2.6 / -1.8 / 0.0 |
+| United States | -1.5 / 0.0 / -0.3 | +5.0 / +1.7 / +1.1 | +1.3 / +5.1 / +5.0 |
+| Serbia | -7.7 / -5.5 / -7.6 | -6.2 / -2.6 / -3.3 | -5.0 / -8.0 / -6.6 |
+
+At 0.75 the Mexico route pulled Mexico ~6 points too foreign on every seed and
+drew South Americans away from MLS; 0.3 fixes Mexico. The US now runs a
+little too domestic on two seeds, and Serbia's shortfall is Stage 2's,
+unchanged. Spain and Italy stay too foreign, as accepted in Stage 2.
+
+**Ladder and solvency (`weakLeaguesAudit`, 20 seasons x 4 seeds, one seed
+per process, pooled by hand):** every seed reads `ladder OK`; every rung
+passes the mean gate (worst Greece->Scotland -0.89, US->Greece -0.30).
+BIG4->France +3.90, France->Brazil +0.83, Brazil->Netherlands +1.61,
+Portugal->Belgium +2.18; BIG4->Serbia +12.99, France->Serbia +9.09. **0
+clubs in deficit at any sample on all four seeds.** The per-seed "FAILURES"
+on seeds 1, 3 and 4 (Greece->Scotland -1.89, France->Brazil -1.16,
+Belgium->Mexico -1.51) are the documented single-seed misuse of the mean
+gate; all pass pooled.
+
+### Still to come
+
+Reputation and its trend on Club History and the club Database; personality
+traits (Ambition, Loyalty, Adaptability, fogged one-word reveal); passports
+(Spain's Ibero-American route, Italian oriundi), declined for now.
 
 ## Tuning and audits (in progress)
 
