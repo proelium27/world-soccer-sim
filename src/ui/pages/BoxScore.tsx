@@ -329,7 +329,7 @@ export function BoxScore() {
     match.boxScore.events
       .filter((e) => e.type !== "turnover")
       .filter((e) => showAllEvents || KEY_EVENTS.has(e.type)),
-    periodMarkers(firstHalfStoppage, match.boxScore.finalClock),
+    periodMarkers(firstHalfStoppage, match.boxScore.finalClock, match.boxScore.extraTimeClock),
   );
 
   return (
@@ -458,6 +458,7 @@ export function BoxScore() {
                 event={item.event}
                 playerName={playerName}
                 firstHalfStoppage={firstHalfStoppage}
+                extraTimeClock={match.boxScore.extraTimeClock}
                 detail={eventDetail(
                   item.event,
                   match.boxScore.events,

@@ -4,7 +4,14 @@ import type { StoredTeam } from "../../core/teams/clubs.js";
 import type { MatchEvent, MatchPosition } from "../../engine/attribution.js";
 import { ClubCrest } from "./ClubCrest.js";
 import { eventSummary, KEY_EVENTS, TimelineRow, TimelineMarkerRow } from "./matchEvents.js";
-import { halfTimeMinute, matchMinuteLabel, matchTimeline, periodMarkers } from "../matchClock.js";
+import {
+  EXTRA_TIME_HALF_MINUTES,
+  extraTimeStartMinute,
+  halfTimeMinute,
+  matchMinuteLabel,
+  matchTimeline,
+  periodMarkers,
+} from "../matchClock.js";
 import { eventDetail } from "../matchNarration.js";
 import { SPEEDS, useMatchPlayback } from "../live/useMatchPlayback.js";
 import type { MatchLineups, SideLineup } from "../live/lineups.js";
@@ -206,10 +213,15 @@ export function LiveMatchView({
   // the first half reads 45+2, and the second half discounts the stoppage
   // already played. One number bridges them. See matchClock.ts.
   const h1 = match.firstHalfStoppage;
+  // Where extra time kicked off, if the tie went there. Playback plays on to the
+  // 120th, and the clock restarts its labels at 91'.
+  const et = match.extraTimeClock;
+  const etStart = et === undefined ? null : extraTimeStartMinute(et);
   const playback = useMatchPlayback(match.events, {
     autoStart: true,
     finalClock: match.finalClock,
     firstHalfStoppage: h1,
+    extraTimeClock: et,
   });
   const { minute, finished } = playback;
 
@@ -228,8 +240,8 @@ export function LiveMatchView({
   // to now, so ratings and marks move as the match does. O(events) on ~200
   // events, against the feed and rail this screen already re-derives per tick.
   const live = useMemo(
-    () => (lineups ? liveMatchState(lineups, match.events, minute, match.finalClock, h1) : null),
-    [lineups, match.events, match.finalClock, minute, h1],
+    () => (lineups ? liveMatchState(lineups, match.events, minute, match.finalClock, h1, et) : null),
+    [lineups, match.events, match.finalClock, minute, h1, et],
   );
 
   // Slots come from the lineups when the caller has them; a LiveMatch on its own
@@ -263,7 +275,7 @@ export function LiveMatchView({
   const shown = eventsThrough(match.events, minute).filter((e) => e.type !== "turnover");
   const feed = matchTimeline(
     shown.filter((e) => showAllEvents || KEY_EVENTS.has(e.type)),
-    periodMarkers(h1, match.finalClock),
+    periodMarkers(h1, match.finalClock, et),
     minute,
   ).reverse();
 
@@ -278,14 +290,38 @@ export function LiveMatchView({
   const detailOf = (e: MatchEvent) =>
     eventDetail(e, match.events, match.finalClock ?? 0, slotOfPid);
 
-  const rail = scoresAtMinute(otherMatches, minute);
-  const table = tableAtMinute ? tableAtMinute(minute) : null;
+  // Once your whistle has gone every match on the day is over, so the rail and
+  // table show where they finished. Otherwise a tie elsewhere that went to extra
+  // time, or ran longer in stoppage, would be left frozen at your final minute.
+  const sideMinute = finished ? Number.POSITIVE_INFINITY : minute;
+  const rail = scoresAtMinute(otherMatches, sideMinute);
+  const table = tableAtMinute ? tableAtMinute(sideMinute) : null;
 
+  const pens = match.penalties;
+  const fullTimeLabel = pens
+    ? `${pens.home}-${pens.away} on penalties`
+    : et !== undefined
+      ? "After extra time"
+      : "Full time";
   const clockLabel =
-    minute === 0 ? "Kickoff" : finished ? "Full time" : matchMinuteLabel(minute, h1);
+    minute === 0 ? "Kickoff" : finished ? fullTimeLabel : matchMinuteLabel(minute, h1, et);
   // The break falls at the END of first-half stoppage, so it is minute 48 of
-  // football when three were added — not minute 45.
-  const atHalfTime = minute === halfTimeMinute(h1) && !finished;
+  // football when three were added — not minute 45. Extra time adds two more:
+  // the whistle at the end of normal time, and its own break at 105.
+  const breakLabel = finished
+    ? null
+    : minute === halfTimeMinute(h1)
+      ? "Half time"
+      : etStart !== null && minute === etStart
+        ? "Extra time"
+        : etStart !== null && minute === etStart + EXTRA_TIME_HALF_MINUTES
+          ? "Extra time, half time"
+          : null;
+  const atHalfTime = breakLabel !== null;
+
+  const shootoutSentence = pens
+    ? ` ${nameOf(pens.home > pens.away ? match.home : match.away)} win ${Math.max(pens.home, pens.away)}-${Math.min(pens.home, pens.away)} on penalties.`
+    : "";
 
   /**
    * What a screen reader hears as the match runs.
@@ -300,10 +336,12 @@ export function LiveMatchView({
   const latest = shown.filter((e) => KEY_EVENTS.has(e.type)).at(-1);
   const latestIsNow = latest !== undefined && eventMinute(latest.clock) === minute;
   const announcement = finished
-    ? `Full time. ${nameOf(match.home)} ${score.home}, ${nameOf(match.away)} ${score.away}.`
+    ? `${et !== undefined ? "After extra time" : "Full time"}. ${nameOf(match.home)} ${score.home}, ${nameOf(match.away)} ${score.away}.${shootoutSentence}`
     : latestIsNow
-      ? `${eventSummary(latest, playerName, clubOfSide(latest.side), h1, detailOf(latest))} ${score.home}-${score.away}.`
-      : "";
+      ? `${eventSummary(latest, playerName, clubOfSide(latest.side), h1, detailOf(latest), et)} ${score.home}-${score.away}.`
+      : breakLabel !== null && etStart !== null && minute === etStart
+        ? `End of normal time, ${score.home}-${score.away}. Extra time.`
+        : "";
 
   return (
     <div className="live-page">
@@ -326,7 +364,7 @@ export function LiveMatchView({
             </span>
           </h1>
           <div className={`live-clock stat-num${atHalfTime ? " live-clock--break" : ""}`}>
-            {atHalfTime ? "Half time" : clockLabel}
+            {breakLabel ?? clockLabel}
           </div>
         </header>
 
@@ -421,6 +459,7 @@ export function LiveMatchView({
                     playerName={playerName}
                     clubName={clubOfSide(item.event.side)}
                     firstHalfStoppage={h1}
+                    extraTimeClock={et}
                     detail={detailOf(item.event)}
                   />
                 ),

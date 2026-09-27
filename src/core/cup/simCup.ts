@@ -1,9 +1,10 @@
 import type { Composites } from "../../engine/composites.js";
-import type { MatchPlayer, PlayerMatchLine, BoxScore } from "../../engine/attribution.js";
+import type { MatchPlayer, PlayerMatchLine, BoxScore, MatchEvent } from "../../engine/attribution.js";
 import type { TeamMatchData } from "../league/composites.js";
 import type { CupState, CupTie, KnockoutLeg } from "./types.js";
 import { simMatchDetailed, resolveShot, finisherAdj } from "../../engine/matchSim.js";
-import { pickShooter, pickAssister, emptyLine } from "../../engine/attribution.js";
+import { pickShooter, pickAssister, emptyLine, eventTypeFromShot } from "../../engine/attribution.js";
+import { MATCH_SECONDS, EXTRA_TIME_SECONDS, EXTRA_TIME_TIMING_STREAM } from "../../engine/constants.js";
 import { mulberry32, hashInts } from "../../engine/rng.js";
 import {
   matchupsForRound, applyPlayIn, applyPlayoff, cupFormat,
@@ -86,53 +87,128 @@ function mergeLines(acc: PlayerMatchLine[], add: PlayerMatchLine[]): void {
 }
 
 /**
+ * The men a side had on the pitch at the final whistle: the starting eleven,
+ * with every substitution and sending-off in `events` applied.
+ *
+ * Extra time used to be played by the STARTING eleven, which nobody could see
+ * while it left no timeline. Once its chances became events, that meant a man
+ * substituted on the hour could score in the 112th minute. A substitute takes
+ * the slot his box-score line records, the one the engine gave him.
+ */
+function onPitchAtWhistle(
+  xi: MatchPlayer[],
+  bench: MatchPlayer[],
+  lines: PlayerMatchLine[],
+  events: MatchEvent[],
+  side: "home" | "away",
+): MatchPlayer[] {
+  let onPitch = [...xi];
+  for (const e of events) {
+    if (e.side !== side) continue;
+    if (e.type === "substitution") {
+      const [off, on] = e.pids;
+      const leaving = onPitch.find((p) => p.pid === off);
+      const arriving = bench.find((p) => p.pid === on);
+      onPitch = onPitch.filter((p) => p.pid !== off);
+      if (arriving) {
+        const slot = lines.find((l) => l.pid === on)?.slot ?? leaving?.slot ?? arriving.slot;
+        onPitch.push(arriving.slot === slot ? arriving : { ...arriving, slot });
+      }
+    } else if (e.type === "red_card") {
+      onPitch = onPitch.filter((p) => p.pid !== e.pids[0]);
+    }
+  }
+  return onPitch;
+}
+
+/**
+ * The regulation whistle a box score records. A box score from before
+ * `finalClock` existed falls back to its last event, then to 90 minutes flat.
+ */
+function whistleOf(box: BoxScore): number {
+  if (box.finalClock !== undefined) return box.finalClock;
+  return box.events.reduce((min, e) => Math.min(min, e.clock), 0);
+}
+
+/** One side of a tie going into extra time, in the box score's orientation. */
+interface ExtraTimeSide {
+  comp: Composites;
+  /** Who is on the pitch at the whistle (see onPitchAtWhistle). */
+  onPitch: MatchPlayer[];
+  lines: PlayerMatchLine[];
+  side: "home" | "away";
+}
+
+/**
  * Extra time: each side takes CUP_ET_CHANCES_PER_SIDE shots resolved with the
  * same block→off-target→save→goal cascade as regulation, attributed to a
  * picked shooter/assister and (for goals/xGA) the defending keeper, mutating
  * the existing box score in place. Returns the extra-time goals added per side.
+ *
+ * Every chance is also written into the timeline, at a minute of the 30 played
+ * on past `whistleClock` (see BoxScore.extraTimeClock), so the live viewer plays
+ * on into extra time instead of cutting to the result. The chances are rolled
+ * on `rng` in exactly the order they always were, all of home's then all of
+ * away's; only their MINUTES come from a separate stream seeded off the match
+ * itself, so no result moved to put them on the clock. Minutes played and the
+ * stored match rating stay regulation-only, as they always were.
  */
 function playExtraTime(
   rng: () => number,
-  homeComp: Composites,
-  awayComp: Composites,
-  homeXI: MatchPlayer[],
-  awayXI: MatchPlayer[],
+  home: ExtraTimeSide,
+  away: ExtraTimeSide,
   box: BoxScore,
+  whistleClock: number,
 ): { homeGoals: number; awayGoals: number } {
-  const sideGoals = (
-    offComp: Composites,
-    defComp: Composites,
-    attackers: MatchPlayer[],
-    offLines: PlayerMatchLine[],
-    defXI: MatchPlayer[],
-    defLines: PlayerMatchLine[],
-  ): number => {
+  // The minute boundary at or after the whistle, so an extra-time minute is
+  // always a whole playing-time minute and 91' to 120' land cleanly.
+  const startClock = MATCH_SECONDS - Math.ceil((MATCH_SECONDS - whistleClock) / 60) * 60;
+  const timing = mulberry32(hashInts(
+    home.onPitch[0]?.pid ?? 0,
+    away.onPitch[0]?.pid ?? 0,
+    EXTRA_TIME_TIMING_STREAM,
+  ));
+  const events: MatchEvent[] = [];
+
+  const sideGoals = (off: ExtraTimeSide, def: ExtraTimeSide): number => {
     let goals = 0;
-    const gk = defXI.find((p) => p.pos === "GK");
+    const attackers = off.onPitch;
+    const gk = def.onPitch.find((p) => p.pos === "GK");
     for (let i = 0; i < CUP_ET_CHANCES_PER_SIDE; i++) {
       const shooter = pickShooter(rng, attackers);
-      const shot = resolveShot(rng, offComp, defComp, finisherAdj(shooter, attackers, "shooting"));
-      const line = lineFor(offLines, shooter.pid);
+      const shot = resolveShot(rng, off.comp, def.comp, finisherAdj(shooter, attackers, "shooting"));
+      const line = lineFor(off.lines, shooter.pid);
+      const pids = [shooter.pid];
       line.shots++;
       line.xg += shot.xg;
-      if (gk) lineFor(defLines, gk.pid).xga += shot.xg;
+      if (gk) lineFor(def.lines, gk.pid).xga += shot.xg;
       if (shot.outcome === "saved") {
         line.shotsOnTarget++;
-        if (gk) lineFor(defLines, gk.pid).saves++;
+        if (gk) lineFor(def.lines, gk.pid).saves++;
       } else if (shot.outcome === "goal") {
         line.shotsOnTarget++;
         line.goals++;
         goals++;
-        if (gk) lineFor(defLines, gk.pid).goalsAgainst++;
+        if (gk) lineFor(def.lines, gk.pid).goalsAgainst++;
         const assister = pickAssister(rng, attackers, shooter.pid);
-        if (assister) lineFor(offLines, assister.pid).assists++;
+        if (assister) {
+          lineFor(off.lines, assister.pid).assists++;
+          pids.push(assister.pid);
+        }
       }
+      // Somewhere in the 30 minutes, never on the kickoff second itself.
+      const at = 1 + Math.floor(timing() * (EXTRA_TIME_SECONDS - 1));
+      events.push({ clock: startClock - at, type: eventTypeFromShot(shot.outcome), side: off.side, pids });
     }
     return goals;
   };
 
-  const homeGoals = sideGoals(homeComp, awayComp, homeXI, box.home, awayXI, box.away);
-  const awayGoals = sideGoals(awayComp, homeComp, awayXI, box.away, homeXI, box.home);
+  const homeGoals = sideGoals(home, away);
+  const awayGoals = sideGoals(away, home);
+  // Clock counts down, so descending clock is chronological.
+  events.sort((a, b) => b.clock - a.clock);
+  box.events.push(...events);
+  box.extraTimeClock = startClock;
   return { homeGoals, awayGoals };
 }
 
@@ -223,7 +299,13 @@ export function resolveCupTie(
   if (homeGoals === awayGoals) {
     if (extraTime) {
       wentToExtraTime = true;
-      const et = playExtraTime(rng, hd.composites, ad.composites, hd.xi, ad.xi, box);
+      const et = playExtraTime(
+        rng,
+        { comp: hd.composites, onPitch: onPitchAtWhistle(hd.xi, hd.bench, box.home, box.events, "home"), lines: box.home, side: "home" },
+        { comp: ad.composites, onPitch: onPitchAtWhistle(ad.xi, ad.bench, box.away, box.events, "away"), lines: box.away, side: "away" },
+        box,
+        whistleOf(box),
+      );
       homeGoals += et.homeGoals;
       awayGoals += et.awayGoals;
     }
@@ -354,7 +436,16 @@ export function resolveTwoLeggedTie(
 
   if (homeGoals === awayGoals) {
     wentToExtraTime = true;
-    const et = playExtraTime(rng, hd.composites, ad.composites, hd.xi, ad.xi, box);
+    // Extra time follows on from leg 2, where `away` hosted: in leg 2's own
+    // events the tie's `home` club is the away side.
+    const leg2Box = leg2.boxScore;
+    const et = playExtraTime(
+      rng,
+      { comp: hd.composites, onPitch: onPitchAtWhistle(hd.xi, hd.bench, leg2Box.away, leg2Box.events, "away"), lines: box.home, side: "away" },
+      { comp: ad.composites, onPitch: onPitchAtWhistle(ad.xi, ad.bench, leg2Box.home, leg2Box.events, "home"), lines: box.away, side: "home" },
+      box,
+      whistleOf(leg2Box),
+    );
     homeGoals += et.homeGoals;
     awayGoals += et.awayGoals;
     // Extra time is played at `away`'s ground, so goals `home` scores in it are

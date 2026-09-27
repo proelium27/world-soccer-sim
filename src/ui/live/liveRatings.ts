@@ -91,6 +91,7 @@ function sideState(
   minute: number,
   finalClock?: number,
   firstHalfStoppage?: number,
+  extraTimeClock?: number,
 ): LiveSide {
   // Everyone who appears in the box score is a starter or came on for one, so
   // the team sheet already names the whole cast and no second input is needed.
@@ -128,12 +129,22 @@ function sideState(
 
   let goals = 0;
   let goalsAgainst = 0;
+  // The engine rates a player at the end of normal time and extra time only adds
+  // to his line afterwards, so the rating is taken off the lines as they stood at
+  // that whistle. Goals and assists scored in extra time still show on the chip.
+  let atNormalTime: { lines: Map<number, PlayerMatchLine>; goalsAgainst: number } | null = null;
 
   // Chronological — the clock counts down, so descending clock runs forwards.
   const sorted = [...events].sort((a, b) => b.clock - a.clock);
   for (const e of sorted) {
     const at = eventMinute(e.clock);
     if (at > minute) break;
+    if (atNormalTime === null && extraTimeClock !== undefined && e.clock < extraTimeClock) {
+      atNormalTime = {
+        lines: new Map([...lines].map(([pid, l]) => [pid, { ...l }])),
+        goalsAgainst,
+      };
+    }
     const mine = e.side === side;
     const line = (pid: number) => lines.get(pid);
 
@@ -234,6 +245,8 @@ function sideState(
         : matchMinutesBetween(enter, exit, firstHalfStoppage);
     const line = lines.get(pid)!;
     line.minutesPlayed = minutesPlayed;
+    const rated = atNormalTime?.lines.get(pid) ?? line;
+    rated.minutesPlayed = minutesPlayed;
     const slot = slotOf.get(pid) ?? null;
     return {
       pid,
@@ -250,7 +263,7 @@ function sideState(
       rating:
         minute === 0 || slot === null
           ? null
-          : computeMatchRating(line, slot, minutesPlayed, goalsAgainst),
+          : computeMatchRating(rated, slot, minutesPlayed, atNormalTime?.goalsAgainst ?? goalsAgainst),
     };
   };
 
@@ -298,10 +311,11 @@ export function liveMatchState(
   minute: number,
   finalClock?: number,
   firstHalfStoppage?: number,
+  extraTimeClock?: number,
 ): LiveMatchState {
   return {
-    home: sideState(lineups.home, "home", events, minute, finalClock, firstHalfStoppage),
-    away: sideState(lineups.away, "away", events, minute, finalClock, firstHalfStoppage),
+    home: sideState(lineups.home, "home", events, minute, finalClock, firstHalfStoppage, extraTimeClock),
+    away: sideState(lineups.away, "away", events, minute, finalClock, firstHalfStoppage, extraTimeClock),
   };
 }
 
