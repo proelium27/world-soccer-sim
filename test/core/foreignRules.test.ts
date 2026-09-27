@@ -145,7 +145,7 @@ describe("on a real world", () => {
 
   it("the academy is no way round a cap", () => {
     const extra = Array.from({ length: 6 }, () => player("Brazil", { born: 0, pos: "CM" }));
-    const kid = player("Chile", { born: league.season - 19, pos: "CM", contract: { salary: 0, expiresSeason: 0 } } as Partial<Player>);
+    const kid = player("Chile", { born: league.season - 17, pos: "CM", contract: { salary: 0, expiresSeason: 0 } } as Partial<Player>);
     const teams = league.teams.map((t) => t.tid === argClub.tid
       ? { ...t, roster: [...t.roster.filter((pid) => !foreigner(pid)).slice(0, 18), ...extra.map((p) => p.pid)], academyRoster: [], budget: 1e12 }
       : t);

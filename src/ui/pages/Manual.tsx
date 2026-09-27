@@ -570,7 +570,7 @@ export function Manual() {
             <li><strong>Incoming Offers</strong>. AI clubs bidding for <em>your</em> players. Accept, reject, or counter to push the fee upward.</li>
             <li><strong>Loans</strong>. List your own players for a fixed-length loan, look over AI clubs' incoming loan offers, borrow other clubs' young players, and keep track of who's out on loan and who you have in.</li>
             <li><strong>Finance</strong>. Budget, the full wage-bill table, a projected (or final) season settlement, your transfer history, and a league-wide money table.</li>
-            <li><strong>Free Agents</strong>. Every other unsigned player, sign straight to your senior team. The default view shows the best across every position but caps how many of any one position it lists, so a spot that always has lots of free agents (defensive and attacking mids only get two roster spots per club, so their good extras spill into free agency more often) can't crowd out the rest. Pick a position from the dropdown to see that position's full list.</li>
+            <li><strong>Free Agents</strong>. Every other unsigned player. Sign him straight to your senior team, or, if he's under 18, into your academy on its flat stipend instead (an Age filter narrows the list to those players). The default view shows the best across every position but caps how many of any one position it lists, so a spot that always has lots of free agents (defensive and attacking mids only get two roster spots per club, so their good extras spill into free agency more often) can't crowd out the rest. Pick a position from the dropdown to see that position's full list.</li>
             <li><strong>Academy</strong>. Your club's youth academy. Kids join at 14 every summer; your scouts decide who stays at 16 and who turns pro at 18, and a Next rollover column lets you change any of those calls. Release or promote anyone early. Also where you set your scout directions: which countries your scouts look in, and which positions they look for. Sorting by potential ranks kids on the top of each scouting estimate, not on what they'll really become: nobody has told you that yet.</li>
             <li><strong>Box Score</strong>. Per-match detail, in three parts. The scoreboard at the top names the competition and matchday and starts the Man of the Match, the highest-rated player among those who actually played. Under it, a head-to-head strip compares the two sides on possession, shots, shots on target, xG, corners and fouls. Then a full-width stat table per club (xG, passes completed/attempted, crosses and fouls, goals against and xG against on the goalkeeper's row, and a 0&ndash;10 match rating for everyone who appeared), grouped into attacking, keeping, defending, passing and discipline blocks. The play-by-play at the bottom runs down a timeline with one club on each side, showing goals, cards, substitutions, penalties and injuries by default; switch it to "Every event" to add every shot and corner too.</li>
             <li><strong>Leagues</strong>. Your saved leagues. Create, enter, or delete saves. Each one is fully independent. Every save is named after the club you took over, so the row also shows the season it's reached and when you started it, which is how you tell two saves of the same club apart.</li>
@@ -3131,8 +3131,11 @@ export function Manual() {
           <p>
             Unsigned players of any age, youngsters included, live on the <strong>Free Agents</strong>{" "}
             page. Don't expect to find a future star there: clubs keep their best young players now,
-            so what reaches it is genuinely what nobody wanted. Your own academy is the reliable
-            route to a homegrown star.
+            so what reaches it is genuinely what nobody wanted. Anyone under 18 there can go
+            straight into your academy on the academy stipend rather than a senior wage, as long as
+            the academy has one of its 20 places free and he's willing to join you. From then on he's
+            treated like your own kids: the same cuts at 16 and 18. Your own academy
+            is still the reliable route to a homegrown star.
           </p>
         </Section>
 
