@@ -55,6 +55,15 @@ describe("language and family ties", () => {
     expect(congo.lines.find((l) => l.id === "language")?.label).toBe("Family ties");
   });
 
+  it("names a loss after the stronger tie he'd leave, not the weaker one he'd gain", () => {
+    // DR Congo: Family ties to Belgium (1.25), Language to France (1). Moving
+    // Belgium -> France is a net loss, and the label must say what he loses.
+    const move = clubAppealFor(player("DR Congo", 60), club(4, "France"), { stature: 0.4, club: club(3, "Belgium") });
+    const line = move.lines.find((l) => l.id === "language")!;
+    expect(line.value).toBeLessThan(0);
+    expect(line.label).toBe("Family ties");
+  });
+
   it("fades for a star, like the home line", () => {
     const star = clubAppealFor(player("Brazil", 95), portugal, { stature: 0.4 });
     expect(language(star)).toBe(0);

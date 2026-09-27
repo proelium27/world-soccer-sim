@@ -146,11 +146,15 @@ function languageAt(player: Player, club: AppealClub | undefined, care: number):
   return route ? APPEAL_LANGUAGE * route.strength * (1 - care) : 0;
 }
 
-/** The reason to show on the language line: the route into the club he'd join, else the one he'd leave. */
+/**
+ * The reason to show on the language line: whichever route counts more, so a
+ * negative line leaving a stronger tie is named after the tie he'd lose.
+ */
 function languageLabel(player: Player, to: AppealClub, from: AppealFrom): string {
   const into = to.home ? corridorFor(player.nationality, to.home.country) : null;
   const out = from.club?.home ? corridorFor(player.nationality, from.club.home.country) : null;
-  return (into ?? out)?.reason ?? LABELS.language;
+  const route = into && out ? (out.strength > into.strength ? out : into) : (into ?? out);
+  return route?.reason ?? LABELS.language;
 }
 
 /** The line values, without building the labelled list. */

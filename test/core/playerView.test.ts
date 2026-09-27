@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { playerClubView, owningClub, mainReason, PLAYER_VIEW_LIST } from "../../src/core/transfers/playerView.js";
 import { userView } from "../../src/core/transfers/userView.js";
+import { playerChoice } from "../../src/core/transfers/playerChoice.js";
 import { makeLeague } from "../helpers/league.js";
 
 describe("playerClubView", () => {
@@ -27,10 +28,25 @@ describe("playerClubView", () => {
     for (const c of [...view.favourites, ...view.wouldPlay]) expect(c.appeal.refused).toBe(false);
   });
 
-  it("only puts clubs he'd get games at in the playing list", () => {
-    for (const c of view.wouldPlay) {
-      const pt = c.appeal.lines.find((l) => l.id === "playingTime")?.value ?? 0;
-      expect(pt).toBeGreaterThanOrEqual(0);
+  it("only puts clubs where he'd beat their weakest starter in the playing list", () => {
+    // Judged at the destination alone, not against his current club: the
+    // playing-time line is relative and clamped, so a benched youngster reads
+    // 0 at every club where he'd also sit.
+    const choice = playerChoice({
+      teams: league.teams, players: league.players, competitions: league.competitions,
+      season: league.season, played: league.played, model: league.progressionModel,
+    }, userTid);
+    const bench = league.players
+      .filter((p) => other.roster.includes(p.pid))
+      .sort((a, b) => a.ovr - b.ovr)[0];
+    for (const who of [star, bench]) {
+      const v = playerClubView(league, who);
+      for (const c of v.wouldPlay) {
+        expect(who.ovr).toBeGreaterThan(choice.contexts.get(c.tid)!.posWeakestStarterOvr[who.pos]);
+      }
+      // And nothing the rule admits is skipped for a lower-ranked club.
+      const admitted = [...v.favourites].filter((c) => who.ovr > choice.contexts.get(c.tid)!.posWeakestStarterOvr[who.pos]);
+      if (admitted.length > 0) expect(v.wouldPlay[0].tid).toBe(admitted[0].tid);
     }
   });
 

@@ -31,7 +31,7 @@ export interface PlayerClubView {
   yourClub: ClubInView | null;
   /** The clubs he would most like to join, best first. */
   favourites: ClubInView[];
-  /** The best clubs where he would get games (playing time not against him), best first. */
+  /** The best clubs where he would start (he beats their weakest starter at his position), best first. */
   wouldPlay: ClubInView[];
   /** How many clubs he would refuse outright. */
   refusedCount: number;
@@ -86,7 +86,16 @@ export function playerClubView(league: LeagueStore, player: Player): PlayerClubV
     else all.push(entry);
   }
   all.sort((a, b) => b.appeal.score - a.appeal.score || a.tid - b.tid);
-  const playing = (c: ClubInView) => (c.appeal.lines.find((l) => l.id === "playingTime")?.value ?? 0) >= 0;
+  // Whether he'd get games is a question about the destination alone: does he
+  // beat the weakest man its shape fields at his position (the loan market's
+  // rule). The playing-time LINE is relative to his current club and clamped,
+  // so a benched youngster reads 0 at every other club where he'd also sit.
+  const starts = new Set<number>();
+  for (const ctx of choice.contexts.values()) {
+    const weakest = ctx.posWeakestStarterOvr?.[player.pos];
+    if (weakest === undefined || player.ovr > weakest) starts.add(ctx.tid);
+  }
+  const playing = (c: ClubInView) => starts.has(c.tid);
   return {
     yourClub,
     favourites: all.slice(0, PLAYER_VIEW_LIST),
