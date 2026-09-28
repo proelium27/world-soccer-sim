@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { reputationSnapshot } from "../../src/core/teams/reputation.js";
 import { mulberry32 } from "../../src/engine/rng.js";
 import { type LeagueStore } from "../../src/core/leagueState.js";
 import { makeLeague } from "../helpers/league.js";
@@ -113,7 +114,7 @@ describe("simOffseason", () => {
     const recorded = next.seasonHistory.at(-1)!.reputation!;
     expect(Object.keys(recorded)).toHaveLength(next.teams.length);
     // Reputation moves only at step 3.61, so the entry holds what the clubs carry now.
-    for (const t of next.teams) expect(recorded[t.tid]).toBeCloseTo(t.reputation!, 1);
+    expect(recorded).toEqual(reputationSnapshot(next.teams));
   });
 
   it("swaps 3 up / 3 down between divisions and records pre-swap compsByTid", () => {
