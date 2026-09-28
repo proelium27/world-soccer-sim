@@ -12,6 +12,7 @@ import type { PlayerName } from "./players/playerNames.js";
 import type { PowerRankingSnapshot } from "./teams/powerRanking.js";
 import type { ActiveLoan, LoanListing, LoanRejection } from "./loans.js";
 import type { Competition } from "./competitions.js";
+import type { DefunctTeam } from "./worldRestructure.js";
 import type { CupState } from "./cup/types.js";
 import type { DomesticCupState } from "./domesticCup/types.js";
 import type { PromotionPlayoff } from "./promotionPlayoff.js";
@@ -437,6 +438,21 @@ export interface LeagueStore {
    * Optional with no migration: absent means nothing is queued.
    */
   pendingCompetitions?: Competition[];
+
+  /**
+   * Competitions God Mode has removed from the world (see
+   * core/worldRestructure.ts). Kept so a past season's compId still resolves on
+   * the history pages; never simulated. Their ids are never reused. Optional,
+   * no migration: absent means none.
+   */
+  retiredCompetitions?: Competition[];
+
+  /**
+   * Clubs that folded when God Mode shrank or removed their division, with the
+   * name and colours they had, so history can still say who they were. Optional,
+   * no migration: absent means none.
+   */
+  defunctTeams?: DefunctTeam[];
 
   /**
    * How many nations the World Cup takes: 16, 24, 32 or 48, or "auto" to size

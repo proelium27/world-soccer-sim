@@ -3,7 +3,6 @@ import type { StoredTeam } from "../teams/clubs.js";
 import type { LeagueStore } from "../leagueState.js";
 import type { Competition } from "../competitions.js";
 import type { SeasonHistoryEntry } from "../standings.js";
-import { tierOf } from "../competitions.js";
 import {
   PROTECTED_STAR_OVR, PROTECTED_STAR_TOP_FINISH, difficultyProfile, type Difficulty,
 } from "../constants.js";
@@ -97,7 +96,10 @@ export function isProtectedStar(
   if (compId === undefined) return false;
   // Only top-flight success protects a player — a second-division title isn't
   // the kind of season that takes a star off the market.
-  if (tierOf(competitions, compId) !== 1) return false;
+  // A competition God Mode has since removed isn't in the live table; none of
+  // its clubs can be a top-flight side now (see core/worldRestructure.ts).
+  const comp = competitions.find((c) => c.id === compId);
+  if (!comp || comp.tier !== 1) return false;
   const rank = finishingRank(last, tid);
   if (rank < 0 || rank >= bar.topFinish) return false;
   return player.ovr >= bar.ovr || wonHonorLastSeason(last, player.pid);
