@@ -59,6 +59,7 @@ import {
 } from "./titlePlayoff.js";
 import { buildCompetitionSchedule } from "./schedule.js";
 import { assignConferences } from "./conferences.js";
+import { applyPendingCompetitions } from "./worldEdit.js";
 import { updateHype } from "./finance/hype.js";
 import {
   settleSeasonEnd, chargeSeasonStart, wageBill, financeScaleFor, clampBudget,
@@ -749,6 +750,16 @@ export function simOffseasonReporting(
   // one carries nothing into a single table (see core/conferences.ts).
   teams = assignConferences(teams, league.competitions);
   teams = stepAcademyBaseConvergence(teams, league.competitions);
+
+  // 3.65. League settings queued in God Mode take over here: after the swap
+  //       above (settled under the rules the season was played by) and before
+  //       free agency, youth intake, the market, the schedule and the cup
+  //       draws, which all read the new table. A changed split re-seats clubs.
+  if (league.pendingCompetitions) {
+    const { pendingCompetitions, ...rest } = league;
+    league = { ...rest, competitions: applyPendingCompetitions(league.competitions, pendingCompetitions) };
+    teams = assignConferences(teams, league.competitions);
+  }
 
   // 3.7. Guaranteed ceiling on Division 2 quality, first pass: any
   //      AI-controlled player at or above DIVISION_2_REFUSAL_OVR_THRESHOLD
