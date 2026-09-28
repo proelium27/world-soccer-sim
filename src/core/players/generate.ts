@@ -57,6 +57,51 @@ function rollRating(rng: () => number, tier: Tier, base: number, spread: number)
 }
 
 /**
+ * Position-shaped ratings that come out at (as near as rounding allows) a given
+ * OVR — for a player who needs ratings but has none on record, i.e. a retiree
+ * God Mode brings back (the archive keeps his career, never his attributes).
+ *
+ * Same template and noise as `generatePlayer`, so he looks like any other
+ * player at his position rather than a flat line of identical numbers. The
+ * noise is drawn once, from its own `seed`-derived stream (never the shared
+ * rng), and only the base is searched: every rating rises with the base, so
+ * OVR does too and a bisection finds it.
+ */
+export function ratingsForOvr(
+  pos: Position, targetOvr: number, heightCm: number, seed: number,
+): PlayerRatings {
+  const rng = mulberry32(seed);
+  const tiers = GEN_OFFSETS[pos];
+  const spread = POSITION_RATING_SPREAD[pos];
+  const noise = {} as Record<SkillKey, number>;
+  for (const key of SKILL_KEYS as readonly SkillKey[]) {
+    noise[key] = tiers[key] === "ABS"
+      ? ABS_LOW_MIN + rng() * (ABS_LOW_MAX - ABS_LOW_MIN)
+      : TIER_OFFSET[tiers[key]] + gaussian(rng) * RATING_NOISE_SD * spread + OVR_SCALE_SHIFT;
+  }
+  const at = (base: number): PlayerRatings => {
+    const r = {} as PlayerRatings;
+    for (const key of SKILL_KEYS as readonly SkillKey[]) {
+      r[key] = clampRating(tiers[key] === "ABS" ? noise[key] : base + noise[key]);
+    }
+    return r;
+  };
+  let lo = -100;
+  let hi = 200;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (computeOvr(pos, at(mid), heightCm) < targetOvr) lo = mid;
+    else hi = mid;
+  }
+  // `hi` is the lowest base reaching the target; `lo` the highest falling short.
+  // Take whichever lands closer, so an unreachable exact value rounds sensibly.
+  const up = at(hi);
+  const down = at(lo);
+  return Math.abs(computeOvr(pos, up, heightCm) - targetOvr)
+    <= Math.abs(computeOvr(pos, down, heightCm) - targetOvr) ? up : down;
+}
+
+/**
  * Eases a generation base onto a soft floor so it can never fall far enough
  * below `RATING_MIN` to clamp a whole squad into rubble.
  *
