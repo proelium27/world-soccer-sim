@@ -28,6 +28,7 @@ import { ClubLink } from "../components/ClubLink.js";
 import {
   cupStatColumns, leagueStatColumns, statCellText, statColumnScope, statHeader, sumStatRows,
 } from "../playerStatColumns.js";
+import { clubLines } from "../../core/players/seasonStints.js";
 import { INTL_TOURNAMENT_NAME } from "../../core/constants.js";
 import { isSuspended, matchesLabel } from "../../core/suspensions.js";
 import { PlayerEditModal } from "../components/PlayerEditModal.js";
@@ -730,24 +731,38 @@ export function PlayerProfile() {
                   </tr>
                 </thead>
                 <tbody>
-                  {statsBySeasonDesc.map((s) => (
-                    <tr key={s.season}>
-                      <td>
-                        {seasonYear(s.season)}
-                        {seasonTid(s.season) !== null && (
-                          <span className="text-muted small">
-                            {" ("}
-                            <ClubLink tid={seasonTid(s.season)!} season={s.season} variant="abbrev"
-                              linked={hasClubSeason(league, s.season)} />
-                            {")"}
-                          </span>
-                        )}
-                      </td>
-                      {leagueColumns.map((c) => (
-                        <td key={c.key} className="text-end">{statCellText(c, s, statsRate)}</td>
-                      ))}
-                    </tr>
-                  ))}
+                  {statsBySeasonDesc.flatMap((s) => {
+                    // A season split by a mid-season move reads as one row per
+                    // club and then the season's total, the way a real player's
+                    // record does (seasonStints.ts).
+                    const lines = clubLines(s);
+                    const rows = lines.length === 1
+                      ? [{ key: `${s.season}`, tid: seasonTid(s.season), line: s, total: false }]
+                      : [
+                          ...lines.map((l, i) => ({ key: `${s.season}-${i}`, tid: l.tid, line: l, total: false })),
+                          { key: `${s.season}-total`, tid: null, line: s, total: true },
+                        ];
+                    return rows.map((r) => (
+                      <tr key={r.key} className={r.total ? "fst-italic" : undefined}>
+                        <td>
+                          {seasonYear(s.season)}
+                          {r.total ? (
+                            <span className="text-muted small"> (Total)</span>
+                          ) : r.tid !== null && (
+                            <span className="text-muted small">
+                              {" ("}
+                              <ClubLink tid={r.tid} season={s.season} variant="abbrev"
+                                linked={hasClubSeason(league, s.season)} />
+                              {")"}
+                            </span>
+                          )}
+                        </td>
+                        {leagueColumns.map((c) => (
+                          <td key={c.key} className="text-end">{statCellText(c, r.line, statsRate)}</td>
+                        ))}
+                      </tr>
+                    ));
+                  })}
                 </tbody>
                 {/* A career row under a single season would just repeat it. */}
                 {statsBySeasonDesc.length > 1 && (
