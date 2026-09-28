@@ -1006,7 +1006,8 @@ export function Manual() {
             <strong>Up and down</strong> to <strong>None</strong> and the divisions are closed, the
             way Liga MX and MLS run: nobody goes up or down, whatever they finish. The{" "}
             <strong>Champion</strong> picker decides how the title is won: top of the table, a top-8
-            playoff (one game a round, or home and away like the Liguilla), or playoffs within each
+            playoff (one game a round, or home and away like the Liguilla), the Liguilla with Liga
+            MX&apos;s old play-in for 7th to 10th, or playoffs within each
             half, top 9 of each conference like MLS or top 8 of each zone like Argentina. The per-half
             ones only appear once the top flight is split with enough clubs in each half to fill
             them. And <strong>Continent</strong> puts a league in Europe or the Americas: a European
@@ -1544,11 +1545,14 @@ export function Manual() {
           </p>
           <p>
             <strong>Mexico</strong> takes the <strong>top eight</strong>: 1st v 8th, 4th v 5th, 2nd v
-            7th and 3rd v 6th, then semi-finals and a final. Every round, final included, is two legs,
-            with the better-placed club at home for the second, and it uses the Liguilla&apos;s real
-            tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s level on aggregate goes
-            to the club that finished higher, with no extra time, no penalties and no away goals. Only
-            the final goes to extra time and penalties, and there where you finished no longer helps.
+            7th and 3rd v 6th in the quarter-finals. Then the bracket is <strong>reseeded</strong>: the
+            best-placed club left plays the worst, and the other two meet. Every round, final included,
+            is two legs, with the better-placed club at home for the second, and it uses the
+            Liguilla&apos;s real tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s
+            level on aggregate goes to the club that finished higher, with no extra time, no penalties
+            and no away goals. Only the final goes to extra time and penalties, and there where you
+            finished no longer helps. Mexico&apos;s second and third divisions play the same Liguilla
+            for their own titles, since nobody goes up or down in Mexico.
           </p>
           <p>
             The <strong>US</strong> takes the <strong>top nine in each conference</strong>. Eighth
@@ -1574,8 +1578,8 @@ export function Manual() {
             <strong>Argentina</strong> takes the <strong>top eight in each zone</strong>. The round of
             16 pairs 1st in one zone with 8th in the other, 2nd with 7th and so on, so the two zone
             winners can only meet in the final. Every game is one-off at the better-placed club&apos;s
-            ground and a level game goes straight to penalties, except the final, which is at a neutral
-            ground and gets extra time first.
+            ground, except the final, which is at a neutral ground, and a level game in any round gets
+            extra time and then penalties.
           </p>
           <p>
             The winner is the champion: it&apos;s their name in the history books, on the trophy case

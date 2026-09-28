@@ -308,12 +308,13 @@ describe("the split title playoffs", () => {
     expect([final.home, final.away]).toContain(us.winnerTid);
   });
 
-  it("plays Argentina's shape: a cross-zone round of 16, no extra time until the final", () => {
+  it("plays Argentina's shape: a cross-zone round of 16, extra time before penalties in every round", () => {
     const perRound = titlePlayoffRoundNames("zones").map((_, r) => arg.ties.filter((t) => t.round === r));
     expect(perRound.map((r) => r.length)).toEqual([8, 4, 2, 1]);
     const [zoneA] = arg.conferences!;
     for (const t of perRound[0]) expect(zoneA.includes(t.home) !== zoneA.includes(t.away)).toBe(true);
-    for (const t of [...perRound[0], ...perRound[1], ...perRound[2]]) expect(t.wentToExtraTime).toBe(false);
+    // The 2026 rules: no shootout without extra time first, in any round.
+    for (const t of arg.ties) if (t.wentToPens) expect(t.wentToExtraTime).toBe(true);
     // Even index against odd index, i.e. always one club from each zone.
     for (const [x, y] of ZONE_ROUND_OF_16_PAIRS) expect((x + y) % 2).toBe(1);
   });
