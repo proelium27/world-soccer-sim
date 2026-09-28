@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { WatchToggle } from "../components/WatchToggle.js";
+import { HowHeSeesClubs } from "../components/HowHeSeesClubs.js";
 import { TrophyIcon } from "../components/TrophyIcon.js";
 import { SKILL_KEYS } from "../../core/players/types.js";
 import type { CompletedTransfer } from "../../core/transfers/negotiation.js";
@@ -434,6 +435,8 @@ export function PlayerProfile() {
               )}
             </div>
           </div>
+
+          <HowHeSeesClubs league={league} player={player} />
         </div>
 
         <div className="col-lg-7">
