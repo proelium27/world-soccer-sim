@@ -1,11 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
   detachPlayer, movePlayerToClub, applyPlayerEdit, createCustomPlayer, setClubFinances,
+  unretirePlayer,
 } from "../../src/core/godMode.js";
 import { computeOvr } from "../../src/core/players/ovr.js";
+import { ratingsForOvr } from "../../src/core/players/generate.js";
+import { archivePlayer } from "../../src/core/players/archive.js";
+import { summaryOf } from "../../src/core/players/careerSummary.js";
+import { computePlayerHonors } from "../../src/core/playerHonors.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
+import type { SeasonHistoryEntry } from "../../src/core/standings.js";
 import type { StoredTeam } from "../../src/core/teams/clubs.js";
-import type { Player, PlayerRatings } from "../../src/core/players/types.js";
+import { emptySeasonStats, type Player, type PlayerRatings, type Position } from "../../src/core/players/types.js";
 
 function team(tid: number, over: Partial<StoredTeam> = {}): StoredTeam {
   return {
@@ -231,5 +237,103 @@ describe("setClubFinances", () => {
   it("is a no-op for an unknown tid", () => {
     const teams = [team(0)];
     expect(setClubFinances(teams, 99, 500, 50)).toBe(teams);
+  });
+});
+
+describe("ratingsForOvr", () => {
+  const POSITIONS: Position[] = ["GK", "CB", "FB", "DM", "CM", "AM", "W", "ST"];
+
+  it("lands on the target OVR at every position", () => {
+    for (const pos of POSITIONS) {
+      for (const target of [62, 76, 88]) {
+        const r = ratingsForOvr(pos, target, 182, 7);
+        expect(Math.abs(computeOvr(pos, r, 182) - target)).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("is shaped like the position, not flat", () => {
+    const st = ratingsForOvr("ST", 80, 182, 7);
+    expect(st.finishing).toBeGreaterThan(st.tackling);
+    const gk = ratingsForOvr("GK", 80, 190, 7);
+    expect(gk.goalkeeping).toBeGreaterThan(gk.finishing);
+  });
+
+  it("is deterministic for a seed", () => {
+    expect(ratingsForOvr("CM", 75, 180, 11)).toEqual(ratingsForOvr("CM", 75, 180, 11));
+  });
+});
+
+describe("unretirePlayer", () => {
+  const SEASON = 3;
+  // A three-season striker at club 0, retired at the end of season 2.
+  function retiree(): Player {
+    const stats = [0, 1, 2].map((season) => ({
+      ...emptySeasonStats(season, 0), appearances: 30, goals: 12 + season,
+      ratingSum: 30 * 7, avgRating: 7, minutesPlayed: 2700,
+    }));
+    const hist = [
+      { season: -1, ratings: RATINGS, ovr: 80, potential: 84, academy: false, pos: "ST" as const },
+      { season: 0, ratings: RATINGS, ovr: 84, potential: 84, academy: false, pos: "ST" as const },
+      { season: 1, ratings: RATINGS, ovr: 82, potential: 84, academy: false, pos: "ST" as const },
+    ];
+    const ovrFor = (s: number) => hist.find((h) => h.season === s - 1)!.ovr;
+    return player({
+      pid: 7, born: SEASON - 36, ovr: 79, stats, hist,
+      peakOvr: 84, peakOvrSeason: 0,
+      career: summaryOf(stats, ovrFor),
+      intl: { caps: 40, goals: 15, assists: 0, tournaments: 2, titles: 1, seasons: [] },
+    });
+  }
+  const archived = archivePlayer(retiree(), 2);
+
+  it("brings him back as a free agent and takes him out of the archive", () => {
+    const l = league({ season: SEASON, teams: [team(0)], retiredPlayers: [archived] });
+    const next = unretirePlayer(l, 7);
+    const p = next.players.find((x) => x.pid === 7)!;
+    expect(p).toBeDefined();
+    expect(next.retiredPlayers).toEqual([]);
+    expect(next.teams[0].roster).not.toContain(7);
+    expect(p.contract.expiresSeason).toBe(SEASON);
+    expect(p.born).toBe(archived.born);
+    expect(Math.abs(p.ovr - archived.finalOvr)).toBeLessThanOrEqual(1);
+  });
+
+  it("keeps his career: archiving him again gives back the same record", () => {
+    const next = unretirePlayer(league({ season: SEASON, retiredPlayers: [archived] }), 7);
+    const p = next.players.find((x) => x.pid === 7)!;
+    const again = archivePlayer(p, 2);
+    expect(again.totals).toEqual(archived.totals);
+    expect(again.best).toEqual(archived.best);
+    expect(again.seasons).toEqual(archived.seasons);
+    expect(again.peakOvr).toBe(archived.peakOvr);
+    expect(again.peakSeason).toBe(archived.peakSeason);
+    expect(again.caps).toBe(40);
+    expect(again.intlTitles).toBe(1);
+    // One rating snapshot per archived season plus today's, oldest first.
+    expect(p.hist.map((h) => h.season)).toEqual([-1, 0, 1, 2]);
+    expect(p.hist.slice(0, 3).map((h) => h.ovr)).toEqual(archived.seasons.map((s) => s.ovr));
+  });
+
+  it("still credits the titles he won before retiring", () => {
+    const history = [1].map((season) => ({
+      season, awards: {}, championTidByCompId: { 0: 0 },
+    })) as unknown as SeasonHistoryEntry[];
+    const next = unretirePlayer(league({ season: SEASON, retiredPlayers: [archived] }), 7);
+    const p = next.players.find((x) => x.pid === 7)!;
+    expect(p.stats).toEqual([]);
+    expect(computePlayerHonors(p, history).leagueTitles).toEqual([1]);
+  });
+
+  it("comes back the same way every time", () => {
+    const l = league({ season: SEASON, retiredPlayers: [archived] });
+    expect(unretirePlayer(l, 7).players).toEqual(unretirePlayer(l, 7).players);
+  });
+
+  it("is a no-op for a pid that isn't archived, or one already in the pool", () => {
+    const l = league({ season: SEASON, retiredPlayers: [archived] });
+    expect(unretirePlayer(l, 99)).toBe(l);
+    const clash = league({ season: SEASON, players: [player({ pid: 7 })], retiredPlayers: [archived] });
+    expect(unretirePlayer(clash, 7)).toBe(clash);
   });
 });

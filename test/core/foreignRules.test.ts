@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   registrationBlock, helpsShortMinimum, breaksMinimum, isHomegrown, isNonEu, isAcp,
-  competitionForeignRules, worldRules, LEAGUE_FOREIGN_RULES, type ForeignRule, type RuleContext,
+  competitionForeignRules, worldRules, LEAGUE_FOREIGN_RULES, leagueRegistrationBlock, type ForeignRule, type RuleContext,
 } from "../../src/core/foreignRules.js";
 import { worldCompetitions } from "../../src/core/competitions.js";
 import { signFreeAgent, signToAcademy, trimRosterSurplus } from "../../src/core/freeAgency.js";
@@ -74,6 +74,16 @@ describe("isHomegrown", () => {
     expect(isHomegrown(p, "Spain", countryOfTid, 5)).toBe(false);
   });
 
+  it("counts Welsh training for England's rule, as the Premier League does", () => {
+    const p = player("Wales", { born: -30 });
+    expect(isHomegrown(p, "England", countryOfTid, 5)).toBe(true);
+    expect(isHomegrown(p, "Spain", countryOfTid, 5)).toBe(false);
+  });
+
+  it("registers a Swiss player as EU", () => {
+    expect(isNonEu("Switzerland", {})).toBe(false);
+  });
+
   it("drives a 'trained' cap like Mexico's", () => {
     const rule: ForeignRule = { kind: "foreignCap", max: 1, basis: "trained" };
     const mx = (nationality: string) => player(nationality, { born: -30 });
@@ -138,9 +148,12 @@ describe("on a real world", () => {
     const players = [...league.players, ...extra, target];
     const out = signFreeAgent(teams, players, argClub.tid, target.pid, league.season, "offseason", [], undefined, league.competitions);
     expect(out.teams).toBe(teams);
+    // A home player takes no foreign slot. Checked against the rules directly:
+    // whether he'd sign also depends on his view of the club (playerChoice.ts),
+    // which is not what this case is about.
     const home = player("Argentina", { born: 0, pos: "CM", contract: { salary: 0, expiresSeason: 0 } } as Partial<Player>);
-    const ok = signFreeAgent(teams, [...players, home], argClub.tid, home.pid, league.season, "offseason", [], undefined, league.competitions);
-    expect(ok.teams.find((t) => t.tid === argClub.tid)!.roster).toContain(home.pid);
+    expect(leagueRegistrationBlock({ teams, competitions: league.competitions, players: [...players, home], season: league.season }, argClub.tid, home)).toBeNull();
+    expect(leagueRegistrationBlock({ teams, competitions: league.competitions, players, season: league.season }, argClub.tid, target)).not.toBeNull();
   });
 
   it("the academy is no way round a cap", () => {

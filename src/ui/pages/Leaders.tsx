@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { ClubLink } from "../components/ClubLink.js";
 import type { LeagueStore } from "../../core/leagueState.js";
-import type { Player, SeasonStats } from "../../core/players/types.js";
+import type { Player, SeasonStatLine } from "../../core/players/types.js";
 import type { TeamSeasonStats } from "../../core/standings.js";
 import { teamSeasonStatsFor } from "../../db/leagueDb.js";
 import { Flag } from "../components/Flag.js";
@@ -19,6 +19,7 @@ import {
   type StatKey,
 } from "../leadersBoard.js";
 import { per90QualifyingMinutes } from "../../core/stats/per90.js";
+import { statsAtClubs } from "../../core/players/seasonStints.js";
 
 type LeadersTab = "players" | "teams";
 
@@ -26,7 +27,7 @@ interface LeaderRow {
   player: Player;
   teamName: string;
   isUserTeam: boolean;
-  stats: SeasonStats;
+  stats: SeasonStatLine;
   /** Which season this row's stat line belongs to; shown when browsing all seasons. */
   season: number | null;
 }
@@ -196,9 +197,10 @@ function PlayerLeadersBody({
     const rows: LeaderRow[] = [];
     const compByTid = compByTidForSeason(season);
     for (const p of league.players) {
-      const ss = p.stats.find((s) => s.season === season);
+      // Only what he did in this competition: a player who moved leagues in
+      // January is split between the two boards (seasonStints.ts).
+      const ss = statsAtClubs(p, season, (tid) => compByTid.get(tid) === compId);
       if (!ss || ss[stat] <= 0) continue;
-      if (compByTid.get(ss.tid) !== compId) continue;
       rows.push({
         player: p,
         teamName: teamNameByTid.get(ss.tid) ?? "Unknown",

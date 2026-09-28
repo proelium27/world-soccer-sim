@@ -574,7 +574,7 @@ export function Manual() {
             <li><strong>Academy</strong>. Your club's youth academy. Kids join at 14 every summer; your scouts decide who stays at 16 and who turns pro at 18, and a Next rollover column lets you change any of those calls. Release or promote anyone early. Also where you set your scout directions: which countries your scouts look in, and which positions they look for. Sorting by potential ranks kids on the top of each scouting estimate, not on what they'll really become: nobody has told you that yet.</li>
             <li><strong>Box Score</strong>. Per-match detail, in three parts. The scoreboard at the top names the competition and matchday and starts the Man of the Match, the highest-rated player among those who actually played. Under it, a head-to-head strip compares the two sides on possession, shots, shots on target, xG, corners and fouls. Then a full-width stat table per club (xG, passes completed/attempted, crosses and fouls, goals against and xG against on the goalkeeper's row, and a 0&ndash;10 match rating for everyone who appeared), grouped into attacking, keeping, defending, passing and discipline blocks. The play-by-play at the bottom runs down a timeline with one club on each side, showing goals, cards, substitutions, penalties and injuries by default; switch it to "Every event" to add every shot and corner too.</li>
             <li><strong>Leagues</strong>. Your saved leagues. Create, enter, or delete saves. Each one is fully independent. Every save is named after the club you took over, so the row also shows the season it's reached and when you started it, which is how you tell two saves of the same club apart.</li>
-            <li><strong>Player Profile</strong>. Click any player's name anywhere in the game (Roster, Stat Leaders, Awards, Transfers, News Feed) to open his full career page: every attribute rating, individual and team honors (Ballon d'Or, World Team of the Year, Goalkeeper of the Year, Defender of the Year, Player of the Season, Golden Boot, Team of the Season, league titles), the fullest season-by-season stat line in the game (goals, assists, goals+assists, shots, shots on target, shot accuracy, conversion rate, xG, goals over or under xG, passes, pass completion, crosses, tackles, interceptions, fouls, yellow and red cards, and average match rating), with a <strong>Career</strong> row underneath totaling the lot. Keepers get their own set instead (saves, save percentage, goals against, xG against, and goals prevented), and the shooting columns disappear for them, so nobody carries a row of columns that will only ever read zero (a keeper who has actually scored keeps them). Two of those columns are worth knowing what to do with. <strong>Goals over xG</strong> is the finishing read: xG doesn't care who's taking the shot, so a striker sitting well above his xG season after season really is finishing better than the chances he's getting, and one below it is missing chances an average forward would take. <strong>Goals prevented</strong> is the same idea for keepers, the other way round: xG against minus what he actually let in, so positive means he's saving shots that usually go in. The table carries the same Totals / Per 90 switch as Stat Leaders, on the Cup tab as well, but not on national-team stats, where caps are recorded without minutes and so have no per-90 reading. Percentages and match ratings stay put in Per 90 mode, since they're already rates. The Career row is worked out from the underlying totals rather than by averaging the seasons above it, so a big season counts for more than a six-game one in his career pass completion or match rating. It also has full transfer history, a transfer-value-over-time chart, and a season-by-season OVR/POT/attribute history. The value chart plots what he's worth on the market against the seasons he's played, with the line colored by whichever club he was at and club crests marking transfers. Hover any season for a card with his value that year, his age, his OVR and POT, his goals and assists, his appearances, his average match rating, and the club he was at, where a youth-academy year reads as "Club (Academy)". A Value/OVR switch in the corner of the panel flips the same chart to his rating over time, which is worth a look on an older player: a veteran's OVR can sit flat for years while his value falls away underneath it, because the market is paying for the seasons he has left as much as for how good he is. His ratings only move in the offseason, so there's one real value per season and the line between them is just a smooth join, not extra readings. The value is worked out from the same numbers the market uses, which includes his potential. So if your scouts still only have a range on his POT, the chart is priced off that range rather than the real number, and it sharpens as they do.</li>
+            <li><strong>Player Profile</strong>. Click any player's name anywhere in the game (Roster, Stat Leaders, Awards, Transfers, News Feed) to open his full career page: every attribute rating, individual and team honors (Ballon d'Or, World Team of the Year, Goalkeeper of the Year, Defender of the Year, Player of the Season, Golden Boot, Team of the Season, league titles), the fullest season-by-season stat line in the game (goals, assists, goals+assists, shots, shots on target, shot accuracy, conversion rate, xG, goals over or under xG, passes, pass completion, crosses, tackles, interceptions, fouls, yellow and red cards, and average match rating), with a <strong>Career</strong> row underneath totaling the lot. A season he spent at two clubs gets a row for each, then a row for the season's total. Keepers get their own set instead (saves, save percentage, goals against, xG against, and goals prevented), and the shooting columns disappear for them, so nobody carries a row of columns that will only ever read zero (a keeper who has actually scored keeps them). Two of those columns are worth knowing what to do with. <strong>Goals over xG</strong> is the finishing read: xG doesn't care who's taking the shot, so a striker sitting well above his xG season after season really is finishing better than the chances he's getting, and one below it is missing chances an average forward would take. <strong>Goals prevented</strong> is the same idea for keepers, the other way round: xG against minus what he actually let in, so positive means he's saving shots that usually go in. The table carries the same Totals / Per 90 switch as Stat Leaders, on the Cup tab as well, but not on national-team stats, where caps are recorded without minutes and so have no per-90 reading. Percentages and match ratings stay put in Per 90 mode, since they're already rates. The Career row is worked out from the underlying totals rather than by averaging the seasons above it, so a big season counts for more than a six-game one in his career pass completion or match rating. It also has full transfer history, a transfer-value-over-time chart, and a season-by-season OVR/POT/attribute history. The value chart plots what he's worth on the market against the seasons he's played, with the line colored by whichever club he was at and club crests marking transfers. Hover any season for a card with his value that year, his age, his OVR and POT, his goals and assists, his appearances, his average match rating, and the club he was at, where a youth-academy year reads as "Club (Academy)". A Value/OVR switch in the corner of the panel flips the same chart to his rating over time, which is worth a look on an older player: a veteran's OVR can sit flat for years while his value falls away underneath it, because the market is paying for the seasons he has left as much as for how good he is. His ratings only move in the offseason, so there's one real value per season and the line between them is just a smooth join, not extra readings. The value is worked out from the same numbers the market uses, which includes his potential. So if your scouts still only have a range on his POT, the chart is priced off that range rather than the real number, and it sharpens as they do.</li>
           </ul>
           <p>
             <strong>Three ways to read the same list.</strong> Transfers, Free Agents, the
@@ -680,7 +680,11 @@ export function Manual() {
             both either way; the one you skip still has its box score. A league-phase match
             shows the Swiss table beside it instead of your league table, and a two-legged
             quarter-final or semi-final is watched a leg at a time, the second leg at the other
-            club's ground.
+            club's ground. A tie that's level at the end goes on into extra time and you watch
+            that too, 91st minute to the 120th, with a break at 105. If it's still level the
+            shootout isn't played out kick by kick; you just get the result at the end. Match
+            ratings stop at 90 minutes, same as in the box score, but goals scored in extra time
+            still show up next to the player.
           </p>
           <p>
             The match is played the moment you press the button, and what you're watching is the
@@ -1006,7 +1010,8 @@ export function Manual() {
             <strong>Up and down</strong> to <strong>None</strong> and the divisions are closed, the
             way Liga MX and MLS run: nobody goes up or down, whatever they finish. The{" "}
             <strong>Champion</strong> picker decides how the title is won: top of the table, a top-8
-            playoff (one game a round, or home and away like the Liguilla), or playoffs within each
+            playoff (one game a round, or home and away like the Liguilla), the Liguilla with Liga
+            MX&apos;s old play-in for 7th to 10th, or playoffs within each
             half, top 9 of each conference like MLS or top 8 of each zone like Argentina. The per-half
             ones only appear once the top flight is split with enough clubs in each half to fill
             them. And <strong>Continent</strong> puts a league in Europe or the Americas: a European
@@ -1550,11 +1555,14 @@ export function Manual() {
           </p>
           <p>
             <strong>Mexico</strong> takes the <strong>top eight</strong>: 1st v 8th, 4th v 5th, 2nd v
-            7th and 3rd v 6th, then semi-finals and a final. Every round, final included, is two legs,
-            with the better-placed club at home for the second, and it uses the Liguilla&apos;s real
-            tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s level on aggregate goes
-            to the club that finished higher, with no extra time, no penalties and no away goals. Only
-            the final goes to extra time and penalties, and there where you finished no longer helps.
+            7th and 3rd v 6th in the quarter-finals. Then the bracket is <strong>reseeded</strong>: the
+            best-placed club left plays the worst, and the other two meet. Every round, final included,
+            is two legs, with the better-placed club at home for the second, and it uses the
+            Liguilla&apos;s real tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s
+            level on aggregate goes to the club that finished higher, with no extra time, no penalties
+            and no away goals. Only the final goes to extra time and penalties, and there where you
+            finished no longer helps. Mexico&apos;s second and third divisions play the same Liguilla
+            for their own titles, since nobody goes up or down in Mexico.
           </p>
           <p>
             The <strong>US</strong> takes the <strong>top nine in each conference</strong>. Eighth
@@ -1580,8 +1588,8 @@ export function Manual() {
             <strong>Argentina</strong> takes the <strong>top eight in each zone</strong>. The round of
             16 pairs 1st in one zone with 8th in the other, 2nd with 7th and so on, so the two zone
             winners can only meet in the final. Every game is one-off at the better-placed club&apos;s
-            ground and a level game goes straight to penalties, except the final, which is at a neutral
-            ground and gets extra time first.
+            ground, except the final, which is at a neutral ground, and a level game in any round gets
+            extra time and then penalties.
           </p>
           <p>
             The winner is the champion: it&apos;s their name in the history books, on the trophy case
@@ -2823,15 +2831,27 @@ export function Manual() {
             Transfers tables, the Watchlist and the loan search, each player carries a label for how he
             feels about joining you: <strong>Keen</strong>, <strong>Open</strong>,{" "}
             <strong>Reluctant</strong> or <strong>Won&apos;t talk</strong>. Hover it for his reasons.
-            It&apos;s the same view every club gets. When AI clubs compete for a player, it decides
-            where he goes. On your own offers only <strong>Won&apos;t talk</strong> stops a deal. The
-            rest tells you how he feels about you, which matters when others want him too.
+            It&apos;s the same view every club gets, and it decides where he goes, yours included. A
+            player who won&apos;t talk to you or is <strong>Reluctant</strong> turns your transfer bid
+            down.
           </p>
           <ul>
             <li>
-              <strong>Level of club.</strong> Good players want good clubs. A squad player will go
-              anywhere, a star won&apos;t drop far below where he is, and a big enough step down is a flat
-              no. This is the only reason that can turn a player down outright.
+              <strong>Level of club.</strong> Good players want good clubs, and how good a club is
+              means how strong its squad is and how rich it is (money stands in for the wages it can
+              pay). A good player is drawn to a bigger club well before he&apos;s a star. Only a star
+              refuses to drop down, though, and a big enough step down is a flat no. This is the only
+              reason that can turn a player down outright.
+            </li>
+            <li>
+              <strong>Reputation.</strong> The rest of how big a club looks is its name. A club&apos;s
+              reputation is built from what it has won and where it plays: finishing
+              high in a strong league, titles, cups and runs in the continental competitions all push it
+              up, and relegation pulls it down. Everything is on one world scale, so a struggling club in
+              a big league still has more of a name than the champion of a small one. It moves slowly. It
+              climbs faster than it falls, so a famous club keeps some of its pull through a bad spell,
+              and a club that has just come into money has to win things before stars take it seriously.
+              When you hover a player&apos;s reasons, the level of the club is split into these two lines.
             </li>
             <li>
               <strong>Playing time.</strong> Would he start? A player who&apos;d walk into your eleven
@@ -2847,17 +2867,34 @@ export function Manual() {
               smaller league wants a bigger stage.
             </li>
             <li>
+              <strong>Language and family ties.</strong> Some countries feel familiar to a player who
+              wasn&apos;t born there: Brazilians settle in Portugal, French-speaking Africans in France and
+              Belgium, Surinamese and Curacaoans in the Netherlands, Spanish-speaking South Americans in
+              Mexico and Spain, Australians and Canadians in Scotland. These are the real routes football
+              follows, and they pull the same way home does, weaker for stars. His reasons name the tie,
+              such as &quot;Language&quot; or &quot;Family ties&quot;.
+            </li>
+            <li>
               <strong>Former club.</strong> He&apos;s a bit warmer on a club he&apos;s played for. A
               free agent will always talk to the club he last played for, however far it has fallen.
             </li>
           </ul>
           <p>
-            On a loan the home reason counts for half, since it&apos;s only a season.
+            On a loan the home and language reasons count for half, since it&apos;s only a season.
+          </p>
+          <p>
+            <strong>How he sees clubs.</strong> Every player&apos;s profile has a card with his view of
+            your club and his reasons, the five clubs he&apos;d most like to join, the five best clubs
+            where he&apos;d actually get games, and how many clubs he wouldn&apos;t talk to at all. For a
+            good player the first list is mostly the world&apos;s biggest clubs; the second is where he
+            could realistically end up. Hover a club for his full reasons.
           </p>
           <p>
             <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent
-            takes the one he likes best, rather than the worst club in the world getting first pick. When
-            you sign a free agent yourself he&apos;ll take your offer unless he won&apos;t talk to you.
+            takes the one he likes best, rather than the worst club in the world getting first pick. That
+            goes for you too: a free agent signs for you only if your club suits him at least as well as
+            the best AI club that wants him. If one suits him better, the Free Agents page says which club
+            he&apos;d rather join.
           </p>
           <p>
             <strong>League registration rules.</strong> Leagues have real rules on who a club can
@@ -3434,6 +3471,7 @@ export function Manual() {
             <li><strong>Lock a player's ratings.</strong> Freeze a player where he is and the offseason stops moving him: no growth, no decline with age, and his overall and potential hold too. There's a <em>Lock ratings</em> button on his profile, a checkbox in the edit window, and a Lock button on every row of the Roster Builder if you're doing a whole squad. Everything else about him carries on as normal: he still plays, gets injured, signs contracts, moves clubs and eventually retires. Unlock him and he picks up developing again from wherever you left him. The lock is saved with the game, so it stays put if you switch God Mode back off, and his profile says so.</li>
             <li><strong>Move players freely.</strong> From a player's profile, send him to any club instantly, with no fee, no budget check, and no cap, or release him to free agency.</li>
             <li><strong>Create players.</strong> The <em>God Mode</em> page has a Create Player tool. Build a player from scratch and drop him onto any club or leave him a free agent.</li>
+            <li><strong>Un-retire players.</strong> A retired player's career page has an <em>Un-retire</em> button. He comes back as a free agent with his career totals, honours and caps intact, rated where he finished his last season. The game doesn't keep a retired player's individual ratings, so his attributes are rebuilt to fit his position and that overall. He keeps his real age, so an old player is likely to retire again at the next offseason unless you make him younger in the edit window. Lock his ratings too if you don't want age wearing him down. Only players who have a career page can come back; anyone else who retired is gone from the save for good.</li>
             <li><strong>Build any club's roster.</strong> The same page lets you pick any club and add, move, or release its players directly.</li>
             <li><strong>Set club finances and identity.</strong> Set any club's budget and hype to whatever you want, and rename or recolor any club.</li>
             <li><strong>Rewrite the award formulas.</strong> The God Mode page has an Awards tab for changing what the end-of-season awards reward. The quick way is a style: <em>Goals win awards</em> doubles what goals and assists are worth, <em>Defenders get their due</em> doubles tackles, interceptions and save percentage for the Team of the Season and the defensive world awards, <em>Trophies decide it</em> triples titles and cup runs, and <em>Form only</em> stops a player's overall rating counting at all. Underneath, <em>Fine-tune the numbers</em> lists every weight: goals and assists by position, match rating, overall, tackles and interceptions per game, save percentage, the league games needed to qualify (19 out of the box), and everything the Ballon d&apos;Or adds for league strength, trophies, cup runs and international football. Each one is explained as what it's worth in goals by a forward. Before you save, the tab shows who would have won last season's Ballon d&apos;Or, Goalkeeper and Defender of the Year and your league's Player of the Season under your numbers, judged on the players still in the game. Save and your formula is used the next time awards are handed out. Seasons already played keep their winners, and picking <em>As shipped</em> puts the game's own formula back. Worth knowing: a Team of the Season place is part of what makes a big club refuse to sell a star, so changing that formula also changes who&apos;s on the market. Like a ratings lock, it stays in force if you switch God Mode off, and the Awards page says so.</li>
@@ -3457,7 +3495,7 @@ export function Manual() {
           <p><strong>Where can I see that a player is injured?</strong> Injured players show a red cross on your Roster (on the pitch chip and next to their name in the tables) and on their profile, and your Dashboard has an Injuries list of everyone currently out and roughly how long. They sit out on their own until they're fit.</p>
           <p><strong>Can I change formation?</strong> Yep. Pick from sixteen shapes (4-3-3, 4-4-2, 3-5-2, 5-3-2, 4-2-3-1, 4-5-1, 3-4-3, 5-4-1, 4-3-1-2, 4-4-1-1, 4-3-2-1, 4-2-2-2, 3-4-2-1, 3-5-1-1, 5-2-3, 5-2-1-2) in the dropdown above the pitch on the Roster page. It changes which eleven you field (and so your match strength), and resets your Starting XI to the best fit for the new shape. Or just click <strong>Best XI</strong> next to the dropdown to let the game pick the shape that fields your strongest eleven and fill the lineup for you. Each AI club automatically uses whichever shape fields its own strongest eleven, refreshed at the end of each transfer window (summer and winter).</p>
           <p><strong>Can I go into debt?</strong> AI clubs are tuned never to. You can, by hoarding elite wages past what the base allocation covers. The Finance page shows you the shortfall before it hits. There are no debt consequences yet beyond the number itself.</p>
-          <p><strong>I bought a striker in January and his whole season's stats show at my club.</strong> Season stats are one running total per player and show at his current club. There's no per-club split for mid-season movers yet. (Known quirk.)</p>
+          <p><strong>I bought a striker in January. Where do his goals from before the move go?</strong> To the club he scored them for. A player who moves mid-season, on a transfer or a loan, has his season split by club: his profile shows a row for each club and then the season's total, your Roster and the Dashboard's squad leaders only count what he's done for you, and a player who changed leagues appears on each league's Stat Leaders board with just what he did in it. Anything about the player himself rather than a club (awards, milestones, career totals) still reads his whole season.</p>
           <p><strong>A recommended target or incoming offer disappeared.</strong> Both lists are recalculated live from the state of the league, so a target can get bought by an AI club right out from under you, and an offer can drift if the bidding club's situation changes. Deals you've already agreed to are never affected.</p>
           <p><strong>Why can't I release this player?</strong> The depth floor. Releasing him would leave a position without enough cover to field a legal team. Sign or promote cover first.</p>
           <p><strong>Why did his potential drop? Scouts promised 82!</strong> Potential is a forecast that gets re-estimated over time (see <a href="#players">Players</a>). A development setback lowers the realistic ceiling, and the estimate follows it down.</p>

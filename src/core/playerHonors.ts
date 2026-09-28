@@ -65,9 +65,15 @@ export interface PlayerHonors {
  * recorded move, and its fallback is his present-day club — which would hand
  * every new arrival the club's entire back catalogue of titles, including ones
  * won before he was generated.
+ *
+ * Falls back to his career summary's line for the season, which is the same
+ * `SeasonStats.tid` folded at the offseason. The two agree for anyone whose rows
+ * survive; the fallback is for a retiree God Mode brought back, whose rows were
+ * deleted at retirement and whose summary is all that carried his clubs over.
  */
 function squadTidForSeason(player: Player, season: number): number | undefined {
-  return player.stats.find((s) => s.season === season)?.tid;
+  return player.stats.find((s) => s.season === season)?.tid
+    ?? player.career?.seasons.find((s) => s.season === season)?.tid;
 }
 
 /**

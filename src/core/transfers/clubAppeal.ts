@@ -15,7 +15,12 @@
  * Lines, all bounded so no single one can swamp the rest by construction:
  *
  *  - **Level match** — the existing stature rule (`moveAppeal`/`refusesMove`)
- *    expressed as a line. The only line that can refuse.
+ *    expressed as a line. The only line that can refuse. On screen it is shown
+ *    as two lines, "Level of club" (the squad and the club's wealth) and
+ *    "Reputation" (the club's name), apportioned by how much of the stature
+ *    gap each makes up.
+ *    That split is display only: the score reads the one unsplit value, so the
+ *    markets decide exactly as before.
  *  - **Playing time** — would he start? His rating against the weakest man the
  *    club's shape fields at his position, clamped. Near zero for a star (he
  *    starts anywhere) and decisive for a squad player, which is the real reason
@@ -25,9 +30,12 @@
  *    and by `homeAttachment` (a star or a player who has outgrown his league
  *    feels none of it).
  *  - **Confederation** — the club is outside his confederation. Symmetric.
+ *  - **Language** — the club is in a country he finds familiar although he
+ *    wasn't born there: a shared language or family ties (transfers/corridors.ts).
+ *    Symmetric, and labelled with the route's own reason ("Family ties").
  *  - **Former club** — he has played for them before. Never a refusal.
  *
- * On a loan the home and confederation lines are scaled by APPEAL_LOAN_FACTOR:
+ * On a loan the home, confederation and language lines are scaled by APPEAL_LOAN_FACTOR:
  * a loan is a season, not a career.
  *
  * The score is the sum of the lines; as a valuation multiplier it is
@@ -40,15 +48,20 @@ import type { Position } from "../players/types.js";
 import { confederationOf } from "../international/confederations.js";
 import { moveAppeal, refusesMove, statureSensitivity } from "./playerWill.js";
 import { homeAttachment, type HomeClub } from "./homePull.js";
+import { corridorFor } from "./corridors.js";
+import type { StatureParts } from "../ai/clubContext.js";
 import {
-  APPEAL_HOME, APPEAL_CONFEDERATION, APPEAL_PLAYING_TIME, APPEAL_PLAYING_TIME_LO,
+  APPEAL_HOME, APPEAL_CONFEDERATION, APPEAL_LANGUAGE, APPEAL_PLAYING_TIME, APPEAL_PLAYING_TIME_LO,
   APPEAL_PLAYING_TIME_HI, APPEAL_FORMER_CLUB, APPEAL_LOAN_FACTOR,
+  STATURE_W_STRENGTH, STATURE_W_REPUTATION, STATURE_W_WEALTH,
 } from "../constants.js";
 
 /** What the appeal reads about a club. `ClubContext` satisfies it. */
 export interface AppealClub {
   tid: number;
   stature: number;
+  /** The two weighted halves of `stature` (ClubContext.statureParts). Display only. */
+  statureParts?: StatureParts;
   home?: HomeClub;
   /** The weakest man the club's shape fields at each position; 0 where it is short. */
   posWeakestStarterOvr?: Record<Position, number>;
@@ -64,7 +77,7 @@ export interface AppealFrom {
   club?: AppealClub;
 }
 
-export type AppealLineId = "level" | "playingTime" | "home" | "confederation" | "formerClub";
+export type AppealLineId = "level" | "reputation" | "playingTime" | "home" | "confederation" | "language" | "formerClub";
 
 export interface AppealLine {
   id: AppealLineId;
@@ -84,9 +97,11 @@ export interface AppealOptions {
 
 const LABELS: Record<AppealLineId, string> = {
   level: "Level of club",
+  reputation: "Reputation",
   playingTime: "Playing time",
   home: "Home country",
   confederation: "Far from home",
+  language: "Language",
   formerClub: "Former club",
 };
 
@@ -124,22 +139,45 @@ function confederationAt(player: Player, club: AppealClub | undefined, care: num
   return -APPEAL_CONFEDERATION * (1 - care);
 }
 
-/** The five line values, without building the labelled list. */
+function languageAt(player: Player, club: AppealClub | undefined, care: number): number {
+  const country = club?.home?.country;
+  if (!country) return 0;
+  const route = corridorFor(player.nationality, country);
+  return route ? APPEAL_LANGUAGE * route.strength * (1 - care) : 0;
+}
+
+/**
+ * The reason to show on the language line: whichever route counts more, so a
+ * negative line leaving a stronger tie is named after the tie he'd lose.
+ */
+function languageLabel(player: Player, to: AppealClub, from: AppealFrom): string {
+  const into = to.home ? corridorFor(player.nationality, to.home.country) : null;
+  const out = from.club?.home ? corridorFor(player.nationality, from.club.home.country) : null;
+  const route = into && out ? (out.strength > into.strength ? out : into) : (into ?? out);
+  return route?.reason ?? LABELS.language;
+}
+
+/** The line values, without building the labelled list. */
 function lineValues(
   player: Player,
   to: AppealClub,
   from: AppealFrom,
   options: AppealOptions,
-): { refused: boolean; level: number; playingTime: number; home: number; confederation: number; formerClub: number } {
-  const refused = refusesMove(player.ovr, from.stature, to.stature);
-  const level = refused ? -1 : moveAppeal(player.ovr, from.stature, to.stature) - 1;
-  const care = statureSensitivity(player.ovr);
+): { refused: boolean; level: number; playingTime: number; home: number; confederation: number; language: number; formerClub: number } {
   const away = options.loan ? APPEAL_LOAN_FACTOR : 1;
+  // A loan is a season, not a career, so it counts as that fraction of the move
+  // for the club's level too, refusal included: a benched youngster at a giant
+  // goes down on loan to play, where he'd never sign there for good.
+  const toStature = from.stature + (to.stature - from.stature) * away;
+  const refused = refusesMove(player.ovr, from.stature, toStature);
+  const level = refused ? -1 : moveAppeal(player.ovr, from.stature, toStature) - 1;
+  const care = statureSensitivity(player.ovr);
   const playingTime = playingTimeAt(player, to) - (from.club ? playingTimeAt(player, from.club) : 0);
   const home = away * (homeAt(player, to) - homeAt(player, from.club));
   const confederation = away * (confederationAt(player, to, care) - confederationAt(player, from.club, care));
+  const language = away * (languageAt(player, to, care) - languageAt(player, from.club, care));
   const formerClub = to.tid !== from.club?.tid && formerClubs(player).has(to.tid) ? APPEAL_FORMER_CLUB : 0;
-  return { refused, level, playingTime, home, confederation, formerClub };
+  return { refused, level, playingTime, home, confederation, language, formerClub };
 }
 
 /** The score alone, for the markets' inner loops. `refused` wins over any score. */
@@ -150,7 +188,7 @@ export function appealScore(
   options: AppealOptions = {},
 ): { score: number; refused: boolean } {
   const v = lineValues(player, to, from, options);
-  return { score: v.level + v.playingTime + v.home + v.confederation + v.formerClub, refused: v.refused };
+  return { score: v.level + v.playingTime + v.home + v.confederation + v.language + v.formerClub, refused: v.refused };
 }
 
 /** The appeal as a multiplier on a buyer's valuation: 0 when refused, else `max(0, 1 + score)`. */
@@ -164,6 +202,40 @@ export function appealMultiplier(
   return refused ? 0 : Math.max(0, 1 + score);
 }
 
+/**
+ * Where the player is coming from, split into its two stature halves. A club
+ * carries its own; a free agent has only a stature, which is split in the
+ * weights' proportion.
+ */
+function fromParts(from: AppealFrom): StatureParts {
+  if (from.club?.statureParts) return from.club.statureParts;
+  const total = STATURE_W_STRENGTH + STATURE_W_REPUTATION + STATURE_W_WEALTH;
+  return {
+    strength: from.stature * STATURE_W_STRENGTH / total,
+    reputation: from.stature * STATURE_W_REPUTATION / total,
+    wealth: from.stature * STATURE_W_WEALTH / total,
+  };
+}
+
+/**
+ * The level value split into its size and reputation parts, for display: "Level
+ * of club" is the squad and the club's wealth (how big a club it is), and
+ * "Reputation" is its earned name. Each part gets the level value in proportion
+ * to its share of the stature gap; the two always sum to the unsplit value. A
+ * refusal stays whole on the level line, and so does everything when the gap is
+ * zero or the club carries no parts.
+ */
+function splitLevel(level: number, refused: boolean, to: AppealClub, from: AppealFrom): { level: number; reputation: number } {
+  if (refused || !to.statureParts || level === 0) return { level, reputation: 0 };
+  const f = fromParts(from);
+  const dSize = (to.statureParts.strength + to.statureParts.wealth) - (f.strength + f.wealth);
+  const dReputation = to.statureParts.reputation - f.reputation;
+  const delta = dSize + dReputation;
+  if (delta === 0) return { level, reputation: 0 };
+  const reputation = level * dReputation / delta;
+  return { level: level - reputation, reputation };
+}
+
 /** The player's full view of a move, line by line, for the screens. */
 export function clubAppealFor(
   player: Player,
@@ -172,10 +244,13 @@ export function clubAppealFor(
   options: AppealOptions = {},
 ): ClubAppeal {
   const v = lineValues(player, to, from, options);
-  const ids: AppealLineId[] = ["level", "playingTime", "home", "confederation", "formerClub"];
-  const lines = ids.map((id) => ({ id, label: LABELS[id], value: v[id] })).filter((l) => l.value !== 0);
+  const split = splitLevel(v.level, v.refused, to, from);
+  const shown: Record<AppealLineId, number> = { ...v, level: split.level, reputation: split.reputation };
+  const ids: AppealLineId[] = ["level", "reputation", "playingTime", "home", "confederation", "language", "formerClub"];
+  const label = (id: AppealLineId) => (id === "language" ? languageLabel(player, to, from) : LABELS[id]);
+  const lines = ids.map((id) => ({ id, label: label(id), value: shown[id] })).filter((l) => l.value !== 0);
   return {
-    score: v.level + v.playingTime + v.home + v.confederation + v.formerClub,
+    score: v.level + v.playingTime + v.home + v.confederation + v.language + v.formerClub,
     refused: v.refused,
     lines,
   };

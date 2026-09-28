@@ -50,7 +50,8 @@ import { promotionNewsBySeason } from "../../core/promotionNews.js";
 import { currency, ordinal, seasonYear } from "../format.js";
 import { Flag } from "../components/Flag.js";
 import { ClubCrest } from "../components/ClubCrest.js";
-import type { Player, SeasonStats } from "../../core/players/types.js";
+import type { Player, SeasonStatLine } from "../../core/players/types.js";
+import { statsAtClubs } from "../../core/players/seasonStints.js";
 import { isSuspended, matchesLabel } from "../../core/suspensions.js";
 import { pointsDeductionMap } from "../../core/finance/debt.js";
 import { userDebtView } from "../userDebt.js";
@@ -95,7 +96,7 @@ function ConfidenceLine({ label, mood, value, note, to }: {
 
 const STANDINGS_TOP_N = 8;
 const NEWS_TOP_N = 8;
-const LEADER_STAT_KEYS: { key: keyof SeasonStats; label: string }[] = [
+const LEADER_STAT_KEYS: { key: keyof SeasonStatLine; label: string }[] = [
   { key: "goals", label: "Goals" },
   { key: "assists", label: "Assists" },
   { key: "tackles", label: "Tackles" },
@@ -110,15 +111,18 @@ interface StatLeaderRow {
 
 function topByStat(
   players: Player[],
-  pidPool: Set<number>,
+  pidPool: Set<number> | null,
+  inScope: (tid: number) => boolean,
   season: number,
-  key: keyof SeasonStats,
+  key: keyof SeasonStatLine,
   ratingMinApps: number,
 ): StatLeaderRow[] {
   const rows: StatLeaderRow[] = [];
   for (const p of players) {
-    if (!pidPool.has(p.pid)) continue;
-    const ss = p.stats.find((s) => s.season === season);
+    if (pidPool && !pidPool.has(p.pid)) continue;
+    // Only what he did for the clubs this board is about: a January signing's
+    // goals for his old club don't count toward yours (seasonStints.ts).
+    const ss = statsAtClubs(p, season, inScope);
     if (!ss || Number(ss[key]) <= 0) continue;
     // Match Rating is an average: a one-off cameo shouldn't top the board. The
     // threshold scales with how many games have been played (see caller).
@@ -348,15 +352,14 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
     newsHeadlineNode(item, { teamByTid, playerByPid, competitions: league.competitions });
 
   // Stat leaders: league-wide (user's division) vs. the user's own team only.
-  const leaguePidPool = useMemo(() => {
-    const pool = new Set<number>();
-    for (const t of league.teams) {
-      if (t.compId !== userTeam.compId) continue;
-      for (const pid of t.roster) pool.add(pid);
-    }
-    return pool;
-  }, [league.teams, userTeam.compId]);
+  // The league board reads every player, so one who left the division in
+  // January keeps his goals in it; the team board is the current squad.
+  const leagueTids = useMemo(
+    () => new Set(league.teams.filter((t) => t.compId === userTeam.compId).map((t) => t.tid)),
+    [league.teams, userTeam.compId],
+  );
   const teamPidPool = useMemo(() => new Set(userTeam.roster), [userTeam.roster]);
+  const userTid = userTeam.tid;
 
   // The Match Rating board needs a player to have appeared in a fraction of the
   // games played *so far* — count the matchdays this division has completed and
@@ -375,12 +378,12 @@ function DashboardBody({ league, userTeam }: { league: LeagueStore; userTeam: St
   // Pre-scan the stat leaders once per pool (each is an O(players) sweep). Index
   // aligns with LEADER_STAT_KEYS so the JSX below just reads the ith result.
   const leagueLeaders = useMemo(
-    () => LEADER_STAT_KEYS.map(({ key }) => topByStat(league.players, leaguePidPool, league.season, key, ratingMinApps)),
-    [league.players, leaguePidPool, league.season, ratingMinApps],
+    () => LEADER_STAT_KEYS.map(({ key }) => topByStat(league.players, null, (tid) => leagueTids.has(tid), league.season, key, ratingMinApps)),
+    [league.players, leagueTids, league.season, ratingMinApps],
   );
   const teamLeaders = useMemo(
-    () => LEADER_STAT_KEYS.map(({ key }) => topByStat(league.players, teamPidPool, league.season, key, ratingMinApps)),
-    [league.players, teamPidPool, league.season, ratingMinApps],
+    () => LEADER_STAT_KEYS.map(({ key }) => topByStat(league.players, teamPidPool, (tid) => tid === userTid, league.season, key, ratingMinApps)),
+    [league.players, teamPidPool, userTid, league.season, ratingMinApps],
   );
   const hasLeaders = leagueLeaders.some((rows) => rows.length > 0)
     || teamLeaders.some((rows) => rows.length > 0);

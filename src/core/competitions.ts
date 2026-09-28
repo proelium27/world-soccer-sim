@@ -46,7 +46,7 @@ import {
   COUNTRY_REGION, DEFAULT_CONTINENTAL_REGION, type ContinentalRegion,
   COUNTRY_TITLE_PLAYOFF, type TitlePlayoffFormat, AMERICAS_CUP_LEAGUE_SLOTS,
   COUNTRY_CONFERENCES, type ConferenceFormat,
-  CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS,
+  CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS, LIGUILLA_TEAMS,
   COUNTRY_LOWER_TITLE_PLAYOFF, COUNTRY_SEASON_FORMAT, type SeasonFormat,
 } from "./constants.js";
 import type { ForeignRule } from "./foreignRules.js";
@@ -1030,11 +1030,14 @@ export function normalizeLeagueSpec(spec: LeagueSpec): LeagueSpec {
   }
   const after = resolveLeagueSpec(out);
   const top = after.conferences[0];
-  const need = titlePlayoffHalfNeed(out.titlePlayoff
-    ?? COUNTRY_TITLE_PLAYOFF[out.country] ?? "none");
+  const format = out.titlePlayoff ?? COUNTRY_TITLE_PLAYOFF[out.country] ?? "none";
+  const need = titlePlayoffHalfNeed(format);
   if (need > 0 && (!top || Math.floor(after.d1Teams / 2) < need)) {
     out.titlePlayoff = "single";
   }
+  // A Liguilla's play-in needs ten clubs; below that it is the plain two-legged
+  // eight, which is what the playoff builder would otherwise quietly skip.
+  if (format === "liguilla" && after.d1Teams < LIGUILLA_TEAMS) out.titlePlayoff = "two-legged";
   return out;
 }
 

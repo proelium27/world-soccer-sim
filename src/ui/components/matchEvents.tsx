@@ -250,10 +250,11 @@ export function eventSummary(
   clubName?: string,
   firstHalfStoppage?: number,
   detail?: string | null,
+  extraTimeClock?: number,
 ): string {
   const who = (i: number) => playerName(event.pids[i]);
   const club = clubName ? `${clubName}. ` : "";
-  const at = `${formatClock(event.clock, firstHalfStoppage)} ${club}`;
+  const at = `${formatClock(event.clock, firstHalfStoppage, extraTimeClock)} ${club}`;
   // Spoken the same way it is shown, so a screen reader is not told less.
   const why = detail ? `, ${detail}` : "";
   switch (event.type) {
@@ -287,6 +288,7 @@ export function TimelineRow({
   playerName,
   clubName,
   firstHalfStoppage,
+  extraTimeClock,
   detail,
 }: {
   event: MatchEvent;
@@ -295,6 +297,8 @@ export function TimelineRow({
   clubName?: string;
   /** See BoxScore.firstHalfStoppage — what makes a stoppage minute read 45+2. */
   firstHalfStoppage?: number;
+  /** See BoxScore.extraTimeClock — what makes an extra-time minute read 105'. */
+  extraTimeClock?: number;
   /** Why the card, or where the shot came from. See matchNarration.ts. */
   detail?: string | null;
 }) {
@@ -314,7 +318,7 @@ export function TimelineRow({
       <div className="bs-ev-cell bs-ev-cell--home">{event.side === "home" && cell}</div>
       <div className="bs-ev-spine">
         <span className={`bs-ev-chip stat-num ${chipTone(event.type)}`}>
-          {formatClock(event.clock, firstHalfStoppage)}
+          {formatClock(event.clock, firstHalfStoppage, extraTimeClock)}
         </span>
       </div>
       <div className="bs-ev-cell bs-ev-cell--away">{event.side === "away" && cell}</div>

@@ -15,6 +15,7 @@ import { wouldRefuseExtension } from "../../core/ai/breakoutRefusal.js";
 import { tierOf } from "../../core/competitions.js";
 import { RatingDelta, previousRatings } from "../components/RatingDelta.js";
 import { formatWeeklyWage, seasonYear } from "../format.js";
+import { statsAtClub } from "../../core/players/seasonStints.js";
 import { PlayerRatingsTooltip } from "../components/PlayerRatingsTooltip.js";
 import { PotDisplay } from "../components/PotDisplay.js";
 import { PitchField } from "../components/PitchField.js";
@@ -45,6 +46,8 @@ export function sortByPosThenOvr(players: Player[]): Player[] {
 interface RosterTableProps {
   players: Player[];
   season: number;
+  /** The club this table is for: a mid-season signing shows only what he has done here. */
+  tid: number;
   hasStats: boolean;
   onRelease: (pid: number) => void;
   onExtend: (pid: number, lengthSeasons: number) => void;
@@ -77,6 +80,7 @@ interface RosterTableProps {
 function RosterTable({
   players,
   season,
+  tid,
   hasStats,
   onRelease,
   onExtend,
@@ -129,7 +133,7 @@ function RosterTable({
       </thead>
       <tbody>
         {players.map((p) => {
-          const ss = p.stats.find((s) => s.season === season);
+          const ss = statsAtClub(p, season, tid);
           const prev = previousRatings(p);
           const borrowed = borrowedFrom.get(p.pid);
           return (
@@ -590,6 +594,7 @@ export function Roster() {
           <RosterTable
             players={xi}
             season={league.season}
+            tid={league.meta.userTid}
             hasStats={hasStats}
             onRelease={releasePlayerAction}
             onExtend={extendContractAction}
@@ -615,6 +620,7 @@ export function Roster() {
             <RosterTable
               players={bench}
               season={league.season}
+              tid={league.meta.userTid}
               hasStats={hasStats}
               onRelease={releasePlayerAction}
               onExtend={extendContractAction}

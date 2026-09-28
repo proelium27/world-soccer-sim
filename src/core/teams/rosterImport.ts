@@ -12,6 +12,7 @@ import { seasonSalaryForOvr } from "../contracts.js";
 import { competitionOf, competitionNationalities } from "../competitions.js";
 import type { NationalityWeights } from "../players/nationalities.js";
 import { reconcileScoutingObserved } from "../scouting/potentialFog.js";
+import { seedReputations } from "./reputationSeed.js";
 import { computeTeamRating } from "./teamRating.js";
 import { mulberry32, hashInts } from "../../engine/rng.js";
 import { emptyCareerSummary } from "../players/careerSummary.js";
@@ -429,7 +430,12 @@ export function applyRosterFileToNewLeague(
   identity: RosterIdentityOptions = {},
 ): RosterFileApplyResult {
   const applied = applyRosterFile(league, file, identity);
-  const teams = assignAIFormations(applied.league.teams, applied.league.players, userTid);
+  // Reputation was seeded off the generated squads too, so it is reseeded
+  // against the imported ones (forced: every club already carries a value).
+  const teams = seedReputations(
+    assignAIFormations(applied.league.teams, applied.league.players, userTid),
+    applied.league.competitions, applied.league.players, true,
+  );
   const userTeam = teams.find((t) => t.tid === userTid);
   if (userTeam) {
     userTeam.scoutingObserved = reconcileScoutingObserved({}, userTeam.roster, league.season);

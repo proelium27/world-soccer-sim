@@ -11,6 +11,7 @@ import { playoffMatchData } from "./playoffMatchData.js";
 import { mulberry32, hashInts } from "../engine/rng.js";
 import {
   TITLE_PLAYOFF_TEAMS, CONFERENCE_PLAYOFF_TEAMS, ZONE_PLAYOFF_TEAMS, CONFERENCE_SINGLE_PLAYOFF_TEAMS,
+  LIGUILLA_TEAMS,
 } from "./constants.js";
 
 /* ── Title playoffs ──────────────────────────────────────────────────────────
@@ -20,8 +21,9 @@ import {
  * that: after the last matchday the league's best clubs play a seeded bracket
  * and the winner is the season's champion.
  *
- * Four shapes (see TitlePlayoffFormat): a top-eight bracket over single games
- * or two legs, MLS's per-conference playoff and Argentina's cross-zone round of
+ * The shapes (see TitlePlayoffFormat): a top-eight bracket over single games
+ * or two legs, Liga MX's two-legged Liguilla behind a play-in, the per-conference
+ * playoffs of MLS and the USL Championship, and Argentina's cross-zone round of
  * sixteen.
  *
  * Everything else still reads the regular-season TABLE — prize money, hype,
@@ -46,12 +48,18 @@ import {
 /** rng-stream tag, clear of every other competition's (see promotionPlayoff.ts for the list). */
 export const TITLE_PLAYOFF_STREAM = 0x7171;
 
-/** Round indices within `TitlePlayoff.ties` for the eight-club formats. */
+/** Round indices within `TitlePlayoff.ties` for the eight-club formats (one later for a `liguilla`). */
 export const TITLE_ROUND_QF = 0;
 export const TITLE_ROUND_SF = 1;
 export const TITLE_ROUND_FINAL = 2;
 
-export type PlayedTitlePlayoffFormat = "single" | "two-legged" | "conference" | "zones" | "conference-single";
+export type PlayedTitlePlayoffFormat =
+  | "single" | "two-legged" | "liguilla" | "conference" | "zones" | "conference-single";
+
+/** The Liguilla formats, which reseed after the quarter-finals. */
+function reseeds(format: PlayedTitlePlayoffFormat): boolean {
+  return format === "two-legged" || format === "liguilla";
+}
 
 /** The formats that seed each half of a split division separately. */
 function perHalfFormat(format: PlayedTitlePlayoffFormat): boolean {
@@ -104,6 +112,7 @@ export function titlePlayoffRoundNames(format: PlayedTitlePlayoffFormat): string
   if (format === "conference-single") {
     return ["Conference quarter-finals", "Conference semi-finals", "Conference finals", "Final"];
   }
+  if (format === "liguilla") return ["Play-in", "Quarter-finals", "Semi-finals", "Final"];
   return ["Quarter-finals", "Semi-finals", "Final"];
 }
 
@@ -156,12 +165,13 @@ export function titlePlayoffFields(
       continue;
     }
 
-    if (table.length < TITLE_PLAYOFF_TEAMS) continue;
+    const entrants = format === "liguilla" ? LIGUILLA_TEAMS : TITLE_PLAYOFF_TEAMS;
+    if (table.length < entrants) continue;
     out.push({
       country: comp.country,
       compId: comp.id,
       format,
-      teams: table.slice(0, TITLE_PLAYOFF_TEAMS).map((r) => r.tid),
+      teams: table.slice(0, entrants).map((r) => r.tid),
     });
   }
   return out;
@@ -229,7 +239,26 @@ export function titlePlayoffNextEntrants(playoff: TitlePlayoff): Set<number> {
     if (round === 0) return new Set(halves.flatMap((c) => [c[7], c[8]]));
     if (round === 1) return new Set([...halves.flatMap((c) => c.slice(0, 7)), ...previousWinners]);
   }
+  if (playoff.format === "liguilla") {
+    if (round === 0) return new Set(playoff.teams.slice(TITLE_PLAYOFF_TEAMS - 2));
+    if (round === 1) return new Set(liguillaSeeds(playoff));
+  }
   return new Set(round === 0 ? playoff.teams : previousWinners);
+}
+
+/**
+ * The eight seeds of an eight-club bracket, best first. The table's top eight,
+ * except in a `liguilla`, where the play-in fills the last two: the winner of
+ * 7th v 8th is the seventh seed and the winner of the last game the eighth,
+ * whatever their places in the table. Before the play-in is decided, just the
+ * six clubs already through.
+ */
+export function liguillaSeeds(playoff: Pick<TitlePlayoff, "format" | "teams" | "ties">): number[] {
+  const direct = TITLE_PLAYOFF_TEAMS - 2;
+  if (playoff.format !== "liguilla") return playoff.teams.slice(0, TITLE_PLAYOFF_TEAMS);
+  const playIn = playoff.ties.filter((t) => t.round === 0);
+  if (playIn.length < 3) return playoff.teams.slice(0, direct);
+  return [...playoff.teams.slice(0, direct), playIn[0].winner, playIn[2].winner];
 }
 
 /** A title playoff drawn from its field, with nothing played. */
@@ -281,12 +310,13 @@ function playTie(
   compId: number,
   round: number,
   index: number,
+  isFinal: boolean,
 ): CupTie {
   const rng = tieRng(lid, season, compId, round, index);
   if (format === "two-legged") {
     const leg1 = playFirstLeg(rng, low, high, matchData.get(low)!, matchData.get(high)!, round);
     // The better seed takes a level tie everywhere but the final.
-    const levelGoesTo = round === TITLE_ROUND_FINAL ? undefined : high;
+    const levelGoesTo = isFinal ? undefined : high;
     return {
       ...resolveTwoLeggedTie(rng, leg1, matchData.get(low)!, matchData.get(high)!, 0, { levelGoesTo }),
       boxScore: null,
@@ -420,20 +450,49 @@ export function playTitlePlayoffRound(
       const [zoneA, zoneB] = playoff.conferences!;
       const interleaved = zoneA.flatMap((tid, i) => [tid, zoneB[i]]);
       ZONE_ROUND_OF_16_PAIRS.forEach(([x, y]) =>
-        single(interleaved[x], interleaved[y], { extraTime: false }));
+        single(interleaved[x], interleaved[y], { extraTime: true }));
     } else if (round < lastRound) {
-      pairUp(previous).forEach(([a, b]) => single(a, b, { extraTime: false }));
+      // Extra time in every round, as the 2026 rules have it (2025's went
+      // straight to penalties before the final).
+      pairUp(previous).forEach(([a, b]) => single(a, b, { extraTime: true }));
     } else {
       single(previous[0], previous[1], { extraTime: true, neutral: true });
     }
+  } else if (playoff.format === "liguilla" && round === 0) {
+    // The play-in, one game each at the better-placed club's ground and
+    // straight to penalties if level: 7th v 8th for the seventh seed, 9th v 10th
+    // to stay alive, then the loser of the first hosts the winner of the second
+    // for the eighth seed.
+    const [s7, s8, s9, s10] = playoff.teams.slice(TITLE_PLAYOFF_TEAMS - 2);
+    single(s7, s8, { extraTime: false });
+    single(s9, s10, { extraTime: false });
+    const g1 = ties[0];
+    single(g1.winner === g1.home ? g1.away : g1.home, ties[1].winner, { extraTime: false });
   } else {
-    const format = playoff.format;
-    const pairs: [number, number][] = round === 0
-      ? TITLE_PLAYOFF_QF_PAIRS.map(([a, b]) => [playoff.teams[a], playoff.teams[b]])
-      : pairUp(previous);
+    const legs = playoff.format === "single" ? "single" : "two-legged";
+    const quarterFinals = playoff.format === "liguilla" ? 1 : 0;
+    // Seeds, not table places: a liguilla's play-in winners are the seventh and
+    // eighth seeds whatever their places, and the higher seed is who hosts the
+    // second leg and takes a level tie.
+    const seeds = liguillaSeeds(playoff);
+    const seed = new Map(seeds.map((tid, i) => [tid, i]));
+    const bySeed = (a: number, b: number): [number, number] =>
+      (seed.get(a)! <= seed.get(b)! ? [a, b] : [b, a]);
+    let pairs: [number, number][];
+    if (round === quarterFinals) {
+      pairs = TITLE_PLAYOFF_QF_PAIRS.map(([a, b]) => [seeds[a], seeds[b]]);
+    } else if (round === quarterFinals + 1 && reseeds(playoff.format)) {
+      // The Liguilla reseeds: best seed left against the worst, the other two
+      // against each other.
+      const [a, b, c, d] = [...previous].sort((x, y) => seed.get(x)! - seed.get(y)!);
+      pairs = [[a, d], [b, c]];
+    } else {
+      pairs = pairUp(previous);
+    }
     pairs.forEach(([a, b]) => {
-      const [high, low] = better(a, b);
-      ties.push(playTie(format, high, low, matchData, lid, season, playoff.compId, round, index++));
+      const [high, low] = bySeed(a, b);
+      ties.push(playTie(legs, high, low, matchData, lid, season, playoff.compId, round, index++,
+        round === lastRound));
     });
   }
 

@@ -108,4 +108,4 @@ Post-M6 features are all shipped; see the ledger files for each. Major systems i
 
 ## Open design decisions
 
-See `docs/ledger/open-decisions.md`. Still open and needing a user call: the winter-sale wage dodge, deficits at the 30-man cap, and per-stint stats for mid-season transfers. Discuss options before coding any of them.
+See `docs/ledger/open-decisions.md`. Still open and needing a user call: the winter-sale wage dodge and deficits at the 30-man cap. Discuss options before coding any of them.

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MatchEvent } from "../../engine/attribution.js";
-import { finalMinute, halfTimeMinute, HALF_TIME_MINUTE } from "./liveMatch.js";
+import {
+  EXTRA_TIME_HALF_MINUTES,
+  extraTimeStartMinute,
+  finalMinute,
+  halfTimeMinute,
+  HALF_TIME_MINUTE,
+} from "./liveMatch.js";
 
 /**
  * The playback clock for the live match viewer.
@@ -44,8 +50,11 @@ export function tickDelayMs(
   minute: number,
   speed: PlaybackSpeed,
   breakMinute: number = HALF_TIME_MINUTE,
+  /** Extra time's two breaks: the end of normal time, and its own half time. */
+  extraBreaks: readonly number[] = [],
 ): number {
-  const base = minute === breakMinute ? HALF_TIME_MS : MS_PER_MATCH_MINUTE;
+  const isBreak = minute === breakMinute || extraBreaks.includes(minute);
+  const base = isBreak ? HALF_TIME_MS : MS_PER_MATCH_MINUTE;
   return base / speed;
 }
 
@@ -117,17 +126,26 @@ export interface MatchPlayback {
 
 export function useMatchPlayback(
   events: MatchEvent[],
-  opts: { autoStart?: boolean; finalClock?: number; firstHalfStoppage?: number } = {},
+  opts: { autoStart?: boolean; finalClock?: number; firstHalfStoppage?: number; extraTimeClock?: number } = {},
 ): MatchPlayback {
   const autoStart = opts.autoStart ?? true;
-  const { finalClock, firstHalfStoppage } = opts;
+  const { finalClock, firstHalfStoppage, extraTimeClock } = opts;
   // The break falls at the END of first-half stoppage — minute 48 of football
   // when three were added, not minute 45. Holding on 45 instead would pause the
   // match mid-passage and then run the rest of the half past the break.
   const breakMinute = halfTimeMinute(firstHalfStoppage);
   // Play to the whistle, not to the last thing that happened — stoppage carries
   // on past the final event, so the old reading stopped the clock short.
-  const lastMinute = useMemo(() => finalMinute(events, finalClock), [events, finalClock]);
+  const lastMinute = useMemo(
+    () => finalMinute(events, finalClock, extraTimeClock),
+    [events, finalClock, extraTimeClock],
+  );
+  // Extra time pauses twice more: when normal time ends, and at its own break.
+  const extraBreaks = useMemo(() => {
+    if (extraTimeClock === undefined) return [];
+    const start = extraTimeStartMinute(extraTimeClock);
+    return [start, start + EXTRA_TIME_HALF_MINUTES];
+  }, [extraTimeClock]);
 
   const [minute, setMinute] = useState(0);
   const [playing, setPlaying] = useState(autoStart);
@@ -153,10 +171,10 @@ export function useMatchPlayback(
     // normal minute without the interval fighting the change.
     const timer = setTimeout(
       () => setMinute((m) => m + 1),
-      tickDelayMs(minute, speed, breakMinute),
+      tickDelayMs(minute, speed, breakMinute, extraBreaks),
     );
     return () => clearTimeout(timer);
-  }, [playing, finished, minute, speed, breakMinute]);
+  }, [playing, finished, minute, speed, breakMinute, extraBreaks]);
 
   const play = useCallback(() => setPlaying(true), []);
   const pause = useCallback(() => setPlaying(false), []);

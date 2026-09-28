@@ -13,6 +13,7 @@ import { getRatingColor } from "../utils/ratingColor.js";
 import { seasonYear, transferFeeLabel } from "../format.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { STAT_LABELS, formatStat } from "../statLabels.js";
+import { useLeague } from "../context/LeagueContext.js";
 
 /** One career-honor badge, e.g. "3x Golden Boot" — omits the count for a single win. */
 function AwardPill({ label, seasons, icon }: { label: string; seasons: number[]; icon?: ReactNode }) {
@@ -44,6 +45,7 @@ export function RetiredPlayerProfile({
   archived: ArchivedPlayer;
   league: LeagueStore;
 }) {
+  const { unretirePlayerAction, simming } = useLeague();
   const honors = computeArchivedHonors(archived, league.seasonHistory, {
     cupHistory: league.cupHistory,
     shieldHistory: league.shieldHistory,
@@ -93,6 +95,24 @@ export function RetiredPlayerProfile({
         {" "}in {seasonYear(archived.peakSeason)}
         {" "}&middot; Final OVR <strong style={{ color: getRatingColor(archived.finalOvr) }}>{archived.finalOvr}</strong>
       </p>
+
+      {league.godMode && (
+        <div className="gm-panel">
+          <div className="gm-panel-title">God Mode</div>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            {/* Once he's back in the pool this same URL renders his living
+                profile, where Move to / Edit / Lock take over. */}
+            <button
+              className="btn btn-sm btn-warning"
+              disabled={simming}
+              title="Bring him back as a free agent, rated where he finished."
+              onClick={() => unretirePlayerAction(archived.pid)}
+            >
+              Un-retire
+            </button>
+          </div>
+        </div>
+      )}
 
       {archived.clubs.length > 0 && (
         <p className="mb-3">

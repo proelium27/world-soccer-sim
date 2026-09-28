@@ -225,7 +225,7 @@ export function ClubSeason() {
           />
         </div>
         <div className="col-6 col-md-3 col-xl-2">
-          <StatCard label="Squad size" value={squad.length} sub={clubSeason.live ? "On the books now" : "Finished the season here"} />
+          <StatCard label="Squad size" value={squad.length} sub={clubSeason.live ? "On the books now" : "In the squad that season"} />
         </div>
         <div className="col-6 col-md-3 col-xl-2">
           <StatCard
@@ -332,8 +332,9 @@ export function ClubSeason() {
                     : <>This is the squad as it stands right now, mid-season.</>
                 ) : (
                   <>
-                    This is who finished the season here, so a winter signing shows up at his new
-                    club only. Ratings are what each player carried through that season.
+                    This is everyone who was in the squad that season. A player who moved
+                    mid-season shows up at both clubs, each with only what he did there. Ratings
+                    are what each player carried through that season.
                     {clubSeason.fromArchiveCount > 0 && (
                       <>
                         {" "}

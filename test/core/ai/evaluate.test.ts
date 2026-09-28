@@ -59,6 +59,7 @@ function ctx(overrides: Partial<ClubContext> = {}): ClubContext {
     posWeakestStarterOvr,
     hype: 50,
     stature: 0.5,
+    statureParts: { strength: 0.325, reputation: 0.175, wealth: 0 },
     ambition: 0.5,
     frugality: 0.5,
     direction: "Midtable Stability" as StrategicDirection,
