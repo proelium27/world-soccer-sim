@@ -680,7 +680,11 @@ export function Manual() {
             both either way; the one you skip still has its box score. A league-phase match
             shows the Swiss table beside it instead of your league table, and a two-legged
             quarter-final or semi-final is watched a leg at a time, the second leg at the other
-            club's ground.
+            club's ground. A tie that's level at the end goes on into extra time and you watch
+            that too, 91st minute to the 120th, with a break at 105. If it's still level the
+            shootout isn't played out kick by kick; you just get the result at the end. Match
+            ratings stop at 90 minutes, same as in the box score, but goals scored in extra time
+            still show up next to the player.
           </p>
           <p>
             The match is played the moment you press the button, and what you're watching is the
