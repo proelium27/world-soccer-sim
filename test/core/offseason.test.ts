@@ -108,6 +108,14 @@ describe("simOffseason", () => {
     return seed6;
   };
 
+  it("records every club's end-of-season reputation on the season's history entry", () => {
+    const next = seed6Offseason();
+    const recorded = next.seasonHistory.at(-1)!.reputation!;
+    expect(Object.keys(recorded)).toHaveLength(next.teams.length);
+    // Reputation moves only at step 3.61, so the entry holds what the clubs carry now.
+    for (const t of next.teams) expect(recorded[t.tid]).toBeCloseTo(t.reputation!, 1);
+  });
+
   it("swaps 3 up / 3 down between divisions and records pre-swap compsByTid", () => {
     const next = seed6Offseason();
 

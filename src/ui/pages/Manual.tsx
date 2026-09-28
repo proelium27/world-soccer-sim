@@ -2838,6 +2838,11 @@ export function Manual() {
               climbs faster than it falls, so a famous club keeps some of its pull through a bad spell,
               and a club that has just come into money has to win things before stars take it seriously.
               When you hover a player&apos;s reasons, the level of the club is split into these two lines.
+              Club History shows a club&apos;s reputation and how much the last summer moved it, with
+              a column for where it stood at the end of each season, and the club Database has a
+              Reputation column you can sort by. Reputation only moves in the summer, so the change
+              shows once two summers are on record: after your second in a new save, after your next
+              in one started before this.
             </li>
             <li>
               <strong>Playing time.</strong> Would he start? A player who&apos;d walk into your eleven

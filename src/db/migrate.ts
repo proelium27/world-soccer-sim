@@ -17,6 +17,7 @@ import { GEN_OFFSETS } from "../core/players/templates.js";
 import { chargeSeasonStart, wageBill, financeScale } from "../core/finance/budget.js";
 import { englandCompetitions } from "../core/competitions.js";
 import { seedReputations } from "../core/teams/reputationSeed.js";
+import { reputationSnapshot } from "../core/teams/reputation.js";
 import { cullOnLoad } from "../core/players/freeAgentCull.js";
 import { summaryOf, ovrLookup } from "../core/players/careerSummary.js";
 import { computeOvr } from "../core/players/ovr.js";
@@ -332,7 +333,28 @@ function migratePlayer(p: Player, fallbackTid: number, currentSeason: number): P
  * the real-club-names era) would be silently reverted on the next load.
  */
 export function migrateLeague(league: LeagueStore): LeagueStore {
-  return cullOnLoad(migrateFields(rescaleRatings(league)));
+  // Read before seeding: a club that had no reputation is given a seed, and a
+  // seed is not what it ended last season on.
+  const hadReputation = (league.teams ?? []).every((t) => t.reputation !== undefined);
+  return cullOnLoad(backfillLatestReputation(migrateFields(rescaleRatings(league)), hadReputation));
+}
+
+/**
+ * Stamp every club's current reputation onto the latest season's history entry
+ * when no season has one yet (see SeasonHistoryEntry.reputation). Exact, not a
+ * guess: reputation moves only in the offseason, so the value a club holds now
+ * is the one it ended last season on. Skipped when this load had to seed any
+ * club's reputation, and a no-op once any season carries the field. Earlier
+ * seasons are left alone, since nothing recorded them.
+ */
+function backfillLatestReputation(league: LeagueStore, hadReputation: boolean): LeagueStore {
+  const history = league.seasonHistory;
+  if (!hadReputation || history.length === 0 || history.some((e) => e.reputation)) return league;
+  const last = history[history.length - 1];
+  return {
+    ...league,
+    seasonHistory: [...history.slice(0, -1), { ...last, reputation: reputationSnapshot(league.teams) }],
+  };
 }
 
 /**

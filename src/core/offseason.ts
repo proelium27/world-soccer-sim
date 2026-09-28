@@ -77,7 +77,7 @@ import { reviewNationalCampaign } from "./nationalManager/index.js";
 import { carryIntlInjuries } from "./injuries.js";
 import { hashInts, mulberry32 } from "../engine/rng.js";
 import {
-  reputationTarget, finishScore, continentalScore, stepReputation, teamReputation,
+  reputationTarget, finishScore, continentalScore, stepReputation, teamReputation, reputationSnapshot,
 } from "./teams/reputation.js";
 import {
   NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, AMERICAS_CUP_FORMAT, difficultyProfile,
@@ -1413,7 +1413,9 @@ export function simOffseasonReporting(
     // Assembled at step 3.66, where the farewell list is also scored against
     // it. `retirements` names players who no longer exist by the time anything
     // renders this, which is why it is a snapshot rather than a list of pids.
-    seasonHistory: [...league.seasonHistory, { ...seasonEntry, retirements }],
+    // Reputation is attached here rather than at step 3.6, where the entry is
+    // built, because it only moves at step 3.61 (see SeasonHistoryEntry.reputation).
+    seasonHistory: [...league.seasonHistory, { ...seasonEntry, retirements, reputation: reputationSnapshot(teams) }],
   };
 
   // Dead last, deliberately. The cull consumes no rng, but it removes entries

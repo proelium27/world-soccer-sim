@@ -10,6 +10,7 @@ import { pointsDeductionMap } from "../core/finance/debt.js";
 import { isFreeAgentTid } from "../core/transfers/negotiation.js";
 import type { CompetitionScope } from "../core/competitions.js";
 import { scopeCompIds, competitionSplit } from "../core/competitions.js";
+import { reputationChange, teamReputation } from "../core/teams/reputation.js";
 
 /**
  * The club database's row model — the world's 626 clubs with their strength,
@@ -41,6 +42,10 @@ export interface ClubDbRow {
   /** Season wage bill across the senior squad and the academy, as Finance shows it. */
   wages: number;
   hype: number;
+  /** The club's world-scale name, 0-100 (core/teams/reputation.ts). */
+  reputation: number;
+  /** How far the last offseason moved it, or null when two seasons weren't recorded. */
+  reputationChange: number | null;
   /** How full the club's savings ceiling is, 0-1 — see budgetCap. */
   capUsed: number;
   /** Fees paid out and taken in this season; loans and free moves are not fees. */
@@ -159,6 +164,8 @@ export function buildClubRows(league: LeagueStore): ClubDbRow[] {
       budget: team.budget,
       wages: wageBill([...team.roster, ...team.academyRoster], salaries),
       hype: team.hype,
+      reputation: teamReputation(team),
+      reputationChange: reputationChange(league.seasonHistory, team.tid),
       capUsed: cap > 0 ? Math.max(0, team.budget) / cap : 0,
       spent: spent.get(team.tid) ?? 0,
       received: received.get(team.tid) ?? 0,
@@ -199,7 +206,7 @@ export function filterClubRows(
 
 export type ClubSortKey =
   | "club" | "league" | "rank" | "ovr" | "pot" | "power" | "squad" | "age"
-  | "budget" | "wages" | "hype" | "cap" | "spent" | "received" | "net"
+  | "budget" | "wages" | "hype" | "reputation" | "cap" | "spent" | "received" | "net"
   | "played" | "won" | "drawn" | "lost" | "points" | "gf" | "ga" | "gd"
   | "shots" | "sot" | "xg" | "xga" | "saves" | "tackles" | "possession" | "rating";
 
@@ -230,6 +237,7 @@ export function clubSortAccessors(): Record<ClubSortKey, (row: ClubDbRow) => num
     budget: (r) => r.budget,
     wages: (r) => r.wages,
     hype: (r) => r.hype,
+    reputation: (r) => r.reputation,
     cap: (r) => r.capUsed,
     spent: (r) => r.spent,
     received: (r) => r.received,
@@ -263,7 +271,7 @@ export function clubSortAccessors(): Record<ClubSortKey, (row: ClubDbRow) => num
  * column added without an accessor fails rather than sorting by nothing.
  */
 const CLUB_SORT_KEYS: Record<ClubColumnSet, readonly ClubSortKey[]> = {
-  overview: ["ovr", "pot", "power", "squad", "age", "hype"],
+  overview: ["ovr", "pot", "power", "squad", "age", "reputation", "hype"],
   finance: ["budget", "cap", "wages", "hype", "spent", "received", "net"],
   season: [
     "played", "won", "drawn", "lost", "gf", "ga", "gd", "points",

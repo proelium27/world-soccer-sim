@@ -111,3 +111,40 @@ export function stepReputation(current: number, target: number): number {
 export function teamReputation(t: Pick<StoredTeam, "reputation" | "hype">): number {
   return t.reputation ?? t.hype;
 }
+
+/** Every club's reputation to one decimal, keyed by tid, for a season's history entry. */
+export function reputationSnapshot(teams: readonly Pick<StoredTeam, "tid" | "reputation" | "hype">[]): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (const t of teams) out[t.tid] = Math.round(teamReputation(t) * 10) / 10;
+  return out;
+}
+
+/** A club's reputation at the end of each recorded season, oldest first. */
+export function reputationHistory(
+  history: readonly { season: number; reputation?: Record<number, number> }[],
+  tid: number,
+): { season: number; reputation: number }[] {
+  const out: { season: number; reputation: number }[] = [];
+  for (const e of history) {
+    const r = e.reputation?.[tid];
+    if (r !== undefined) out.push({ season: e.season, reputation: r });
+  }
+  return out;
+}
+
+/**
+ * How much a club's reputation moved in its last recorded offseason, or null
+ * when the save has not recorded two in a row. Reputation changes only in the
+ * offseason, so this is also its trend right now.
+ */
+export function reputationChange(
+  history: readonly { season: number; reputation?: Record<number, number> }[],
+  tid: number,
+): number | null {
+  const last = history[history.length - 1];
+  const prev = history[history.length - 2];
+  const a = prev?.reputation?.[tid];
+  const b = last?.reputation?.[tid];
+  if (a === undefined || b === undefined) return null;
+  return Math.round((b - a) * 10) / 10;
+}
