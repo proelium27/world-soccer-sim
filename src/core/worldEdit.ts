@@ -316,3 +316,15 @@ export function applyPendingCompetitions(
   });
   return lines ? [...pending] : live;
 }
+
+/**
+ * Every competition a save has had, live and removed. For looking up a PAST
+ * season's compId, which may name a league God Mode has since removed; the
+ * live table alone would throw in `competitionOf`.
+ */
+export function everyCompetition(league: {
+  competitions: readonly Competition[];
+  retiredCompetitions?: readonly Competition[];
+}): Competition[] {
+  return [...league.competitions, ...(league.retiredCompetitions ?? [])];
+}

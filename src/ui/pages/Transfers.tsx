@@ -301,8 +301,9 @@ export function Transfers() {
   // Covers retirees too — the completed-transfer log outlives the players in it.
   const refOf = usePlayerRefs();
   const teamNameByTid = useMemo(
-    () => new Map((league?.teams ?? []).map((t) => [t.tid, t.name])),
-    [league?.teams],
+    // Folded clubs too: the log outlives them, like it outlives retirees.
+    () => new Map([...(league?.defunctTeams ?? []), ...(league?.teams ?? [])].map((t) => [t.tid, t.name])),
+    [league?.teams, league?.defunctTeams],
   );
   const teamName = useCallback(
     (tid: number) => clubDisplayName(tid, (id) => teamNameByTid.get(id)),

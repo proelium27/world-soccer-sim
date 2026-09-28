@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { isFreeAgentTid } from "../../core/transfers/negotiation.js";
 import { ClubCrest } from "./ClubCrest.js";
+import { seasonYear } from "../format.js";
 
 /**
  * A club, rendered as a link to what it did in one season.
@@ -63,17 +64,20 @@ export function ClubLink({
   if (isFreeAgentTid(tid)) return <>Free agent</>;
 
   const team = league?.teams.find((t) => t.tid === tid);
-  const label = team
+  // A club God Mode folded is gone from `teams` but still named in history.
+  const folded = team ? undefined : league?.defunctTeams?.find((d) => d.tid === tid);
+  const known = team ?? folded;
+  const label = known
     ? variant === "abbrev"
-      ? team.abbrev
-      : team.name
+      ? known.abbrev
+      : known.name
     : variant === "abbrev"
       ? "???"
       : "Unknown";
 
   const body = crest ? (
     <>
-      <ClubCrest tid={tid} colors={team?.colors ?? ["#888888", "#888888"]} size={crestSize} />{" "}
+      <ClubCrest tid={tid} colors={known?.colors ?? ["#888888", "#888888"]} size={crestSize} />{" "}
       {label}
     </>
   ) : (
@@ -83,7 +87,8 @@ export function ClubLink({
   // No league loaded, or a club this save has no record of: the page would have
   // nothing to show, so don't offer the trip.
   if (!league || !team || !linked) {
-    return <span className={className} title={title}>{body}</span>;
+    const why = folded ? `Folded after ${seasonYear(folded.lastSeason)}` : undefined;
+    return <span className={className} title={title ?? why}>{body}</span>;
   }
 
   return (

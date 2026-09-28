@@ -8,6 +8,7 @@ import { createLeagueState, type LeagueStore } from "../../src/core/leagueState.
 import { simThrough } from "../../src/core/simThrough.js";
 import { simOffseason } from "../../src/core/offseason.js";
 import { mulberry32 } from "../../src/engine/rng.js";
+import { computeClubHistory } from "../../src/core/clubHistory.js";
 
 /** Two small countries, two divisions of ten each. */
 const WORLD = buildCompetitions([
@@ -55,9 +56,9 @@ describe("changing the world's shape at the rollover", () => {
     const [a1, a2] = divisionsOf(league.competitions, "Atlantis");
     const retired = league.retiredCompetitions ?? [];
     const atlantis = { ...leagueSpecFromDivisions([a1, a2]), d1Teams: 12, d2Teams: 8 };
-    let pending = queueCountryEdit(league.competitions, undefined, "Atlantis", atlantis, null, retired);
-    pending = queueRemoveCountry(league.competitions, pending, "Lemuria");
-    pending = queueAddCountry(league.competitions, pending, retired, {
+    let pending: Competition[] | undefined | null = queueCountryEdit(league.competitions, undefined, "Atlantis", atlantis, null, retired)!;
+    pending = queueRemoveCountry(league.competitions, pending!, "Lemuria");
+    pending = queueAddCountry(league.competitions, pending!, retired, {
       country: "Mu", divisions: 1, d1Teams: 10, strengthOffset: 10, nationalities: { Brazil: 100 },
     });
     league = queue(league, pending);
@@ -114,6 +115,17 @@ describe("changing the world's shape at the rollover", () => {
     league = simOffseason(league, mulberry32(15));
     expectConsistent(league);
     expect(league.teams.length).toBe(30);
+
+    // History reads for every club the save has had: new ones have no season
+    // before they existed, folded ones none after, removed leagues still resolve.
+    for (const tid of [...league.teams.map((t) => t.tid), ...(league.defunctTeams ?? []).map((d) => d.tid)]) {
+      const history = computeClubHistory(league, tid);
+      expect(history.seasons.length, `club ${tid}`).toBeGreaterThan(0);
+    }
+    const lemurian = [...lemuriaTids][0];
+    expect(computeClubHistory(league, lemurian).seasons).toHaveLength(1);
+    const newcomer = created[0].tid;
+    expect(computeClubHistory(league, newcomer).seasons.every((s) => s.season >= 2)).toBe(true);
   }, 300_000);
 
   it("never folds the user's club: a removed division drops it into the one above", () => {

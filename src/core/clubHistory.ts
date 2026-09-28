@@ -151,9 +151,15 @@ export interface ClubHistory {
  * here is derived, matching the read-only nature of `awards.ts`.
  */
 export function computeClubHistory(league: LeagueStore, tid: number): ClubHistory {
-  const { seasonHistory, competitions, players } = league;
+  const { seasonHistory, players } = league;
+  // A league God Mode removed still names the seasons played in it.
+  const competitions = [...league.competitions, ...(league.retiredCompetitions ?? [])];
   // Oldest → newest so we can look at the *following* season for promotion.
-  const ordered = [...seasonHistory].sort((a, b) => a.season - b.season);
+  // Only seasons the club played: one God Mode added mid-save has none before
+  // it existed, and one that folded has none after.
+  const ordered = seasonHistory
+    .filter((h) => h.compsByTid[tid] !== undefined)
+    .sort((a, b) => a.season - b.season);
 
   // Season → this club's stat tid for each player, so an award pid can be
   // attributed to the club the player actually played for that season.
