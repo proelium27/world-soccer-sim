@@ -114,6 +114,16 @@ describe("migrateLeague", () => {
     expect(migrated.newsEvents).toEqual([]);
   });
 
+  it("seeds club reputation for a save written before it, and leaves an existing one alone", () => {
+    const league = makeLeague(0, 1);
+    const before = league.teams.map(({ reputation: _r, ...t }) => t);
+    const migrated = migrateLeague({ ...league, teams: before } as unknown as LeagueStore);
+    // The seed a new world gets, so migrating an old save lands on the same values.
+    expect(migrated.teams.map((t) => t.reputation)).toEqual(league.teams.map((t) => t.reputation));
+    const kept = migrateLeague({ ...league, teams: league.teams.map((t) => ({ ...t, reputation: 12 })) });
+    expect(kept.teams.every((t) => t.reputation === 12)).toBe(true);
+  });
+
   it("backfills powerRankingHistory to an empty array for saves written before this feature", () => {
     const league = makeLeague(0, 1);
     const { powerRankingHistory: _prh, ...withoutHistory } = league;

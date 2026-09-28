@@ -14,6 +14,7 @@ import {
   inboundOfferCandidates, acceptInboundOffer, buyerAcceptsClauses,
 } from "../../../src/core/transfers/inboundOffers.js";
 import { transferWindowState } from "../../../src/core/transfers/window.js";
+import { playerChoice } from "../../../src/core/transfers/playerChoice.js";
 import {
   detachArchive, reattachArchive, detachNews, reattachNews,
   detachTransfers, reattachTransfers, detachPlayed, reattachPlayed,
@@ -443,11 +444,17 @@ describe("negotiating with add-ons", () => {
     const user = league.teams.find((t) => t.tid === userTid)!;
     const ws = openWindow(league);
 
+    // A player who'd come: a Reluctant one turns the bid down (playerChoice.ts),
+    // which is not what this case is about.
+    const choice = playerChoice({
+      teams: league.teams, players: league.players, competitions: league.competitions,
+      season: league.season, played: league.played,
+    }, userTid);
     const target = league.players.find((p) => {
       const seller = league.teams.find((t) => t.tid !== userTid && t.roster.includes(p.pid));
       if (!seller) return false;
       const res = reservationPrice(league.lid, ws.season, ws.window, p);
-      return res > 2_000_000 && res < user.budget * 0.4;
+      return res > 2_000_000 && res < user.budget * 0.4 && !choice.reluctant(p, seller.tid);
     });
     expect(target).toBeDefined();
     const res = reservationPrice(league.lid, ws.season, ws.window, target!);

@@ -37,6 +37,7 @@ import {
 import { isSpectatorTid } from "./spectator.js";
 import type { AwardFormula } from "./awardFormula.js";
 import type { ContinentalFormats } from "./cup/cupShape.js";
+import { seedReputations } from "./teams/reputationSeed.js";
 
 export type { StoredTeam } from "./teams/clubs.js";
 export type { ScheduleGame } from "./schedule.js";
@@ -486,9 +487,11 @@ export function createLeagueState(
   // user's club keeps the neutral 4-3-3 default and picks its own on the Roster page.
   // Each club in a split top flight is given its conference here, so it keeps
   // it from season to season (see core/conferences.ts).
-  const teams = assignConferences(assignAIFormations(
+  // Every club starts with a reputation seeded off where its squad ranks in its
+  // division (core/teams/reputationSeed.ts). Rng-free.
+  const teams = seedReputations(assignConferences(assignAIFormations(
     assignIdentities(league, competitions, userTid, difficulty), league.players, userTid,
-  ), competitions);
+  ), competitions), competitions, league.players);
   const schedule = buildCompetitionSchedule(teams, competitions);
 
   // Fog-of-war: stamp the user's initial senior roster as first-observed in

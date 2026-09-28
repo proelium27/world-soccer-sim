@@ -140,18 +140,18 @@ describe("refusesFreeAgentSigning", () => {
 
   it("keeps a star released by a big club out of a small one", () => {
     const w = world(PLAYER_WILL_CARE_CEILING + 5, bigTid);
-    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(true);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players, [])).toBe(true);
   });
 
   it("lets that same star join a club of his own level", () => {
     const w = world(PLAYER_WILL_CARE_CEILING + 5, bigTid);
-    expect(refusesFreeAgentSigning(w.fa, w.big, w.teams, w.players)).toBe(false);
+    expect(refusesFreeAgentSigning(w.fa, w.big, w.teams, w.players, [])).toBe(false);
   });
 
   it("leaves a squad filler free to join anyone", () => {
     // The care ramp, not a special case: a fringe player takes the game time.
     const w = world(PLAYER_WILL_CARE_FLOOR - 1, bigTid);
-    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(false);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players, [])).toBe(false);
   });
 
   it("judges a player with no senior career on his ability alone", () => {
@@ -159,8 +159,8 @@ describe("refusesFreeAgentSigning", () => {
     // that prompted this an 81-rated free agent had no club on record and
     // signed for a third-division side; ability is what stops that.
     const w = world(PLAYER_WILL_CARE_CEILING + 5, null);
-    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(true);
-    expect(refusesFreeAgentSigning(w.fa, w.big, w.teams, w.players)).toBe(false);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players, [])).toBe(true);
+    expect(refusesFreeAgentSigning(w.fa, w.big, w.teams, w.players, [])).toBe(false);
   });
 
   it("takes the higher of his last club and his ability, not just the last club", () => {
@@ -172,7 +172,7 @@ describe("refusesFreeAgentSigning", () => {
     // A DIFFERENT small club, or the rejoin-your-own-club exemption fires and
     // hides the thing under test.
     const w = world(PLAYER_WILL_CARE_CEILING + 5, smallTid);
-    expect(refusesFreeAgentSigning(w.fa, w.otherSmall, w.teams, w.players)).toBe(true);
+    expect(refusesFreeAgentSigning(w.fa, w.otherSmall, w.teams, w.players, [])).toBe(true);
   });
 
   it("leaves the best player alive signable by the best club there is", () => {
@@ -184,10 +184,10 @@ describe("refusesFreeAgentSigning", () => {
     // A separate world per half, so neither reading is masked by the
     // rejoin-your-own-club exemption below.
     const up = world(99, smallTid);
-    expect(refusesFreeAgentSigning(up.fa, up.big, up.teams, up.players)).toBe(false);
+    expect(refusesFreeAgentSigning(up.fa, up.big, up.teams, up.players, [])).toBe(false);
     // ...and he still won't drop to the bottom of the pyramid.
     const down = world(99, bigTid);
-    expect(refusesFreeAgentSigning(down.fa, down.small, down.teams, down.players)).toBe(true);
+    expect(refusesFreeAgentSigning(down.fa, down.small, down.teams, down.players, [])).toBe(true);
   });
 
   it("lets a club re-sign a player whose contract it just let lapse", () => {
@@ -196,17 +196,17 @@ describe("refusesFreeAgentSigning", () => {
     // forgets to extend him could never take him back, while an AI club could.
     // Nobody refuses to stay where he already is.
     const w = world(PLAYER_WILL_CARE_CEILING + 5, smallTid);
-    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players)).toBe(false);
+    expect(refusesFreeAgentSigning(w.fa, w.small, w.teams, w.players, [])).toBe(false);
   });
 
   it("agrees with the precomputed-stature form, which is what listing pages use", () => {
     // Two implementations of one rule is exactly how a page and the action
     // behind its button start disagreeing.
     const w = world(PLAYER_WILL_CARE_CEILING + 5, bigTid);
-    const statures = clubStatures(w.teams, w.players);
+    const statures = clubStatures(w.teams, w.players, []);
     for (const buyer of w.teams) {
       expect(refusesFreeAgentSigningWith(w.fa, statures.get(buyer.tid)!, statures))
-        .toBe(refusesFreeAgentSigning(w.fa, buyer, w.teams, w.players));
+        .toBe(refusesFreeAgentSigning(w.fa, buyer, w.teams, w.players, []));
     }
   });
 });

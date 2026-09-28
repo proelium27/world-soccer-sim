@@ -64,8 +64,14 @@ interface Candidate {
   buyerTid: number;
   /** Seller's keep-value (valueToClub to the current club) — the floor on the fee. */
   reservation: number;
-  /** Buyer's (jittered) valuation — the ceiling on the fee. */
+  /** Buyer's (jittered) valuation with the player's view applied — decides whether the deal happens. */
   buyerValue: number;
+  /**
+   * The same valuation without the player's view: the ceiling on the fee. A
+   * player keen on the move makes a deal happen but doesn't make the buyer pay
+   * more for him; if anything a player pushing to leave weakens his club's hand.
+   */
+  priceValue: number;
   /** Club-agnostic true market value — the anchor for AI_MARKET_FEE_FLOOR_FRACTION. */
   market: number;
   /** buyerValue − reservation: how much more useful he is to the buyer. */
@@ -249,6 +255,7 @@ export function runAITransferMarket(
           buyerTid: buyer.tid,
           reservation,
           buyerValue: jittered,
+          priceValue: Math.max(reservation, Math.min(jittered, rawJittered)),
           market,
           surplus: jittered - reservation,
           needBuy,
@@ -323,7 +330,7 @@ export function runAITransferMarket(
     const wageCharge = phase === "regular" ? player.contract.salary : 0;
     let fee = Math.max(
       feeFloor,
-      Math.round(c.reservation + AI_MARKET_FEE_SHARE * (c.buyerValue - c.reservation)),
+      Math.round(c.reservation + AI_MARKET_FEE_SHARE * (c.priceValue - c.reservation)),
     );
 
     // A club spends only the surplus above its cash reserve (never its whole

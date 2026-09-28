@@ -118,15 +118,125 @@ never 73+); keeping good Brazilians and Argentines at home compressed the
 country ladder (big four to Brazil 4.95 -> 1.09 on one seed), which is why the
 home line fades for a player who has outgrown his league.
 
-## Stage 2: club reputation (planned)
+## Stage 2: club reputation (built)
 
-`StoredTeam.reputation` beside hype. Target is a per-season achievement score
-(continental trophy > deep run > league title scaled by league strength >
-domestic cup > finish scaled by league strength > promotion; relegation a
-penalty), with no squad-strength or hype term. Rises ~10% a season toward it,
-falls ~4-5%. Stature becomes 0.65 × squad strength + 0.35 × reputation. Adds a
-Reputation line to `clubAppealFor`. Own audit; expected to slow a newly promoted
-rich club's rise.
+`StoredTeam.reputation` (optional, 0-100) sits beside hype. Hype stays what it
+was, a finance channel; reputation is what players see. Code:
+`src/core/teams/reputation.ts` (pure, rng-free) and
+`src/core/teams/reputationSeed.ts`. Constants: the `REPUTATION_*` block after
+`APPEAL_LOAN_FACTOR`, all first values, to be tuned.
+
+**One world scale.** A finish scores `leagueCeiling − SPREAD × (rank−1)/(size−1)`,
+where the ceiling is `FINISH_TOP (80) − PER_OFFSET (2.5) × strength offset −
+PER_TIER (25) × (tier − 1)`. Bottom of the Premier League (50) outranks the
+Serbian champion (42.5) by construction.
+
+**Target, from that season only.** Finish in the division the club played in,
+plus title (8, a top flight's recorded champion or a lower division's playoff
+winner), domestic cup (6), every continental run (won 35; lost final 28, SF 23,
+QF 17, earlier 12; playoff 8; league phase 6; × 1 / 0.5 / 0.7 for Cup / Shield /
+Americas Cup), promotion (+5), relegation (−8), clamped to [0, 100]. No squad
+strength and no hype term: a club cannot buy a name, it has to win with the
+squad. Stepped at offseason step 3.61 (after the promotion swap, while the cups
+are still the finished ones): 10% of the gap a season upward, 4.5% downward.
+Zero rng draws.
+
+**Ordering** (from an 8th-place finish in England, the agreed design order):
+Cup win (+35) > lost final (+28) > semi-final (+23) > league title (climb to
+first plus the bonus, ~+19) > domestic cup (+6) > nothing. The continental
+values were raised from a first draft (25 / 18 / 14 / 11 / 9 / 7 / 5) under
+which a title beat a lost final. Pinned by `test/core/reputation.test.ts`.
+A lower-division club that tops its table is not a champion here (only a
+lower division's title-playoff winner is); the promotion bonus credits it.
+
+**Seeding.** A new world, a roster import (forced reseed, since squads are
+replaced) and migration of an old save give each club the finish score its squad
+strength ranks it at within its division. Same scale as the target, so there is
+no opening transient. A seed, not a reconstruction of an old save's history.
+
+**Stature reads how good a club is.** `0.45 × squad strength + 0.2 ×
+reputation / 100 + 0.35 × wealth` (`STATURE_W_STRENGTH`, `STATURE_W_REPUTATION`,
+`STATURE_W_WEALTH`), where wealth is `clubWealth`: the league's money scale
+(`financeScale`, 1 at a big-four top flight) times how big a name the club is on
+the world scale, `0.5 + 0.5 × reputation / 100`. It is the stand-in for wages
+until wages exist. All three are the club's own; there is no
+regional term (user rule: players are pulled to good clubs, and good clubs
+happen to be in Europe). The first shape, `0.65 × squad + 0.35 × reputation`,
+still rated Brazil's best club (0.67) above a median big-four club (0.56),
+because squads there really are comparable and the reputation seed puts
+Brazil's champion level with a mid-table English club; with wealth at 0.35 the
+median big-four club reads 0.71 against Brazil's best 0.67
+(`scripts/statureGapProbe.ts`). Every stature reader (`clubStature`,
+`clubStatures`, the contexts, `refusesMoveToClub`, `refusesFreeAgentSigning`)
+now REQUIRES the competitions, so no screen can compute a different stature
+from the AI's. `ClubContext.statureParts` carries the three weighted parts.
+
+**Ambition for good players.** The step-up bonus used the star-only care curve
+(ovr 73 → 89) at `PLAYER_WILL_RISE_BONUS` 0.35, so a 76-rated player gained
+~0.02 for a move from Brazil to a mid-table big-four club against a home pull of
+~0.17. A step up now reads `playerAmbition`, ramping from
+`PLAYER_WILL_AMBITION_FLOOR` (ovr 66) to the care ceiling, at a rise bonus of
+1.2. Refusals still read the care curve, so who refuses a step down is
+unchanged. `scripts/appealCheck.ts` prints the line-by-line view of that move.
+
+**Reputation line.** `clubAppealFor` shows the level line as two: "Level of
+club" (squad and wealth) and "Reputation", apportioned by each part's share of
+the stature gap (a free agent's own stature is split in the weights'
+proportion). Display only: `appealScore`/`appealMultiplier` read the unsplit
+value. A refusal stays whole on the level line.
+
+**Measured (20 seasons, seeds 1-2, against Stage 1 at the same seeds):**
+Brazil 66.1 / 66.3 (Stage 1 67.9 / 67.6, main ~63), big four 71.6 / 71.1
+(69.0 / 68.6), France 66.3 / 68.7. France→Brazil +0.16 / +2.38 (Stage 1
+−0.09 / −0.62); BIG4→France +5.38 / +2.47; BIG4→Serbia 13.3 / 13.2 (main ~10):
+good players everywhere now move up to the best clubs, so the ladder widens.
+0 of 882 clubs in deficit at any sample on either seed. Nationality: worst gap
+8.5 / 9.6, mean absolute 3.6 / 3.8 (Stage 1 about the same); the big-four
+leagues run a few points more foreign, as their clubs import more talent.
+
+**First four-seed audit, before the review fixes** (Stage 2 / Stage 1 / main): every rung within the
+±1 mean gate. BIG4→France +3.49 / +1.80 / +3.66, **France→Brazil +0.84** /
+−1.27 / +2.51, Brazil→Netherlands +2.60 / +4.63 / −0.19, Netherlands→Argentina
+−0.34 / −0.82 / +1.54, Argentina→Portugal +3.08 / +3.09 / −0.07,
+Portugal→Belgium +1.54, Belgium→Mexico +1.30, Mexico→Turkey +1.37, Turkey→US
+−0.53, US→Greece +0.13, Greece→Scotland −0.49, Scotland→Serbia −0.02.
+BIG4→Serbia 12.95 (main ~10): the ladder widens as good players move up to the
+best clubs, the big four ending ~71 against main's ~69.5. Brazil averages 66.7
+against France's 67.5. Solvency 4/4 seeds, 0 of 882 clubs in deficit at any of
+42 samples.
+
+**Review fixes (a /code-review pass on Stage 2), and one that went wrong.**
+Wealth was a league label (every club in a division read the same), so it was
+first rebuilt from the club's money ceiling (`budgetCap`: league money × hype).
+Hype is ranked within a club's own division, so that made the top of every league
+read equally rich again: four seeds pooled, France→Brazil fell to **−0.92** and
+Italy ran 10-13 points too foreign. The user's objection, "players shop clubs
+across the entire world", is the rule: nothing in stature may be ranked within a
+league. Wealth now reads reputation (world-scaled) instead. The other review
+fixes, all in: a player's view decides whether an AI deal happens but not the
+fee; a loan counts as half a move for the level line and refusals; AI free
+agency rebuilds contexts between passes; every division's champion earns the
+title bonus; reputation's finish scale is proportional (positive everywhere);
+Swiss players register as EU; Welsh training counts for England; and players
+choose the user as they choose AI clubs (`playerChoice.ts`: a free agent signs
+only if the user suits him at least as well as the best AI club that wants him,
+and a Reluctant player turns the user's bid down).
+
+**Four seeds pooled, final shape (wealth from reputation):** every rung within
+the ±1 mean gate. BIG4→France +2.90, **France→Brazil +1.20**, Brazil→Netherlands
++2.41, Netherlands→Argentina +0.80, Argentina→Portugal +1.98, Portugal→Belgium
++1.97, Belgium→Mexico −0.05, Mexico→Turkey +2.00, Turkey→US −0.32, US→Greece
++0.14, Greece→Scotland +0.33, Scotland→Serbia −0.90. BIG4→Serbia ~12.4. 0 of
+882 clubs in deficit at any sample on any seed. Nationality (seeds 1-2): worst
+gap 9.1 / 10.5 / 11.1 (seeds 1-3), mean absolute 4.6 / 4.2 / 4.3. Spain
+(−9 to −11), Italy (−9 to −11) and England (−4 to −8) run too foreign as their
+clubs attract talent from everywhere; Brazil, Mexico and the US land within ~2
+points and most smaller leagues within ~6 (Serbia −7 to −8 the furthest).
+**Accepted by the user (2026-09-24): the goal is talent flowing to the big
+European leagues and the smaller leagues staying realistically domestic, so the
+big four running a little more foreign than real life is fine.** Raising
+APPEAL_HOME would pull them back but is the same pull that held Brazil up, so
+it was deliberately left at 0.25.
 
 ## Stage 3 (planned)
 

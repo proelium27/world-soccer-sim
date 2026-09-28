@@ -2817,15 +2817,27 @@ export function Manual() {
             Transfers tables, the Watchlist and the loan search, each player carries a label for how he
             feels about joining you: <strong>Keen</strong>, <strong>Open</strong>,{" "}
             <strong>Reluctant</strong> or <strong>Won&apos;t talk</strong>. Hover it for his reasons.
-            It&apos;s the same view every club gets. When AI clubs compete for a player, it decides
-            where he goes. On your own offers only <strong>Won&apos;t talk</strong> stops a deal. The
-            rest tells you how he feels about you, which matters when others want him too.
+            It&apos;s the same view every club gets, and it decides where he goes, yours included. A
+            player who won&apos;t talk to you or is <strong>Reluctant</strong> turns your transfer bid
+            down.
           </p>
           <ul>
             <li>
-              <strong>Level of club.</strong> Good players want good clubs. A squad player will go
-              anywhere, a star won&apos;t drop far below where he is, and a big enough step down is a flat
-              no. This is the only reason that can turn a player down outright.
+              <strong>Level of club.</strong> Good players want good clubs, and how good a club is
+              means how strong its squad is and how rich it is (money stands in for the wages it can
+              pay). A good player is drawn to a bigger club well before he&apos;s a star. Only a star
+              refuses to drop down, though, and a big enough step down is a flat no. This is the only
+              reason that can turn a player down outright.
+            </li>
+            <li>
+              <strong>Reputation.</strong> The rest of how big a club looks is its name. A club&apos;s
+              reputation is built from what it has won and where it plays: finishing
+              high in a strong league, titles, cups and runs in the continental competitions all push it
+              up, and relegation pulls it down. Everything is on one world scale, so a struggling club in
+              a big league still has more of a name than the champion of a small one. It moves slowly. It
+              climbs faster than it falls, so a famous club keeps some of its pull through a bad spell,
+              and a club that has just come into money has to win things before stars take it seriously.
+              When you hover a player&apos;s reasons, the level of the club is split into these two lines.
             </li>
             <li>
               <strong>Playing time.</strong> Would he start? A player who&apos;d walk into your eleven
@@ -2850,8 +2862,10 @@ export function Manual() {
           </p>
           <p>
             <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent
-            takes the one he likes best, rather than the worst club in the world getting first pick. When
-            you sign a free agent yourself he&apos;ll take your offer unless he won&apos;t talk to you.
+            takes the one he likes best, rather than the worst club in the world getting first pick. That
+            goes for you too: a free agent signs for you only if your club suits him at least as well as
+            the best AI club that wants him. If one suits him better, the Free Agents page says which club
+            he&apos;d rather join.
           </p>
           <p>
             <strong>League registration rules.</strong> Leagues have real rules on who a club can

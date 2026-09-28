@@ -124,6 +124,9 @@ export const EU_EEA = new Set([
   "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden",
   // EEA
   "Iceland", "Norway", "Liechtenstein",
+  // Free movement with the EU by bilateral agreement, registered as EU in the
+  // leagues that cap non-EU players.
+  "Switzerland",
   // A Dutch constituent country: its players hold Dutch passports.
   "Curacao",
 ]);
@@ -183,9 +186,20 @@ export function isHomegrown(
     if (season > currentSeason) break;
     const tid = clubBySeason.get(season);
     const where = tid === undefined ? player.nationality : countryOfTid(tid);
-    if (where === country && ++seasons >= HOMEGROWN_SEASONS) return true;
+    if (sameTrainingGround(where, country) && ++seasons >= HOMEGROWN_SEASONS) return true;
   }
   return false;
+}
+
+/**
+ * Whether training in `where` counts as training in `country`. England's
+ * homegrown rule counts clubs in England and Wales, and the game has no Welsh
+ * league, so a Welsh player's unrecorded youth seasons (credited to Wales)
+ * count for England. Seasons in a user club's academy leave no record and are
+ * credited to his nationality like any other unrecorded season, a known gap.
+ */
+function sameTrainingGround(where: string | undefined, country: string): boolean {
+  return where === country || (country === "England" && where === "Wales");
 }
 
 /** What the rules need to classify players at one club's country. */
