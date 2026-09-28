@@ -14,6 +14,7 @@ import {
 } from "./calendar.js";
 import { simMatchDetailed } from "../engine/matchSim.js";
 import { emptySeasonStats } from "./players/types.js";
+import { moveSeasonRowTo, addMatchToSeasonRow, copySeasonRow } from "./players/seasonStints.js";
 import { applyInjuries } from "./injuries.js";
 import { superCupsPending, playSuperCups } from "./superCup/superCup.js";
 import { applySuspensions, isSuspended } from "./suspensions.js";
@@ -98,32 +99,13 @@ function accumulateStats(
       ss = emptySeasonStats(season, tid);
       p.stats.push(ss);
     } else {
-      ss.tid = tid;
+      // A change of club mid-season opens a new spell rather than handing
+      // the whole season to the new club (seasonStints.ts).
+      moveSeasonRowTo(ss, tid);
     }
 
     const line = allLines.find((l) => l.pid === p.pid);
-    if (line) {
-      ss.appearances++;
-      ss.goals += line.goals;
-      ss.assists += line.assists;
-      ss.shots += line.shots;
-      ss.shotsOnTarget += line.shotsOnTarget;
-      ss.xg += line.xg;
-      ss.goalsAgainst += line.goalsAgainst;
-      ss.xga += line.xga;
-      ss.saves += line.saves;
-      ss.tackles += line.tackles;
-      ss.interceptions += line.interceptions;
-      ss.passes += line.passes;
-      ss.passesCompleted += line.passesCompleted;
-      ss.crosses += line.crosses;
-      ss.foulsCommitted += line.foulsCommitted;
-      ss.yellowCards += line.yellowCards;
-      ss.redCards += line.redCards;
-      ss.minutesPlayed += line.minutesPlayed;
-      ss.ratingSum += line.rating;
-      ss.avgRating = ss.ratingSum / ss.appearances;
-    }
+    if (line) addMatchToSeasonRow(ss, line);
   }
 }
 
@@ -270,7 +252,9 @@ export function simThrough(
 
   let currentPlayers = league.players.map((p) => ({
     ...p,
-    stats: [...p.stats.map((s) => ({ ...s }))],
+    // copySeasonRow copies a split season's stints too: accumulateStats edits
+    // them in place, and a shallow copy would edit the caller's league.
+    stats: p.stats.map(copySeasonRow),
   }));
 
   // All games share one RNG stream, so sim order defines the results:

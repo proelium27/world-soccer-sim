@@ -6,12 +6,14 @@ import type { PlayedMatch } from "../standings.js";
 import type { Competition } from "../competitions.js";
 import { homeClubs, type HomeClub } from "../transfers/homePull.js";
 import { computeStandings } from "../standings.js";
+import { teamReputation } from "../teams/reputation.js";
+import { financeScale } from "../finance/budget.js";
 import {
   AI_SQUAD_STRENGTH_COUNT,
   AI_AMBITION_W_STRENGTH, AI_AMBITION_W_WEALTH, AI_AMBITION_W_FAME, AI_AMBITION_W_FORM,
   AI_AMBITION_HIGH, AI_AMBITION_LOW, AI_YOUNG_SQUAD_AGE,
-  STATURE_STRENGTH_LO, STATURE_STRENGTH_HI, STATURE_W_STRENGTH, STATURE_W_HYPE,
-  HYPE_MAX,
+  STATURE_STRENGTH_LO, STATURE_STRENGTH_HI, STATURE_W_STRENGTH, STATURE_W_REPUTATION, STATURE_W_WEALTH,
+  REPUTATION_MAX,
 } from "../constants.js";
 
 /**
@@ -75,8 +77,9 @@ export interface ClubContext {
   /** Fame/popularity, 0-100, straight off the club. */
   hype: number;
   /**
-   * How big this club is in *world* terms, [0,1] — squad quality blended with
-   * fame, measured against absolute bands rather than league-relative ones.
+   * How big this club is in *world* terms, [0,1]: how good a club it is, read
+   * from its squad, its reputation and its own wealth (`statureOf`), measured
+   * against absolute bands rather than league-relative ones.
    *
    * Deliberately NOT normalized within a competition, unlike ambition and
    * frugality. Those answer "how does this club compare to its rivals", which
@@ -87,6 +90,12 @@ export interface ClubContext {
    * drifting with whatever the league's current extremes happen to be.
    */
   stature: number;
+  /**
+   * The weighted, normalized parts of `stature` (they sum to it): the squad's
+   * strength, the club's reputation and its wealth. Lets a screen say how much
+   * of a step up or down is the club's size and how much is its name.
+   */
+  statureParts: StatureParts;
   /**
    * The club's country and how domestic its league really is, for home-country
    * pull (transfers/homePull.ts). Optional so hand-built contexts need not carry
@@ -172,17 +181,54 @@ function positionalDepthAndBest(
   return { depth, best, secondBest, weakestStarter };
 }
 
+/** The weighted parts of a club's stature; their sum is the stature. */
+export interface StatureParts {
+  strength: number;
+  reputation: number;
+  wealth: number;
+}
+
 /**
- * A club's world stature, [0,1]: squad quality against an absolute band,
- * blended with fame. See ClubContext.stature for why this one normalization is
- * global rather than per-competition.
+ * A club's own wealth, [0,1]: its income scale (`financeScale`: its league's
+ * money times its division's), 1 at a big-four top-flight club. A club whose
+ * competition isn't in `competitions` reads 0, which only a hand-built fixture
+ * with no competitions reaches (every club then reads the same).
  */
-function statureOf(strength: number, hype: number): number {
+export function clubWealth(competitions: readonly Competition[], compId: number, reputation: number): number {
+  if (!competitions.some((c) => c.id === compId)) return 0;
+  // Its league's money scale, times how big a name it is on the WORLD scale
+  // (reputation, 0-100), between half and all of it. Club-level, so a famous
+  // club reads richer than an unknown one in the same division, and never
+  // ranked within its own league: players shop clubs across the whole world.
+  // Hype is deliberately not used: it is ranked within a club's own division
+  // (points and finish there), so the top of every league would read equally
+  // rich, which is the bug stature had before reputation.
+  const name = clamp01(reputation / REPUTATION_MAX);
+  return clamp01(financeScale([...competitions], compId) * (0.5 + 0.5 * name));
+}
+
+/** The weighted, normalized parts of a club's stature. */
+export function statureParts(strength: number, reputation: number, wealth: number): StatureParts {
   const strengthNorm = clamp01(
     (strength - STATURE_STRENGTH_LO) / (STATURE_STRENGTH_HI - STATURE_STRENGTH_LO),
   );
-  const hypeNorm = clamp01(hype / HYPE_MAX);
-  return STATURE_W_STRENGTH * strengthNorm + STATURE_W_HYPE * hypeNorm;
+  const reputationNorm = clamp01(reputation / REPUTATION_MAX);
+  return {
+    strength: STATURE_W_STRENGTH * strengthNorm,
+    reputation: STATURE_W_REPUTATION * reputationNorm,
+    wealth: STATURE_W_WEALTH * clamp01(wealth),
+  };
+}
+
+/**
+ * A club's world stature, [0,1]: how good a club is, read from the club itself
+ * (squad quality against an absolute band, its earned reputation, its own
+ * wealth), never from a regional label. See ClubContext.stature for why this
+ * one normalization is global rather than per-competition.
+ */
+export function statureOf(strength: number, reputation: number, wealth: number): number {
+  const parts = statureParts(strength, reputation, wealth);
+  return parts.strength + parts.reputation + parts.wealth;
 }
 
 /** Clamp into [0,1]. */
@@ -196,8 +242,8 @@ function clamp01(x: number): number {
  * league-wide context map would be wasteful. Identical result to the `stature`
  * field on that club's ClubContext.
  */
-export function clubStature(roster: Player[], hype: number): number {
-  return statureOf(squadStrength(roster), hype);
+export function clubStature(roster: Player[], reputation: number, wealth: number): number {
+  return statureOf(squadStrength(roster), reputation, wealth);
 }
 
 /**
@@ -209,14 +255,19 @@ export function clubStature(roster: Player[], hype: number): number {
  * save). The transfer pages are INP-sensitive — precompute once, look up per
  * row.
  */
-export function clubStatures(teams: StoredTeam[], players: Player[]): Map<number, number> {
+export function clubStatures(
+  teams: StoredTeam[],
+  players: Player[],
+  /** Required, not defaulted: wealth reads it, and a screen that left it out would show a different stature from the one the AI decides on. */
+  competitions: readonly Competition[],
+): Map<number, number> {
   const byPid = new Map(players.map((p) => [p.pid, p]));
   const out = new Map<number, number>();
   for (const t of teams) {
     const roster = t.roster
       .map((pid) => byPid.get(pid))
       .filter((p): p is Player => p != null);
-    out.set(t.tid, clubStature(roster, t.hype));
+    out.set(t.tid, clubStature(roster, teamReputation(t), clubWealth(competitions, t.compId, teamReputation(t))));
   }
   return out;
 }
@@ -272,6 +323,7 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
       compId: t.compId,
       budget: t.budget,
       hype: t.hype,
+      reputation: teamReputation(t),
       strength: squadStrength(roster),
       avgAge: mean(roster.map((p) => league.season - p.born)),
       depth,
@@ -352,7 +404,8 @@ export function deriveLeagueContexts(league: LeagueSnapshot): Map<number, ClubCo
         posSecondBestOvr: r.secondBest,
         posWeakestStarterOvr: r.weakestStarter,
         hype: r.hype,
-        stature: statureOf(r.strength, r.hype),
+        stature: statureOf(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId, r.reputation)),
+        statureParts: statureParts(r.strength, r.reputation, clubWealth(league.competitions ?? [], r.compId, r.reputation)),
         home: homes.get(r.tid),
         ambition,
         frugality,

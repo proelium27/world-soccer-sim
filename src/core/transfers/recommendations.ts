@@ -20,6 +20,7 @@ import {
 import { refusesMove } from "./playerWill.js";
 import { worldRules } from "../foreignRules.js";
 import { clubStatures } from "../ai/clubContext.js";
+import { playerChoice, type PlayerChoice } from "./playerChoice.js";
 import {
   RECOMMENDED_TRANSFERS_MIN, RECOMMENDED_TRANSFERS_MAX,
   RECOMMENDED_OVR_BELOW, RECOMMENDED_OVR_ABOVE, RECOMMENDED_BAND_WIDEN,
@@ -120,7 +121,7 @@ export function recommendedTransfers(
   );
 
   // Precomputed once — see clubStatures; calling per player would be quadratic.
-  const statures = clubStatures(league.teams, league.players);
+  const statures = clubStatures(league.teams, league.players, league.competitions);
   const userStature = statures.get(user.tid) ?? 0;
   const reg = worldRules(league.teams, league.competitions, (pid) => playerMap.get(pid), league.season)
     .forSquad(user.tid, user.roster);
@@ -128,6 +129,7 @@ export function recommendedTransfers(
   // Nor is anyone who has already moved clubs this window — the offer engine
   // would refuse him, and a recommendation it refuses is a dead end.
   const moved = movedThisWindow(league.transfers, ws.season, ws.window);
+  let choice: PlayerChoice | undefined;
 
   const candidates: TransferTarget[] = [];
   for (const team of league.teams) {
@@ -149,6 +151,13 @@ export function recommendedTransfers(
       // Nor anyone the user's league rules would stop him registering.
       if (reg.block(player) !== null) continue;
       if (!isForSale(team, playerMap, pid) && !wouldRefuseExtension(player, team, league.competitions)) continue;
+      // Nor anyone who'd rather not come (Reluctant): the offer engine turns
+      // the bid down for him. Last, being the costliest check.
+      choice ??= playerChoice({
+        teams: league.teams, players: league.players, competitions: league.competitions,
+        season: league.season, played: league.played,
+      }, user.tid);
+      if (choice.reluctant(player, team.tid)) continue;
       if (departsAtRollover(league, player)) continue;
       const value = scoutedValue(
       league.lid, ws.season, ws.window, player, user.scoutingSpend,
@@ -279,11 +288,12 @@ export function saleGateFor(
     userProtectedStarBar(league.difficulty),
   );
   const protectedReason = protectedStarReason(league.difficulty);
-  const statures = clubStatures(league.teams, league.players);
+  const statures = clubStatures(league.teams, league.players, league.competitions);
   const userStature = statures.get(user.tid) ?? 0;
   // The user's squad against its league's registration rules, counted once.
   const reg = worldRules(league.teams, league.competitions, (pid) => playerMap.get(pid), league.season)
     .forSquad(user.tid, user.roster);
+  let choice: PlayerChoice | undefined;
 
   return (player, team) => {
     if (loanedPids.has(player.pid)) return "Out on loan";
@@ -301,6 +311,13 @@ export function saleGateFor(
     if (refusesMove(player.ovr, statures.get(team.tid) ?? 0, userStature)) {
       return "Wouldn't drop to a club this size";
     }
+    // Mirrors makeTransferOffer's reluctance gate (playerChoice.ts). Built on
+    // first use: most lists stop at a sale gate above this line.
+    choice ??= playerChoice({
+      teams: league.teams, players: league.players, competitions: league.competitions,
+      season: league.season, played: league.played,
+    }, user.tid);
+    if (choice.reluctant(player, team.tid)) return "Doesn't want to join you";
     // Mirrors makeTransferOffer's registration gate (foreignRules.ts).
     const blocked = reg.block(player);
     if (blocked) return blocked;

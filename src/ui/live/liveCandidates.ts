@@ -11,7 +11,7 @@
  */
 import type { LeagueStore } from "../../core/leagueState.js";
 import type { PlayedMatch } from "../../core/standings.js";
-import type { CupState } from "../../core/cup/types.js";
+import type { CupState, CupTie } from "../../core/cup/types.js";
 import { competitionOf, competitionSplit } from "../../core/competitions.js";
 import { cupRoundName, koRoundsOf, openingStageName } from "../../core/cup/cup.js";
 import type { DomesticCupState } from "../../core/domesticCup/types.js";
@@ -47,6 +47,22 @@ export interface LiveCandidate {
   key: "league" | "cup" | "domestic";
   choice: LiveChoice;
   view: LiveView;
+}
+
+/**
+ * A finished tie's extra time and shootout, as the viewer wants them. `swapped`
+ * is for a second leg shown with the clubs the other way round, which is where
+ * it was played, so the shootout has to turn round with it.
+ */
+function tieFinish(t: CupTie, swapped = false): Pick<LiveMatch, "extraTimeClock" | "penalties"> {
+  return {
+    extraTimeClock: t.boxScore?.extraTimeClock,
+    penalties: t.wentToPens
+      ? swapped
+        ? { home: t.awayPens, away: t.homePens }
+        : { home: t.homePens, away: t.awayPens }
+      : undefined,
+  };
 }
 
 /** "at home to Kestrel City" / "away to Kestrel City", from the user's side. */
@@ -203,6 +219,7 @@ function cupCandidate(
         events: t.boxScore!.events,
         finalClock: t.boxScore!.finalClock,
         firstHalfStoppage: t.boxScore!.firstHalfStoppage,
+        ...tieFinish(t),
       });
       return build(
         asLive(ours),
@@ -246,7 +263,14 @@ function cupCandidate(
       twoLegged(t)
         ? // Leg 2 is played at the other ground, so the clubs swap and the
           // events already use that orientation — no flipping needed.
-          { home: t.away, away: t.home, matchday, events: splitTwoLeggedEvents(t.boxScore!.events)[1] }
+          // Extra time follows on from leg 2, so its events are in there too.
+          {
+            home: t.away,
+            away: t.home,
+            matchday,
+            events: splitTwoLeggedEvents(t.boxScore!.events)[1],
+            ...tieFinish(t, true),
+          }
         : {
             home: t.home,
             away: t.away,
@@ -254,6 +278,7 @@ function cupCandidate(
             events: t.boxScore!.events,
             finalClock: t.boxScore!.finalClock,
             firstHalfStoppage: t.boxScore!.firstHalfStoppage,
+            ...tieFinish(t),
           };
     const round = cupRoundName(ours.round, koRounds);
     return build(
@@ -300,6 +325,7 @@ function domesticCandidate(
       events: t.boxScore!.events,
       finalClock: t.boxScore!.finalClock,
       firstHalfStoppage: t.boxScore!.firstHalfStoppage,
+      ...tieFinish(t),
     });
     const subtitle = domesticRoundName(cup, round.round);
     return {

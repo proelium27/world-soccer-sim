@@ -5,7 +5,9 @@ import { MemoryRouter } from "react-router-dom";
 import { makeLeague } from "../helpers/league.js";
 import { ACADEMY_GRADUATION_AGE, ACADEMY_ROSTER_CAP } from "../../src/core/constants.js";
 import { freeAgentPids } from "../../src/core/freeAgency.js";
+import { playerChoice } from "../../src/core/transfers/playerChoice.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
+import type { Player } from "../../src/core/players/types.js";
 
 /**
  * The Free Agents page offers an academy signing for anyone young enough.
@@ -29,26 +31,35 @@ function render(league: LeagueStore): string {
   return renderToStaticMarkup(createElement(MemoryRouter, null, createElement(FreeAgents)));
 }
 
-/** A league whose free-agent pool is a handful of young players, so they make the list. */
+/**
+ * A league whose free-agent pool is a handful of young players who would pick
+ * the user's club. Players choose where they sign (clubReputation Stage 2), so
+ * a prospect an AI club wants more shows "Prefers <club>" instead of a button;
+ * the fixture releases kids with no such rival.
+ */
 function youngPool(): LeagueStore {
   const league = makeLeague(0, 5);
   const fa = freeAgentPids(league.teams, league.players, league.activeLoans);
-  // Release a few of another club's youngest players into free agency.
-  const donor = league.teams.find((t) => t.tid !== league.meta.userTid)!;
-  const young = donor.roster
-    .map((pid) => league.players.find((p) => p.pid === pid)!)
-    .filter((p) => league.season - p.born < ACADEMY_GRADUATION_AGE)
-    .slice(0, 3)
-    .map((p) => p.pid);
-  const keep = new Set(young);
-  return {
+  // Add young free agents rather than releasing rostered ones: a fresh world
+  // has no surplus anywhere, so a release leaves his club short, and then it
+  // wants him back more than anyone (Stage 2: players choose where they sign).
+  let nextPid = Math.max(...league.players.map((p) => p.pid)) + 1;
+  const copies = league.players
+    .filter((p) => !fa.has(p.pid) && league.season - p.born < ACADEMY_GRADUATION_AGE)
+    .map((p): Player => ({ ...p, pid: nextPid++, stats: [] }));
+  const withCopies: LeagueStore = {
     ...league,
-    // Only the young releases (plus whatever older free agents exist) are unsigned.
-    players: league.players.filter((p) => !fa.has(p.pid) || keep.has(p.pid)),
-    teams: league.teams.map((t) => (t.tid === donor.tid
-      ? { ...t, roster: t.roster.filter((pid) => !keep.has(pid)) }
-      : t)),
+    // Only the added copies are unsigned.
+    players: [...league.players.filter((p) => !fa.has(p.pid)), ...copies],
   };
+  const choice = playerChoice({
+    teams: withCopies.teams, players: withCopies.players, competitions: withCopies.competitions,
+    season: withCopies.season, played: withCopies.played,
+  }, withCopies.meta.userTid);
+  const copyPids = new Set(copies.map((p) => p.pid));
+  const keep = new Set(copies.filter((p) => choice.freeAgentRival(p) === null).slice(0, 5).map((p) => p.pid));
+  if (keep.size === 0) throw new Error("fixture: no young free agent would pick the user");
+  return { ...withCopies, players: withCopies.players.filter((p) => !copyPids.has(p.pid) || keep.has(p.pid)) };
 }
 
 describe("Free Agents academy signing", () => {

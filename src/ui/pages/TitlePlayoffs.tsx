@@ -28,7 +28,9 @@ function allTitlePlayoffs(
 function formatSummary(format: TitlePlayoff["format"]): string {
   switch (format) {
     case "two-legged":
-      return "two legs a round; a level tie goes to the higher-placed club, except in the final";
+      return "top eight, two legs a round, reseeded after the quarter-finals; a level tie goes to the higher seed, except in the final";
+    case "liguilla":
+      return "top six plus a play-in for 7th to 10th, then two legs a round, reseeded after the quarter-finals; a level tie goes to the higher seed, except in the final";
     case "conference":
       return "top nine in each conference: a wild card, a best-of-three first round (games 1 and 3 at the higher seed), then one-off games to the final";
     case "conference-single":
@@ -57,6 +59,7 @@ export function TitlePlayoffs() {
   const { league } = useLeague();
   const [countrySel, setCountrySel] = useState<string | null>(null);
   const [seasonSel, setSeasonSel] = useState<number | null>(null);
+  const [compSel, setCompSel] = useState<number | null>(null);
 
   if (!league) return <p className="p-3">Loading...</p>;
 
@@ -64,8 +67,8 @@ export function TitlePlayoffs() {
     <HelpHint>
       Some leagues don&apos;t give the title to whoever tops the table. Once the last matchday is
       played, their best clubs go into a knockout and the winner is the champion. Mexico takes the
-      top eight over two legs a round, and a quarter-final or semi-final that&apos;s level on
-      aggregate goes to the better-placed club. The US takes the top nine in each conference:
+      top eight over two legs a round, reseeds after the quarter-finals, and gives a quarter-final
+      or semi-final that&apos;s level on aggregate to the higher seed. The US takes the top nine in each conference:
       eighth plays ninth for a wild card, the first round is best of three, and the two conference
       champions meet in the final. Argentina takes the top eight in each zone and pairs first in one
       zone with eighth in the other. The table still decides prize money, continental places and
@@ -99,12 +102,17 @@ export function TitlePlayoffs() {
   }
 
   const userTid = league.meta.userTid;
-  const userCountry = league.competitions.find(
-    (c) => c.id === league.teams.find((t) => t.tid === userTid)?.compId,
-  )?.country;
+  const userCompId = league.teams.find((t) => t.tid === userTid)?.compId;
+  const userCountry = league.competitions.find((c) => c.id === userCompId)?.country;
   const countries = [...new Set(playoffs.map((p) => p.country))].sort();
   const country = countrySel ?? (userCountry && countries.includes(userCountry) ? userCountry : countries[0]);
-  const forCountry = playoffs.filter((p) => p.country === country);
+  // A country can hold one a division (Liga MX and Liga de Expansión, MLS and
+  // the USL), top flight first.
+  const tierOf = (compId: number) => league.competitions.find((c) => c.id === compId)?.tier ?? 99;
+  const divisions = [...new Set(playoffs.filter((p) => p.country === country).map((p) => p.compId))]
+    .sort((a, b) => tierOf(a) - tierOf(b));
+  const compId = divisions.find((d) => d === (compSel ?? userCompId)) ?? divisions[0];
+  const forCountry = playoffs.filter((p) => p.country === country && p.compId === compId);
   const seasons = [...new Set(forCountry.map((p) => p.season))];
   const season = seasons.find((s) => s === seasonSel) ?? seasons[0];
   const playoff = forCountry.find((p) => p.season === season)!;
@@ -249,6 +257,9 @@ export function TitlePlayoffs() {
   const splitByConference = (playoff.format === "conference" || playoff.format === "conference-single")
     && !!playoff.conferences;
   const zoned = playoff.format === "zones" && !!playoff.conferences;
+  const liguilla = playoff.format === "liguilla" || playoff.format === "two-legged";
+  const quarterFinals = playoff.format === "liguilla" ? 1 : 0;
+  const playIn = playoff.format === "liguilla" ? tiesIn(0) : [];
   const treeRounds = [...new Set(playoff.ties.map((t) => t.round))].sort((a, b) => a - b);
 
   return (
@@ -260,10 +271,23 @@ export function TitlePlayoffs() {
           className="form-select form-select-sm"
           style={{ width: "auto" }}
           value={country}
-          onChange={(e) => { setCountrySel(e.target.value); setSeasonSel(null); }}
+          onChange={(e) => { setCountrySel(e.target.value); setCompSel(null); setSeasonSel(null); }}
         >
           {countries.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
+        {divisions.length > 1 && (
+          <select
+            className="form-select form-select-sm"
+            style={{ width: "auto" }}
+            value={compId}
+            aria-label="Division"
+            onChange={(e) => { setCompSel(Number(e.target.value)); setSeasonSel(null); }}
+          >
+            {divisions.map((d) => (
+              <option key={d} value={d}>{competitionOf(league.competitions, d).name}</option>
+            ))}
+          </select>
+        )}
         <select
           className="form-select form-select-sm"
           style={{ width: "auto" }}
@@ -360,6 +384,22 @@ export function TitlePlayoffs() {
             </div>
           </section>
         </>
+      ) : liguilla ? (
+        // The play-in feeds the quarter-finals the way MLS's wild card feeds
+        // round one. The Liguilla reseeds after the quarter-finals, so no line
+        // is drawn into the semi-finals: the tie above a semi-final isn't
+        // necessarily one that fed it.
+        <div className="cup-bracket cup-bracket--tree">
+          {playIn.length > 0 && bracketRound({
+            key: "play-in", title: roundName(0), ties: playIn,
+            depth: null, linked: false, isFinal: false, withHalf: false, rows: playIn.length,
+          })}
+          {treeRounds.filter((round) => round >= quarterFinals).map((round) => bracketRound({
+            key: round, title: roundName(round), ties: tiesIn(round),
+            depth: round - quarterFinals, linked: round === finalRound,
+            isFinal: round === finalRound, withHalf: false,
+          }))}
+        </div>
       ) : (
         <div className="cup-bracket cup-bracket--tree">
           {treeRounds.map((round) => bracketRound({

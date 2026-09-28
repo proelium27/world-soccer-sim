@@ -203,8 +203,16 @@ export function inboundOfferCandidates(league: LeagueStore): InboundOfferCandida
       // user's won't get anywhere near his reservation, so no more insulting
       // bids from minnows for the user's best player.
       const appealed = rawCeiling * moveAppealBetween(player, userCtx, buyerCtx);
-      const ceiling = Math.min(appealed, buyerSpendable(buyer, buyerCtx, wageCharge));
-      if (ceiling < reservation * (1 + minSurplus)) continue;
+      const spendable = buyerSpendable(buyer, buyerCtx, wageCharge);
+      // Whether the club bids reads the player's view; what it will pay does
+      // not. A player keen on the move doesn't raise the price (if anything a
+      // player pushing to leave weakens his club's hand), so the ceiling is the
+      // lower of the two valuations, never below the bar that made it bid.
+      if (Math.min(appealed, spendable) < reservation * (1 + minSurplus)) continue;
+      const ceiling = Math.min(
+        spendable,
+        Math.max(reservation * (1 + minSurplus), Math.min(appealed, rawCeiling)),
+      );
       const candidate: InboundOfferCandidate = {
         player,
         buyerTid: buyer.tid,
@@ -300,8 +308,11 @@ export function inboundCeiling(league: LeagueStore, pid: number): number | null 
   const userCtx = contexts.get(league.meta.userTid);
   if (!buyerCtx || !userCtx) return null;
   const wageCharge = acquisitionWageCharge(league, player);
+  // The player's view can only lower what the buyer will pay (see the offer
+  // builder above), never raise it.
+  const value = valueToClub(player, buyerCtx);
   const live = Math.min(
-    valueToClub(player, buyerCtx) * moveAppealBetween(player, userCtx, buyerCtx),
+    Math.min(value, value * moveAppealBetween(player, userCtx, buyerCtx)),
     buyerSpendable(buyer, buyerCtx, wageCharge),
   );
   return Math.max(live, resolved.offers.at(-1) ?? 0);

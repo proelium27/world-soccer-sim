@@ -100,8 +100,9 @@ describe("Club season page render", () => {
     expect(html).toContain("Domestic cup");
     expect(html).toContain("Continental Cup");
     expect(html).toContain("Continental Shield");
-    // The end-of-season caveat has to be on the page, not just in the code.
-    expect(html).toContain("finished the season here");
+    // How the squad was built (everyone in it that season, a mid-season mover
+    // at both clubs) has to be on the page, not just in the code.
+    expect(html).toContain("shows up at both clubs");
     expect(html).not.toContain("In progress");
   });
 

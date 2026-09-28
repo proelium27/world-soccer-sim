@@ -8,7 +8,7 @@ import {
   normalizeLeagueSpec, maxDivisionTeams, maxCrossRounds, titlePlayoffHalfNeed,
 } from "../../core/competitions.js";
 import {
-  MAX_PROMOTION_SPOTS, AMERICAS_CUP_LEAGUE_SLOTS,
+  MAX_PROMOTION_SPOTS, AMERICAS_CUP_LEAGUE_SLOTS, LIGUILLA_TEAMS,
   type PlayoffFormat, type ContinentalRegion, type TitlePlayoffFormat, type ConferenceFormat,
 } from "../../core/constants.js";
 import { REGION_LABELS, REGION_ORDER, groupByRegion } from "../continents.js";
@@ -716,6 +716,7 @@ const TITLE_PLAYOFF_OPTIONS: { value: TitlePlayoffFormat; label: string }[] = [
   { value: "none", label: "Top of the table" },
   { value: "single", label: "Top-8 playoff, one game a round" },
   { value: "two-legged", label: "Top-8 playoff, home and away" },
+  { value: "liguilla", label: "Top-10 with a play-in, home and away" },
   { value: "conference", label: "Conference playoffs, top 9 of each half" },
   { value: "zones", label: "Zone playoffs, top 8 of each half" },
 ];
@@ -1129,8 +1130,10 @@ export function LeagueSettings({
           >
             {TITLE_PLAYOFF_OPTIONS.map((o) => {
               const need = titlePlayoffHalfNeed(o.value);
-              const fits = need === 0
-                || (!!resolved.conferences[0] && Math.floor(resolved.d1Teams / 2) >= need);
+              const fits = o.value === "liguilla"
+                ? resolved.d1Teams >= LIGUILLA_TEAMS
+                : need === 0
+                  || (!!resolved.conferences[0] && Math.floor(resolved.d1Teams / 2) >= need);
               return (
                 <option key={o.value} value={o.value} disabled={!fits}>{o.label}</option>
               );

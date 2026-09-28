@@ -12,10 +12,13 @@
 import type { MatchEvent, MatchEventType } from "../../engine/attribution.js";
 import type { MatchScore, PlayedMatch, StandingsRow } from "../../core/standings.js";
 import { computeStandings, type StandingsSplit } from "../../core/standings.js";
-import { eventMinute, REGULATION_MINUTES } from "../matchClock.js";
+import { eventMinute, extraTimeEndMinute, REGULATION_MINUTES } from "../matchClock.js";
 
 export {
   eventMinute,
+  extraTimeEndMinute,
+  extraTimeStartMinute,
+  EXTRA_TIME_HALF_MINUTES,
   formatClock,
   halfTimeMinute,
   matchMinuteLabel,
@@ -48,6 +51,16 @@ export interface LiveMatch {
    * had none.
    */
   firstHalfStoppage?: number;
+  /**
+   * Where extra time kicked off, when the match had any. See
+   * `BoxScore.extraTimeClock`; playback runs on to the 120th when it is set.
+   */
+  extraTimeClock?: number;
+  /**
+   * The shootout, when a level tie went to one, in this match's orientation.
+   * Kicks are not events (see playShootout), so this is all there is to show.
+   */
+  penalties?: LiveScore;
 }
 
 /** A league fixture as something the viewer can play. */
@@ -59,6 +72,7 @@ export function toLiveMatch(m: PlayedMatch): LiveMatch {
     events: m.boxScore.events,
     finalClock: m.boxScore.finalClock,
     firstHalfStoppage: m.boxScore.firstHalfStoppage,
+    extraTimeClock: m.boxScore.extraTimeClock,
   };
 }
 
@@ -72,8 +86,10 @@ export function toLiveMatch(m: PlayedMatch): LiveMatch {
  * still on the pitch was credited only as far as the last thing that happened.
  * See `liveRatings`, which has to reproduce the stored minutes exactly.
  */
-export function finalMinute(events: MatchEvent[], finalClock?: number): number {
+export function finalMinute(events: MatchEvent[], finalClock?: number, extraTimeClock?: number): number {
   let last = REGULATION_MINUTES;
+  // Extra time is played to the 120th whether or not anything happens late in it.
+  if (extraTimeClock !== undefined) last = Math.max(last, extraTimeEndMinute(extraTimeClock));
   if (finalClock !== undefined) {
     const m = eventMinute(finalClock);
     if (m > last) last = m;
@@ -194,9 +210,10 @@ export function statsAtMinute(
  * score lurching about. The legs are concatenated rather than interleaved,
  * though, so the boundary is the single point where the clock jumps back up.
  *
- * Safe because extra time contributes **no events** (it only updates player
- * lines), so nothing follows leg 2 to confuse the split. A single-leg tie has
- * no such jump and comes back as one leg and an empty second.
+ * Extra time's events follow leg 2 and carry on DOWN the clock past its
+ * whistle (see BoxScore.extraTimeClock), so they land in the second leg, which
+ * is where they were played, and never make a second jump. A single-leg tie has
+ * no jump at all and comes back as one leg and an empty second.
  *
  * Note leg 2 is played at the other ground, so its events use the reversed
  * orientation: `side: "home"` there means the tie's *away* club. Callers show

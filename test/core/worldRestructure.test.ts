@@ -102,6 +102,8 @@ describe("changing the world's shape at the rollover", () => {
     const created = league.teams.filter((t) => !oldTids.has(t.tid));
     expect(created).toHaveLength(12);
     expect(new Set(league.teams.map((t) => t.name)).size).toBe(league.teams.length);
+    // Seeded like world creation seeds them, not left to fall back to hype.
+    for (const t of created) expect(t.reputation, `club ${t.tid} reputation`).toBeTypeOf("number");
     const mu = league.competitions.find((c) => c.country === "Mu")!;
     const muPlayers = league.teams.filter((t) => t.compId === mu.id).flatMap((t) => t.roster)
       .map((pid) => league.players.find((p) => p.pid === pid)!);

@@ -61,6 +61,7 @@ import { buildCompetitionSchedule } from "./schedule.js";
 import { assignConferences } from "./conferences.js";
 import { applyPendingCompetitions } from "./worldEdit.js";
 import { isStructuralChange, isValidRestructure, restructureWorld } from "./worldRestructure.js";
+import { seedReputations } from "./teams/reputationSeed.js";
 import { updateHype } from "./finance/hype.js";
 import {
   settleSeasonEnd, chargeSeasonStart, wageBill, financeScaleFor, clampBudget,
@@ -78,6 +79,9 @@ import { simThroughInternational, confederationCupChampions } from "./internatio
 import { reviewNationalCampaign } from "./nationalManager/index.js";
 import { carryIntlInjuries } from "./injuries.js";
 import { hashInts, mulberry32 } from "../engine/rng.js";
+import {
+  reputationTarget, finishScore, continentalScore, stepReputation, teamReputation,
+} from "./teams/reputation.js";
 import {
   NEWS_POSITION_CHANGE_OVR, CONTINENTAL_CUP_FORMAT, SHIELD_FORMAT, AMERICAS_CUP_FORMAT, difficultyProfile,
   USER_ACADEMY_INTAKE_MIN, USER_ACADEMY_INTAKE_MAX, USER_ACADEMY_ENTRY_AGE,
@@ -752,6 +756,45 @@ export function simOffseasonReporting(
   teams = assignConferences(teams, league.competitions);
   teams = stepAcademyBaseConvergence(teams, league.competitions);
 
+  // 3.61. Club reputation (core/teams/reputation.ts): each club moves part of
+  //       the way toward what the season just finished earned it — its finish
+  //       in the division it played in (pre-swap), a title, the domestic cup,
+  //       its continental runs, promotion or relegation. Run here because the
+  //       swap has just decided promotion/relegation and the cups are still the
+  //       finished ones. Zero rng draws: every input is a table or a result.
+  {
+    const compById = new Map(league.competitions.map((c) => [c.id, c]));
+    const rankIn = new Map<number, { rank: number; size: number }>();
+    for (const [, table] of tablesByCompId) {
+      table.forEach((row, i) => rankIn.set(row.tid, { rank: i + 1, size: table.length }));
+    }
+    const domesticWinners = new Set(
+      (league.domesticCups ?? []).map((c) => c.championTid).filter((t): t is number => t != null),
+    );
+    const continental = [league.cup, league.shield, league.americasCup ?? null];
+    teams = teams.map((t) => {
+      const before = compById.get(compIdBeforeSwaps.get(t.tid) ?? t.compId);
+      const after = compById.get(t.compId);
+      const place = rankIn.get(t.tid);
+      if (!before || !place) return t;
+      const beforeId = before.id;
+      const target = reputationTarget({
+        finish: finishScore(before, place.rank, place.size),
+        // Every division has a champion: a top flight's recorded one, a lower
+        // division's title-playoff winner, else whoever topped its table (the
+        // Championship is a title as well as a promotion).
+        champion: before.tier === 1
+          ? championTidByCompId[beforeId] === t.tid
+          : (lowerChampionTidByCompId[beforeId] ?? tablesByCompId.get(beforeId)?.[0]?.tid) === t.tid,
+        domesticCup: domesticWinners.has(t.tid),
+        continental: continental.reduce((sum, cup) => sum + continentalScore(cup, t.tid), 0),
+        promoted: !!after && after.tier < before.tier,
+        relegated: !!after && after.tier > before.tier,
+      });
+      return { ...t, reputation: stepReputation(teamReputation(t), target) };
+    });
+  }
+
   // 3.65. League settings queued in God Mode take over here: after the swap
   //       above (settled under the rules the season was played by) and before
   //       free agency, youth intake, the market, the schedule and the cup
@@ -784,6 +827,9 @@ export function simOffseasonReporting(
         compIdBeforeSwaps,
       });
       ({ teams, players, activeLoans } = r);
+      // New clubs get the reputation world creation would have given them: where
+      // their squad ranks in their division. Clubs that have one keep it.
+      teams = seedReputations(teams, r.competitions, players);
       const gone = r.dissolved;
       league = {
         ...rest,

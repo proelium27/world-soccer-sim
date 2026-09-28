@@ -1083,6 +1083,14 @@ export interface StoredTeam {
   /** Fame/popularity, 0-100; drives a damped ticket/jersey revenue channel. */
   hype: number;
   /**
+   * Club reputation, 0-100 on one world scale: a slow-moving record of what the
+   * club has won and where it plays (core/teams/reputation.ts). Feeds stature,
+   * i.e. how players see the club. Hype stays for finance. Optional: seeded at
+   * world creation, roster import and migration, then stepped every offseason.
+   * Read it through `teamReputation`.
+   */
+  reputation?: number;
+  /**
    * The scouting spend locked in for the *current* season: deducted from
    * budget at season-end settlement, lowers transfer valuation noise, and
    * sharpens the user's potential fog-of-war (see potentialFog.ts). Only
