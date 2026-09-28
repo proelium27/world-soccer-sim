@@ -4,7 +4,9 @@ import type { LeagueStore } from "../../core/leagueState.js";
 import type { ProgressionModel, WorldCupSize } from "../../core/constants.js";
 import { isCustomAwardFormula, resolveAwardFormula, type AwardFormula } from "../../core/awardFormula.js";
 import { isDefaultContinentalFormat, sanitizeContinentalFormat, type ContinentalFormatSettings } from "../../core/cup/cupShape.js";
-import { queueCountryEdit, discardCountryEdit } from "../../core/worldEdit.js";
+import {
+  queueCountryEdit, discardCountryEdit, queueAddCountry, queueRemoveCountry, userCountryOf, withQueue,
+} from "../../core/worldEdit.js";
 import type { LeagueSpec } from "../../core/competitions.js";
 import type { ForeignRule } from "../../core/foreignRules.js";
 import type { CupCompetitionId } from "../../core/constants.js";
@@ -190,6 +192,10 @@ interface LeagueContextValue {
   godModeQueueLeagueEditAction: (country: string, spec: LeagueSpec, foreignRules: ForeignRule[] | null) => Promise<void>;
   /** Drop one country's queued league settings. */
   godModeDiscardLeagueEditAction: (country: string) => Promise<void>;
+  /** Queue a new country's league for next season (clubs are generated at the rollover). */
+  godModeAddLeagueAction: (spec: LeagueSpec, replacing?: string | null) => Promise<void>;
+  /** Queue a country's league for removal at the rollover (its clubs fold). */
+  godModeRemoveLeagueAction: (country: string) => Promise<void>;
   /** Set how many nations the World Cup takes, from the next qualifying draw on. */
   setWorldCupSizeAction: (size: WorldCupSize) => Promise<void>;
   movePlayerToClubAction: (pid: number, tid: number) => Promise<void>;
@@ -1198,14 +1204,29 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const godModeQueueLeagueEditAction = useCallback(
     (country: string, spec: LeagueSpec, foreignRules: ForeignRule[] | null) => mutate((l) => {
       if (!l.godMode) return null;
-      const next = queueCountryEdit(l.competitions, l.pendingCompetitions, country, spec, foreignRules);
-      if (next === null) return null;
-      if (next === undefined) {
-        if (!l.pendingCompetitions) return null;
-        const { pendingCompetitions: _dropped, ...without } = l;
-        return without;
-      }
-      return { ...l, pendingCompetitions: next };
+      const next = queueCountryEdit(
+        l.competitions, l.pendingCompetitions, country, spec, foreignRules, l.retiredCompetitions ?? [],
+      );
+      return withQueue(l, next);
+    }),
+    [mutate],
+  );
+
+  const godModeAddLeagueAction = useCallback(
+    (spec: LeagueSpec, replacing: string | null = null) => mutate((l) => {
+      if (!l.godMode) return null;
+      return withQueue(l, queueAddCountry(
+        l.competitions, l.pendingCompetitions, l.retiredCompetitions ?? [], spec, replacing,
+      ));
+    }),
+    [mutate],
+  );
+
+  const godModeRemoveLeagueAction = useCallback(
+    (country: string) => mutate((l) => {
+      // The user's own country can't go: their club would have nowhere to play.
+      if (!l.godMode || userCountryOf(l) === country) return null;
+      return withQueue(l, queueRemoveCountry(l.competitions, l.pendingCompetitions, country));
     }),
     [mutate],
   );
@@ -1424,6 +1445,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSetContinentalFormatAction,
     godModeQueueLeagueEditAction,
     godModeDiscardLeagueEditAction,
+    godModeAddLeagueAction,
+    godModeRemoveLeagueAction,
     setWorldCupSizeAction,
     releasePlayerGodModeAction,
     editPlayerAction,
@@ -1461,6 +1484,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSetContinentalFormatAction,
     godModeQueueLeagueEditAction,
     godModeDiscardLeagueEditAction,
+    godModeAddLeagueAction,
+    godModeRemoveLeagueAction,
     setWorldCupSizeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
     setClubInterestAction, setNationInterestAction,

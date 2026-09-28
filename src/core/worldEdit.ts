@@ -210,18 +210,26 @@ export function canAddCountry(
     && ![...live, ...(pending ?? [])].some((c) => c.country.trim().toLowerCase() === name);
 }
 
-/** Queue a brand-new country's league, built from a spec like the new-save screen's. */
+/**
+ * Queue a brand-new country's league, built from a spec like the new-save
+ * screen's. `replacing` names a league added earlier and not yet played (only
+ * in the queue): it is swapped for this one, which is how such a league is
+ * edited before its first season, strength and all.
+ */
 export function queueAddCountry(
   live: readonly Competition[],
   pending: readonly Competition[] | undefined,
   retired: readonly Competition[],
   spec: LeagueSpec,
+  replacing: string | null = null,
 ): Competition[] | undefined | null {
   const clean = normalizeLeagueSpec({ ...spec, country: spec.country.trim() });
-  if (!canAddCountry(live, pending, clean.country)) return null;
+  if (replacing !== null && live.some((c) => c.country === replacing)) return null;
+  const base = (pending ?? live).filter((c) => replacing === null || c.country !== replacing);
+  if (!canAddCountry(live, base, clean.country)) return null;
   const first = nextCompetitionId(live, pending, retired);
   const built = buildCompetitions([clean]).map((c, i) => ({ ...c, id: first + i }));
-  return settle(live, [...(pending ?? live), ...built]);
+  return settle(live, [...base, ...built]);
 }
 
 /** Queue a country's removal: every one of its clubs folds at the rollover. */
@@ -327,4 +335,31 @@ export function everyCompetition(league: {
   retiredCompetitions?: readonly Competition[];
 }): Competition[] {
   return [...league.competitions, ...(league.retiredCompetitions ?? [])];
+}
+
+/**
+ * A save with its queue set to `next`, as the God Mode actions store it: null
+ * (the edit didn't fit) changes nothing, undefined clears the queue.
+ */
+export function withQueue<L extends { pendingCompetitions?: Competition[] }>(
+  league: L,
+  next: Competition[] | undefined | null,
+): L | null {
+  if (next === null) return null;
+  if (next === undefined) {
+    if (!league.pendingCompetitions) return null;
+    const { pendingCompetitions: _dropped, ...without } = league;
+    return without as L;
+  }
+  return { ...league, pendingCompetitions: next };
+}
+
+/** The country whose league the user's club plays in, or null for a spectator. */
+export function userCountryOf(league: {
+  competitions: readonly Competition[];
+  teams: readonly { tid: number; compId: number }[];
+  meta: { userTid: number };
+}): string | null {
+  const team = league.teams.find((t) => t.tid === league.meta.userTid);
+  return team ? league.competitions.find((c) => c.id === team.compId)?.country ?? null : null;
 }
