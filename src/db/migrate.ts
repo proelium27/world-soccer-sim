@@ -549,7 +549,7 @@ function migrateFields(league: LeagueStore): LeagueStore {
         // "Give more minutes" flags (added 2026-07-22). Old saves start with none
         // flagged — subs behave exactly as before until the user flags someone.
         moreMinutes: t.moreMinutes ?? [],
-        // Named penalty / set-piece takers (added 2026-09-27). Old saves start
+        // Named penalty / set-piece takers (added 2026-10-01). Old saves start
         // on auto: the best finisher and best passer on the pitch.
         penaltyTaker: t.penaltyTaker ?? null,
         setPieceTaker: t.setPieceTaker ?? null,

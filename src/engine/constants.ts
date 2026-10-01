@@ -428,7 +428,7 @@ export const SUB_MINUTES_BOOST = 6;
 // from step 1 that compressed the table-spread gate).
 export const CORNER_FROM_MISS_PROB = 0.008;
 
-// Corners that produce no shot (2026-09-27, user report "I regularly get 0
+// Corners that produce no shot (2026-10-01, user report "I regularly get 0
 // corner games"). The engine corner above is really "a corner that led to a
 // header", and at 0.8% of misses it came to ~0.15 a match, so 86% of matches
 // had none; real top-flight football averages ~10 (~5 a side). These are the
