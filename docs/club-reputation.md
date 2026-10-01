@@ -316,7 +316,7 @@ wealth as a stand-in.
 
 ## Stage 4: reputation on the page (built)
 
-User call (2026-09-28): display only. Club History shows a club's reputation
+User call (2026-10-01): display only. Club History shows a club's reputation
 beside its name with how far the last offseason moved it, plus a Rep column
 for the end of each recorded season; the club Database has a sortable
 Reputation column with the same change. Both render through
