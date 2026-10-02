@@ -1,12 +1,26 @@
 /** Seeded RNG — mulberry32. Returns a function producing floats in [0, 1). */
 export function mulberry32(seed: number): () => number {
+  return mulberry32Resumable(seed).next;
+}
+
+/**
+ * The same mulberry32 stream with its state readable, so it can be stopped and
+ * picked up again somewhere else: `mulberry32(r.state())` continues exactly
+ * where `r` left off. Its whole state is one 32-bit integer, which is what lets
+ * a long sim be split into chunks across the worker boundary and still draw the
+ * identical sequence a single call would have (see ui/simChunks.ts).
+ */
+export function mulberry32Resumable(seed: number): { next: () => number; state: () => number } {
   let a = seed >>> 0;
-  return function (): number {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  return {
+    next(): number {
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    },
+    state: () => a >>> 0,
   };
 }
 

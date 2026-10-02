@@ -21,7 +21,22 @@ export type PlayoffMode = "stage" | "through";
 
 // UI -> Worker
 export type WorkerCommand =
-  | { type: "sim"; through: SimThrough; league: LeagueStore }
+  | {
+      type: "sim";
+      through: SimThrough;
+      league: LeagueStore;
+      /**
+       * Resume the shared rng stream from here instead of seeding it afresh.
+       * Set on every chunk of a split sim but the first, from the `rngState`
+       * the previous chunk returned, so the chunks draw exactly the sequence
+       * one call would have (see ui/simChunks.ts).
+       */
+      rngState?: number;
+      /** See simThrough's option of the same name. Set on every chunk of a split sim. */
+      batchStartMatchday?: number;
+      /** Send progress without box scores (see core/simArchive.ts's slimMatchdayProgress). */
+      slimProgress?: boolean;
+    }
   /**
    * `teamStats` is this season's aggregate, worked out on the main thread. The
    * offseason is the only place the sim reads a box score belonging to a
@@ -59,7 +74,12 @@ export type WorkerCommand =
 
 // Worker -> UI
 export type WorkerResponse =
-  | { type: "simResult"; league: LeagueStore }
+  | {
+      type: "simResult";
+      league: LeagueStore;
+      /** Where the shared rng stream stopped, for the next chunk of a split sim to resume from. */
+      rngState?: number;
+    }
   | {
       type: "offseasonResult";
       league: LeagueStore;

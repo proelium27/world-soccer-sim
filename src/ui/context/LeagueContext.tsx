@@ -57,6 +57,7 @@ import { playSuperCups, superCupsPending } from "../../core/superCup/superCup.js
 import { superCupChampion } from "../../core/superCup/types.js";
 import type { PlayedMatch } from "../../core/standings.js";
 import { trackEvent } from "../analytics.js";
+import { simChunkTargets, simMatchdayCount } from "../simChunks.js";
 import { userSpendPolicy } from "../userDebt.js";
 
 interface LeagueContextValue {
@@ -222,7 +223,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const [loadingActiveLeague, setLoadingActiveLeague] = useState(
     () => getActiveLid() !== null,
   );
-  const { sim, runOffseason, runIntlStage, runPlayoffStage, runJump, simming } = useSimWorker();
+  const { sim, simChunk, runOffseason, runIntlStage, runPlayoffStage, runJump, simming } = useSimWorker();
   // Declared here rather than beside its first user because two of them —
   // finishing a jump and opening the live match viewer — sit either side of the
   // file, and a hook cannot be called twice conditionally.
@@ -437,9 +438,46 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     overlayOpenRef.current = true;
     setSimOverlayOpen(true);
     try {
-      const result = await sim(through, current, (progress) => {
-        setAnimQueue((q) => [...q, progress]);
-      });
+      // A long sim goes to the worker a few matchdays at a time, each chunk
+      // saved — and its box scores dropped from memory — before the next one
+      // starts. One round trip for a whole season is what ran phone tabs out of
+      // memory (see ui/simChunks.ts). The chunks play exactly the matches one
+      // call would; the overlay sees one continuous run.
+      const targets = simChunkTargets(current.schedule, through);
+      const total = simMatchdayCount(current.schedule, through);
+      const batchStartMatchday = targets.length > 1
+        ? Math.min(...current.schedule.map((g) => g.matchday))
+        : undefined;
+      let result = current;
+      let rngState: number | undefined;
+      let shown = 0;
+      for (let i = 0; i < targets.length; i++) {
+        const before = result;
+        const chunk = await simChunk(
+          targets[i], before, { rngState, batchStartMatchday },
+          (progress) => {
+            const md = { ...progress, matchdayIndex: shown++, totalMatchdays: Math.max(total, shown) };
+            setAnimQueue((q) => [...q, md]);
+          },
+        );
+        rngState = chunk.rngState;
+        result = chunk.league;
+        if (i === targets.length - 1) break;
+        // Nothing played, or the batch stopped short of this chunk's target
+        // (the user's final is next, or the season ended): the rest of the
+        // plan no longer applies, and this result is the sim's result.
+        const stop = targets[i] as { matchday: number };
+        if (
+          result.played.length === before.played.length ||
+          result.phase !== "regular" ||
+          result.schedule.some((g) => g.matchday <= stop.matchday)
+        ) break;
+        // Persist and commit, which is what lets elideWrittenDetail drop this
+        // chunk's box scores before the next chunk adds its own.
+        const lid = await saveLeague(result);
+        commitLeague({ ...result, lid });
+        result = leagueRef.current ?? result;
+      }
       // Reference equality can't survive the worker's structured clone, so
       // detect a no-op sim by comparing played-game counts.
       if (result.played.length === current.played.length) {
@@ -468,7 +506,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       closeOverlay();
       console.error("Simulation failed:", err);
     }
-  }), [runExclusive, sim, closeOverlay]);
+  }), [runExclusive, simChunk, commitLeague, closeOverlay]);
 
   /**
    * Commit the watched matchday and close the viewer.

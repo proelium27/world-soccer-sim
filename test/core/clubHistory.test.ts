@@ -200,4 +200,20 @@ describe("computeClubHistory", () => {
     expect(h.bestFinish).toBeNull();
     expect(h.seasons).toEqual([]);
   });
+
+  // Production crash ("Unknown compId undefined"): the jump summary builds this
+  // for the user's club, and a spectator save has no club, nor does a club
+  // added mid-save have a row in the seasons before it existed.
+  it("skips seasons the club had no part in instead of throwing", () => {
+    const history = [
+      entry(1, { 0: [1, 2] }, {}),
+      entry(2, { 0: [7, 1, 2] }, {}),
+    ];
+    const league = makeLeague(history, [{ tid: 7, compId: 0 }], []);
+    const h = computeClubHistory(league, 7);
+    expect(h.seasons.map((s) => s.season)).toEqual([2]);
+    expect(h.leagueTitles).toEqual([2]);
+    // A tid with no club at all (a spectator) is simply an empty history.
+    expect(computeClubHistory(league, -1).seasons).toEqual([]);
+  });
 });

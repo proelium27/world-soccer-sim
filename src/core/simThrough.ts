@@ -164,6 +164,15 @@ export function simThrough(
      * two land on the same results.
      */
     stagePlayoffs?: boolean;
+    /**
+     * The matchday the user's sim started on, when this call is one chunk of a
+     * longer one (see ui/simChunks.ts). The stop before the user's final reads
+     * "is the final still ahead of where the batch began", and a chunk that
+     * happens to start ON the final's matchday would otherwise take itself for
+     * a resumed batch and play the final straight through. Absent means this
+     * call is the whole batch, which is every caller but the game's chunked sim.
+     */
+    batchStartMatchday?: number;
   } = {},
 ): LeagueStore {
   if (league.phase !== "regular" || league.schedule.length === 0) {
@@ -188,6 +197,7 @@ export function simThrough(
     : (league.superCups ?? []);
 
   const currentMatchday = Math.min(...league.schedule.map((g) => g.matchday));
+  const batchStart = options.batchStartMatchday ?? currentMatchday;
 
   let targetMatchday: number;
   if (typeof through === "object") {
@@ -278,7 +288,7 @@ export function simThrough(
     // Stop-before-final: if the user's club has reached the cup final (known
     // once the semi-finals are played) and the final is still ahead of where
     // this batch began, halt here rather than auto-simming through the final.
-    // `matchday > currentMatchday` is what lets a *resumed* batch — which
+    // `matchday > batchStart` is what lets a *resumed* batch — which
     // starts exactly on the final's matchday — actually play it instead of
     // stopping forever.
     const userFinalDue = (c: CupState | null): boolean =>
@@ -286,7 +296,7 @@ export function simThrough(
       dueCupRound(c, matchday) === koFinalRound(c) &&
       cupFinalists(c).includes(league.meta.userTid);
     if (
-      matchday > currentMatchday &&
+      matchday > batchStart &&
       (userFinalDue(cup) || userFinalDue(shield) || userFinalDue(americasCup))
     ) {
       stoppedBeforeMatchday = matchday;
@@ -297,7 +307,7 @@ export function simThrough(
     // the semi-finals are played, so hand control back rather than simming
     // through the biggest one-off game of his season.
     if (
-      matchday > currentMatchday
+      matchday > batchStart
       && domesticCups.some((c) => (
         domesticRoundDue(c, matchday) && domesticFinalists(c).includes(league.meta.userTid)
       ))
