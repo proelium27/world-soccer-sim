@@ -40,6 +40,8 @@ export function playoffMatchData(
       starters: t.starters,
       formation: t.formation,
       moreMinutes: t.moreMinutes,
+      penaltyTaker: t.penaltyTaker,
+      setPieceTaker: t.setPieceTaker,
     })),
     players,
   });

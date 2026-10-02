@@ -201,7 +201,10 @@ export function EventBody({
           <span className="bs-ev-icon">
             <CornerIcon />
           </span>
-          <span className="bs-ev-kind">Corner</span>
+          <span>
+            <span className="bs-ev-kind">Corner</span>
+            {event.pids.length > 0 && <>, {link(event.pids[0])} to take</>}
+          </span>
         </div>
       );
     case "shot_saved":
@@ -271,7 +274,8 @@ export function eventSummary(
     case "injury":
       return `${at}Injury, ${who(0)} goes down.`;
     case "corner":
-      return `${at}Corner.`;
+      // Corners recorded before 2026-10-02 name no taker.
+      return event.pids.length > 0 ? `${at}Corner, ${who(0)} to take.` : `${at}Corner.`;
     case "shot_saved":
       return `${at}Shot saved, ${who(0)}${why}.`;
     case "shot_blocked":
