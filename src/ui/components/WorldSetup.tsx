@@ -586,10 +586,17 @@ function DivisionShapes({
   spec,
   resolved,
   onChange,
+  lockSizes = false,
 }: {
   spec: LeagueSpec;
   resolved: ResolvedLeagueSpec;
   onChange: (next: Partial<LeagueSpec>) => void;
+  /**
+   * A live save's divisions: the club count is fixed (the clubs already
+   * exist), so the size shows but can't move, and a shape the size can't be
+   * played in is not offered.
+   */
+  lockSizes?: boolean;
 }) {
   const divisions = resolved.divisions;
   const sizes = [resolved.d1Teams, resolved.d2Teams, resolved.d3Teams];
@@ -624,6 +631,7 @@ function DivisionShapes({
                 <select
                   className="form-select form-select-sm"
                   value={size}
+                  disabled={lockSizes}
                   aria-label={`Clubs in the ${noun}`}
                   onChange={(e) => onChange({ [f.teams]: Number(e.target.value) })}
                 >
@@ -642,8 +650,8 @@ function DivisionShapes({
                     ? { names: DEFAULT_HALF_NAMES, crossRounds: 0 }
                     : null)}
                 >
-                  <option value="table">One table</option>
-                  <option value="split">Two halves</option>
+                  <option value="table" disabled={lockSizes && size > maxDivisionTeams(false)}>One table</option>
+                  <option value="split" disabled={lockSizes && size > maxDivisionTeams(true)}>Two halves</option>
                 </select>
               </div>
             </div>
@@ -695,11 +703,17 @@ function DivisionShapes({
           </div>
         );
       })}
-      <p className="text-muted small mb-2">
-        Renaming is safe for roster files: one written for this country's old
-        division names still finds it. A single table holds up to 20 clubs; split
-        into two halves, a division can hold up to {maxDivisionTeams(true)}.
-      </p>
+      {lockSizes ? (
+        <p className="text-muted small mb-2">
+          Club counts are fixed in a save you&apos;re playing.
+        </p>
+      ) : (
+        <p className="text-muted small mb-2">
+          Renaming is safe for roster files: one written for this country's old
+          division names still finds it. A single table holds up to 20 clubs; split
+          into two halves, a division can hold up to {maxDivisionTeams(true)}.
+        </p>
+      )}
     </>
   );
 }
@@ -930,10 +944,21 @@ export function LeagueSettings({
   entry,
   onEntry,
   onSpec,
+  midSave = false,
+  children,
 }: {
   entry: WorldEntry;
   onEntry: (next: Partial<WorldEntry>) => void;
   onSpec: (next: Partial<LeagueSpec>) => void;
+  /**
+   * Editing a league in a save already being played (God Mode). Only the
+   * settings a save can take without new clubs are offered: no shape presets
+   * (they resize divisions), no strength, continent, division count or roster
+   * files, and club counts are locked. See core/worldEdit.ts.
+   */
+  midSave?: boolean;
+  /** Extra controls rendered at the foot of the settings panel. */
+  children?: React.ReactNode;
 }) {
   const spec = entry.spec;
   const resolved = resolveLeagueSpec(spec);
@@ -942,7 +967,7 @@ export function LeagueSettings({
   // Open the raw controls on arrival only for a league no preset describes —
   // the same rule the Awards tab's Fine-tune disclosure follows. Read once, so
   // picking a preset doesn't snap the panel shut under the cursor.
-  const [tuningOpen] = useState(() => preset === undefined);
+  const [tuningOpen] = useState(() => midSave || preset === undefined);
 
   function choosePreset(next: LeaguePreset) {
     // Straight onto the entry rather than through onSpec, because applying a
@@ -961,27 +986,31 @@ export function LeagueSettings({
 
   return (
     <>
-      <LeaguePresetPicker
-        entry={entry}
-        presets={leaguePresetsFor(baseline)}
-        preset={preset}
-        onChoose={choosePreset}
-      />
-      <LeaguePreview entry={entry} resolved={resolved} />
+      {!midSave && (
+        <LeaguePresetPicker
+          entry={entry}
+          presets={leaguePresetsFor(baseline)}
+          preset={preset}
+          onChoose={choosePreset}
+        />
+      )}
+      <LeaguePreview entry={entry} resolved={resolved} title={midSave ? "Next season" : undefined} />
 
       <details className="gm-panel mb-3" open={tuningOpen || undefined}>
         <summary className="gm-panel-title" style={{ cursor: "pointer" }}>
           Fine-tune this league
         </summary>
-      <Slider
-        label="Strength"
-        min={0}
-        max={STRENGTH_SCALE_MAX}
-        step={1}
-        value={strengthDial(resolved.strengthOffset)}
-        display={String(strengthDial(resolved.strengthOffset))}
-        onChange={(v) => onSpec({ strengthOffset: strengthOffsetFromDial(v) })}
-      />
+      {!midSave && (
+        <Slider
+          label="Strength"
+          min={0}
+          max={STRENGTH_SCALE_MAX}
+          step={1}
+          value={strengthDial(resolved.strengthOffset)}
+          display={String(strengthDial(resolved.strengthOffset))}
+          onChange={(v) => onSpec({ strengthOffset: strengthOffsetFromDial(v) })}
+        />
+      )}
       <Slider
         label="Money"
         min={0.2}
@@ -991,6 +1020,7 @@ export function LeagueSettings({
         display={resolved.budgetScale.toFixed(2)}
         onChange={(v) => onSpec({ budgetScale: v })}
       />
+      {!midSave && (
       <div className="form-check form-switch small mb-2">
         <input
           type="checkbox"
@@ -1015,6 +1045,7 @@ export function LeagueSettings({
           Keep money in step with strength
         </label>
       </div>
+      )}
 
       {/*
         Sits directly under the two sliders it calibrates rather than at the foot
@@ -1024,6 +1055,7 @@ export function LeagueSettings({
       */}
       <ShippedLeagueTable />
 
+      {!midSave && (
       <div className="row g-2 mb-2">
         <div className="col">
           <label className="form-label small mb-1">Continent</label>
@@ -1058,8 +1090,9 @@ export function LeagueSettings({
           </select>
         </div>
       </div>
+      )}
 
-      <DivisionShapes spec={spec} resolved={resolved} onChange={onSpec} />
+      <DivisionShapes spec={spec} resolved={resolved} onChange={onSpec} lockSizes={midSave} />
 
       <div className="row g-2 mb-2">
         {/* Nothing to size in a one-division league: it has no second tier to
@@ -1151,7 +1184,9 @@ export function LeagueSettings({
         onChange={(nationalities) => onSpec({ nationalities })}
       />
 
-      <RosterPicker
+      {children}
+
+      {!midSave && <RosterPicker
         entry={entry}
         onChange={(rosterSources, nationalities) => {
           // A file that declares a mix pre-fills the editor rather than
@@ -1168,7 +1203,7 @@ export function LeagueSettings({
             ...(nationalities ? { spec: { ...spec, nationalities } } : {}),
           });
         }}
-      />
+      />}
       </details>
     </>
   );
@@ -1234,7 +1269,11 @@ function LeaguePresetPicker({
  * 14" says nothing, "about as strong as Turkey" is the question people are
  * actually asking.
  */
-function LeaguePreview({ entry, resolved }: { entry: WorldEntry; resolved: ResolvedLeagueSpec }) {
+function LeaguePreview({ entry, resolved, title = "What this builds" }: {
+  entry: WorldEntry;
+  resolved: ResolvedLeagueSpec;
+  title?: string;
+}) {
   const sizes = [resolved.d1Teams, resolved.d2Teams, resolved.d3Teams].slice(0, resolved.divisions);
   const clubs = sizes.reduce((n, s) => n + s, 0);
   const country = entry.spec.country || "This country";
@@ -1265,7 +1304,7 @@ function LeaguePreview({ entry, resolved }: { entry: WorldEntry; resolved: Resol
 
   return (
     <div className="gm-panel mb-3">
-      <div className="gm-panel-title">What this builds</div>
+      <div className="gm-panel-title">{title}</div>
       <p className="small mb-1">{describeStrength(resolved.strengthOffset, entry.spec.country)}</p>
       <p className="small mb-1">{shape}{split}</p>
       <p className="small mb-1">{swap} {champion}</p>

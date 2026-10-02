@@ -430,6 +430,16 @@ export interface LeagueStore {
   continentalFormats?: ContinentalFormats;
 
   /**
+   * League settings God Mode has changed for next season: the whole
+   * competitions table as it will read once applied (see core/worldEdit.ts).
+   * Applied and cleared by the offseason right after promotion and relegation,
+   * so the season just played is settled under its own rules. Same ids,
+   * countries, tiers and club counts as `competitions`; only settings differ.
+   * Optional with no migration: absent means nothing is queued.
+   */
+  pendingCompetitions?: Competition[];
+
+  /**
    * How many nations the World Cup takes: 16, 24, 32 or 48, or "auto" to size
    * it off how many nations the world can field (resolveWorldCupSize).
    *

@@ -4,6 +4,9 @@ import type { LeagueStore } from "../../core/leagueState.js";
 import type { ProgressionModel, WorldCupSize } from "../../core/constants.js";
 import { isCustomAwardFormula, resolveAwardFormula, type AwardFormula } from "../../core/awardFormula.js";
 import { isDefaultContinentalFormat, sanitizeContinentalFormat, type ContinentalFormatSettings } from "../../core/cup/cupShape.js";
+import { queueCountryEdit, discardCountryEdit } from "../../core/worldEdit.js";
+import type { LeagueSpec } from "../../core/competitions.js";
+import type { ForeignRule } from "../../core/foreignRules.js";
 import type { CupCompetitionId } from "../../core/constants.js";
 import type { SimThrough, IntlMode, PlayoffMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
@@ -185,6 +188,10 @@ interface LeagueContextValue {
   /** God Mode: set this save's award weights, or pass null to go back to the shipped ones. */
   godModeSetAwardFormulaAction: (formula: AwardFormula | null) => Promise<void>;
   godModeSetContinentalFormatAction: (competition: CupCompetitionId, settings: ContinentalFormatSettings | null) => Promise<void>;
+  /** Queue one country's league settings for next season (see core/worldEdit.ts). `foreignRules` null keeps each division's own. */
+  godModeQueueLeagueEditAction: (country: string, spec: LeagueSpec, foreignRules: ForeignRule[] | null) => Promise<void>;
+  /** Drop one country's queued league settings. */
+  godModeDiscardLeagueEditAction: (country: string) => Promise<void>;
   /** Set how many nations the World Cup takes, from the next qualifying draw on. */
   setWorldCupSizeAction: (size: WorldCupSize) => Promise<void>;
   movePlayerToClubAction: (pid: number, tid: number) => Promise<void>;
@@ -1192,6 +1199,40 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   );
 
   /**
+   * God Mode: change a country's league settings from next season on. Queued
+   * on `pendingCompetitions` and applied by the offseason after promotion and
+   * relegation; an edit that would need a division resized is dropped (the
+   * editor never offers one).
+   */
+  const godModeQueueLeagueEditAction = useCallback(
+    (country: string, spec: LeagueSpec, foreignRules: ForeignRule[] | null) => mutate((l) => {
+      if (!l.godMode) return null;
+      const next = queueCountryEdit(l.competitions, l.pendingCompetitions, country, spec, foreignRules);
+      if (next === null) return null;
+      if (next === undefined) {
+        if (!l.pendingCompetitions) return null;
+        const { pendingCompetitions: _dropped, ...without } = l;
+        return without;
+      }
+      return { ...l, pendingCompetitions: next };
+    }),
+    [mutate],
+  );
+
+  const godModeDiscardLeagueEditAction = useCallback(
+    (country: string) => mutate((l) => {
+      if (!l.godMode || !l.pendingCompetitions) return null;
+      const next = discardCountryEdit(l.competitions, l.pendingCompetitions, country);
+      if (next === undefined) {
+        const { pendingCompetitions: _dropped, ...without } = l;
+        return without;
+      }
+      return { ...l, pendingCompetitions: next };
+    }),
+    [mutate],
+  );
+
+  /**
    * God Mode: edit the weights the end-of-season awards are scored with (see
    * `LeagueStore.awardFormula`).
    *
@@ -1396,6 +1437,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSetProgressionModelAction,
     godModeSetAwardFormulaAction,
     godModeSetContinentalFormatAction,
+    godModeQueueLeagueEditAction,
+    godModeDiscardLeagueEditAction,
     setWorldCupSizeAction,
     releasePlayerGodModeAction,
     editPlayerAction,
@@ -1432,6 +1475,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     godModeSetProgressionModelAction,
     godModeSetAwardFormulaAction,
     godModeSetContinentalFormatAction,
+    godModeQueueLeagueEditAction,
+    godModeDiscardLeagueEditAction,
     setWorldCupSizeAction,
     acceptJobOfferAction, declineJobOffersAction, setSackingEnabledAction,
     setClubInterestAction, setNationInterestAction,
