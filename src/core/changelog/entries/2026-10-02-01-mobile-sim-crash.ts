@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-10-01",
+  date: "2026-10-02",
   title: "The game was crashing on phones",
   items: [
     "A lot of you on phones were losing the game partway through a season, usually on **Sim to End of Season** or the first offseason. The page just died, with no error, which is why it took me this long to see it.",
