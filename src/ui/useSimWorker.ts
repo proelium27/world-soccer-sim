@@ -13,7 +13,7 @@ import {
 } from "../core/simArchive.js";
 import { referencedPids } from "../core/players/playerNames.js";
 import { honourSourcesOf } from "../core/frivolities/goat.js";
-import { teamSeasonStatsFor } from "../db/leagueDb.js";
+import { teamSeasonStatsFor, teamSeasonAccFor } from "../db/leagueDb.js";
 import { offseasonCoefficientSlots } from "../core/cup/coefficients.js";
 
 export type SimProgress = {
@@ -59,6 +59,9 @@ export function useSimWorker() {
   const pendingRef = useRef<Pending | null>(null);
   const progressRef = useRef<((progress: SimProgress) => void) | null>(null);
   const jumpProgressRef = useRef<((progress: JumpProgressUpdate) => void) | null>(null);
+  // Where the last sim's rng stream stopped (see simChunk). Read straight after
+  // the await, and `post` runs one command at a time, so it can't be another's.
+  const lastRngStateRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const worker = new Worker(
@@ -90,6 +93,7 @@ export function useSimWorker() {
         setSimming(false);
         const pending = pendingRef.current;
         if (pending) {
+          lastRngStateRef.current = e.data.type === "simResult" ? e.data.rngState : undefined;
           let league = e.data.league;
           // Whoever the free-agent cull deleted. The worker could only scrub
           // its own copies, so every held-back list that carries a pid gets the
@@ -129,7 +133,14 @@ export function useSimWorker() {
   const post = useCallback(
     (
       command:
-        | { type: "sim"; through: SimThrough; league: LeagueStore }
+        | {
+            type: "sim";
+            through: SimThrough;
+            league: LeagueStore;
+            rngState?: number;
+            batchStartMatchday?: number;
+            slimProgress?: boolean;
+          }
         | { type: "offseason"; league: LeagueStore }
         | { type: "intl"; mode: IntlMode; league: LeagueStore }
         | { type: "playoffs"; mode: PlayoffMode; league: LeagueStore }
@@ -189,8 +200,13 @@ export function useSimWorker() {
         // just play (computeTeamSeasonStats). Working it out here is what makes
         // stripping them safe; without it the offseason would aggregate stubs
         // and quietly record a season of zeroes.
+        // A jump keeps `played` as it is in memory, which is with this
+        // session's stripped matches' player lines gone, so it carries the
+        // season's running totals instead of re-adding them from nothing.
         const outgoing =
-          command.type === "offseason" && stripPlayed
+          command.type === "jump"
+            ? { ...command, league: payload, seasonAcc: teamSeasonAccFor(command.league) }
+            : command.type === "offseason" && stripPlayed
             ? {
                 ...command,
                 league: payload,
@@ -234,6 +250,27 @@ export function useSimWorker() {
     [post],
   );
 
+  /**
+   * One chunk of a split sim (core/simChunks.ts): progress comes without box
+   * scores, and the rng stream resumes from `rngState` when given. Returns
+   * where the stream stopped, for the next chunk.
+   */
+  const simChunk = useCallback(
+    async (
+      through: SimThrough,
+      league: LeagueStore,
+      opts: { rngState?: number; batchStartMatchday?: number },
+      onProgress?: (progress: SimProgress) => void,
+    ): Promise<{ league: LeagueStore; rngState: number | undefined }> => {
+      const result = await post(
+        { type: "sim", through, league, slimProgress: true, ...opts },
+        { onProgress },
+      );
+      return { league: result, rngState: lastRngStateRef.current };
+    },
+    [post],
+  );
+
   const runOffseason = useCallback(
     (league: LeagueStore): Promise<LeagueStore> => post({ type: "offseason", league }),
     [post],
@@ -258,5 +295,5 @@ export function useSimWorker() {
     [post],
   );
 
-  return { sim, runOffseason, runIntlStage, runPlayoffStage, runJump, simming };
+  return { sim, simChunk, runOffseason, runIntlStage, runPlayoffStage, runJump, simming };
 }
