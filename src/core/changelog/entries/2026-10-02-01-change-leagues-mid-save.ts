@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-10-01",
+  date: "2026-10-02",
   title: "Change how your leagues run, season by season",
   items: [
     "God Mode has a new **Leagues** tab with the same league settings you get when starting a save, for any league in the world you're already playing.",
