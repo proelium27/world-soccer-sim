@@ -1,7 +1,6 @@
 # Club reputation and home-country pull
 
-Design doc and work log. **Stage 1 (nationality realism) is built and being
-tuned; Stages 2-3 are planned.** Decisions are Caleb's (2026-09-22), worked
+Design doc and work log. **Stages 1-4 are built.** Decisions are Caleb's (2026-09-22), worked
 out with a Fable review: the goal is realism, free agency is the player's
 choice, playing time is a line, foreign-player rules are real league rules only
 where a real league has one and bind the user too, wages are a later stage, and
@@ -246,16 +245,23 @@ no personality traits yet.
 ### How he sees clubs (`transfers/playerView.ts`, `HowHeSeesClubs.tsx`)
 
 A card on every Player Profile: his view of the user's club with the reasons,
-his five favourite clubs, the five best clubs where the playing-time line is
-not against him, and a count of clubs he'd refuse. It reads `clubAppealFor`
+his five favourite clubs with whether he'd start at each (he beats the
+destination's weakest starter at his position), and a count of clubs he'd
+refuse. It reads `clubAppealFor`
 measured from where he stands (his club; his parent while on loan; for a free
 agent, his expected stature for AI clubs and `freeAgentFrom` for the user's),
 so it agrees with the transfer pages to the last decimal (pinned by a test
 against `userView`). Club contexts are built once per league object (a
 WeakMap, the `usePlayerRefs` pattern): ~19 ms the first time, 0.4 ms per
 further profile on the 883-club world. For a good player the favourites are
-mostly the world's biggest clubs, which is true; the second list is where he
-could actually end up.
+mostly the world's biggest clubs, which is true. A second "where he'd play"
+list shipped beside it and was cut in Stage 4: his ranking already weighs
+playing time, so it came out identical to the favourites for every player.
+Stage 4 also opened the card up into a full breakdown: a column per appeal
+line (only those some shown club has), a Total that is the score the markets
+use, your club as its own group under a rule, and the card moved to full
+width at the bottom of the profile. A refusal's level line is a flat -1
+marker, so it shows as "Too small" with "Refuses" as the total.
 
 ### Language and family ties (`transfers/corridors.ts`)
 
@@ -310,9 +316,28 @@ gate; all pass pooled.
 
 ### Still to come
 
-Reputation and its trend on Club History and the club Database; personality
-traits (Ambition, Loyalty, Adaptability, fogged one-word reveal); passports
-(Spain's Ibero-American route, Italian oriundi), declined for now.
+Personality traits (Ambition, Loyalty, Adaptability, fogged one-word reveal);
+passports (Spain's Ibero-American route, Italian oriundi). Both declined for
+now; wages that differ by club remain the later stage that would replace
+wealth as a stand-in.
+
+## Stage 4: reputation on the page (built)
+
+User call (2026-10-02): display only. Club History shows a club's reputation
+beside its name with how far the last offseason moved it, plus a Rep column
+for the end of each recorded season; the club Database has a sortable
+Reputation column with the same change. Both render through
+`ui/components/ReputationTrend.tsx`.
+
+Nothing recorded a past reputation, so each season's history entry now carries
+`SeasonHistoryEntry.reputation` (every club to one decimal, ~7 KB a season on
+the 883-club world). It is attached where the offseason writes the entry out,
+not where the entry is built (step 3.6), because reputation moves at 3.61.
+Migration stamps only the latest season, and only when every club already had
+a reputation: exact, since reputation moves nowhere but the offseason. A
+change therefore needs two recorded seasons: an existing save shows one after
+its next offseason, a new save after its second. Zero rng draws and nothing
+reads it back in the sim, so no audit.
 
 ## Tuning and audits (in progress)
 

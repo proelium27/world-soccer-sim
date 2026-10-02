@@ -2864,6 +2864,11 @@ export function Manual() {
               climbs faster than it falls, so a famous club keeps some of its pull through a bad spell,
               and a club that has just come into money has to win things before stars take it seriously.
               When you hover a player&apos;s reasons, the level of the club is split into these two lines.
+              Club History shows a club&apos;s reputation and how much the last summer moved it, with
+              a column for where it stood at the end of each season, and the club Database has a
+              Reputation column you can sort by. Reputation only moves in the summer, so the change
+              shows once two summers are on record: after your second in a new save, after your next
+              in one started before this.
             </li>
             <li>
               <strong>Playing time.</strong> Would he start? A player who&apos;d walk into your eleven
@@ -2895,11 +2900,15 @@ export function Manual() {
             On a loan the home and language reasons count for half, since it&apos;s only a season.
           </p>
           <p>
-            <strong>How he sees clubs.</strong> Every player&apos;s profile has a card with his view of
-            your club and his reasons, the five clubs he&apos;d most like to join, the five best clubs
-            where he&apos;d actually get games, and how many clubs he wouldn&apos;t talk to at all. For a
-            good player the first list is mostly the world&apos;s biggest clubs; the second is where he
-            could realistically end up. Hover a club for his full reasons.
+            <strong>How he sees clubs.</strong> Every player&apos;s profile has a card with the five clubs
+            he&apos;d most like to join and your club, and how many clubs he wouldn&apos;t talk to at all.
+            Each club gets a column for every reason he weighs: its level (the squad and the money),
+            its reputation, playing time, home, being far from home, language or family ties, and
+            having played there before. Every reason but the last compares the move with where he is
+            now (his parent club if he&apos;s on loan): a club the same size as his scores 0 on level,
+            and a player already at home gets nothing extra for staying in his country. Green pulls
+            him toward a club, red pushes him away, and Total adds them up. &quot;Too small&quot; means the club is too big a step down for him to talk at
+            any price.
           </p>
           <p>
             <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent

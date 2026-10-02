@@ -19,6 +19,8 @@ import {
 } from "../../core/frivolities/clubGoat.js";
 import { seasonYear, ordinal } from "../format.js";
 import { isSpectator } from "../../core/spectator.js";
+import { reputationChange, reputationHistory, teamReputation } from "../../core/teams/reputation.js";
+import { ReputationTrend } from "../components/ReputationTrend.js";
 
 /** A small inline trophy mark — no emoji in the UI (icons are hand-drawn SVG). */
 function TrophyIcon({ size = 18 }: { size?: number }) {
@@ -214,6 +216,8 @@ export function ClubHistory() {
   const currentComp = team ? competitionOf(league.competitions, team.compId) : undefined;
 
   const history = computeClubHistory(league, tid);
+  // Only seasons the save recorded one for: see SeasonHistoryEntry.reputation.
+  const repBySeason = new Map(reputationHistory(league.seasonHistory, tid).map((r) => [r.season, r.reputation]));
 
   const countries = countriesOf(league.competitions);
   const hasCup = worldHasCup(league.competitions);
@@ -233,6 +237,12 @@ export function ClubHistory() {
       </div>
       <div className="text-muted mb-3">
         {currentComp ? `${currentComp.name} · ${history.seasonsPlayed} season${history.seasonsPlayed === 1 ? "" : "s"} on record` : ""}
+        {team && (
+          <>
+            {" · Reputation "}
+            <ReputationTrend value={teamReputation(team)} change={reputationChange(league.seasonHistory, tid)} />
+          </>
+        )}
       </div>
 
       <div className="mb-3">
@@ -523,6 +533,7 @@ export function ClubHistory() {
                 <th className="text-end">GA</th>
                 <th className="text-end">GD</th>
                 <th className="text-end">Pts</th>
+                {repBySeason.size > 0 && <th className="text-end" title="Reputation at the end of the season">Rep</th>}
                 <th>Notes</th>
                 {/* The chevron's column. Empty rather than labelled: it is an
                     affordance, not data. */}
@@ -581,6 +592,9 @@ export function ClubHistory() {
                     <td className="text-end">{s.row.ga}</td>
                     <td className="text-end">{s.row.gd}</td>
                     <td className="text-end">{s.row.points}</td>
+                    {repBySeason.size > 0 && (
+                      <td className="text-end">{repBySeason.has(s.season) ? Math.round(repBySeason.get(s.season)!) : "—"}</td>
+                    )}
                     <td className="small text-muted">{notes.join(" · ")}</td>
                     {/* Hidden from screen readers: the year in the first cell
                         is already a real link saying where this goes, and a

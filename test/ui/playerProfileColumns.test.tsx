@@ -72,12 +72,23 @@ function countTags(html: string, tag: "th" | "td"): number {
   return [...html.matchAll(new RegExp(`<${tag}\\b`, "g"))].length;
 }
 
-/** Header count, and the cell count of the first body row. */
+/** How many columns a body row fills: its cells, a `colspan` counting as that many. */
+function rowWidth(row: string): number {
+  return [...row.matchAll(/<td\b([^>]*)>/g)]
+    .reduce((n, m) => n + Number(/colSpan="(\d+)"/i.exec(m[1])?.[1] ?? 1), 0);
+}
+
+/** Every body row in the table, across all its `<tbody>`s. */
+function bodyRows(table: string): string[] {
+  const bodies = [...table.matchAll(/<tbody\b[\s\S]*?<\/tbody>/g)].map((m) => m[0]).join("");
+  return [...bodies.matchAll(/<tr\b[\s\S]*?<\/tr>/g)].map((m) => m[0]);
+}
+
+/** Header count, and the width of the first body row. */
 function columnCounts(table: string): { headers: number; cells: number } {
   const head = /<thead\b[\s\S]*?<\/thead>/.exec(table)?.[0] ?? "";
-  const body = /<tbody\b[\s\S]*?<\/tbody>/.exec(table)?.[0] ?? "";
-  const firstRow = /<tr\b[\s\S]*?<\/tr>/.exec(body)?.[0] ?? "";
-  return { headers: countTags(head, "th"), cells: countTags(firstRow, "td") };
+  const firstRow = bodyRows(table)[0] ?? "";
+  return { headers: countTags(head, "th"), cells: rowWidth(firstRow) };
 }
 
 function profileWithStats(): { league: LeagueStore; pid: number } {
@@ -100,10 +111,11 @@ describe("player profile table columns", () => {
     const { league, pid } = profileWithStats();
     const tables = tablesIn(render(league, pid));
     expect(tables.length).toBeGreaterThan(0);
+    // Every row, not just the first: How he sees clubs opens on a full-width
+    // group label, which would otherwise be the only row this ever compared.
     for (const table of tables) {
-      const { headers, cells } = columnCounts(table);
-      if (cells === 0) continue; // an empty table has no row to compare
-      expect(cells).toBe(headers);
+      const headers = countTags(/<thead\b[\s\S]*?<\/thead>/.exec(table)?.[0] ?? "", "th");
+      for (const row of bodyRows(table)) expect(rowWidth(row)).toBe(headers);
     }
   });
 

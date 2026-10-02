@@ -12,6 +12,15 @@ const league = makeLeague(0, 4);
 const rows = buildClubRows(league);
 
 describe("buildClubRows", () => {
+  it("carries each club's reputation, and no change before two seasons are recorded", () => {
+    for (const row of rows) {
+      expect(row.reputation).toBe(row.team.reputation);
+      expect(row.reputationChange).toBeNull();
+    }
+    const sorted = [...rows].sort((a, b) => (clubSortAccessors().reputation(b) as number) - (clubSortAccessors().reputation(a) as number));
+    expect(sorted[0].reputation).toBe(Math.max(...rows.map((r) => r.reputation)));
+  });
+
   it("covers every club in the world exactly once", () => {
     expect(rows).toHaveLength(league.teams.length);
     expect(new Set(rows.map((r) => r.team.tid)).size).toBe(league.teams.length);
