@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-10-01",
+  date: "2026-10-02",
   title: "Pick your penalty taker, and corners actually happen now",
   items: [
     "Corners were close to extinct. A match averaged about 0.15 of them and most had none at all. Now there are about ten a match, more for the side that's on top, and most get cleared like real ones do. Scores don't change: the extra corners are the ones that come to nothing.",

@@ -273,7 +273,7 @@ export function eventSummary(
     case "injury":
       return `${at}Injury, ${who(0)} goes down.`;
     case "corner":
-      // Corners recorded before 2026-10-01 name no taker.
+      // Corners recorded before 2026-10-02 name no taker.
       return event.pids.length > 0 ? `${at}Corner, ${who(0)} to take.` : `${at}Corner.`;
     case "shot_saved":
       return `${at}Shot saved, ${who(0)}${why}.`;
