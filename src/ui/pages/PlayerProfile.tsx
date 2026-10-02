@@ -520,8 +520,6 @@ export function PlayerProfile() {
         </div>
       </div>
 
-      <HowHeSeesClubs league={league} player={player} />
-
       <div className="card mt-3">
         <div className="card-body">
           <div className="d-flex align-items-center justify-content-between mb-2">
@@ -850,6 +848,8 @@ export function PlayerProfile() {
           </p>
         </div>
       </div>
+
+      <HowHeSeesClubs league={league} player={player} />
     </div>
   );
 }
