@@ -155,10 +155,16 @@ export function computeClubHistory(league: LeagueStore, tid: number): ClubHistor
   // A league God Mode removed still names the seasons played in it.
   const competitions = [...league.competitions, ...(league.retiredCompetitions ?? [])];
   // Oldest → newest so we can look at the *following* season for promotion.
-  // Only seasons the club played: one God Mode added mid-save has none before
-  // it existed, and one that folded has none after.
-  const ordered = seasonHistory
-    .filter((h) => h.compsByTid[tid] !== undefined)
+  //
+  // Only the seasons this club actually played in a competition the save knows
+  // (live or retired, above). A club added mid-save (God Mode) has no entry in
+  // the seasons before it existed, a folded one none after, and a spectator
+  // save's "club" has none at all. Reading those used to
+  // throw "Unknown compId", and because the jump summary builds this inside the
+  // app shell, one bad season took the whole game down after every jump.
+  const knownComp = new Set(competitions.map((c) => c.id));
+  const ordered = [...seasonHistory]
+    .filter((h) => knownComp.has(h.compsByTid[tid]))
     .sort((a, b) => a.season - b.season);
 
   // Season → this club's stat tid for each player, so an award pid can be

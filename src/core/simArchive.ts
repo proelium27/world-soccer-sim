@@ -405,3 +405,32 @@ export function reattachTransfers(
     : transfers.filter((t) => !culledPids.has(t.pid));
   return { ...result, transfers: [...kept, ...(result.transfers ?? [])] };
 }
+
+/**
+ * A matchday's progress report with every box score emptied, for a sim whose
+ * only consumer is the sim overlay's ticker.
+ *
+ * Each `simProgress` message is a separate structured clone, and the UI keeps
+ * every one it receives in the overlay's queue until the animation ends. Sent
+ * whole, a "sim to end of season" therefore arrived on the main thread TWICE —
+ * once matchday by matchday in the queue, once in the finished league — which
+ * on the shipped world is two copies of ~330 MB of box scores and the main
+ * reason that button ran a phone tab out of memory. The ticker reads scores,
+ * clubs, winners and the pens/extra-time flags, never a box score.
+ *
+ * The live match viewer is the exception: it builds the "elsewhere" rail out of
+ * the whole matchday's timelines, so its sim asks for the full report.
+ */
+export function slimMatchdayProgress<
+  T extends { results: PlayedMatch[]; cupTies: { boxScore: unknown }[]; domesticTies: { tie: { boxScore: unknown } }[] },
+>(progress: T): T {
+  return {
+    ...progress,
+    results: progress.results.map((m) => ({
+      ...m,
+      boxScore: { ...m.boxScore, home: [], away: [], events: [] },
+    })),
+    cupTies: progress.cupTies.map((t) => ({ ...t, boxScore: null })),
+    domesticTies: progress.domesticTies.map((d) => ({ ...d, tie: { ...d.tie, boxScore: null } })),
+  };
+}

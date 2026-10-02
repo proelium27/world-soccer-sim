@@ -52,6 +52,19 @@ export interface GameEvents {
     matchdays?: "1" | "2-5" | "6-15" | "16+";
     live?: boolean;
   };
+  /**
+   * A sim was handed to the worker. Paired with the event its success fires
+   * (`season_simmed`, `offseason_advanced`, `seasons_jumped`), the gap is how
+   * many never came back: a tab the browser kills for memory reports nothing at
+   * all, so this is the only way to count those crashes. Sent instantly rather
+   * than batched (see trackEventNow) for exactly that reason. `split` marks a
+   * season sim run in chunks on a low-memory device (core/simChunks.ts).
+   */
+  sim_started: {
+    kind: "sim" | "offseason" | "jump";
+    through?: "game" | "matchday" | "season";
+    split?: boolean;
+  };
   /** The user advanced past the offseason into a new season. */
   offseason_advanced: Record<string, never>;
   /**
@@ -123,6 +136,22 @@ export function trackEvent<K extends keyof GameEvents>(
 ): void {
   try {
     posthog.capture(name, props[0]);
+  } catch {
+    // Analytics must never break the game.
+  }
+}
+
+/**
+ * `trackEvent`, but sent straight away instead of waiting in PostHog's batch
+ * queue. For an event that may be the last thing a tab ever does: a batched
+ * event is lost with the tab if the browser kills it for memory first.
+ */
+export function trackEventNow<K extends keyof GameEvents>(
+  name: K,
+  ...props: GameEvents[K] extends Record<string, never> ? [] : [GameEvents[K]]
+): void {
+  try {
+    posthog.capture(name, props[0], { send_instantly: true });
   } catch {
     // Analytics must never break the game.
   }

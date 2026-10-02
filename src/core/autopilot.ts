@@ -23,7 +23,12 @@ import { simOffseason } from "./offseason.js";
 import { ensureUserRosterSafety } from "./freeAgency.js";
 import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
 import { FREE_AGENT_TID } from "./transfers/negotiation.js";
-import { mulberry32 } from "../engine/rng.js";
+import { mulberry32, mulberry32Resumable } from "../engine/rng.js";
+import { simChunkTargets } from "./simChunks.js";
+import {
+  addToTeamSeasonAcc, cloneTeamSeasonAcc, emptyTeamSeasonAcc, teamSeasonStatsFromAcc,
+  type PlayedMatch, type TeamSeasonAcc,
+} from "./standings.js";
 
 /**
  * The stand-in `meta.userTid` while the AI is in charge. Negative so it can
@@ -164,6 +169,16 @@ export function jumpSeasons(
   league: LeagueStore,
   seasons: number,
   onProgress?: JumpProgress,
+  options: {
+    /**
+     * This season's team totals over every match already in `league.played`.
+     * The game's own league holds those matches with their player lines
+     * dropped (db/leagueDb.ts), so it must hand the totals in or the first
+     * offseason records a season of zeroes. Absent means `league.played` still
+     * carries real box scores, as it does for every headless caller.
+     */
+    seasonAcc?: TeamSeasonAcc;
+  } = {},
 ): LeagueStore {
   const total = clampJumpSeasons(seasons);
   const userTid = league.meta.userTid;
@@ -172,6 +187,10 @@ export function jumpSeasons(
 
   let work = beginAutopilot(league);
   const managed: number[] = [];
+  // The season's team totals, folded as matches are played so their player
+  // lines can be dropped straight away (see simSeasonFolding).
+  let acc = options.seasonAcc ? cloneTeamSeasonAcc(options.seasonAcc) : emptyTeamSeasonAcc();
+  if (!options.seasonAcc) addToTeamSeasonAcc(acc, work.played);
 
   while (work.season < target) {
     onProgress?.(work.season - startSeason, total, work.season);
@@ -183,7 +202,7 @@ export function jumpSeasons(
       // labelling it "AI managed" in the history would be a lie.
       managed.push(work.season);
       const played = work.played.length;
-      work = simThrough(work, "season", mulberry32((work.lid * 1000 + played) >>> 0));
+      work = simSeasonFolding(work, acc);
       // A "regular" league with nothing left to play can't advance and would
       // spin here forever. Unreachable in practice (simThrough flips the phase
       // as the schedule empties), but a jump is a long unattended loop and an
@@ -191,13 +210,59 @@ export function jumpSeasons(
       if (work.phase === "regular" && work.played.length === played) break;
     }
 
-    const advanced = simOffseason(work, mulberry32((work.lid * 1000 + work.season) >>> 0));
+    const advanced = simOffseason(work, mulberry32((work.lid * 1000 + work.season) >>> 0), {
+      teamStats: teamSeasonStatsFromAcc(acc, work.teams.map((t) => t.tid)),
+    });
     if (advanced.season === work.season) break;
     work = advanced;
+    acc = emptyTeamSeasonAcc();
   }
 
   return {
     ...endAutopilot(work, userTid),
     aiManagedSeasons: [...league.aiManagedSeasons, ...managed],
   };
+}
+
+/**
+ * The rest of the season, played exactly as `simThrough(league, "season", ...)`
+ * with the worker's seed would play it, but a few matchdays at a time with each
+ * chunk's box-score detail folded into `acc` and then dropped.
+ *
+ * A jump used to carry a whole season of box scores in the worker before its
+ * offseason could let them go, ~330 MB on the shipped world: the same spike
+ * that ran "Sim to End of Season" out of memory on phones. Nothing later in
+ * the season reads an old match's detail (the sim reads scores only, which
+ * `test/core/simArchive.test.ts` proves with stubbed matches), and the offseason
+ * reads it only through the team totals `acc` carries. Same rng stream and
+ * batch start across chunks as the game's split sim, so the matches are
+ * identical; `test/core/simChunks.test.ts` holds a jump to that.
+ */
+function simSeasonFolding(league: LeagueStore, acc: TeamSeasonAcc): LeagueStore {
+  const rng = mulberry32Resumable((league.lid * 1000 + league.played.length) >>> 0);
+  const targets = simChunkTargets(league.schedule, "season");
+  const batchStartMatchday = targets.length > 1
+    ? Math.min(...league.schedule.map((g) => g.matchday))
+    : undefined;
+  let work = league;
+  for (let i = 0; i < targets.length; i++) {
+    const before = work.played.length;
+    work = simThrough(work, targets[i], rng.next, undefined, { batchStartMatchday });
+    const fresh = work.played.slice(before);
+    addToTeamSeasonAcc(acc, fresh);
+    work = { ...work, played: [...work.played.slice(0, before), ...fresh.map(withoutDetail)] };
+    if (i === targets.length - 1) break;
+    const stop = targets[i] as { matchday: number };
+    if (
+      work.played.length === before ||
+      work.phase !== "regular" ||
+      work.schedule.some((g) => g.matchday <= stop.matchday)
+    ) break;
+  }
+  return work;
+}
+
+/** A played match with its timeline and player lines emptied; the score stays. */
+function withoutDetail(m: PlayedMatch): PlayedMatch {
+  return { ...m, boxScore: { ...m.boxScore, home: [], away: [], events: [] } };
 }

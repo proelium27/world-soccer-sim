@@ -4,7 +4,8 @@ import { simOffseasonReporting } from "../core/offseason.js";
 import { jumpSeasons } from "../core/autopilot.js";
 import { playIntlStage, simThroughInternational } from "../core/international/index.js";
 import { playPlayoffStage, simThroughPlayoffs } from "../core/playoffStages.js";
-import { mulberry32 } from "../engine/rng.js";
+import { mulberry32, mulberry32Resumable } from "../engine/rng.js";
+import { slimMatchdayProgress } from "../core/simArchive.js";
 import type { WorkerCommand, WorkerResponse } from "./protocol.js";
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -12,30 +13,28 @@ declare const self: DedicatedWorkerGlobalScope;
 self.onmessage = (e: MessageEvent<WorkerCommand>) => {
   const cmd = e.data;
   if (cmd.type === "sim") {
-    // Derive seed from league state so each sim batch is deterministic but different
+    // Derive seed from league state so each sim batch is deterministic but
+    // different — unless this is a later chunk of a split sim, which carries on
+    // the stream the previous chunk left off (core/simChunks.ts).
     const seed = (cmd.league.lid * 1000 + cmd.league.played.length) >>> 0;
-    const rng = mulberry32(seed);
+    const rng = mulberry32Resumable(cmd.rngState ?? seed);
     const result = simThrough(
       cmd.league,
       cmd.through,
-      rng,
+      rng.next,
       (matchday, matchdayIndex, totalMatchdays, results, cupTies, domesticTies) => {
+        const full = { matchday, matchdayIndex, totalMatchdays, results, cupTies, domesticTies };
         const progress: WorkerResponse = {
           type: "simProgress",
-          matchday,
-          matchdayIndex,
-          totalMatchdays,
-          results,
-          cupTies,
-          domesticTies,
+          ...(cmd.slimProgress ? slimMatchdayProgress(full) : full),
         };
         self.postMessage(progress);
       },
       // The game plays the playoffs a round per sim block, so a season that
       // ends here only draws them (see core/playoffStages.ts).
-      { stagePlayoffs: true },
+      { stagePlayoffs: true, batchStartMatchday: cmd.batchStartMatchday },
     );
-    const response: WorkerResponse = { type: "simResult", league: result };
+    const response: WorkerResponse = { type: "simResult", league: result, rngState: rng.state() };
     self.postMessage(response);
   } else if (cmd.type === "offseason") {
     const seed = (cmd.league.lid * 1000 + cmd.league.season) >>> 0;
@@ -59,10 +58,15 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
     // exactly the way the equivalent button click above does (see
     // core/autopilot.ts), so jumping five seasons and clicking through five
     // seasons land on the same world.
-    const result = jumpSeasons(cmd.league, cmd.seasons, (seasonsDone, totalSeasons, season) => {
-      const progress: WorkerResponse = { type: "jumpProgress", seasonsDone, totalSeasons, season };
-      self.postMessage(progress);
-    });
+    const result = jumpSeasons(
+      cmd.league,
+      cmd.seasons,
+      (seasonsDone, totalSeasons, season) => {
+        const progress: WorkerResponse = { type: "jumpProgress", seasonsDone, totalSeasons, season };
+        self.postMessage(progress);
+      },
+      { seasonAcc: cmd.seasonAcc },
+    );
     const response: WorkerResponse = { type: "jumpResult", league: result };
     self.postMessage(response);
   } else if (cmd.type === "intl") {
