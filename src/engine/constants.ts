@@ -523,3 +523,14 @@ export const POSITION_FOREIGN_PENALTY = 16;
 // rating, which an outfielder simply does not have. Only reachable when a side
 // runs out of fit keepers (an injured GK with no keeper on the bench).
 export const POSITION_KEEPER_PENALTY = 35;
+
+// Extra time: two 15-minute halves after a level knockout tie, played on
+// straight through the countdown clock past the regulation whistle. The engine
+// has no stoppage in extra time, so each half is exactly this long.
+export const EXTRA_TIME_SECONDS = 30 * 60;
+
+// Stream tag for WHEN each extra-time chance happens. The chances themselves are
+// still rolled on the tie's own stream, in the order they always were; only the
+// minute they are shown at comes from this one, drawn off match intrinsics, so
+// timing extra time moved no result.
+export const EXTRA_TIME_TIMING_STREAM = 93;

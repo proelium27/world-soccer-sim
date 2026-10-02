@@ -2,7 +2,11 @@ import type { LeagueStore } from "./leagueState.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import { computeOvr } from "./players/ovr.js";
 import type { Player, PlayerRatings, Position, SkillKey } from "./players/types.js";
-import { emptyCareerSummary } from "./players/careerSummary.js";
+import { emptyCareerSummary, type CareerSummary } from "./players/careerSummary.js";
+import type { ArchivedPlayer } from "./players/archive.js";
+import { ratingsForOvr } from "./players/generate.js";
+import { seasonSalaryForOvr } from "./contracts.js";
+import { hashInts } from "../engine/rng.js";
 import { RATING_MIN, RATING_MAX } from "./constants.js";
 
 /**
@@ -235,4 +239,104 @@ export function setClubFinances(
   if (!teams.some((t) => t.tid === tid)) return teams;
   const clampedHype = Math.max(0, Math.min(100, hype));
   return teams.map((t) => (t.tid === tid ? { ...t, budget, hype: clampedHype } : t));
+}
+
+/**
+ * The career summary an archived retiree carried, rebuilt so he picks it up
+ * again where he left off. The archive stores exactly the summary's shape bar
+ * `ratingSum`, which is recoverable: `avgRating` is `ratingSum / appearances`.
+ */
+function careerFromArchive(a: ArchivedPlayer): CareerSummary {
+  return {
+    totals: { ...a.totals },
+    best: { ...a.best },
+    ratingSum: a.totals.avgRating * a.totals.appearances,
+    seasons: a.seasons.map((s) => ({ ...s })),
+  };
+}
+
+/**
+ * God Mode: bring a retired player back as a free agent.
+ *
+ * Only a retiree in the archive can come back. Retirement deletes a player
+ * outright and the archive keeps only careers worth a profile page; for anyone
+ * else there is nothing left to restore. No-op if the pid isn't archived or is
+ * somehow still in the pool.
+ *
+ * **The archive keeps his career, not his attributes**, so his ratings are
+ * rebuilt from his position's template at the rating he played his final season
+ * at (`finalOvr`), off a stream seeded by his pid so the same retiree always
+ * comes back the same. Everything the archive does keep comes with him: career
+ * totals and bests, the club-per-season line honours are credited on, his peak
+ * and his caps. His per-season stat lines are gone for good, which is why a
+ * living player's honours fall back to his career summary
+ * (`core/playerHonors.ts`).
+ *
+ * He keeps his real age, so a 38-year-old is still 38 and the next offseason's
+ * retirement roll treats him as one; edit his age if that's not the plan (a
+ * ratings lock stops decline, not retirement).
+ * Pure and off the shared rng.
+ */
+export function unretirePlayer(league: LeagueStore, pid: number): LeagueStore {
+  const archive = league.retiredPlayers ?? [];
+  const a = archive.find((r) => r.pid === pid);
+  if (!a || league.players.some((p) => p.pid === pid)) return league;
+
+  const seed = hashInts(pid, 0x0e7e7);
+  const ratings = ratingsForOvr(a.pos, a.finalOvr, a.heightCm, seed);
+  const ovr = computeOvr(a.pos, ratings, a.heightCm);
+  const beatsPeak = ovr > a.peakOvr;
+  // One snapshot per archived season, so his profile's rating chart and history
+  // table show the career he had rather than starting today. Same seed as his
+  // current ratings, so each season is the same player scaled to that season's
+  // rating. A snapshot stamped N is what he carried through N + 1.
+  const nowStamp = league.season - 1;
+  const pastHist = a.seasons
+    .filter((s) => s.season - 1 < nowStamp)
+    .map((s) => ({
+      season: s.season - 1,
+      ratings: ratingsForOvr(a.pos, s.ovr, a.heightCm, seed),
+      ovr: s.ovr,
+      potential: Math.max(s.ovr, a.peakOvr),
+      academy: false,
+      pos: a.pos,
+    }));
+  const player: Player = {
+    pid,
+    name: a.name,
+    nationality: a.nationality,
+    born: a.born,
+    pos: a.pos,
+    heightCm: a.heightCm,
+    ratings,
+    ovr,
+    // No scout estimate survives retirement, and a veteran's ceiling is where
+    // he already is.
+    potential: ovr,
+    // Expiring this season, which is what makes him a free agent anyone can sign.
+    contract: { salary: seasonSalaryForOvr(ovr, pid, league.season), expiresSeason: league.season },
+    injury: null,
+    stats: [],
+    hist: [
+      ...pastHist,
+      { season: nowStamp, ratings, ovr, potential: ovr, academy: false, pos: a.pos },
+    ],
+    peakOvr: beatsPeak ? ovr : a.peakOvr,
+    peakOvrSeason: beatsPeak ? league.season - 1 : a.peakSeason,
+    career: careerFromArchive(a),
+    // The archive keeps only the headline international numbers; the
+    // per-campaign lines and tournament counts didn't survive, so the World
+    // Cups he won are the fewest he can have been named for.
+    intl: a.caps > 0 || a.intlTitles > 0
+      ? {
+          caps: a.caps, goals: a.intlGoals, assists: 0,
+          tournaments: a.intlTitles, titles: a.intlTitles, seasons: [],
+        }
+      : undefined,
+  };
+  return {
+    ...league,
+    players: [...league.players, player],
+    retiredPlayers: archive.filter((r) => r.pid !== pid),
+  };
 }

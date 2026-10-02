@@ -31,6 +31,7 @@ import { competitionTitlePlayoff } from "../competitions.js";
 import {
   CONFERENCE_PLAYOFF_TEAMS,
   CONFERENCE_SINGLE_PLAYOFF_TEAMS,
+  LIGUILLA_TEAMS,
   TITLE_PLAYOFF_TEAMS,
   ZONE_PLAYOFF_TEAMS,
 } from "../constants.js";
@@ -60,6 +61,7 @@ export function playoffEntrants(format: PlayedTitlePlayoffFormat): number {
     case "conference": return 2 * CONFERENCE_PLAYOFF_TEAMS;
     case "conference-single": return 2 * CONFERENCE_SINGLE_PLAYOFF_TEAMS;
     case "zones": return 2 * ZONE_PLAYOFF_TEAMS;
+    case "liguilla": return LIGUILLA_TEAMS;
     default: return TITLE_PLAYOFF_TEAMS;
   }
 }
@@ -106,8 +108,12 @@ export function playoffResult(playoff: TitlePlayoff, tid: number): PlayoffStage 
   if (!playoff.teams.includes(tid)) return null;
   const stages = playoffStages(playoff.format);
   if (playoff.winnerTid === tid) return stages[0];
-  const lost = playoff.ties.find((t) => (t.home === tid || t.away === tid) && t.winner !== tid);
-  if (!lost) return null;
+  // The club's LAST tie, not its first defeat: in a Liguilla's play-in the loser
+  // of 7th v 8th plays again for the eighth seed, so an early loss need not be
+  // the end.
+  const played = playoff.ties.filter((t) => t.home === tid || t.away === tid);
+  const lost = played[played.length - 1];
+  if (!lost || lost.winner === tid) return null;
   return stages.find((s) => s.round === lost.round) ?? null;
 }
 

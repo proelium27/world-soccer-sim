@@ -100,6 +100,15 @@ describe("retired player profile", () => {
     expect(render(league, 999002)).toContain("Player not found");
   });
 
+  it("offers Un-retire only in God Mode", () => {
+    const league = makeLeague(0, 1);
+    league.retiredPlayers = [archived({ pid: 999004 })];
+    league.godMode = false;
+    expect(render(league, 999004)).not.toContain("Un-retire");
+    league.godMode = true;
+    expect(render(league, 999004)).toContain("Un-retire");
+  });
+
   it("credits honours the same way a living player's profile does", () => {
     const league = makeLeague(0, 1);
     const club = league.teams[0];

@@ -177,6 +177,24 @@ export interface BoxScore {
    */
   firstHalfStoppage?: number;
   /**
+   * Where extra time kicked off on the countdown clock, when the match had any.
+   *
+   * Extra time runs straight on down the same clock past the regulation whistle
+   * for EXTRA_TIME_SECONDS, so its events sort after regulation's and the live
+   * viewer can play on into them. This is the one number needed to label them
+   * 91' to 120' rather than 90+n. It sits on the minute boundary at or after the
+   * whistle, so every extra-time minute is a whole playing-time minute.
+   *
+   * `finalClock` stays the REGULATION whistle on purpose: it is what minutes
+   * played and the live rating are measured to, and extra time adds to neither
+   * (see playExtraTime in core/cup/simCup.ts).
+   *
+   * Optional, and absent means no extra-time events: a tie that never went to
+   * extra time, or one played before 2026-09-27, whose extra time wrote its
+   * shots into the player lines and left no timeline.
+   */
+  extraTimeClock?: number;
+  /**
    * Set when this box score's detail — `events`, `home` and `away` — has been
    * emptied to keep it out of memory, rather than because the match recorded
    * none.

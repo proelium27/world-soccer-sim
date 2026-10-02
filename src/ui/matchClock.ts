@@ -23,7 +23,7 @@
  * from 47.
  */
 import type { MatchEvent } from "../engine/attribution.js";
-import { MATCH_SECONDS } from "../engine/constants.js";
+import { EXTRA_TIME_SECONDS, MATCH_SECONDS } from "../engine/constants.js";
 
 /** Regulation length in minutes. Stoppage pushes real matches past this. */
 export const REGULATION_MINUTES = MATCH_SECONDS / 60;
@@ -80,8 +80,18 @@ export function halfTimeMinute(firstHalfStoppage?: number): number {
  * engine played both halves' stoppage together at the end. Those matches read
  * exactly as they always did, except that the tail now says 90+3 rather than 93.
  */
-export function matchMinuteLabel(minute: number, firstHalfStoppage?: number): string {
+export function matchMinuteLabel(
+  minute: number,
+  firstHalfStoppage?: number,
+  extraTimeClock?: number,
+): string {
   const h1 = stoppageMinutes(firstHalfStoppage);
+  // Extra time restarts the wall clock at 90 and counts on to 120, whatever
+  // stoppage the second half had. See `BoxScore.extraTimeClock`.
+  if (extraTimeClock !== undefined) {
+    const etStart = extraTimeStartMinute(extraTimeClock);
+    if (minute > etStart) return `${REGULATION_MINUTES + minute - etStart}'`;
+  }
   if (minute <= HALF_TIME_MINUTE) return `${minute}'`;
   if (minute <= HALF_TIME_MINUTE + h1) return `${HALF_TIME_MINUTE}+${minute - HALF_TIME_MINUTE}'`;
   const displayed = minute - h1;
@@ -90,8 +100,29 @@ export function matchMinuteLabel(minute: number, firstHalfStoppage?: number): st
 }
 
 /** The label for a raw clock reading. The form every event row wants. */
-export function formatClock(clock: number, firstHalfStoppage?: number): string {
-  return matchMinuteLabel(eventMinute(clock), firstHalfStoppage);
+export function formatClock(clock: number, firstHalfStoppage?: number, extraTimeClock?: number): string {
+  return matchMinuteLabel(eventMinute(clock), firstHalfStoppage, extraTimeClock);
+}
+
+/* ---------------------------------------------------------------------------
+   Extra time
+   --------------------------------------------------------------------------- */
+
+/** Extra time's length in minutes, and its break halfway through. */
+export const EXTRA_TIME_MINUTES = EXTRA_TIME_SECONDS / 60;
+export const EXTRA_TIME_HALF_MINUTES = EXTRA_TIME_MINUTES / 2;
+
+/**
+ * The playing-time minute extra time kicks off after: regulation's last minute.
+ * `extraTimeClock` sits on a minute boundary by construction, so this is exact.
+ */
+export function extraTimeStartMinute(extraTimeClock: number): number {
+  return Math.round((MATCH_SECONDS - extraTimeClock) / 60);
+}
+
+/** The playing-time minute extra time ends on, the 120th on the wall. */
+export function extraTimeEndMinute(extraTimeClock: number): number {
+  return extraTimeStartMinute(extraTimeClock) + EXTRA_TIME_MINUTES;
 }
 
 /* ---------------------------------------------------------------------------
@@ -122,7 +153,11 @@ export interface PeriodMarker {
   addedMinutes?: number;
 }
 
-export function periodMarkers(firstHalfStoppage?: number, finalClock?: number): PeriodMarker[] {
+export function periodMarkers(
+  firstHalfStoppage?: number,
+  finalClock?: number,
+  extraTimeClock?: number,
+): PeriodMarker[] {
   const h1 = stoppageMinutes(firstHalfStoppage);
   const halfSeconds = MATCH_SECONDS / 2;
   const out: PeriodMarker[] = [];
@@ -146,7 +181,25 @@ export function periodMarkers(firstHalfStoppage?: number, finalClock?: number): 
         addedMinutes: h2,
       });
     }
-    out.push({ clock: finalClock, minute: eventMinute(finalClock), label: "Full time" });
+    // After a level 90 the whistle ends normal time rather than the match.
+    out.push({
+      clock: finalClock,
+      minute: eventMinute(finalClock),
+      label: extraTimeClock === undefined ? "Full time" : "End of normal time",
+    });
+  }
+  if (extraTimeClock !== undefined) {
+    const start = extraTimeStartMinute(extraTimeClock);
+    out.push({
+      clock: extraTimeClock - EXTRA_TIME_HALF_MINUTES * 60,
+      minute: start + EXTRA_TIME_HALF_MINUTES,
+      label: "Extra time, half time",
+    });
+    out.push({
+      clock: extraTimeClock - EXTRA_TIME_SECONDS,
+      minute: start + EXTRA_TIME_MINUTES,
+      label: "End of extra time",
+    });
   }
   return out;
 }

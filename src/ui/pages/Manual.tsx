@@ -680,7 +680,11 @@ export function Manual() {
             both either way; the one you skip still has its box score. A league-phase match
             shows the Swiss table beside it instead of your league table, and a two-legged
             quarter-final or semi-final is watched a leg at a time, the second leg at the other
-            club's ground.
+            club's ground. A tie that's level at the end goes on into extra time and you watch
+            that too, 91st minute to the 120th, with a break at 105. If it's still level the
+            shootout isn't played out kick by kick; you just get the result at the end. Match
+            ratings stop at 90 minutes, same as in the box score, but goals scored in extra time
+            still show up next to the player.
           </p>
           <p>
             The match is played the moment you press the button, and what you're watching is the
@@ -1006,7 +1010,8 @@ export function Manual() {
             <strong>Up and down</strong> to <strong>None</strong> and the divisions are closed, the
             way Liga MX and MLS run: nobody goes up or down, whatever they finish. The{" "}
             <strong>Champion</strong> picker decides how the title is won: top of the table, a top-8
-            playoff (one game a round, or home and away like the Liguilla), or playoffs within each
+            playoff (one game a round, or home and away like the Liguilla), the Liguilla with Liga
+            MX&apos;s old play-in for 7th to 10th, or playoffs within each
             half, top 9 of each conference like MLS or top 8 of each zone like Argentina. The per-half
             ones only appear once the top flight is split with enough clubs in each half to fill
             them. And <strong>Continent</strong> puts a league in Europe or the Americas: a European
@@ -1544,11 +1549,14 @@ export function Manual() {
           </p>
           <p>
             <strong>Mexico</strong> takes the <strong>top eight</strong>: 1st v 8th, 4th v 5th, 2nd v
-            7th and 3rd v 6th, then semi-finals and a final. Every round, final included, is two legs,
-            with the better-placed club at home for the second, and it uses the Liguilla&apos;s real
-            tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s level on aggregate goes
-            to the club that finished higher, with no extra time, no penalties and no away goals. Only
-            the final goes to extra time and penalties, and there where you finished no longer helps.
+            7th and 3rd v 6th in the quarter-finals. Then the bracket is <strong>reseeded</strong>: the
+            best-placed club left plays the worst, and the other two meet. Every round, final included,
+            is two legs, with the better-placed club at home for the second, and it uses the
+            Liguilla&apos;s real tiebreaker: in the quarter-finals and semi-finals a tie that&apos;s
+            level on aggregate goes to the club that finished higher, with no extra time, no penalties
+            and no away goals. Only the final goes to extra time and penalties, and there where you
+            finished no longer helps. Mexico&apos;s second and third divisions play the same Liguilla
+            for their own titles, since nobody goes up or down in Mexico.
           </p>
           <p>
             The <strong>US</strong> takes the <strong>top nine in each conference</strong>. Eighth
@@ -1574,8 +1582,8 @@ export function Manual() {
             <strong>Argentina</strong> takes the <strong>top eight in each zone</strong>. The round of
             16 pairs 1st in one zone with 8th in the other, 2nd with 7th and so on, so the two zone
             winners can only meet in the final. Every game is one-off at the better-placed club&apos;s
-            ground and a level game goes straight to penalties, except the final, which is at a neutral
-            ground and gets extra time first.
+            ground, except the final, which is at a neutral ground, and a level game in any round gets
+            extra time and then penalties.
           </p>
           <p>
             The winner is the champion: it&apos;s their name in the history books, on the trophy case
@@ -3462,6 +3470,7 @@ export function Manual() {
             <li><strong>Lock a player's ratings.</strong> Freeze a player where he is and the offseason stops moving him: no growth, no decline with age, and his overall and potential hold too. There's a <em>Lock ratings</em> button on his profile, a checkbox in the edit window, and a Lock button on every row of the Roster Builder if you're doing a whole squad. Everything else about him carries on as normal: he still plays, gets injured, signs contracts, moves clubs and eventually retires. Unlock him and he picks up developing again from wherever you left him. The lock is saved with the game, so it stays put if you switch God Mode back off, and his profile says so.</li>
             <li><strong>Move players freely.</strong> From a player's profile, send him to any club instantly, with no fee, no budget check, and no cap, or release him to free agency.</li>
             <li><strong>Create players.</strong> The <em>God Mode</em> page has a Create Player tool. Build a player from scratch and drop him onto any club or leave him a free agent.</li>
+            <li><strong>Un-retire players.</strong> A retired player's career page has an <em>Un-retire</em> button. He comes back as a free agent with his career totals, honours and caps intact, rated where he finished his last season. The game doesn't keep a retired player's individual ratings, so his attributes are rebuilt to fit his position and that overall. He keeps his real age, so an old player is likely to retire again at the next offseason unless you make him younger in the edit window. Lock his ratings too if you don't want age wearing him down. Only players who have a career page can come back; anyone else who retired is gone from the save for good.</li>
             <li><strong>Build any club's roster.</strong> The same page lets you pick any club and add, move, or release its players directly.</li>
             <li><strong>Set club finances and identity.</strong> Set any club's budget and hype to whatever you want, and rename or recolor any club.</li>
             <li><strong>Rewrite the award formulas.</strong> The God Mode page has an Awards tab for changing what the end-of-season awards reward. The quick way is a style: <em>Goals win awards</em> doubles what goals and assists are worth, <em>Defenders get their due</em> doubles tackles, interceptions and save percentage for the Team of the Season and the defensive world awards, <em>Trophies decide it</em> triples titles and cup runs, and <em>Form only</em> stops a player's overall rating counting at all. Underneath, <em>Fine-tune the numbers</em> lists every weight: goals and assists by position, match rating, overall, tackles and interceptions per game, save percentage, the league games needed to qualify (19 out of the box), and everything the Ballon d&apos;Or adds for league strength, trophies, cup runs and international football. Each one is explained as what it's worth in goals by a forward. Before you save, the tab shows who would have won last season's Ballon d&apos;Or, Goalkeeper and Defender of the Year and your league's Player of the Season under your numbers, judged on the players still in the game. Save and your formula is used the next time awards are handed out. Seasons already played keep their winners, and picking <em>As shipped</em> puts the game's own formula back. Worth knowing: a Team of the Season place is part of what makes a big club refuse to sell a star, so changing that formula also changes who&apos;s on the market. Like a ratings lock, it stays in force if you switch God Mode off, and the Awards page says so.</li>

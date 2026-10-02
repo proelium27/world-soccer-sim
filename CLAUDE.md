@@ -56,6 +56,7 @@ npm run audit:cluster -- <auditName>  # split an audit's seeds across two Macs
 - A merged PR isn't done until it's pulled into local `main` (`git checkout main && git pull`).
 - Only skip this if the user explicitly asks you to hold off.
 - One account (proelium27) works this repo, but several branches/worktrees are usually open at once, so avoid making two branches fight over one shared file. Local `main` is often stale: measure against `origin/main` / `git merge-base HEAD origin/main`.
+- **Every PR the user will merge targets `main`.** Don't stack a PR on another PR's branch; wait for the parent to merge, then branch off `origin/main`. If a stack is unavoidable, open the child as a **draft**, say "stacked: do not merge until it targets main" at the top of its body, and when the parent merges, confirm with `gh pr view <n> --json baseRefName` that the child now targets `main` (retarget it with `gh pr edit <n> --base main` if not) before calling it ready. A stacked PR merged into its parent's branch after the parent was squashed never reaches main; this happened 12 times (#406 most recently). The repo deletes head branches on merge, which normally retargets children automatically, but check anyway.
 - **worldsoccersim.org deploys itself** via Cloudflare Workers Builds on every push to main (shows as a check run, not a GitHub deployment; lag 6-20 min). There is no deploy workflow in `.github/`, and none should be added. See `docs/cloudflare.md`.
 
 ## Files to keep in sync in the same PR
