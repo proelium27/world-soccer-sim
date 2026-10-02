@@ -19,6 +19,7 @@ function ClubRows({ clubs }: { clubs: ClubInView[] }) {
         <tr className="small text-muted">
           <th className="fw-normal">Club</th>
           <th className="fw-normal">Feeling</th>
+          <th className="fw-normal">Starts</th>
           <th className="fw-normal text-end">Main reason</th>
         </tr>
       </thead>
@@ -27,6 +28,7 @@ function ClubRows({ clubs }: { clubs: ClubInView[] }) {
           <tr key={c.tid} title={appealBreakdown(c.appeal)}>
             <td><ClubLink tid={c.tid} crest /></td>
             <td className={`small text-nowrap ${interestTone(c)}`}>{c.interest}</td>
+            <td className="small text-muted">{c.starts ? "Yes" : "No"}</td>
             <td className="small text-muted text-end">{mainReason(c.appeal) ?? ""}</td>
           </tr>
         ))}
@@ -36,8 +38,9 @@ function ClubRows({ clubs }: { clubs: ClubInView[] }) {
 }
 
 /**
- * How a player sees clubs: your club and why, his favourites, the best clubs
- * where he'd play, and how many he'd refuse. Reads the same view the markets
+ * How a player sees clubs: your club and why, his favourites and whether he'd
+ * start at each, and how many he'd refuse. A second "where he'd play" list was
+ * cut: his ranking already weighs playing time, so it matched the first. Reads the same view the markets
  * decide with (core/transfers/playerView.ts); what each reason means is in the
  * Manual.
  */
@@ -56,8 +59,6 @@ export function HowHeSeesClubs({ league, player }: { league: LeagueStore; player
         )}
         <div className="text-muted small mb-1">Where he'd most like to go</div>
         <ClubRows clubs={view.favourites} />
-        <div className="text-muted small mb-1">Where he'd play</div>
-        <ClubRows clubs={view.wouldPlay} />
         <p className="small text-muted mb-0">
           {view.refusedCount === 0
             ? "He'd talk to any club."

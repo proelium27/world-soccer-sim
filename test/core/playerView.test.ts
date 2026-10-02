@@ -14,24 +14,22 @@ describe("playerClubView", () => {
   const view = playerClubView(league, star);
 
   it("never lists his own club and counts every other one", () => {
-    const all = [...view.favourites, ...view.wouldPlay];
+    const all = view.favourites;
     expect(all.some((c) => c.tid === other.tid)).toBe(false);
     expect(view.clubCount).toBe(league.teams.length - 1);
   });
 
   it("orders favourites best first and caps both lists", () => {
     expect(view.favourites.length).toBeLessThanOrEqual(PLAYER_VIEW_LIST);
-    expect(view.wouldPlay.length).toBeLessThanOrEqual(PLAYER_VIEW_LIST);
     for (let i = 1; i < view.favourites.length; i++) {
       expect(view.favourites[i - 1].appeal.score).toBeGreaterThanOrEqual(view.favourites[i].appeal.score);
     }
-    for (const c of [...view.favourites, ...view.wouldPlay]) expect(c.appeal.refused).toBe(false);
+    for (const c of view.favourites) expect(c.appeal.refused).toBe(false);
   });
 
-  it("only puts clubs where he'd beat their weakest starter in the playing list", () => {
-    // Judged at the destination alone, not against his current club: the
-    // playing-time line is relative and clamped, so a benched youngster reads
-    // 0 at every club where he'd also sit.
+  it("marks a club as starting when he beats its weakest starter at his position", () => {
+    // Judged at the destination alone, not from the playing-time line, which
+    // is relative to his current club and clamped.
     const choice = playerChoice({
       teams: league.teams, players: league.players, competitions: league.competitions,
       season: league.season, played: league.played, model: league.progressionModel,
@@ -39,15 +37,15 @@ describe("playerClubView", () => {
     const bench = league.players
       .filter((p) => other.roster.includes(p.pid))
       .sort((a, b) => a.ovr - b.ovr)[0];
+    let seen = 0;
     for (const who of [star, bench]) {
       const v = playerClubView(league, who);
-      for (const c of v.wouldPlay) {
-        expect(who.ovr).toBeGreaterThan(choice.contexts.get(c.tid)!.posWeakestStarterOvr[who.pos]);
+      for (const c of [...v.favourites, ...(v.yourClub ? [v.yourClub] : [])]) {
+        expect(c.starts).toBe(who.ovr > choice.contexts.get(c.tid)!.posWeakestStarterOvr[who.pos]);
+        seen++;
       }
-      // And nothing the rule admits is skipped for a lower-ranked club.
-      const admitted = [...v.favourites].filter((c) => who.ovr > choice.contexts.get(c.tid)!.posWeakestStarterOvr[who.pos]);
-      if (admitted.length > 0) expect(v.wouldPlay[0].tid).toBe(admitted[0].tid);
     }
+    expect(seen).toBeGreaterThan(0);
   });
 
   it("agrees with the user's-club view the transfer pages read", () => {

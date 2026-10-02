@@ -245,16 +245,18 @@ no personality traits yet.
 ### How he sees clubs (`transfers/playerView.ts`, `HowHeSeesClubs.tsx`)
 
 A card on every Player Profile: his view of the user's club with the reasons,
-his five favourite clubs, the five best clubs where the playing-time line is
-not against him, and a count of clubs he'd refuse. It reads `clubAppealFor`
+his five favourite clubs with whether he'd start at each (he beats the
+destination's weakest starter at his position), and a count of clubs he'd
+refuse. It reads `clubAppealFor`
 measured from where he stands (his club; his parent while on loan; for a free
 agent, his expected stature for AI clubs and `freeAgentFrom` for the user's),
 so it agrees with the transfer pages to the last decimal (pinned by a test
 against `userView`). Club contexts are built once per league object (a
 WeakMap, the `usePlayerRefs` pattern): ~19 ms the first time, 0.4 ms per
 further profile on the 883-club world. For a good player the favourites are
-mostly the world's biggest clubs, which is true; the second list is where he
-could actually end up.
+mostly the world's biggest clubs, which is true. A second "where he'd play"
+list shipped beside it and was cut in Stage 4: his ranking already weighs
+playing time, so it came out identical to the favourites for every player.
 
 ### Language and family ties (`transfers/corridors.ts`)
 

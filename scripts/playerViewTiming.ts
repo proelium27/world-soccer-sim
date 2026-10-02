@@ -19,7 +19,6 @@ console.log("per further player", ((performance.now() - t) / (ps.length - 1)).to
 for (const p of ps.slice(0, 3)) {
   const v = playerClubView(league, p);
   console.log(`\n${p.name} (${p.ovr}, ${p.nationality})`);
-  console.log(" likes:", v.favourites.map((c) => `${name(c.tid)} ${c.interest}`).join(" | "));
-  console.log(" plays:", v.wouldPlay.map((c) => name(c.tid)).join(" | "));
+  console.log(" likes:", v.favourites.map((c) => `${name(c.tid)} ${c.interest}${c.starts ? "" : " (bench)"}`).join(" | "));
   console.log(" refuses", v.refusedCount, "of", v.clubCount, "| your club:", v.yourClub?.interest ?? "-");
 }
