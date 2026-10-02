@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-10-01",
+  date: "2026-10-02",
   title: "See every club's reputation",
   items: [
     "**Club History** now shows a club's reputation next to its name, with how much the last summer moved it, and a **Rep** column in the season table for where it stood at the end of each season.",
