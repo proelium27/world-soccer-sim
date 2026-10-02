@@ -2886,8 +2886,10 @@ export function Manual() {
             he&apos;d most like to join and your club, and how many clubs he wouldn&apos;t talk to at all.
             Each club gets a column for every reason he weighs: its level (the squad and the money),
             its reputation, playing time, home, being far from home, language or family ties, and
-            having played there before. Green pulls him toward a club, red pushes him away, and Total
-            adds them up. &quot;Too small&quot; means the club is too big a step down for him to talk at
+            having played there before. Every reason but the last compares the move with where he is
+            now (his parent club if he&apos;s on loan): a club the same size as his scores 0 on level,
+            and a player already at home gets nothing extra for staying in his country. Green pulls
+            him toward a club, red pushes him away, and Total adds them up. &quot;Too small&quot; means the club is too big a step down for him to talk at
             any price.
           </p>
           <p>

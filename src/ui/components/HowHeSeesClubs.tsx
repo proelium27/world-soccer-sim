@@ -5,14 +5,18 @@ import type { AppealLineId, ClubAppeal } from "../../core/transfers/clubAppeal.j
 import { playerClubView, type ClubInView } from "../../core/transfers/playerView.js";
 import { ClubLink } from "./ClubLink.js";
 
-/** Every reason a player weighs, in clubAppealFor's order, with what it means on hover. */
+/**
+ * Every reason a player weighs, in clubAppealFor's order, with what it means on
+ * hover. All but Former club are the move against where he is now (his parent
+ * club on loan), so the hover says so.
+ */
 export const FACTORS: { id: AppealLineId; head: string; name: string }[] = [
-  { id: "level", head: "Level", name: "How big a club it is: the squad and the money" },
-  { id: "reputation", head: "Reputation", name: "The name the club has earned" },
+  { id: "level", head: "Level", name: "How much bigger or smaller a club than his: the squad and the money" },
+  { id: "reputation", head: "Reputation", name: "How much bigger or smaller a name than his club" },
   { id: "playingTime", head: "Playing time", name: "Whether he'd play more or less than he does now" },
-  { id: "home", head: "Home", name: "A club in his own country" },
-  { id: "confederation", head: "Far from home", name: "A club outside his part of the world" },
-  { id: "language", head: "Language", name: "A country he knows: a shared language or family ties" },
+  { id: "home", head: "Home", name: "Moving to or away from his own country" },
+  { id: "confederation", head: "Far from home", name: "Moving to or away from a club outside his part of the world" },
+  { id: "language", head: "Language", name: "Moving to or away from a country he knows: a shared language or family ties" },
   { id: "formerClub", head: "Former club", name: "A club he has played for before" },
 ];
 
