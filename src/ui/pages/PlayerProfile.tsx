@@ -436,8 +436,6 @@ export function PlayerProfile() {
               )}
             </div>
           </div>
-
-          <HowHeSeesClubs league={league} player={player} />
         </div>
 
         <div className="col-lg-7">
@@ -521,6 +519,8 @@ export function PlayerProfile() {
           </div>
         </div>
       </div>
+
+      <HowHeSeesClubs league={league} player={player} />
 
       <div className="card mt-3">
         <div className="card-body">

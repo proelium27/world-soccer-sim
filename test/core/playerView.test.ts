@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { playerClubView, owningClub, mainReason, PLAYER_VIEW_LIST } from "../../src/core/transfers/playerView.js";
+import { playerClubView, owningClub, PLAYER_VIEW_LIST } from "../../src/core/transfers/playerView.js";
 import { userView } from "../../src/core/transfers/userView.js";
 import { playerChoice } from "../../src/core/transfers/playerChoice.js";
 import { makeLeague } from "../helpers/league.js";
@@ -59,13 +59,5 @@ describe("playerClubView", () => {
     const mine = league.players.find((p) => p.pid === league.teams.find((t) => t.tid === userTid)!.roster[0])!;
     expect(playerClubView(league, mine).yourClub).toBeNull();
     expect(owningClub(league, mine.pid)).toBe(userTid);
-  });
-
-  it("names the biggest line as the reason", () => {
-    expect(mainReason({
-      score: 0.1, refused: false,
-      lines: [{ id: "home", label: "Home country", value: 0.05 }, { id: "playingTime", label: "Playing time", value: -0.2 }],
-    })).toBe("Playing time");
-    expect(mainReason({ score: 0, refused: false, lines: [] })).toBeNull();
   });
 });

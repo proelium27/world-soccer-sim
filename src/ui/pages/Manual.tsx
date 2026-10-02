@@ -2882,10 +2882,13 @@ export function Manual() {
             On a loan the home and language reasons count for half, since it&apos;s only a season.
           </p>
           <p>
-            <strong>How he sees clubs.</strong> Every player&apos;s profile has a card with his view of
-            your club and his reasons, the five clubs he&apos;d most like to join with whether he&apos;d
-            start at each, and how many clubs he wouldn&apos;t talk to at all. Hover a club for his full
-            reasons.
+            <strong>How he sees clubs.</strong> Every player&apos;s profile has a card with the five clubs
+            he&apos;d most like to join and your club, and how many clubs he wouldn&apos;t talk to at all.
+            Each club gets a column for every reason he weighs: its level (the squad and the money),
+            its reputation, playing time, home, being far from home, language or family ties, and
+            having played there before. Green pulls him toward a club, red pushes him away, and Total
+            adds them up. &quot;Too small&quot; means the club is too big a step down for him to talk at
+            any price.
           </p>
           <p>
             <strong>Free agency is the player&apos;s choice.</strong> Clubs make offers and each free agent

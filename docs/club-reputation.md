@@ -257,6 +257,11 @@ further profile on the 883-club world. For a good player the favourites are
 mostly the world's biggest clubs, which is true. A second "where he'd play"
 list shipped beside it and was cut in Stage 4: his ranking already weighs
 playing time, so it came out identical to the favourites for every player.
+Stage 4 also opened the card up into a full breakdown: a column per appeal
+line (only those some shown club has), a Total that is the score the markets
+use, your club as its own group under a rule, and the card moved to full
+width below the profile's two columns. A refusal's level line is a flat -1
+marker, so it shows as "Too small" with "Refuses" as the total.
 
 ### Language and family ties (`transfers/corridors.ts`)
 

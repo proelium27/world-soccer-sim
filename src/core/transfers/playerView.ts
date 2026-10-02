@@ -98,9 +98,3 @@ export function playerClubView(league: LeagueStore, player: Player): PlayerClubV
   };
 }
 
-/** The line that counts most either way, for a one-line reason ("Home country"). */
-export function mainReason(appeal: ClubAppeal): string | null {
-  let best: { label: string; value: number } | null = null;
-  for (const l of appeal.lines) if (!best || Math.abs(l.value) > Math.abs(best.value)) best = l;
-  return best ? best.label : null;
-}
