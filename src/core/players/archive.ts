@@ -1,4 +1,5 @@
-import type { Player, Position } from "./types.js";
+import type { Player, Position, SeasonStats } from "./types.js";
+import type { IntlCareer } from "../international/career.js";
 import type { ArchivedSeason } from "./careerSummary.js";
 import { careerOf } from "./careerSummary.js";
 import { ageOf } from "./progression.js";
@@ -226,6 +227,46 @@ export function archivePlayer(player: Player, season: number): ArchivedPlayer {
     intlGoals: player.intl?.goals ?? 0,
     intlTitles: player.intl?.titles ?? 0,
   };
+}
+
+/**
+ * A retiree's full stat lines, kept beside his archive row rather than on it.
+ *
+ * `ArchivedPlayer` is held in memory for the whole session (every all-time board
+ * reads it), so it carries a career's totals and bests and nothing that grows
+ * with a career's length. The per-season lines a living profile shows are
+ * exactly that kind of thing, so they go in their own IndexedDB store
+ * (`retireeCareers`, db/database.ts) and are read one player at a time, when his
+ * profile opens. The sim never reads them back.
+ *
+ * Cup lines are not here because they never left: the archived cups key them by
+ * pid and retirement leaves those alone.
+ */
+export interface RetireeCareer {
+  pid: number;
+  /** His league season rows, exactly as `Player.stats` held them, stints and all. */
+  stats: SeasonStats[];
+  /** His whole national-team record, per-campaign lines included; null if never involved. */
+  intl: IntlCareer | null;
+}
+
+/**
+ * The stat lines of every retiree who gets an archive row.
+ *
+ * Same gate as `extendRetireeArchive`, so a career with lines always has a row
+ * to hang them off; the main thread still drops any whose row the archive cap
+ * prunes (see `useSimWorker`). `stats` is whatever the caller's copy of the
+ * player holds, which in the worker is only the last few seasons
+ * (`detachCareer`): the main thread puts the rest back on the front.
+ *
+ * Pure, reads no rng.
+ */
+export function retireeCareersOf(retirees: Player[]): RetireeCareer[] {
+  return retirees.filter(isArchiveWorthy).map((p) => ({
+    pid: p.pid,
+    stats: p.stats,
+    intl: p.intl ?? null,
+  }));
 }
 
 /**

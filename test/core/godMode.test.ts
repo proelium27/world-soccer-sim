@@ -325,6 +325,22 @@ describe("unretirePlayer", () => {
     expect(computePlayerHonors(p, history).leagueTitles).toEqual([1]);
   });
 
+  it("gets his real stat lines back when they were kept", () => {
+    // The lines stored beside his archive row (RetireeCareer): he returns with
+    // the season table and national-team record his profile showed before.
+    const before = retiree();
+    const saved = { pid: 7, stats: before.stats, intl: before.intl ?? null };
+    const next = unretirePlayer(league({ season: SEASON, retiredPlayers: [archived] }), 7, saved);
+    const p = next.players.find((x) => x.pid === 7)!;
+    expect(p.stats).toEqual(before.stats);
+    expect(p.intl).toEqual(before.intl);
+    // Somebody else's lines are never grafted onto him.
+    const wrong = unretirePlayer(
+      league({ season: SEASON, retiredPlayers: [archived] }), 7, { ...saved, pid: 8 },
+    );
+    expect(wrong.players.find((x) => x.pid === 7)!.stats).toEqual([]);
+  });
+
   it("comes back the same way every time", () => {
     const l = league({ season: SEASON, retiredPlayers: [archived] });
     expect(unretirePlayer(l, 7).players).toEqual(unretirePlayer(l, 7).players);

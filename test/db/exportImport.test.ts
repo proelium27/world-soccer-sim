@@ -113,6 +113,38 @@ describe("importLeagueJSON", () => {
   });
 });
 
+describe("retired players' stat lines in an exported save", () => {
+  const withArchive = () => {
+    const league = makeLeague(0, 1);
+    return {
+      ...league,
+      retiredPlayers: [{ pid: 9001 }, { pid: 9002 }] as unknown as typeof league.retiredPlayers,
+    };
+  };
+  // Packed, as the store holds them and the file carries them.
+  const line = (pid: number) => ({ pid, cols: ["season", "goals"], rows: [[3, 9]], intl: null });
+
+  it("survives the round trip and stays off the league record", async () => {
+    const bytes = await encodeLeagueFile(withArchive(), undefined, [line(9001), line(9002)]);
+    const { league, retireeCareers } = await importLeagueJSON(new File([bytes], "s.json.gz"));
+    expect(retireeCareers).toEqual([line(9001), line(9002)]);
+    expect("retireeCareers" in (league as unknown as Record<string, unknown>)).toBe(false);
+  });
+
+  it("drops lines for anyone the file's archive doesn't have, and junk rows", async () => {
+    const bytes = await encodeLeagueFile(
+      withArchive(), undefined, [line(9001), line(4242), { pid: "x" } as never],
+    );
+    const { retireeCareers } = await importLeagueJSON(new File([bytes], "s.json.gz"));
+    expect(retireeCareers).toEqual([line(9001)]);
+  });
+
+  it("reads an older file without them as none", async () => {
+    const { retireeCareers } = await importLeagueJSON(jsonFile("old.json", makeLeague(0, 1)));
+    expect(retireeCareers).toEqual([]);
+  });
+});
+
 describe("custom club badges in an exported save", () => {
   const PNG = "data:image/png;base64,AAAA";
 
