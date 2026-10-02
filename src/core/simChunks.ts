@@ -1,4 +1,4 @@
-import type { SimThrough } from "../core/simThrough.js";
+import type { SimThrough } from "./simThrough.js";
 
 /**
  * How many matchdays one worker round trip plays when a sim is split.

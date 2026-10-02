@@ -1,6 +1,6 @@
 import type { LeagueStore } from "../core/leagueState.js";
 import type { SimThrough } from "../core/simThrough.js";
-import type { PlayedMatch, TeamSeasonStats } from "../core/standings.js";
+import type { PlayedMatch, TeamSeasonAcc, TeamSeasonStats } from "../core/standings.js";
 import type { CupTie } from "../core/cup/types.js";
 import type { DomesticTieResult } from "../core/simThrough.js";
 import type { OffseasonInputs } from "../core/offseason.js";
@@ -29,7 +29,7 @@ export type WorkerCommand =
        * Resume the shared rng stream from here instead of seeding it afresh.
        * Set on every chunk of a split sim but the first, from the `rngState`
        * the previous chunk returned, so the chunks draw exactly the sequence
-       * one call would have (see ui/simChunks.ts).
+       * one call would have (see core/simChunks.ts).
        */
       rngState?: number;
       /** See simThrough's option of the same name. Set on every chunk of a split sim. */
@@ -70,7 +70,13 @@ export type WorkerCommand =
   | { type: "intl"; mode: IntlMode; league: LeagueStore }
   | { type: "playoffs"; mode: PlayoffMode; league: LeagueStore }
   /** Play `seasons` whole seasons with the AI running the user's club (core/autopilot.ts). */
-  | { type: "jump"; seasons: number; league: LeagueStore };
+  | {
+      type: "jump";
+      seasons: number;
+      league: LeagueStore;
+      /** This season's team totals so far; see jumpSeasons' option of the same name. */
+      seasonAcc?: TeamSeasonAcc;
+    };
 
 // Worker -> UI
 export type WorkerResponse =

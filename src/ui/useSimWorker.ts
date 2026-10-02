@@ -13,7 +13,7 @@ import {
 } from "../core/simArchive.js";
 import { referencedPids } from "../core/players/playerNames.js";
 import { honourSourcesOf } from "../core/frivolities/goat.js";
-import { teamSeasonStatsFor } from "../db/leagueDb.js";
+import { teamSeasonStatsFor, teamSeasonAccFor } from "../db/leagueDb.js";
 import { offseasonCoefficientSlots } from "../core/cup/coefficients.js";
 
 export type SimProgress = {
@@ -200,8 +200,13 @@ export function useSimWorker() {
         // just play (computeTeamSeasonStats). Working it out here is what makes
         // stripping them safe; without it the offseason would aggregate stubs
         // and quietly record a season of zeroes.
+        // A jump keeps `played` as it is in memory, which is with this
+        // session's stripped matches' player lines gone, so it carries the
+        // season's running totals instead of re-adding them from nothing.
         const outgoing =
-          command.type === "offseason" && stripPlayed
+          command.type === "jump"
+            ? { ...command, league: payload, seasonAcc: teamSeasonAccFor(command.league) }
+            : command.type === "offseason" && stripPlayed
             ? {
                 ...command,
                 league: payload,
@@ -246,7 +251,7 @@ export function useSimWorker() {
   );
 
   /**
-   * One chunk of a split sim (ui/simChunks.ts): progress comes without box
+   * One chunk of a split sim (core/simChunks.ts): progress comes without box
    * scores, and the rng stream resumes from `rngState` when given. Returns
    * where the stream stopped, for the next chunk.
    */

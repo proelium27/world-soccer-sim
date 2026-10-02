@@ -8,7 +8,7 @@ export function mulberry32(seed: number): () => number {
  * picked up again somewhere else: `mulberry32(r.state())` continues exactly
  * where `r` left off. Its whole state is one 32-bit integer, which is what lets
  * a long sim be split into chunks across the worker boundary and still draw the
- * identical sequence a single call would have (see ui/simChunks.ts).
+ * identical sequence a single call would have (see core/simChunks.ts).
  */
 export function mulberry32Resumable(seed: number): { next: () => number; state: () => number } {
   let a = seed >>> 0;

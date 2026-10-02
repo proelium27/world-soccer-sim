@@ -219,6 +219,19 @@ function foldFor(league: LeagueStore): { folded: number; acc: TeamSeasonAcc } {
  * wrong table is worse than a loud one.
  */
 export function teamSeasonStatsFor(league: LeagueStore, teamIds: number[]): TeamSeasonStats[] {
+  return teamSeasonStatsFromAcc(teamSeasonAccFor(league), teamIds);
+}
+
+/**
+ * The accumulator behind `teamSeasonStatsFor`, covering every match in
+ * `league.played`: an independent copy, so the caller may fold more into it.
+ *
+ * For handing the season so far to code that will keep playing it somewhere
+ * the fold does not live — a multi-season jump in the worker, which used to
+ * total the season from `played` itself and so counted every match this
+ * session had already stripped as a game with no goals, shots or ratings.
+ */
+export function teamSeasonAccFor(league: LeagueStore): TeamSeasonAcc {
   const f = foldFor(league);
   const acc = cloneTeamSeasonAcc(f.acc);
   const rest = league.played.slice(f.folded);
@@ -228,7 +241,7 @@ export function teamSeasonStatsFor(league: LeagueStore, teamIds: number[]): Team
     );
   }
   addToTeamSeasonAcc(acc, rest);
-  return teamSeasonStatsFromAcc(acc, teamIds);
+  return acc;
 }
 
 /** Whether this match's box score was dropped from memory rather than never recorded. */

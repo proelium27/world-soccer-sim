@@ -56,8 +56,9 @@ import { liveCandidates, type LiveCandidate } from "../live/liveCandidates.js";
 import { playSuperCups, superCupsPending } from "../../core/superCup/superCup.js";
 import { superCupChampion } from "../../core/superCup/types.js";
 import type { PlayedMatch } from "../../core/standings.js";
-import { trackEvent } from "../analytics.js";
-import { simChunkTargets, simMatchdayCount } from "../simChunks.js";
+import { trackEvent, trackEventNow } from "../analytics.js";
+import { simChunkTargets, simMatchdayCount } from "../../core/simChunks.js";
+import { isLowMemoryDevice } from "../lowMemoryDevice.js";
 import { userSpendPolicy } from "../userDebt.js";
 
 interface LeagueContextValue {
@@ -438,16 +439,23 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     overlayOpenRef.current = true;
     setSimOverlayOpen(true);
     try {
-      // A long sim goes to the worker a few matchdays at a time, each chunk
-      // saved — and its box scores dropped from memory — before the next one
-      // starts. One round trip for a whole season is what ran phone tabs out of
-      // memory (see ui/simChunks.ts). The chunks play exactly the matches one
-      // call would; the overlay sees one continuous run.
-      const targets = simChunkTargets(current.schedule, through);
+      // On a phone, a long sim goes to the worker a few matchdays at a time,
+      // each chunk saved — and its box scores dropped from memory — before the
+      // next one starts. One round trip for a whole season is what ran phone
+      // tabs out of memory (see core/simChunks.ts). The chunks play exactly the
+      // matches one call would, and the overlay sees one continuous run. Each
+      // chunk costs a save, so a desktop, which never needed the split, keeps
+      // the single round trip (see ui/lowMemoryDevice.ts).
+      const targets = isLowMemoryDevice() ? simChunkTargets(current.schedule, through) : [through];
       const total = simMatchdayCount(current.schedule, through);
       const batchStartMatchday = targets.length > 1
         ? Math.min(...current.schedule.map((g) => g.matchday))
         : undefined;
+      trackEventNow("sim_started", {
+        kind: "sim",
+        through: typeof through === "object" ? "matchday" : through,
+        ...(targets.length > 1 ? { split: true } : {}),
+      });
       let result = current;
       let rngState: number | undefined;
       let shown = 0;
@@ -542,6 +550,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       // The progress callback hands over the matchday's results directly, which
       // saves picking them back out of the returned league by matchday number.
       let mdResults: PlayedMatch[] = [];
+      trackEventNow("sim_started", { kind: "sim", through: "game" });
       const result = await sim("game", current, (progress) => {
         mdResults = progress.results;
       });
@@ -597,6 +606,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     setJumpResult(null);
     setJumpOpen(true);
     try {
+      trackEventNow("sim_started", { kind: "jump" });
       const result = await runJump(seasons, current, setJumpProgress);
       const lid = await saveLeague(result);
       const saved = { ...result, lid };
@@ -657,6 +667,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     // `sacked` still set and offers belonging to a season that has gone.
     if (isManagerDecisionPending(current.manager)) return;
     try {
+      trackEventNow("sim_started", { kind: "offseason" });
       const result = await runOffseason(current);
       // Offers belong to the boundary that produced them. Left in place they
       // survive into the next season, where accepting one is neither the job

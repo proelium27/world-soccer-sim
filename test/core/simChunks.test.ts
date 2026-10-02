@@ -3,10 +3,13 @@ import { mulberry32, mulberry32Resumable } from "../../src/engine/rng.js";
 import { simThrough, type SimThrough } from "../../src/core/simThrough.js";
 import { createLeagueState, type LeagueStore } from "../../src/core/leagueState.js";
 import { buildCompetitions, worldLeagueSpecs } from "../../src/core/competitions.js";
-import { simChunkTargets, simMatchdayCount } from "../../src/ui/simChunks.js";
+import { simChunkTargets, simMatchdayCount } from "../../src/core/simChunks.js";
+import { beginAutopilot, endAutopilot, jumpSeasons } from "../../src/core/autopilot.js";
+import { simOffseason } from "../../src/core/offseason.js";
+import { emptyTeamSeasonAcc, addToTeamSeasonAcc } from "../../src/core/standings.js";
 
 /**
- * The gate for splitting a long sim into chunks (ui/simChunks.ts).
+ * The gate for splitting a long sim into chunks (core/simChunks.ts).
  *
  * Splitting exists to keep a phone tab's memory down, and it is only acceptable
  * if nobody can tell: a season played in chunks must be EXACTLY the season one
@@ -102,4 +105,59 @@ describe("simChunks", () => {
     expect(firstDifference(chunked, whole)).toBeNull();
     expect(chunked).toEqual(whole);
   }, 300_000);
+
+  /**
+   * The jump as it was before it folded and stripped each chunk: one
+   * simThrough per season and an offseason that totals the season from the
+   * box scores themselves. The new jump must land on exactly this world.
+   */
+  function jumpOneShot(league: LeagueStore, seasons: number): LeagueStore {
+    const userTid = league.meta.userTid;
+    const target = league.season + seasons;
+    let work = beginAutopilot(league);
+    const managed: number[] = [];
+    while (work.season < target) {
+      if (work.phase === "regular") {
+        managed.push(work.season);
+        const played = work.played.length;
+        work = simThrough(work, "season", mulberry32((work.lid * 1000 + played) >>> 0));
+        if (work.phase === "regular" && work.played.length === played) break;
+      }
+      const advanced = simOffseason(work, mulberry32((work.lid * 1000 + work.season) >>> 0));
+      if (advanced.season === work.season) break;
+      work = advanced;
+    }
+    return { ...endAutopilot(work, userTid), aiManagedSeasons: [...league.aiManagedSeasons, ...managed] };
+  }
+
+  it("a jump that drops each chunk's box scores lands where the one-shot jump does", () => {
+    const whole = jumpOneShot(start, 2);
+    const folded = jumpSeasons(start, 2);
+    expect(folded.season).toBe(start.season + 2);
+    expect(folded.seasonHistory.at(-1)!.teamStats).toEqual(whole.seasonHistory.at(-1)!.teamStats);
+    expect(folded).toEqual(whole);
+  }, 600_000);
+
+  /**
+   * The game's own league holds this session's matches with their player
+   * lines dropped, so a jump started mid-season is handed the season's totals
+   * instead. Before, it added them up from the emptied matches and recorded
+   * every club's goals, shots and ratings for those matches as zero.
+   */
+  it("a mid-season jump from stripped matches plus their totals matches one from real box scores", () => {
+    const midway = simThrough(start, { matchday: 12 }, mulberry32(9), undefined, { stagePlayoffs: true });
+    const acc = emptyTeamSeasonAcc();
+    addToTeamSeasonAcc(acc, midway.played);
+    const stripped: LeagueStore = {
+      ...midway,
+      played: midway.played.map((m) => ({
+        ...m,
+        boxScore: { ...m.boxScore, home: [], away: [], events: [], detailElided: true as const },
+      })),
+    };
+    const fromReal = jumpOneShot(midway, 1);
+    const fromStripped = jumpSeasons(stripped, 1, undefined, { seasonAcc: acc });
+    expect(fromStripped.seasonHistory.at(-1)!.teamStats).toEqual(fromReal.seasonHistory.at(-1)!.teamStats);
+    expect(fromStripped).toEqual(fromReal);
+  }, 600_000);
 });

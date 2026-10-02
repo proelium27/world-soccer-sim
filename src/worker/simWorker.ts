@@ -15,7 +15,7 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
   if (cmd.type === "sim") {
     // Derive seed from league state so each sim batch is deterministic but
     // different — unless this is a later chunk of a split sim, which carries on
-    // the stream the previous chunk left off (ui/simChunks.ts).
+    // the stream the previous chunk left off (core/simChunks.ts).
     const seed = (cmd.league.lid * 1000 + cmd.league.played.length) >>> 0;
     const rng = mulberry32Resumable(cmd.rngState ?? seed);
     const result = simThrough(
@@ -58,10 +58,15 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
     // exactly the way the equivalent button click above does (see
     // core/autopilot.ts), so jumping five seasons and clicking through five
     // seasons land on the same world.
-    const result = jumpSeasons(cmd.league, cmd.seasons, (seasonsDone, totalSeasons, season) => {
-      const progress: WorkerResponse = { type: "jumpProgress", seasonsDone, totalSeasons, season };
-      self.postMessage(progress);
-    });
+    const result = jumpSeasons(
+      cmd.league,
+      cmd.seasons,
+      (seasonsDone, totalSeasons, season) => {
+        const progress: WorkerResponse = { type: "jumpProgress", seasonsDone, totalSeasons, season };
+        self.postMessage(progress);
+      },
+      { seasonAcc: cmd.seasonAcc },
+    );
     const response: WorkerResponse = { type: "jumpResult", league: result };
     self.postMessage(response);
   } else if (cmd.type === "intl") {

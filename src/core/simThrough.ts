@@ -166,7 +166,7 @@ export function simThrough(
     stagePlayoffs?: boolean;
     /**
      * The matchday the user's sim started on, when this call is one chunk of a
-     * longer one (see ui/simChunks.ts). The stop before the user's final reads
+     * longer one (see core/simChunks.ts). The stop before the user's final reads
      * "is the final still ahead of where the batch began", and a chunk that
      * happens to start ON the final's matchday would otherwise take itself for
      * a resumed batch and play the final straight through. Absent means this
