@@ -25,6 +25,7 @@ import {
   acceptInboundOffer, rejectInboundOffer, counterInboundOffer, setTransferListed,
 } from "../../core/transfers/inboundOffers.js";
 import { setMoreMinutes } from "../../core/lineup/moreMinutes.js";
+import { setSetPieceTaker, type TakerRole } from "../../core/lineup/setPieceTakers.js";
 import { toggleWatched } from "../../core/watchlist.js";
 import { extendContract, extendAcademyContract } from "../../core/contracts.js";
 import type { RenewalGroup } from "../../core/contractRenewal.js";
@@ -138,6 +139,7 @@ interface LeagueContextValue {
   requestLoanAction: (pid: number, seasons: 1 | 2 | 3) => Promise<void>;
   setTransferListedAction: (pid: number, listed: boolean) => Promise<void>;
   setMoreMinutesAction: (pid: number, enabled: boolean) => Promise<void>;
+  setSetPieceTakerAction: (role: TakerRole, pid: number | null) => Promise<void>;
   /** Star or unstar any player in the world — the /watchlist shortlist. */
   toggleWatchedAction: (pid: number) => Promise<void>;
   setLineupAction: (starters: number[]) => Promise<void>;
@@ -758,6 +760,10 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     (l) => setMoreMinutes(l, pid, enabled),
   ), [mutate]);
 
+  const setSetPieceTakerAction = useCallback((role: TakerRole, pid: number | null) => mutate(
+    (l) => setSetPieceTaker(l, role, pid),
+  ), [mutate]);
+
   const toggleWatchedAction = useCallback((pid: number) => mutate(
     (l) => toggleWatched(l, pid),
   ), [mutate]);
@@ -1372,6 +1378,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     requestLoanAction,
     setTransferListedAction,
     setMoreMinutesAction,
+    setSetPieceTakerAction,
     toggleWatchedAction,
     setLineupAction,
     setFormationAction,
@@ -1415,7 +1422,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     rejectInboundOfferAction, counterInboundOfferAction, extendContractAction,
     extendAllContractsAction,
     listPlayerForLoanAction, unlistPlayerForLoanAction, acceptLoanOfferAction,
-    rejectLoanOfferAction, requestLoanAction, setTransferListedAction, setMoreMinutesAction, toggleWatchedAction,
+    rejectLoanOfferAction, requestLoanAction, setTransferListedAction, setMoreMinutesAction, setSetPieceTakerAction, toggleWatchedAction,
     setLineupAction, setFormationAction,
     autoPickBestXIAction,
     playSuperCupsAction,

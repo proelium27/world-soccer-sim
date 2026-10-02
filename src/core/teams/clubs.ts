@@ -1145,6 +1145,15 @@ export interface StoredTeam {
    */
   moreMinutes: number[];
   /**
+   * The user's named penalty taker and set-piece taker (pids), or null/absent
+   * for "auto": the best finisher on the pitch takes the penalties and the
+   * best passer the corners. A name only counts while that player is on the
+   * pitch, so a sold, injured or benched taker quietly falls back to auto.
+   * Only ever set for the user's own team.
+   */
+  penaltyTaker?: number | null;
+  setPieceTaker?: number | null;
+  /**
    * Scouting fog-of-war: pid → the season the player was first seen on this
    * club's senior roster, so the user's potential estimate for him sharpens
    * with tenure (see src/core/scouting/potentialFog.ts). Only ever populated
@@ -1280,6 +1289,8 @@ export function assignIdentities(
       starters: null,
       transferListed: [],
       moreMinutes: [],
+      penaltyTaker: null,
+      setPieceTaker: null,
       scoutingObserved: {},
     };
   });

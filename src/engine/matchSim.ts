@@ -46,6 +46,11 @@ import {
   SUB_GATE_RATING_INFLUENCE,
   SUB_MINUTES_BOOST,
   CORNER_FROM_MISS_PROB,
+  CORNER_STREAM,
+  CORNER_FROM_BLOCKED_PROB,
+  CORNER_FROM_SAVED_PROB,
+  CORNER_PRESSURE_PER_TICK,
+  PENALTY_TAKER_SUB_SHIELD,
   PENALTY_GIVEN_FOUL,
   PENALTY_CONVERSION,
   PENALTY_MISS_SAVED_PROB,
@@ -75,6 +80,9 @@ import {
   pickFouler,
   pickHeader,
   pickCarrier,
+  penaltyTakerOf,
+  cornerTakerOf,
+  namedSetPieceTakerOf,
   eventTypeFromShot,
   emptyLine,
   attributeTouchStats,
@@ -541,6 +549,21 @@ export function simMatchDetailed(
   // Fired per SIDE, not globally: the two sides no longer share their moments.
   const firedCheckpoints: Record<Side, Set<number>> = { home: new Set(), away: new Set() };
 
+  /**
+   * Corners the defence heads clear (see CORNER_FROM_BLOCKED_PROB). Their own
+   * stream off match intrinsics, like windowMomentsFor, so they never move a
+   * shared-rng draw; and they don't bump stoppage, so they never move the clock.
+   */
+  const cornerRng = mulberry32(hashInts(
+    homePlayers[0]?.pid ?? 0,
+    awayPlayers[0]?.pid ?? 0,
+    CORNER_STREAM,
+  ));
+  function clearedCorner(side: Side): void {
+    const taker = cornerTakerOf(onPitch[side]);
+    events.push({ clock, type: "corner", side, pids: taker ? [taker.pid] : [] });
+  }
+
   const energy = new Map<number, number>();
   for (const p of [...homePlayers, ...awayPlayers, ...homeBench, ...awayBench]) {
     energy.set(p.pid, ENERGY_START);
@@ -814,7 +837,8 @@ export function simMatchDetailed(
   function subPriority(side: Side, p: MatchPlayer): number {
     const energyDeficit = ENERGY_START - energy.get(p.pid)!;
     const ratingDeficit = (RATING_BASELINE - liveRatingFor(side, p)) / 10;
-    return energyDeficit + SUB_RATING_INFLUENCE * ratingDeficit;
+    return energyDeficit + SUB_RATING_INFLUENCE * ratingDeficit
+      - (p.penaltyTaker ? PENALTY_TAKER_SUB_SHIELD : 0);
   }
 
   /**
@@ -1122,7 +1146,10 @@ export function simMatchDetailed(
         0.08,
       ) / FOUL_RATE_MULTIPLIER;
       if (rng() < penaltyP) {
-        const shooter = pickShooter(rng, onPitch[poss]);
+        // The weighted draw that used to pick the taker is still made and
+        // thrown away, so every roll after it lands where it always did.
+        const drawn = pickShooter(rng, onPitch[poss]);
+        const shooter = penaltyTakerOf(onPitch[poss]) ?? drawn;
         const shooterLine = lines.get(shooter.pid)!;
         stat[poss].shots++;
         shooterLine.shots++;
@@ -1131,8 +1158,7 @@ export function simMatchDetailed(
         events.push({ clock, type: "penalty", side: poss, pids: [shooter.pid] });
 
         // Conversion hinges on the actual taker vs. the actual keeper (both
-        // 0..100 ratings), not the fatigue-adjusted team composites — the
-        // taker picked by pickShooter is the one who shoots.
+        // 0..100 ratings), not the fatigue-adjusted team composites.
         const gk = onPitch[defSide].find((p) => p.slot === "GK");
         const gkKeeping = gk ? gk.keeping : 50;
         const goalP = clamp(
@@ -1176,7 +1202,11 @@ export function simMatchDetailed(
         0.3,
       ) / FOUL_RATE_MULTIPLIER;
       if (rng() < freeKickP) {
-        const shooter = pickShooter(rng, onPitch[poss]);
+        // A named set-piece taker shoots it; otherwise it falls to whoever's
+        // best placed, as it always did. The draw is made either way so the
+        // stream after it doesn't move.
+        const drawn = pickShooter(rng, onPitch[poss]);
+        const shooter = namedSetPieceTakerOf(onPitch[poss]) ?? drawn;
         const shooterLine = lines.get(shooter.pid)!;
         stat[poss].shots++;
         shooterLine.shots++;
@@ -1210,6 +1240,12 @@ export function simMatchDetailed(
     const edge = off.attack - def.defense;
     const chanceP = clamp(BASE_CHANCE * (1 + STRENGTH_K * edge), 0.002, 0.2);
     if (rng() >= chanceP) {
+      // No chance, but pressure: a cross or a through ball the defence puts
+      // behind. Edge-scaled like the chance itself, so the side on top wins
+      // more of them. Own stream, see cornerRng.
+      if (cornerRng() < clamp(CORNER_PRESSURE_PER_TICK * (1 + STRENGTH_K * edge), 0.001, 0.05)) {
+        clearedCorner(poss);
+      }
       continue;
     }
 
@@ -1270,8 +1306,11 @@ export function simMatchDetailed(
       rng() < CORNER_FROM_MISS_PROB
     ) {
       bumpEvent();
-      events.push({ clock, type: "corner", side: poss, pids: [] });
       const header = pickHeader(rng, onPitch[poss]);
+      // Named on the corner (so the feed can say who took it) and credited
+      // with the assist if the header goes in, the way a real corner is.
+      const taker = cornerTakerOf(onPitch[poss], header.pid);
+      events.push({ clock, type: "corner", side: poss, pids: taker ? [taker.pid] : [] });
       const headerLine = lines.get(header.pid)!;
       stat[poss].shots++;
       headerLine.shots++;
@@ -1293,7 +1332,9 @@ export function simMatchDetailed(
       if (cornerOutcome === "goal") {
         stat[poss].goals++;
         headerLine.goals++;
-        const assister = pickAssister(rng, onPitch[poss], header.pid);
+        // Drawn and discarded when there's a taker, so the stream holds.
+        const drawnAssist = pickAssister(rng, onPitch[poss], header.pid);
+        const assister = taker ?? drawnAssist;
         if (assister) {
           lines.get(assister.pid)!.assists++;
           cornerPids.push(assister.pid);
@@ -1304,6 +1345,12 @@ export function simMatchDetailed(
         continue;
       }
       events.push({ clock, type: eventTypeFromShot(cornerOutcome), side: poss, pids: cornerPids });
+    } else if (
+      (outcome === "blocked" && cornerRng() < CORNER_FROM_BLOCKED_PROB) ||
+      (outcome === "saved" && cornerRng() < CORNER_FROM_SAVED_PROB)
+    ) {
+      // Deflected behind or pushed round the post, and cleared.
+      clearedCorner(poss);
     }
 
     if (rng() < REBOUND_PROB) {

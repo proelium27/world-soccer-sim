@@ -38,10 +38,22 @@ export function toMatchPlayers(
   players: Player[],
   boostPids?: Set<number>,
   slots?: Position[],
+  takers?: SetPieceTakers,
 ): MatchPlayer[] {
   return players.map((p, i) => {
     const mp = toMatchPlayer(p, slots?.[i] ?? p.pos);
     if (boostPids?.has(p.pid)) mp.minutesBoost = true;
+    if (takers?.penalty === p.pid) mp.penaltyTaker = true;
+    if (takers?.setPiece === p.pid) mp.setPieceTaker = true;
     return mp;
   });
+}
+
+/**
+ * The user's named takers (StoredTeam.penaltyTaker / setPieceTaker). Flagged on
+ * the XI *and* the bench, so a named taker who comes on takes over the duty.
+ */
+export interface SetPieceTakers {
+  penalty?: number | null;
+  setPiece?: number | null;
 }

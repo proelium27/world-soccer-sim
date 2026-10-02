@@ -81,6 +81,8 @@ function handToAI(team: StoredTeam, players: Player[]): StoredTeam {
     starters: null,
     transferListed: [],
     moreMinutes: [],
+    penaltyTaker: null,
+    setPieceTaker: null,
     // Both scout directions — scoutingRegions and scoutingPositions — are
     // deliberately NOT cleared, though both are just as user-only. Nothing
     // reads them except the intake pass, and only for the club matching
@@ -108,6 +110,8 @@ function takeCharge(team: StoredTeam, season: number): StoredTeam {
     starters: null,
     transferListed: [],
     moreMinutes: [],
+    penaltyTaker: null,
+    setPieceTaker: null,
     scoutingObserved: reconcileScoutingObserved({}, team.roster, season),
     nextScoutingSpend: team.scoutingSpend,
   };

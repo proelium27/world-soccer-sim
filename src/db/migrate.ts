@@ -554,6 +554,10 @@ function migrateFields(league: LeagueStore): LeagueStore {
         // "Give more minutes" flags (added 2026-07-22). Old saves start with none
         // flagged — subs behave exactly as before until the user flags someone.
         moreMinutes: t.moreMinutes ?? [],
+        // Named penalty / set-piece takers (added 2026-10-02). Old saves start
+        // on auto: the best finisher and best passer on the pitch.
+        penaltyTaker: t.penaltyTaker ?? null,
+        setPieceTaker: t.setPieceTaker ?? null,
         // Fog-of-war observation map (added 2026-07-18). Old saves get an
         // empty map: the user's existing senior roster reads as tenure 0
         // (fully fogged) and then clears over the next few seasons as the
