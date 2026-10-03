@@ -16,6 +16,10 @@ export {
   withMatchDetail,
   elideWrittenDetail,
   teamSeasonStatsFor,
+  saveRetireeCareers,
+  savePackedRetireeCareers,
+  loadRetireeCareer,
+  loadPackedRetireeCareers,
 } from "./leagueDb.js";
 
 export { loadCrests, saveCrests, deleteCrests } from "./crestDb.js";

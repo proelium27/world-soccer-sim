@@ -14,7 +14,11 @@ import {
   storedPlayerRows,
   storedCareerRows,
   storedRetireeRows,
+  saveRetireeCareers,
+  loadRetireeCareer,
+  loadPackedRetireeCareers,
 } from "../../src/db/index.js";
+import { emptySeasonStats } from "../../src/core/players/types.js";
 import type { ArchivedPlayer } from "../../src/core/players/archive.js";
 
 // An England-only world (two divisions, ~1,000 players) rather than the full
@@ -77,6 +81,7 @@ beforeEach(async () => {
   await db.clear("players");
   await db.clear("careers");
   await db.clear("retirees");
+  await db.clear("retireeCareers");
   await db.clear("played");
   // Otherwise this tab still believes the pool it wrote in the previous test is
   // on disk, and would write only a diff against a store that was just wiped.
@@ -364,6 +369,67 @@ describe("leagueDb retiree store", () => {
     const lid = await saveLeague(league);
     await deleteLeague(lid);
     expect(await storedRetireeRows(lid)).toHaveLength(0);
+  });
+
+  /**
+   * A retiree's full stat lines (`RetireeCareer`) sit in their own store beside
+   * his archive row, written by the sim's result rather than by `saveLeague`,
+   * and must never outlive the row: a line with no row is a profile nobody can
+   * reach, kept forever.
+   */
+  const lines = (pid: number) => ({
+    pid,
+    stats: [{ ...emptySeasonStats(8, 1), appearances: 30, goals: 12 }],
+    intl: null,
+  });
+
+  it("keeps a retiree's stat lines off the league and reads them back by pid", async () => {
+    const league = makeLeague();
+    league.retiredPlayers = [retiree(9001, "Ade Bello")];
+    const lid = await saveLeague(league);
+    await saveRetireeCareers(lid, [lines(9001)]);
+
+    expect(await loadRetireeCareer(lid, 9001)).toEqual(lines(9001));
+    expect(await loadRetireeCareer(lid, 9002)).toBeUndefined();
+    // Never joined onto the archive in memory: that is the whole point.
+    const loaded = await loadLeague(lid);
+    expect(loaded!.retiredPlayers[0]).not.toHaveProperty("stats");
+  });
+
+  it("drops a retiree's stat lines when the cap prunes his row", async () => {
+    const league = makeLeague();
+    league.retiredPlayers = [retiree(9001, "Ade Bello"), retiree(9002, "Cai Duarte")];
+    const lid = await saveLeague(league);
+    await saveRetireeCareers(lid, [lines(9001), lines(9002)]);
+
+    league.lid = lid;
+    league.retiredPlayers = [league.retiredPlayers[0]];
+    await saveLeague(league);
+
+    expect((await loadPackedRetireeCareers(lid)).map((r) => r.pid)).toEqual([9001]);
+  });
+
+  it("sweeps stray stat lines on a full rewrite", async () => {
+    // A full write can't clear and refill this store the way it does the
+    // archive (memory doesn't hold the lines), so it has to sweep instead.
+    const league = makeLeague();
+    league.retiredPlayers = [retiree(9001, "Ade Bello")];
+    const lid = await saveLeague(league);
+    await saveRetireeCareers(lid, [lines(9001), lines(9002)]);
+
+    resetWriteCache();
+    await saveLeague({ ...league, lid });
+
+    expect((await loadPackedRetireeCareers(lid)).map((r) => r.pid)).toEqual([9001]);
+  });
+
+  it("deletes stat lines along with the league", async () => {
+    const league = makeLeague();
+    league.retiredPlayers = [retiree(9001, "Ade Bello")];
+    const lid = await saveLeague(league);
+    await saveRetireeCareers(lid, [lines(9001)]);
+    await deleteLeague(lid);
+    expect(await loadPackedRetireeCareers(lid)).toHaveLength(0);
   });
 
   it("keeps an empty archive empty instead of rewriting on every load", async () => {

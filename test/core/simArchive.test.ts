@@ -9,7 +9,7 @@ import {
 import {
   detachArchive, reattachArchive, detachPlayed, reattachPlayed,
   detachCareer, reattachCareer, detachNews, reattachNews,
-  detachTransfers, reattachTransfers,
+  detachTransfers, reattachTransfers, reattachRetireeCareers,
 } from "../../src/core/simArchive.js";
 import { PLAYER_SETTLED_SEASONS } from "../../src/core/constants.js";
 import { referencedPids } from "../../src/core/players/playerNames.js";
@@ -20,6 +20,7 @@ import type { ArchivedPlayer } from "../../src/core/players/archive.js";
 import { createLeagueState } from "../../src/core/leagueState.js";
 import { englandCompetitions } from "../../src/core/competitions.js";
 import type { LeagueStore } from "../../src/core/leagueState.js";
+import type { SeasonStats } from "../../src/core/players/types.js";
 
 /**
  * The gate for core/simArchive.ts.
@@ -286,6 +287,45 @@ describe("simArchive career windows", () => {
     const windowed = reattachCareer(simOffseason(payload, mulberry32(23)), careers);
 
     expect(windowed).toEqual(whole);
+  });
+
+  it("a retiree's stat lines come back whole from windowed careers", () => {
+    // What a retiree's profile shows is the worker's window with the held-back
+    // seasons put back on the front, so it has to equal what a run that was
+    // handed the whole career reports. The stats compared are his full
+    // `Player.stats`, which is what a living profile showed the day before.
+    const full = simThrough(aged, "season", mulberry32(24));
+    const whole = simOffseasonReporting(full, mulberry32(25)).report.retireeCareers;
+
+    const { payload, careers } = detachCareer(full);
+    const { league: result, report } = simOffseasonReporting(payload, mulberry32(25));
+    const stitched = reattachRetireeCareers(
+      report.retireeCareers, careers, result.retiredPlayers,
+    );
+
+    expect(whole.length).toBeGreaterThan(0);
+    expect(stitched).toEqual(whole);
+    // And the case is not vacuous: somebody's lines really were cut and restored.
+    expect(stitched.some((r) => (careers.get(r.pid)?.statsCut ?? 0) > 0)).toBe(true);
+  });
+
+  it("keeps lines only for a pid the merged archive still has", () => {
+    const line = (pid: number, season: number) =>
+      ({ season, tid: 1, appearances: pid }) as unknown as SeasonStats;
+    const rows = [
+      { pid: 1, stats: [line(1, 3)], intl: null },
+      { pid: 2, stats: [line(2, 3)], intl: null },
+    ];
+    const careers = new Map([
+      [1, { stats: [line(1, 1), line(1, 2), line(1, 3)], hist: [], statsCut: 2, histCut: 0 }],
+    ]);
+    const archive = [{ pid: 1 }] as unknown as ArchivedPlayer[];
+
+    expect(reattachRetireeCareers(rows, careers, archive)).toEqual([
+      { pid: 1, stats: [line(1, 1), line(1, 2), line(1, 3)], intl: null },
+    ]);
+    // A jump hands the worker whole careers, so there is nothing to put back.
+    expect(reattachRetireeCareers(rows, null, archive)).toEqual([rows[0]]);
   });
 });
 

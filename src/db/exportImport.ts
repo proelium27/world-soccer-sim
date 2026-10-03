@@ -4,7 +4,8 @@ import {
   isImageDataUrl, MAX_LOGO_DATA_URL, MAX_LOGO_ENTRIES,
 } from "../core/teams/logoPack.js";
 import { migrateLeague } from "./migrate.js";
-import { withMatchDetail } from "./leagueDb.js";
+import { withMatchDetail, loadPackedRetireeCareers } from "./leagueDb.js";
+import { isPackedRetireeCareer, type PackedRetireeCareer } from "./retireeCareerPack.js";
 
 /**
  * The first two bytes of every gzip stream. Import sniffs for these rather than
@@ -27,6 +28,7 @@ const GZIP_MAGIC = [0x1f, 0x8b];
 export async function encodeLeagueFile(
   league: LeagueStore,
   crests?: ReadonlyMap<number, string>,
+  retireeCareers: PackedRetireeCareer[] = [],
 ): Promise<Uint8Array<ArrayBuffer>> {
   // Custom badges ride along as a sibling key rather than on the league itself.
   // They are stored in their own IndexedDB store precisely so they never join
@@ -34,9 +36,14 @@ export async function encodeLeagueFile(
   // a file somebody carries to another browser, and a save that silently lost
   // its badges on the way would be worse than the bytes. Absent when there are
   // none, so a file from a save without them is byte-identical to before.
-  const payload = crests && crests.size > 0
+  const withCrests = crests && crests.size > 0
     ? { ...league, crests: [...crests].map(([tid, image]) => ({ tid, image })) }
     : league;
+  // Retired players' full stat lines ride along the same way and for the same
+  // reason: they live in their own store, never on `LeagueStore`
+  // (see RetireeCareer). Still packed, as the store holds them
+  // (retireeCareerPack.ts), so the file pays the packed size. Absent when none.
+  const payload = retireeCareers.length > 0 ? { ...withCrests, retireeCareers } : withCrests;
   const json = JSON.stringify(payload);
   const gzipped = new Blob([json])
     .stream()
@@ -72,7 +79,9 @@ export async function exportLeagueJSON(
   crests?: ReadonlyMap<number, string>,
 ): Promise<void> {
   // Never write an elided box score to a file — see `withMatchDetail`.
-  const bytes = await encodeLeagueFile(await withMatchDetail(league), crests);
+  const bytes = await encodeLeagueFile(
+    await withMatchDetail(league), crests, await loadPackedRetireeCareers(league.lid),
+  );
   const blob = new Blob([bytes], { type: "application/gzip" });
   const url = URL.createObjectURL(blob);
 
@@ -94,6 +103,8 @@ export interface ImportedLeague {
   league: LeagueStore;
   /** tid -> data URL. Empty for a file exported before badges existed, or from a save without them. */
   crests: Map<number, string>;
+  /** Retired players' full stat lines, packed, for `savePackedRetireeCareers` once the league has a lid. */
+  retireeCareers: PackedRetireeCareer[];
 }
 
 /**
@@ -190,10 +201,12 @@ export async function importLeagueJSON(file: File): Promise<ImportedLeague> {
   // object it was given, so a `crests` key left on it would ride into the league
   // record on the next save and be re-serialised on every mutation from then on
   // — silently, and only for saves that had been through a file.
-  const { crests: rawCrests, ...rest } = obj;
+  const { crests: rawCrests, retireeCareers: rawLines, ...rest } = obj;
+  const league = dropElisionMarkers(migrateLeague(rest as unknown as LeagueStore));
   return {
-    league: dropElisionMarkers(migrateLeague(rest as unknown as LeagueStore)),
+    league,
     crests: parseExportedCrests(rawCrests),
+    retireeCareers: parseExportedRetireeCareers(rawLines, league.retiredPlayers ?? []),
   };
 }
 
@@ -247,4 +260,16 @@ function parseExportedCrests(raw: unknown): Map<number, string> {
     out.set(tid, image);
   }
   return out;
+}
+
+/**
+ * The retiree stat lines out of a file, keeping only well-formed rows that
+ * belong to someone in its archive. Anything else is dropped rather than
+ * failing the import: these are detail for a profile page, and a save that
+ * loads without them is still the whole save.
+ */
+function parseExportedRetireeCareers(raw: unknown, archive: { pid: number }[]): PackedRetireeCareer[] {
+  if (!Array.isArray(raw)) return [];
+  const pids = new Set(archive.map((r) => r.pid));
+  return raw.filter((r): r is PackedRetireeCareer => isPackedRetireeCareer(r) && pids.has(r.pid));
 }

@@ -15,7 +15,7 @@ import { cullFreeAgentPoolReporting } from "./players/freeAgentCull.js";
 import { summarizeRetirements } from "./players/retirements.js";
 import { honourSourcesOf, type HonourSources } from "./frivolities/goat.js";
 import { clearSuspension } from "./suspensions.js";
-import { extendRetireeArchive } from "./players/archive.js";
+import { extendRetireeArchive, retireeCareersOf, type RetireeCareer } from "./players/archive.js";
 import { withSeason, summaryOf, ovrLookup } from "./players/careerSummary.js";
 import { extendPlayerNames } from "./players/playerNames.js";
 import { archiveCup } from "./cup/archive.js";
@@ -180,6 +180,14 @@ export interface OffseasonReport {
    * culled nobody, a retiree had a real career and his rows are kept on purpose.
    */
   culledPids: Set<number>;
+  /**
+   * The full stat lines of every retiree who got an archive row.
+   *
+   * The archive row itself stays slim because it is held in memory all session;
+   * these go to their own store on disk instead (`RetireeCareer`), so they leave
+   * the sim here rather than on the league. Empty when the phase was wrong.
+   */
+  retireeCareers: RetireeCareer[];
 }
 
 export function simOffseason(
@@ -209,7 +217,7 @@ export function simOffseasonReporting(
     cupSlots: precomputedSlots,
   } = inputs;
   if (league.phase !== "offseason") {
-    return { league, report: { culledPids: new Set<number>() } };
+    return { league, report: { culledPids: new Set<number>(), retireeCareers: [] } };
   }
 
   // International football (drawn the instant the season ended, see simThrough)
@@ -1450,6 +1458,6 @@ export function simOffseasonReporting(
         culled.playerNames ?? [], retirees, culled, precomputedReferenced,
       ),
     },
-    report: { culledPids: cullResult.culled },
+    report: { culledPids: cullResult.culled, retireeCareers: retireeCareersOf(retirees) },
   };
 }

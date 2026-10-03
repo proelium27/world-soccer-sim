@@ -19,7 +19,8 @@
 import type { LeagueStore } from "./leagueState.js";
 import type { StoredTeam } from "./teams/clubs.js";
 import { simThrough } from "./simThrough.js";
-import { simOffseason } from "./offseason.js";
+import { simOffseasonReporting } from "./offseason.js";
+import type { RetireeCareer } from "./players/archive.js";
 import { ensureUserRosterSafety } from "./freeAgency.js";
 import { reconcileScoutingObserved } from "./scouting/potentialFog.js";
 import { FREE_AGENT_TID } from "./transfers/negotiation.js";
@@ -178,6 +179,13 @@ export function jumpSeasons(
      * carries real box scores, as it does for every headless caller.
      */
     seasonAcc?: TeamSeasonAcc;
+    /**
+     * Handed each offseason's retiree stat lines (`OffseasonReport`). A jump
+     * crosses offseasons, and these leave the sim on the report rather than
+     * the league, so without this a jumped-through retirement keeps only the
+     * slim archive row. Absent for headless callers that don't keep them.
+     */
+    onRetireeCareers?: (careers: RetireeCareer[]) => void;
   } = {},
 ): LeagueStore {
   const total = clampJumpSeasons(seasons);
@@ -210,9 +218,11 @@ export function jumpSeasons(
       if (work.phase === "regular" && work.played.length === played) break;
     }
 
-    const advanced = simOffseason(work, mulberry32((work.lid * 1000 + work.season) >>> 0), {
-      teamStats: teamSeasonStatsFromAcc(acc, work.teams.map((t) => t.tid)),
-    });
+    const { league: advanced, report } = simOffseasonReporting(
+      work, mulberry32((work.lid * 1000 + work.season) >>> 0),
+      { teamStats: teamSeasonStatsFromAcc(acc, work.teams.map((t) => t.tid)) },
+    );
+    if (report.retireeCareers.length > 0) options.onRetireeCareers?.(report.retireeCareers);
     if (advanced.season === work.season) break;
     work = advanced;
     acc = emptyTeamSeasonAcc();

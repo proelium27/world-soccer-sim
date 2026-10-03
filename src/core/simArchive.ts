@@ -1,6 +1,6 @@
 import type { LeagueStore } from "./leagueState.js";
 import type { PowerRankingSnapshot } from "./teams/powerRanking.js";
-import type { ArchivedPlayer } from "./players/archive.js";
+import type { ArchivedPlayer, RetireeCareer } from "./players/archive.js";
 import type { PlayedMatch } from "./standings.js";
 import type { CompletedTransfer } from "./transfers/negotiation.js";
 import type { SeasonStats, RatingsSnapshot } from "./players/types.js";
@@ -250,6 +250,35 @@ export function reattachCareer(
       };
     }),
   };
+}
+
+/**
+ * The worker's retiree stat lines, made whole and cut to the merged archive.
+ *
+ * Two corrections, both of which only the main thread can make:
+ *   - the worker held a *window* of each career (`detachCareer`), so the seasons
+ *     it was never handed go back on the front, the same merge `reattachCareer`
+ *     does for the living;
+ *   - lines are kept only for a pid that still has an archive row once the cap
+ *     has been applied (`reattachArchive`), since a career the prune just
+ *     dropped has no profile page to show them on.
+ *
+ * `careers` is null for a command sent with careers whole (a jump).
+ */
+export function reattachRetireeCareers(
+  rows: RetireeCareer[],
+  careers: Map<number, CutCareer> | null,
+  archive: ArchivedPlayer[],
+): RetireeCareer[] {
+  if (rows.length === 0) return rows;
+  const kept = new Set(archive.map((r) => r.pid));
+  return rows
+    .filter((r) => kept.has(r.pid))
+    .map((r) => {
+      const cut = careers?.get(r.pid);
+      if (!cut || cut.statsCut === 0) return r;
+      return { ...r, stats: [...cut.stats.slice(0, cut.statsCut), ...r.stats] };
+    });
 }
 
 /** The append-only history the sim only appends to and prunes. */

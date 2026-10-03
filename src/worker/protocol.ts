@@ -1,3 +1,4 @@
+import type { RetireeCareer } from "../core/players/archive.js";
 import type { LeagueStore } from "../core/leagueState.js";
 import type { SimThrough } from "../core/simThrough.js";
 import type { PlayedMatch, TeamSeasonAcc, TeamSeasonStats } from "../core/standings.js";
@@ -95,10 +96,18 @@ export type WorkerResponse =
        * never had. See `reattachNews`.
        */
       culledPids?: number[];
+      /**
+       * The full stat lines of this offseason's archived retirees, which leave
+       * the sim here because they are stored beside the archive rather than on
+       * it (`RetireeCareer`). Each holds only the seasons the worker was handed;
+       * the main thread puts the rest back on the front.
+       */
+      retireeCareers?: RetireeCareer[];
     }
   | { type: "intlResult"; league: LeagueStore }
   | { type: "playoffsResult"; league: LeagueStore }
-  | { type: "jumpResult"; league: LeagueStore }
+  /** `retireeCareers` as on `offseasonResult`, for every offseason the jump crossed. */
+  | { type: "jumpResult"; league: LeagueStore; retireeCareers?: RetireeCareer[] }
   /**
    * Fired as each jumped season starts playing out. The whole jump is one
    * command rather than one per season precisely so the league is

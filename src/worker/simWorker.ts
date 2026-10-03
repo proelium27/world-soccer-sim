@@ -7,6 +7,7 @@ import { playPlayoffStage, simThroughPlayoffs } from "../core/playoffStages.js";
 import { mulberry32, mulberry32Resumable } from "../engine/rng.js";
 import { slimMatchdayProgress } from "../core/simArchive.js";
 import type { WorkerCommand, WorkerResponse } from "./protocol.js";
+import type { RetireeCareer } from "../core/players/archive.js";
 
 declare const self: DedicatedWorkerGlobalScope;
 
@@ -51,6 +52,7 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
       // An array, not a Set: structuredClone handles Sets, but the protocol
       // stays plainly serialisable so a future transport cannot be surprised.
       culledPids: [...report.culledPids],
+      retireeCareers: report.retireeCareers,
     };
     self.postMessage(response);
   } else if (cmd.type === "jump") {
@@ -58,6 +60,7 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
     // exactly the way the equivalent button click above does (see
     // core/autopilot.ts), so jumping five seasons and clicking through five
     // seasons land on the same world.
+    const retireeCareers: RetireeCareer[] = [];
     const result = jumpSeasons(
       cmd.league,
       cmd.seasons,
@@ -65,9 +68,12 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
         const progress: WorkerResponse = { type: "jumpProgress", seasonsDone, totalSeasons, season };
         self.postMessage(progress);
       },
-      { seasonAcc: cmd.seasonAcc },
+      {
+        seasonAcc: cmd.seasonAcc,
+        onRetireeCareers: (careers) => { retireeCareers.push(...careers); },
+      },
     );
-    const response: WorkerResponse = { type: "jumpResult", league: result };
+    const response: WorkerResponse = { type: "jumpResult", league: result, retireeCareers };
     self.postMessage(response);
   } else if (cmd.type === "intl") {
     // Staged international football: play one stage, or every remaining stage.
