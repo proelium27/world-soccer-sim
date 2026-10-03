@@ -83,7 +83,7 @@ export interface League {
  * shuffle is the only rng use here, so the stream is consumed identically
  * however the offsets are set.
  */
-function generateDivisionTeams(
+export function generateDivisionTeams(
   rng: () => number,
   tidStart: number,
   count: number,
@@ -95,6 +95,11 @@ function generateDivisionTeams(
   country: string,
   nationalities: NationalityWeights | null = null,
   model: ProgressionModel = "random",
+  // The season the squads are made for. World creation is season 1; God Mode
+  // adding a league mid-save (core/worldRestructure.ts) passes the new season
+  // so players' ages and contracts line up with the save. Trailing and
+  // defaulted so world generation is byte-identical.
+  season: number = STARTING_SEASON,
 ): { teams: LeagueTeam[]; players: Player[]; nextPid: number } {
   const teams: LeagueTeam[] = [];
   const players: Player[] = [];
@@ -129,11 +134,11 @@ function generateDivisionTeams(
         const age = drawGenerationAge(rng());
         const p = generatePlayer(
           rng, pos, base, pid++, age,
-          STARTING_SEASON, genSeed, country, nationalities, model, true,
+          season, genSeed, country, nationalities, model, true,
         );
         const length = CONTRACT_LENGTH_MIN
           + Math.floor(rng() * (CONTRACT_LENGTH_MAX - CONTRACT_LENGTH_MIN + 1));
-        p.contract.expiresSeason = STARTING_SEASON + length;
+        p.contract.expiresSeason = season + length;
         players.push(p);
         roster.push(p.pid);
         ovrSum += p.ovr;

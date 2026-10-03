@@ -6,6 +6,7 @@ import { ClubLink } from "../components/ClubLink.js";
 import { usePlayerMap } from "../usePlayerMap.js";
 import { computeClubHistory, type ClubIndividualHonour, type ClubSeasonRecord } from "../../core/clubHistory.js";
 import { competitionOf, countriesOf, competitionRegion } from "../../core/competitions.js";
+import { everyCompetition } from "../../core/worldEdit.js";
 import { worldHasCup } from "../../core/cup/cup.js";
 import { SHIELD_FORMAT, AMERICAS_CUP_FORMAT } from "../../core/constants.js";
 import type { Player } from "../../core/players/types.js";
@@ -542,7 +543,7 @@ export function ClubHistory() {
             </thead>
             <tbody>
               {history.seasons.map((s) => {
-                const comp = competitionOf(league.competitions, s.compId);
+                const comp = competitionOf(everyCompetition(league), s.compId);
                 const notes: string[] = [];
                 if (s.champion) notes.push(s.tier === 1 ? "Champions" : `Div ${s.tier} Champions`);
                 if (s.promoted) notes.push("Promoted");

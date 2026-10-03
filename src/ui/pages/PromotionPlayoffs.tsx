@@ -10,6 +10,7 @@ import {
   PLAYOFF_ROUND_FINAL, FRENCH_ROUND_FINAL, FRENCH_ROUND_FIRST, promotionPlayoffDecider,
 } from "../../core/promotionPlayoff.js";
 import { competitionOf } from "../../core/competitions.js";
+import { everyCompetition } from "../../core/worldEdit.js";
 import { EmptyState } from "../components/EmptyState.js";
 
 /**
@@ -92,7 +93,7 @@ export function PromotionPlayoffs() {
   // business, and each card names its own two divisions.
   const seasons = [...new Set(forCountry.map((p) => p.season))];
   const season = seasons.find((s) => s === seasonSel) ?? seasons[0];
-  const tierOf = (p: PromotionPlayoff) => competitionOf(league.competitions, p.d1CompId).tier;
+  const tierOf = (p: PromotionPlayoff) => competitionOf(everyCompetition(league), p.d1CompId).tier;
   const shown = forCountry
     .filter((p) => p.season === season)
     .sort((a, b) => tierOf(a) - tierOf(b));
@@ -154,8 +155,8 @@ export function PromotionPlayoffs() {
         name: french ? (round === FRENCH_ROUND_FIRST ? "First round" : "Second round") : "Semi-finals",
         ties: playoff.ties.filter((t) => t.round === round),
       }));
-    const d1 = competitionOf(league.competitions, playoff.d1CompId);
-    const d2 = competitionOf(league.competitions, playoff.d2CompId);
+    const d1 = competitionOf(everyCompetition(league), playoff.d1CompId);
+    const d2 = competitionOf(everyCompetition(league), playoff.d2CompId);
     const userEntered = playoff.teams.includes(userTid);
     // Both cross-division formats end against the club from above.
     const german = playoff.format === "german" || french;

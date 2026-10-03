@@ -151,13 +151,15 @@ export interface ClubHistory {
  * here is derived, matching the read-only nature of `awards.ts`.
  */
 export function computeClubHistory(league: LeagueStore, tid: number): ClubHistory {
-  const { seasonHistory, competitions, players } = league;
+  const { seasonHistory, players } = league;
+  // A league God Mode removed still names the seasons played in it.
+  const competitions = [...league.competitions, ...(league.retiredCompetitions ?? [])];
   // Oldest → newest so we can look at the *following* season for promotion.
   //
-  // Only the seasons this club actually played in a competition the world
-  // still has. A club added mid-save (God Mode) has no entry in the seasons
-  // before it existed, a spectator save's "club" has none at all, and a league
-  // removed in God Mode leaves compIds nothing resolves. Reading those used to
+  // Only the seasons this club actually played in a competition the save knows
+  // (live or retired, above). A club added mid-save (God Mode) has no entry in
+  // the seasons before it existed, a folded one none after, and a spectator
+  // save's "club" has none at all. Reading those used to
   // throw "Unknown compId", and because the jump summary builds this inside the
   // app shell, one bad season took the whole game down after every jump.
   const knownComp = new Set(competitions.map((c) => c.id));

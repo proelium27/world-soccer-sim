@@ -60,6 +60,8 @@ import {
 import { buildCompetitionSchedule } from "./schedule.js";
 import { assignConferences } from "./conferences.js";
 import { applyPendingCompetitions } from "./worldEdit.js";
+import { isStructuralChange, isValidRestructure, restructureWorld } from "./worldRestructure.js";
+import { seedReputations } from "./teams/reputationSeed.js";
 import { updateHype } from "./finance/hype.js";
 import {
   settleSeasonEnd, chargeSeasonStart, wageBill, financeScaleFor, clampBudget,
@@ -797,11 +799,80 @@ export function simOffseasonReporting(
   //       above (settled under the rules the season was played by) and before
   //       free agency, youth intake, the market, the schedule and the cup
   //       draws, which all read the new table. A changed split re-seats clubs.
+  //       When the queue changes the world's shape (a league or division added
+  //       or removed, a division resized), clubs are created and dissolved
+  //       here too (see core/worldRestructure.ts). Everything below that reads
+  //       the season just played then reads it WITHOUT the dissolved clubs, and
+  //       continental places come only from competitions that have a table:
+  //       a league added now gets its places from next summer.
+  let seasonTables = tablesByCompId;
+  let seasonStandings = standings;
+  let seasonChampions = championTidByCompId;
   if (league.pendingCompetitions) {
     const { pendingCompetitions, ...rest } = league;
-    league = { ...rest, competitions: applyPendingCompetitions(league.competitions, pendingCompetitions) };
+    const retired = league.retiredCompetitions ?? [];
+    if (isStructuralChange(league.competitions, pendingCompetitions)
+      && isValidRestructure(league.competitions, pendingCompetitions, retired)) {
+      const r = restructureWorld({
+        lid: league.lid,
+        season: nextSeason,
+        userTid: league.meta.userTid,
+        progressionModel: league.progressionModel ?? "random",
+        live: league.competitions,
+        pending: pendingCompetitions,
+        retired,
+        teams, players, activeLoans,
+        nextPid: Math.max(league.nextPid ?? 0, Math.max(0, ...players.map((p) => p.pid)) + 1),
+        tablesByCompId,
+        compIdBeforeSwaps,
+      });
+      ({ teams, players, activeLoans } = r);
+      // New clubs get the reputation world creation would have given them: where
+      // their squad ranks in their division. Clubs that have one keep it.
+      teams = seedReputations(teams, r.competitions, players);
+      const gone = r.dissolved;
+      league = {
+        ...rest,
+        competitions: r.competitions,
+        ...(r.retired.length > 0 ? { retiredCompetitions: r.retired } : {}),
+        ...(r.defunct.length > 0 ? { defunctTeams: [...(league.defunctTeams ?? []), ...r.defunct] } : {}),
+        nextPid: r.nextPid,
+        negotiations: league.negotiations.filter((n) => !gone.has(n.sellerTid)),
+        inboundOffers: league.inboundOffers.filter((o) => !gone.has(o.buyerTid)),
+        loanRejections: league.loanRejections.filter((l) => !gone.has(l.buyerTid)),
+        manager: {
+          ...league.manager,
+          offers: league.manager.offers.filter((o) => !gone.has(o.tid)),
+          ...(league.manager.interests
+            ? { interests: league.manager.interests.filter((tid) => !gone.has(tid)) }
+            : {}),
+        },
+      };
+      if (gone.size > 0) {
+        seasonTables = new Map([...tablesByCompId]
+          .map(([id, table]) => [id, table.filter((row) => !gone.has(row.tid))]));
+        seasonChampions = Object.fromEntries(
+          Object.entries(championTidByCompId).filter(([, tid]) => !gone.has(tid)),
+        );
+      }
+      // Free agency takes part by club, not by order (freeAgencySigningOrder),
+      // so a new club just has to be on the list.
+      seasonStandings = [
+        ...standings.filter((row) => !gone.has(row.tid)),
+        ...r.created.map((tid): StandingsRow => ({
+          tid, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0,
+        })),
+      ];
+    } else {
+      league = { ...rest, competitions: applyPendingCompetitions(league.competitions, pendingCompetitions) };
+    }
     teams = assignConferences(teams, league.competitions);
   }
+  // Competitions the season just played can speak for: every live one with a
+  // table. Used wherever last season's tables hand out places.
+  const tabledCompetitions = league.competitions.filter((c) => seasonTables.has(c.id));
+  // Every competition a club might have played in last season, removed ones included.
+  const everyCompetition = [...league.competitions, ...(league.retiredCompetitions ?? [])];
 
   // 3.7. Guaranteed ceiling on Division 2 quality, first pass: any
   //      AI-controlled player at or above DIVISION_2_REFUSAL_OVR_THRESHOLD
@@ -823,7 +894,7 @@ export function simOffseasonReporting(
   //    world as one queue ranked by points per game — see
   //    freeAgencySigningOrder for why not raw points), skipping the user's
   //    club. Cross-division buying happens later, in the transfer market step.
-  const signingOrder = freeAgencySigningOrder(standings);
+  const signingOrder = freeAgencySigningOrder(seasonStandings);
   let faSignings: { pid: number; toTid: number }[];
   ({ teams, players, signings: faSignings } = runAIFreeAgency(
     teams, players, nextSeason, rng, league.meta.userTid, signingOrder, activeLoans,
@@ -1115,7 +1186,7 @@ export function simOffseasonReporting(
   const marketSeed = hashInts(league.lid, nextSeason, 7);
   // The season that just ended isn't in seasonHistory yet (that entry is
   // appended below), so protect stars off its freshly-computed standings/awards.
-  const justEndedRecord = { table: standings, awards, compsByTid };
+  const justEndedRecord = { table: seasonStandings, awards, compsByTid };
   const summerProtectedPids = protectedStarPids(
     justEndedRecord, teams, players, league.competitions, league.meta.userTid,
   );
@@ -1233,12 +1304,17 @@ export function simOffseasonReporting(
   // the rolled-over state, because these are the cups that have just been
   // decided and `rolled` replaces them with next season's empty ones. A cup
   // still holding a null champion (abandoned mid-save) simply closes its route.
+  // A club God Mode dissolved this summer holds nothing into next season.
+  const liveTids = new Set(teams.map((t) => t.tid));
+  const alive = (tid: number | null | undefined) =>
+    tid !== null && tid !== undefined && liveTids.has(tid) ? tid : undefined;
   const cupRoutes: QualificationContext = {
-    domesticCupWinners: domesticCupWinners(league.domesticCups ?? []),
+    domesticCupWinners: new Map([...domesticCupWinners(league.domesticCups ?? [])]
+      .filter(([, tid]) => liveTids.has(tid))),
     holders: {
-      continental: league.cup?.championTid ?? undefined,
-      shield: league.shield?.championTid ?? undefined,
-      americas: league.americasCup?.championTid ?? undefined,
+      continental: alive(league.cup?.championTid),
+      shield: alive(league.shield?.championTid),
+      americas: alive(league.americasCup?.championTid),
     },
     // How many places each country gets, off its rolling continental record.
     // The season that just ended counts, so its competitions are passed in
@@ -1257,7 +1333,7 @@ export function simOffseasonReporting(
     // projection and the news feed wrap the same call the same way; all three
     // must, or the table shades a place the draw then doesn't hand out.
     slots: continentalSlotOverrides(
-      league.competitions,
+      tabledCompetitions,
       league.continentalFormats,
       precomputedSlots !== undefined ? precomputedSlots : offseasonCoefficientSlots(league),
     ) ?? undefined,
@@ -1287,7 +1363,7 @@ export function simOffseasonReporting(
       .filter((t) => {
         const before = compIdBeforeSwaps.get(t.tid);
         return before !== undefined
-          && tierOf(league.competitions, before) > tierOf(league.competitions, t.compId);
+          && tierOf(everyCompetition, before) > tierOf(league.competitions, t.compId);
       })
       .map((t) => t.tid),
   );
@@ -1297,7 +1373,7 @@ export function simOffseasonReporting(
       players.map((p) => [p.pid, p.stats.find((st) => st.season === league.season)]),
     ),
     qualifiedTids: new Set(
-      qualificationByTid(league.competitions, tablesByCompId, cupRoutes).keys(),
+      qualificationByTid(tabledCompetitions, seasonTables, cupRoutes).keys(),
     ),
     promotedTids,
   });
@@ -1364,13 +1440,13 @@ export function simOffseasonReporting(
     // pass, so a club is placed in exactly one of them — see cup/qualification.
     // buildCupState returns null if that format's field can't be filled.
     // Each is drawn in the format God Mode set for it, if any (default otherwise).
-    cup: buildCupState(league.competitions, tablesByCompId, nextSeason, CONTINENTAL_CUP_FORMAT, cupRoutes,
+    cup: buildCupState(tabledCompetitions, seasonTables, nextSeason, CONTINENTAL_CUP_FORMAT, cupRoutes,
       continentalFormatFor(league.continentalFormats, CONTINENTAL_CUP_FORMAT.id)),
-    shield: buildCupState(league.competitions, tablesByCompId, nextSeason, SHIELD_FORMAT, cupRoutes,
+    shield: buildCupState(tabledCompetitions, seasonTables, nextSeason, SHIELD_FORMAT, cupRoutes,
       continentalFormatFor(league.continentalFormats, SHIELD_FORMAT.id)),
     // The Americas Cup draws from the other continent's leagues through the
     // same one-pass allocation, so it can never share a club with the two above.
-    americasCup: buildCupState(league.competitions, tablesByCompId, nextSeason, AMERICAS_CUP_FORMAT, cupRoutes,
+    americasCup: buildCupState(tabledCompetitions, seasonTables, nextSeason, AMERICAS_CUP_FORMAT, cupRoutes,
       continentalFormatFor(league.continentalFormats, AMERICAS_CUP_FORMAT.id)),
     // International football already played out (in stages) before this advance;
     // carry its state forward, resetting the per-offseason stage marker (and the
@@ -1392,7 +1468,7 @@ export function simOffseasonReporting(
     // promotion/relegation roster of clubs, so a promoted club enters next
     // season's cup as a top-flight one, while the ranking that decides who has
     // to enter at the preliminary round comes from the tables just decided.
-    domesticCups: buildDomesticCups(league.competitions, teams, tablesByCompId, nextSeason),
+    domesticCups: buildDomesticCups(league.competitions, teams, seasonTables, nextSeason),
     // Next preseason's super cups, seeded from everything the season just
     // finished decided. Built here rather than at the season boundary because
     // this is the last moment all four winners are readable at once — the cups
@@ -1400,9 +1476,9 @@ export function simOffseasonReporting(
     // the new season's first matchday, so the match is contested by the squads
     // that will actually start it. Pure and rng-free.
     superCups: buildSuperCups({
-      competitions: league.competitions,
-      tablesByCompId,
-      championTidByCompId,
+      competitions: tabledCompetitions,
+      tablesByCompId: seasonTables,
+      championTidByCompId: seasonChampions,
       domesticCups: league.domesticCups ?? [],
       cup: league.cup,
       shield: league.shield,
