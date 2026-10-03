@@ -405,8 +405,6 @@ export function PlayerProfile() {
               )}
             </div>
           </div>
-
-          <HowHeSeesClubs league={league} player={player} />
         </div>
 
         <div className="col-lg-7">
@@ -490,6 +488,11 @@ export function PlayerProfile() {
           </div>
         </div>
       </div>
+
+      {/* Full width rather than in the left column: its two club lists are
+          taller than everything else on that side put together, which left the
+          right column (just the value chart) with a page of empty space. */}
+      <HowHeSeesClubs league={league} player={player} />
 
       <div className="card mt-3">
         <div className="card-body">

@@ -54,10 +54,18 @@ export function HowHeSeesClubs({ league, player }: { league: LeagueStore; player
             <span className="text-muted"> · {appealBreakdown(you.appeal)}</span>
           </p>
         )}
-        <div className="text-muted small mb-1">Where he'd most like to go</div>
-        <ClubRows clubs={view.favourites} />
-        <div className="text-muted small mb-1">Where he'd play</div>
-        <ClubRows clubs={view.wouldPlay} />
+        {/* Side by side on a wide screen: the card spans the page, and two
+            three-column lists stacked at that width are mostly empty row. */}
+        <div className="row g-3">
+          <div className="col-lg-6">
+            <div className="text-muted small mb-1">Where he'd most like to go</div>
+            <ClubRows clubs={view.favourites} />
+          </div>
+          <div className="col-lg-6">
+            <div className="text-muted small mb-1">Where he'd play</div>
+            <ClubRows clubs={view.wouldPlay} />
+          </div>
+        </div>
         <p className="small text-muted mb-0">
           {view.refusedCount === 0
             ? "He'd talk to any club."
