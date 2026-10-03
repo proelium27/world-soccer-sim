@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-10-02",
+  date: "2026-10-03",
   title: "Retired players keep their full stats",
   items: [
     "A few of you asked for this one. A retired player's page now has the same stat tables he had while he was playing: every league season with all the columns (goals, assists, xG, tackles, passes, cards, minutes, match rating and the rest), the **Per 90** switch, his cup runs and his national-team campaigns.",
