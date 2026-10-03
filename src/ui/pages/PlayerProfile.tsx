@@ -341,6 +341,18 @@ export function PlayerProfile() {
 
       {editing && <PlayerEditModal player={player} onClose={() => setEditing(false)} />}
 
+      {/* Full width at the top: the pills wrap sideways, so a decorated career
+          takes a line or two here, where in the left column it stretched that
+          side far past the value chart. Hidden until there's something in it. */}
+      {honors.hasAny && (
+        <div className="card mb-3">
+          <div className="card-body">
+            <h6 className="card-title">Awards &amp; Trophies</h6>
+            <HonorPills honors={honors} competitions={league.competitions} />
+          </div>
+        </div>
+      )}
+
       <div className="row g-3">
         <div className="col-lg-5">
           <div className="card mb-3">
@@ -356,17 +368,6 @@ export function PlayerProfile() {
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-
-          <div className="card mb-3">
-            <div className="card-body">
-              <h6 className="card-title">Awards &amp; Trophies</h6>
-              {!honors.hasAny ? (
-                <p className="text-muted mb-0">No individual or team honors yet.</p>
-              ) : (
-                <HonorPills honors={honors} competitions={league.competitions} />
-              )}
             </div>
           </div>
 

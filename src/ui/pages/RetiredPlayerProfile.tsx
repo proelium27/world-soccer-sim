@@ -121,19 +121,19 @@ export function RetiredPlayerProfile({
         </p>
       )}
 
+      {/* Full width at the top, as on the living profile: the pills wrap
+          sideways, so a long career's honours stay a line or two tall. */}
+      {honors.hasAny && (
+        <div className="card mb-3">
+          <div className="card-body">
+            <h6 className="card-title">Awards &amp; Trophies</h6>
+            <HonorPills honors={honors} competitions={league.competitions} />
+          </div>
+        </div>
+      )}
+
       <div className="row g-3">
         <div className="col-lg-5">
-          <div className="card mb-3">
-            <div className="card-body">
-              <h6 className="card-title">Awards &amp; Trophies</h6>
-              {!honors.hasAny ? (
-                <p className="text-muted mb-0">No individual or team honors.</p>
-              ) : (
-                <HonorPills honors={honors} competitions={league.competitions} />
-              )}
-            </div>
-          </div>
-
           <div className="card mb-3">
             <div className="card-body">
               <h6 className="card-title">Career Totals</h6>
