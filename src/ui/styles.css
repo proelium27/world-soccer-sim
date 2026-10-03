@@ -4331,3 +4331,35 @@ body.nav-drawer-open {
 .player-view-table > tbody > tr > td.text-end {
   padding-inline: 0.3rem;
 }
+
+/* How he sees clubs (Player Profile): a reason per column, sized to its
+   content rather than stretched across the full-width card, and the two groups
+   (his favourites, your club) split by a rule rather than space. */
+.how-he-sees > * > tr > * {
+  padding-inline: 0.6rem;
+}
+.how-he-sees > * > tr > .text-end {
+  min-width: 4.5rem;
+}
+.how-he-sees > tbody > tr > td.how-he-sees-group {
+  padding-top: 0.5rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.how-he-sees > tbody + tbody > tr:first-child > td {
+  border-top: 1px solid var(--sg-border-strong);
+}
+/* On a phone the reasons scroll; the club stays put so a row still says whose
+   numbers they are. Qualified past Bootstrap's transparent cell background
+   (DESIGN.md §6, the Sticky Column Rule). */
+.how-he-sees > * > tr > .how-he-sees-club {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: var(--sg-surface);
+}
+.how-he-sees-group > span {
+  position: sticky;
+  left: 0.4rem;
+}

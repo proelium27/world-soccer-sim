@@ -172,6 +172,19 @@ export interface SeasonHistoryEntry {
    * `promotionPlayoffs` gives.
    */
   titlePlayoffs?: TitlePlayoff[];
+  /**
+   * Every club's reputation once this season's offseason had moved it (see
+   * core/teams/reputation.ts), keyed by tid, to one decimal. It is the only
+   * record of a past reputation, which is why Club History and the Database
+   * read trends from it.
+   *
+   * Optional. The entry itself is built before reputation moves (step 3.6
+   * against 3.61), so it is attached where the offseason writes the entry out.
+   * Migration fills in only the latest season, and only when every club already
+   * had a reputation: that value is exact, since reputation changes nowhere
+   * but the offseason. Earlier seasons were never recorded.
+   */
+  reputation?: Record<number, number>;
 }
 
 /**

@@ -9,6 +9,7 @@ import type { CupTie } from "../../core/cup/types.js";
 import type { TitlePlayoff } from "../../core/titlePlayoff.js";
 import { titlePlayoffRoundNames, titlePlayoffNextRoundName } from "../../core/titlePlayoff.js";
 import { competitionOf, competitionTitlePlayoff } from "../../core/competitions.js";
+import { everyCompetition } from "../../core/worldEdit.js";
 
 /**
  * Every title playoff the save holds a record of, newest first — the live set
@@ -115,7 +116,7 @@ export function TitlePlayoffs() {
   const seasons = [...new Set(forCountry.map((p) => p.season))];
   const season = seasons.find((s) => s === seasonSel) ?? seasons[0];
   const playoff = forCountry.find((p) => p.season === season)!;
-  const comp = competitionOf(league.competitions, playoff.compId);
+  const comp = competitionOf(everyCompetition(league), playoff.compId);
   const roundNames = titlePlayoffRoundNames(playoff.format);
   const finalRound = roundNames.length - 1;
 

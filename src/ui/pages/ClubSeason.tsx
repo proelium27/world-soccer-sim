@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { computeClubSeason, type ClubRun, type ClubSeasonPlayer } from "../../core/clubSeason.js";
 import { competitionOf, competitionRegion } from "../../core/competitions.js";
+import { everyCompetition } from "../../core/worldEdit.js";
 import { POSITIONS } from "../../core/players/types.js";
 import { ClubCrest } from "../components/ClubCrest.js";
 import { Flag } from "../components/Flag.js";
@@ -102,7 +103,7 @@ export function ClubSeason() {
     );
   }
 
-  const comp = competitionOf(league.competitions, clubSeason.compId);
+  const comp = competitionOf(everyCompetition(league), clubSeason.compId);
   const squad = sortSquad(clubSeason.squad);
   const row = clubSeason.row;
   const { power } = clubSeason;
@@ -247,7 +248,7 @@ export function ClubSeason() {
         {/* A club only ever plays its own continent's competitions, so an
             American club shows the Americas Cup where a European one shows the
             two European competitions. */}
-        {competitionRegion(competitionOf(league.competitions, clubSeason.compId)) === "americas" ? (
+        {competitionRegion(competitionOf(everyCompetition(league), clubSeason.compId)) === "americas" ? (
           <div className="col-12 col-md-4">
             <RunCard title="Americas Cup" run={clubSeason.americasRun} to="/americas-cup" note="Didn't qualify" />
           </div>

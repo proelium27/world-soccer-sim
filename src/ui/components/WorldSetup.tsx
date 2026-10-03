@@ -273,7 +273,34 @@ function PromotionLinkControls({
   );
 }
 
-function newLeagueEntry(index: number): WorldEntry {
+/**
+ * One control's change applied to a league's spec, the way every league editor
+ * applies it (this screen, and God Mode's Leagues tab).
+ */
+export function applySpecEdit(entry: WorldEntry, next: Partial<LeagueSpec>): LeagueSpec {
+  // Normalised on every edit, so no combination of controls can produce a
+  // league the engine cannot build — a 30-club division switched back to one
+  // table, say, which would not fit the season calendar.
+  const spec = normalizeLeagueSpec({ ...entry.spec, ...next });
+  // Money follows strength unless the player has deliberately unlinked it —
+  // the pairing is what keeps the ladder from inverting over a long save.
+  if (entry.linkMoney && next.strengthOffset !== undefined) {
+    spec.budgetScale = suggestedBudgetScale(next.strengthOffset);
+  }
+  // Shrinking the divisions lowers the swap ceiling, so the stored number has
+  // to come down with it. Clamping only the displayed value would leave the
+  // picker reading 4 while the world was still built with the 6 chosen before
+  // the divisions got smaller.
+  if (spec.promotionSpots !== undefined) {
+    spec.promotionSpots = Math.min(spec.promotionSpots, maxPromoSpots(resolveLeagueSpec(spec)));
+  }
+  if (spec.d3PromotionSpots !== undefined) {
+    spec.d3PromotionSpots = Math.min(spec.d3PromotionSpots, maxLowerPromoSpots(resolveLeagueSpec(spec)));
+  }
+  return spec;
+}
+
+export function newLeagueEntry(index: number): WorldEntry {
   const strengthOffset = 8;
   return {
     id: `added:${nextAddedId++}`,
@@ -345,27 +372,7 @@ export function WorldSetup({ entries, onChange, defaultOpen = false }: Props) {
   }
 
   function updateSpec(index: number, next: Partial<LeagueSpec>) {
-    const entry = entries[index];
-    // Normalised on every edit, so no combination of controls can produce a
-    // league the engine cannot build — a 30-club division switched back to one
-    // table, say, which would not fit the season calendar.
-    const spec = normalizeLeagueSpec({ ...entry.spec, ...next });
-    // Money follows strength unless the player has deliberately unlinked it —
-    // the pairing is what keeps the ladder from inverting over a long save.
-    if (entry.linkMoney && next.strengthOffset !== undefined) {
-      spec.budgetScale = suggestedBudgetScale(next.strengthOffset);
-    }
-    // Shrinking the divisions lowers the swap ceiling, so the stored number has
-    // to come down with it. Clamping only the displayed value would leave the
-    // picker reading 4 while the world was still built with the 6 chosen before
-    // the divisions got smaller.
-    if (spec.promotionSpots !== undefined) {
-      spec.promotionSpots = Math.min(spec.promotionSpots, maxPromoSpots(resolveLeagueSpec(spec)));
-    }
-    if (spec.d3PromotionSpots !== undefined) {
-      spec.d3PromotionSpots = Math.min(spec.d3PromotionSpots, maxLowerPromoSpots(resolveLeagueSpec(spec)));
-    }
-    update(index, { spec });
+    update(index, { spec: applySpecEdit(entries[index], next) });
   }
 
   return (
@@ -586,17 +593,10 @@ function DivisionShapes({
   spec,
   resolved,
   onChange,
-  lockSizes = false,
 }: {
   spec: LeagueSpec;
   resolved: ResolvedLeagueSpec;
   onChange: (next: Partial<LeagueSpec>) => void;
-  /**
-   * A live save's divisions: the club count is fixed (the clubs already
-   * exist), so the size shows but can't move, and a shape the size can't be
-   * played in is not offered.
-   */
-  lockSizes?: boolean;
 }) {
   const divisions = resolved.divisions;
   const sizes = [resolved.d1Teams, resolved.d2Teams, resolved.d3Teams];
@@ -631,7 +631,6 @@ function DivisionShapes({
                 <select
                   className="form-select form-select-sm"
                   value={size}
-                  disabled={lockSizes}
                   aria-label={`Clubs in the ${noun}`}
                   onChange={(e) => onChange({ [f.teams]: Number(e.target.value) })}
                 >
@@ -650,8 +649,8 @@ function DivisionShapes({
                     ? { names: DEFAULT_HALF_NAMES, crossRounds: 0 }
                     : null)}
                 >
-                  <option value="table" disabled={lockSizes && size > maxDivisionTeams(false)}>One table</option>
-                  <option value="split" disabled={lockSizes && size > maxDivisionTeams(true)}>Two halves</option>
+                  <option value="table">One table</option>
+                  <option value="split">Two halves</option>
                 </select>
               </div>
             </div>
@@ -703,17 +702,11 @@ function DivisionShapes({
           </div>
         );
       })}
-      {lockSizes ? (
-        <p className="text-muted small mb-2">
-          Club counts are fixed in a save you&apos;re playing.
-        </p>
-      ) : (
-        <p className="text-muted small mb-2">
-          Renaming is safe for roster files: one written for this country's old
-          division names still finds it. A single table holds up to 20 clubs; split
-          into two halves, a division can hold up to {maxDivisionTeams(true)}.
-        </p>
-      )}
+      <p className="text-muted small mb-2">
+        Renaming is safe for roster files: one written for this country's old
+        division names still finds it. A single table holds up to 20 clubs; split
+        into two halves, a division can hold up to {maxDivisionTeams(true)}.
+      </p>
     </>
   );
 }
@@ -945,18 +938,21 @@ export function LeagueSettings({
   onEntry,
   onSpec,
   midSave = false,
+  noRosterFiles = false,
   children,
 }: {
   entry: WorldEntry;
   onEntry: (next: Partial<WorldEntry>) => void;
   onSpec: (next: Partial<LeagueSpec>) => void;
   /**
-   * Editing a league in a save already being played (God Mode). Only the
-   * settings a save can take without new clubs are offered: no shape presets
-   * (they resize divisions), no strength, continent, division count or roster
-   * files, and club counts are locked. See core/worldEdit.ts.
+   * Editing a league in a save already being played (God Mode). Its clubs
+   * already exist, so strength and continent are fixed and the shape presets
+   * (which set strength too) and roster files are not offered. Divisions and
+   * club counts can change: see core/worldRestructure.ts.
    */
   midSave?: boolean;
+  /** Leave out the roster-file picker (a league added to a save in play). */
+  noRosterFiles?: boolean;
   /** Extra controls rendered at the foot of the settings panel. */
   children?: React.ReactNode;
 }) {
@@ -1055,8 +1051,8 @@ export function LeagueSettings({
       */}
       <ShippedLeagueTable />
 
-      {!midSave && (
       <div className="row g-2 mb-2">
+        {!midSave && (
         <div className="col">
           <label className="form-label small mb-1">Continent</label>
           {/* Which club competitions the league feeds: Europe's Continental Cup
@@ -1073,6 +1069,7 @@ export function LeagueSettings({
             ))}
           </select>
         </div>
+        )}
         <div className="col">
           <label className="form-label small mb-1">Divisions</label>
           <select
@@ -1090,9 +1087,8 @@ export function LeagueSettings({
           </select>
         </div>
       </div>
-      )}
 
-      <DivisionShapes spec={spec} resolved={resolved} onChange={onSpec} lockSizes={midSave} />
+      <DivisionShapes spec={spec} resolved={resolved} onChange={onSpec} />
 
       <div className="row g-2 mb-2">
         {/* Nothing to size in a one-division league: it has no second tier to
@@ -1186,7 +1182,7 @@ export function LeagueSettings({
 
       {children}
 
-      {!midSave && <RosterPicker
+      {!midSave && !noRosterFiles && <RosterPicker
         entry={entry}
         onChange={(rosterSources, nationalities) => {
           // A file that declares a mix pre-fills the editor rather than

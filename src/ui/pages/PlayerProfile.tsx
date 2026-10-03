@@ -490,11 +490,6 @@ export function PlayerProfile() {
         </div>
       </div>
 
-      {/* Full width rather than in the left column: its two club lists are
-          taller than everything else on that side put together, which left the
-          right column (just the value chart) with a page of empty space. */}
-      <HowHeSeesClubs league={league} player={player} />
-
       <div className="card mt-3">
         <div className="card-body">
           <div className="d-flex align-items-center justify-content-between mb-2">
@@ -823,6 +818,8 @@ export function PlayerProfile() {
           </p>
         </div>
       </div>
+
+      <HowHeSeesClubs league={league} player={player} />
     </div>
   );
 }
