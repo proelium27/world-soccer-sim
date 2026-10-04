@@ -1,32 +1,17 @@
-import type { ReactNode } from "react";
 import type { ArchivedPlayer } from "../../core/players/archive.js";
 import type { LeagueStore } from "../../core/leagueState.js";
 import { computeArchivedHonors } from "../../core/playerHonors.js";
 import { ALL_TIME_STAT_KEYS } from "../../core/frivolities/stats.js";
 import { isFreeAgentTid } from "../../core/transfers/negotiation.js";
 import { OvrHistoryChart } from "../components/OvrHistoryChart.js";
-import { TrophyIcon } from "../components/TrophyIcon.js";
+import { HonorPills } from "../components/HonorPills.js";
 import { Flag } from "../components/Flag.js";
 import { BackLink } from "../components/BackLink.js";
-import { GoldenBootIcon } from "../components/GoldenBootIcon.js";
 import { getRatingColor } from "../utils/ratingColor.js";
 import { seasonYear, transferFeeLabel } from "../format.js";
 import { ClubLink } from "../components/ClubLink.js";
 import { STAT_LABELS, formatStat } from "../statLabels.js";
 import { useLeague } from "../context/LeagueContext.js";
-
-/** One career-honor badge, e.g. "3x Golden Boot" — omits the count for a single win. */
-function AwardPill({ label, seasons, icon }: { label: string; seasons: number[]; icon?: ReactNode }) {
-  if (seasons.length === 0) return null;
-  const years = [...seasons].sort((a, b) => a - b).map(seasonYear);
-  return (
-    <span className="award-pill" title={years.join(", ")}>
-      {icon}
-      {years.length > 1 && <span className="award-pill-count">{years.length}x</span>}
-      {label}
-    </span>
-  );
-}
 
 /**
  * The career page for a player retirement has deleted from the pool.
@@ -136,36 +121,19 @@ export function RetiredPlayerProfile({
         </p>
       )}
 
+      {/* Full width at the top, as on the living profile: the pills wrap
+          sideways, so a long career's honours stay a line or two tall. */}
+      {honors.hasAny && (
+        <div className="card mb-3">
+          <div className="card-body">
+            <h6 className="card-title">Awards &amp; Trophies</h6>
+            <HonorPills honors={honors} competitions={league.competitions} />
+          </div>
+        </div>
+      )}
+
       <div className="row g-3">
         <div className="col-lg-5">
-          <div className="card mb-3">
-            <div className="card-body">
-              <h6 className="card-title">Awards &amp; Trophies</h6>
-              {!honors.hasAny ? (
-                <p className="text-muted mb-0">No individual or team honors.</p>
-              ) : (
-                <div className="award-pills">
-                  <AwardPill label="Ballon d'Or" seasons={honors.ballonDOr} />
-                  <AwardPill label="World Team of the Year" seasons={honors.worldTeamOfYear} />
-                  <AwardPill label="Goalkeeper of the Year" seasons={honors.goalkeeperOfYear} />
-                  <AwardPill label="Defender of the Year" seasons={honors.defenderOfYear} />
-                  <AwardPill label="Americas Player of the Year" seasons={honors.americasPlayerOfYear} />
-                  <AwardPill label="Americas Team of the Year" seasons={honors.americasTeamOfYear} />
-                  <AwardPill label="Americas Goalkeeper of the Year" seasons={honors.americasGoalkeeperOfYear} />
-                  <AwardPill label="Americas Defender of the Year" seasons={honors.americasDefenderOfYear} />
-                  <AwardPill label="Player of the Season" seasons={honors.playerOfSeason} />
-                  <AwardPill label="Golden Boot" seasons={honors.goldenBoot} icon={<GoldenBootIcon />} />
-                  <AwardPill label="Team of the Season" seasons={honors.teamOfSeason} />
-                  <AwardPill label="League Champion" seasons={honors.leagueTitles} icon={<TrophyIcon />} />
-                  <AwardPill label="Continental Cup" seasons={honors.continentalCups} />
-                  <AwardPill label="Continental Shield" seasons={honors.shields} />
-                  <AwardPill label="Americas Cup" seasons={honors.americasCups} />
-                  <AwardPill label="Domestic Cup" seasons={honors.domesticCups} />
-                </div>
-              )}
-            </div>
-          </div>
-
           <div className="card mb-3">
             <div className="card-body">
               <h6 className="card-title">Career Totals</h6>

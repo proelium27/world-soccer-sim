@@ -134,7 +134,9 @@ describe("retired player profile", () => {
     expect(html).toContain("Player of the Season");
     // Apostrophe comes back HTML-escaped from renderToStaticMarkup.
     expect(html).toContain("Ballon d&#x27;Or");
-    expect(html).toContain("League Champion");
+    // Named for the league it was won in, not a bare "League Champion".
+    const leagueName = league.competitions.find((c) => c.id === 0)!.name;
+    expect(html).toContain(`${leagueName} Champion`);
   });
 
   it("prefers the live player when a pid is somehow in both", () => {

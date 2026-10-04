@@ -16,6 +16,18 @@ export interface HonorCups {
   domesticCupHistory?: DomesticCupState[];
 }
 
+/** One league's share of an honour: which competition (by compId), and the seasons. */
+export interface HonorsByLeague {
+  compId: number;
+  seasons: number[];
+}
+
+/** One domestic cup's share, keyed by the cup's own display name (e.g. "Spanish Cup"). */
+export interface HonorsByCup {
+  name: string;
+  seasons: number[];
+}
+
 /** A player's career honours, each a list of the seasons he won it. */
 export interface PlayerHonors {
   ballonDOr: number[];
@@ -45,6 +57,17 @@ export interface PlayerHonors {
   americasCups: number[];
   /** Seasons his club won its domestic cup while he was in the squad. */
   domesticCups: number[];
+  /**
+   * The league and domestic-cup honours above split by which competition they
+   * came from, so a profile can say "3x Spanish Division 1 Champion" rather
+   * than a bare "League Champion". Each flat list is exactly the union of its
+   * split. Ordered most-won first, then earliest won.
+   */
+  leagueTitlesByComp: HonorsByLeague[];
+  playerOfSeasonByComp: HonorsByLeague[];
+  goldenBootByComp: HonorsByLeague[];
+  teamOfSeasonByComp: HonorsByLeague[];
+  domesticCupsByName: HonorsByCup[];
   hasAny: boolean;
 }
 
@@ -142,6 +165,11 @@ function honorsOf(
   const shields: number[] = [];
   const americasCups: number[] = [];
   const domesticCups: number[] = [];
+  const leagueTitlesByComp = new Map<number, number[]>();
+  const playerOfSeasonByComp = new Map<number, number[]>();
+  const goldenBootByComp = new Map<number, number[]>();
+  const teamOfSeasonByComp = new Map<number, number[]>();
+  const domesticCupsByName = new Map<string, number[]>();
 
   // Cup wins are team honours attributed exactly like a league title: the club
   // he was in the squad of that season. Both lists are keyed by season and
@@ -165,14 +193,25 @@ function honorsOf(
   for (const cup of cups.domesticCupHistory ?? []) {
     if (cup.championTid != null && squadTid(cup.season) === cup.championTid) {
       domesticCups.push(cup.season);
+      pushTo(domesticCupsByName, cup.name, cup.season);
     }
   }
 
   for (const entry of seasonHistory) {
-    for (const compAwards of Object.values(entry.awards)) {
-      if (compAwards.playerOfSeasonPid === pid) playerOfSeason.push(entry.season);
-      if (compAwards.goldenBootPid === pid) goldenBoot.push(entry.season);
-      if (compAwards.teamOfSeason.includes(pid)) teamOfSeason.push(entry.season);
+    for (const [key, compAwards] of Object.entries(entry.awards)) {
+      const compId = Number(key);
+      if (compAwards.playerOfSeasonPid === pid) {
+        playerOfSeason.push(entry.season);
+        pushTo(playerOfSeasonByComp, compId, entry.season);
+      }
+      if (compAwards.goldenBootPid === pid) {
+        goldenBoot.push(entry.season);
+        pushTo(goldenBootByComp, compId, entry.season);
+      }
+      if (compAwards.teamOfSeason.includes(pid)) {
+        teamOfSeason.push(entry.season);
+        pushTo(teamOfSeasonByComp, compId, entry.season);
+      }
     }
     // Optional-chained because a save written before worldwide awards only gets
     // `world` once migrateLeague has run over it.
@@ -192,8 +231,12 @@ function honorsOf(
     if (americas?.defenderOfYear?.[0]?.pid === pid) americasDefenderOfYear.push(entry.season);
 
     const tid = squadTid(entry.season);
-    if (tid !== undefined && Object.values(entry.championTidByCompId).includes(tid)) {
+    const won = tid === undefined
+      ? undefined
+      : Object.entries(entry.championTidByCompId).find(([, champ]) => champ === tid);
+    if (won) {
       leagueTitles.push(entry.season);
+      pushTo(leagueTitlesByComp, Number(won[0]), entry.season);
     }
   }
 
@@ -214,6 +257,11 @@ function honorsOf(
     shields,
     americasCups,
     domesticCups,
+    leagueTitlesByComp: splitOf(leagueTitlesByComp, (compId, seasons) => ({ compId, seasons })),
+    playerOfSeasonByComp: splitOf(playerOfSeasonByComp, (compId, seasons) => ({ compId, seasons })),
+    goldenBootByComp: splitOf(goldenBootByComp, (compId, seasons) => ({ compId, seasons })),
+    teamOfSeasonByComp: splitOf(teamOfSeasonByComp, (compId, seasons) => ({ compId, seasons })),
+    domesticCupsByName: splitOf(domesticCupsByName, (name, seasons) => ({ name, seasons })),
     hasAny:
       ballonDOr.length > 0 ||
       worldTeamOfYear.length > 0 ||
@@ -232,4 +280,18 @@ function honorsOf(
       americasCups.length > 0 ||
       domesticCups.length > 0,
   };
+}
+
+function pushTo<K>(map: Map<K, number[]>, key: K, season: number): void {
+  const list = map.get(key);
+  if (list) list.push(season);
+  else map.set(key, [season]);
+}
+
+/** A split map as a list: most-won first, then whichever was first won earliest. */
+function splitOf<K, T>(map: Map<K, number[]>, make: (key: K, seasons: number[]) => T): T[] {
+  return [...map.entries()]
+    .map(([key, seasons]) => ({ key, seasons: [...seasons].sort((a, b) => a - b) }))
+    .sort((a, b) => b.seasons.length - a.seasons.length || a.seasons[0] - b.seasons[0])
+    .map(({ key, seasons }) => make(key, seasons));
 }
