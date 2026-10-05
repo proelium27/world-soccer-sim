@@ -196,4 +196,33 @@ describe("Club History page render", () => {
         .toContain("No players with a game for this club yet.");
     });
   });
+
+  describe("reputation", () => {
+    const tid = otherTid;
+    const compId = base.teams.find((t) => t.tid === tid)!.compId;
+    const row = { tid, played: 38, won: 20, drawn: 10, lost: 8, gf: 60, ga: 40, gd: 20, points: 70 };
+    const entry = (season: number, reputation?: Record<number, number>) => ({
+      season, table: [row], teamStats: [], awards: {}, compsByTid: { [tid]: compId },
+      championTidByCompId: {}, world: { ballonDOr: [], worldTeamOfYear: [] }, reputation,
+    });
+    const withSeasons = (a?: Record<number, number>, b?: Record<number, number>) => ({
+      ...base,
+      teams: base.teams.map((t) => (t.tid === tid ? { ...t, reputation: 44.5 } : t)),
+      seasonHistory: [entry(1, a), entry(2, b)],
+    }) as unknown as LeagueStore;
+
+    it("shows the reputation, last offseason's move, and a column per recorded season", () => {
+      const html = render(withSeasons({ [tid]: 40 }, { [tid]: 44.5 }), `?tid=${tid}`);
+      expect(html).toContain("Reputation ");
+      expect(html).toMatch(/Reputation <span[^>]*>45<span[^>]*>\+4\.5<\/span>/);
+      expect(html).toContain(">Rep</th>");
+      expect(html).toContain('<td class="text-end">40</td>');
+    });
+
+    it("leaves the change and the column off when nothing was recorded", () => {
+      const html = render(withSeasons(), `?tid=${tid}`);
+      expect(html).not.toContain(">Rep</th>");
+      expect(html).not.toContain("+4.5");
+    });
+  });
 });

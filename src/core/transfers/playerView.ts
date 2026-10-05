@@ -24,6 +24,8 @@ export interface ClubInView {
   tid: number;
   appeal: ClubAppeal;
   interest: Interest;
+  /** Whether he'd start there: he beats the weakest man its shape fields at his position. */
+  starts: boolean;
 }
 
 export interface PlayerClubView {
@@ -31,8 +33,6 @@ export interface PlayerClubView {
   yourClub: ClubInView | null;
   /** The clubs he would most like to join, best first. */
   favourites: ClubInView[];
-  /** The best clubs where he would start (he beats their weakest starter at his position), best first. */
-  wouldPlay: ClubInView[];
   /** How many clubs he would refuse outright. */
   refusedCount: number;
   /** How many clubs were considered (every club but his own). */
@@ -80,34 +80,21 @@ export function playerClubView(league: LeagueStore, player: Player): PlayerClubV
   for (const ctx of choice.contexts.values()) {
     if (ctx.tid === ownTid) continue;
     const appeal = clubAppealFor(player, ctx, ctx.tid === userTid ? userFrom : aiFrom);
-    const entry = { tid: ctx.tid, appeal, interest: interestOf(appeal) };
+    // Judged at the destination alone (the loan market's rule), not from the
+    // playing-time line, which is relative to his current club and clamped.
+    const weakest = ctx.posWeakestStarterOvr?.[player.pos];
+    const starts = weakest === undefined || player.ovr > weakest;
+    const entry = { tid: ctx.tid, appeal, interest: interestOf(appeal), starts };
     if (ctx.tid === userTid) yourClub = entry;
     if (appeal.refused) refusedCount++;
     else all.push(entry);
   }
   all.sort((a, b) => b.appeal.score - a.appeal.score || a.tid - b.tid);
-  // Whether he'd get games is a question about the destination alone: does he
-  // beat the weakest man its shape fields at his position (the loan market's
-  // rule). The playing-time LINE is relative to his current club and clamped,
-  // so a benched youngster reads 0 at every other club where he'd also sit.
-  const starts = new Set<number>();
-  for (const ctx of choice.contexts.values()) {
-    const weakest = ctx.posWeakestStarterOvr?.[player.pos];
-    if (weakest === undefined || player.ovr > weakest) starts.add(ctx.tid);
-  }
-  const playing = (c: ClubInView) => starts.has(c.tid);
   return {
     yourClub,
     favourites: all.slice(0, PLAYER_VIEW_LIST),
-    wouldPlay: all.filter(playing).slice(0, PLAYER_VIEW_LIST),
     refusedCount,
     clubCount: all.length + refusedCount,
   };
 }
 
-/** The line that counts most either way, for a one-line reason ("Home country"). */
-export function mainReason(appeal: ClubAppeal): string | null {
-  let best: { label: string; value: number } | null = null;
-  for (const l of appeal.lines) if (!best || Math.abs(l.value) > Math.abs(best.value)) best = l;
-  return best ? best.label : null;
-}

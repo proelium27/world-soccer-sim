@@ -4,6 +4,7 @@ import type { SeasonAwards } from "../../src/core/awards.js";
 import type { SeasonHistoryEntry } from "../../src/core/standings.js";
 import type { WorldAwards } from "../../src/core/worldAwards.js";
 import type { Player } from "../../src/core/players/types.js";
+import type { DomesticCupState } from "../../src/core/domesticCup/types.js";
 
 const noAwards: SeasonAwards = { playerOfSeasonPid: null, goldenBootPid: null, teamOfSeason: [] };
 const noWorldAwards: WorldAwards = { ballonDOr: [], worldTeamOfYear: [] };
@@ -159,5 +160,48 @@ describe("goalkeeper and defender of the year honours", () => {
     const honors = computePlayerHonors(player(7, { 1: 10 }), history);
     expect(honors.goalkeeperOfYear).toEqual([]);
     expect(honors.defenderOfYear).toEqual([]);
+  });
+});
+
+describe("honours split by competition", () => {
+  /** A season with two top flights: comp 0 won by club 10, comp 3 by club 20. */
+  const twoLeagues = (season: number, awards: Record<number, SeasonAwards> = {}): SeasonHistoryEntry => ({
+    ...entry(season, 10, awards),
+    championTidByCompId: { 0: 10, 3: 20 },
+  });
+
+  it("names which league each title came from, most-won first", () => {
+    const history = [twoLeagues(1), twoLeagues(2), twoLeagues(3)];
+    // Won comp 0 with club 10 in season 1, then comp 3 with club 20 twice.
+    const h = computePlayerHonors(player(1, { 1: 10, 2: 20, 3: 20 }), history);
+    expect(h.leagueTitles).toEqual([1, 2, 3]);
+    expect(h.leagueTitlesByComp).toEqual([
+      { compId: 3, seasons: [2, 3] },
+      { compId: 0, seasons: [1] },
+    ]);
+  });
+
+  it("splits league awards by the competition that gave them", () => {
+    const history = [
+      twoLeagues(1, { 0: { playerOfSeasonPid: null, goldenBootPid: 7, teamOfSeason: [7] } }),
+      twoLeagues(2, { 3: { playerOfSeasonPid: 7, goldenBootPid: 7, teamOfSeason: [7] } }),
+    ];
+    const h = computePlayerHonors(player(7, { 1: 11, 2: 21 }), history);
+    expect(h.goldenBootByComp).toEqual([{ compId: 0, seasons: [1] }, { compId: 3, seasons: [2] }]);
+    expect(h.playerOfSeasonByComp).toEqual([{ compId: 3, seasons: [2] }]);
+    expect(h.teamOfSeasonByComp).toHaveLength(2);
+  });
+
+  it("names each domestic cup by its own name", () => {
+    const cup = (season: number, name: string, championTid: number) =>
+      ({ season, name, championTid }) as unknown as DomesticCupState;
+    const h = computePlayerHonors(player(1, { 1: 10, 2: 20, 3: 20 }), [], {
+      domesticCupHistory: [cup(1, "English Cup", 10), cup(2, "Spanish Cup", 20), cup(3, "Spanish Cup", 20)],
+    });
+    expect(h.domesticCups).toEqual([1, 2, 3]);
+    expect(h.domesticCupsByName).toEqual([
+      { name: "Spanish Cup", seasons: [2, 3] },
+      { name: "English Cup", seasons: [1] },
+    ]);
   });
 });

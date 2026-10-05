@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useLeague } from "../context/LeagueContext.js";
 import { WatchToggle } from "../components/WatchToggle.js";
 import { HowHeSeesClubs } from "../components/HowHeSeesClubs.js";
-import { TrophyIcon } from "../components/TrophyIcon.js";
+import { HonorPills } from "../components/HonorPills.js";
 import { SKILL_KEYS } from "../../core/players/types.js";
 import type { CompletedTransfer } from "../../core/transfers/negotiation.js";
 import { isFreeAgentTid } from "../../core/transfers/negotiation.js";
@@ -17,7 +17,6 @@ import { usePotentialView } from "../potentialView.js";
 import { getRatingColor } from "../utils/ratingColor.js";
 import { Flag } from "../components/Flag.js";
 import { BackLink } from "../components/BackLink.js";
-import { GoldenBootIcon } from "../components/GoldenBootIcon.js";
 import { competitionOf } from "../../core/competitions.js";
 import { formatWeeklyWage, seasonYear, transferFeeLabel } from "../format.js";
 import { PlayerClauseNote } from "../components/ClauseLedger.js";
@@ -29,19 +28,6 @@ import { computePlayerHonors } from "../../core/playerHonors.js";
 import { hasClubSeason } from "../../core/clubSeason.js";
 import { RetiredPlayerProfile } from "./RetiredPlayerProfile.js";
 import { PositionBadge, PositionHistoryNote, PositionStrip } from "../components/PositionBadge.js";
-
-/** One career-honor badge, e.g. "3x Golden Boot" — omits the count for a single win. */
-function AwardPill({ label, seasons, icon }: { label: string; seasons: number[]; icon?: ReactNode }) {
-  if (seasons.length === 0) return null;
-  const years = [...seasons].sort((a, b) => a - b).map(seasonYear);
-  return (
-    <span className="award-pill" title={years.join(", ")}>
-      {icon}
-      {years.length > 1 && <span className="award-pill-count">{years.length}x</span>}
-      {label}
-    </span>
-  );
-}
 
 /**
  * Best-effort reconstruction of which team a player was on during a past
@@ -288,6 +274,18 @@ export function PlayerProfile() {
 
       {editing && <PlayerEditModal player={player} onClose={() => setEditing(false)} />}
 
+      {/* Full width at the top: the pills wrap sideways, so a decorated career
+          takes a line or two here, where in the left column it stretched that
+          side far past the value chart. Hidden until there's something in it. */}
+      {honors.hasAny && (
+        <div className="card mb-3">
+          <div className="card-body">
+            <h6 className="card-title">Awards &amp; Trophies</h6>
+            <HonorPills honors={honors} competitions={league.competitions} />
+          </div>
+        </div>
+      )}
+
       <div className="row g-3">
         <div className="col-lg-5">
           <div className="card mb-3">
@@ -303,34 +301,6 @@ export function PlayerProfile() {
                   </div>
                 ))}
               </div>
-            </div>
-          </div>
-
-          <div className="card mb-3">
-            <div className="card-body">
-              <h6 className="card-title">Awards &amp; Trophies</h6>
-              {!honors.hasAny ? (
-                <p className="text-muted mb-0">No individual or team honors yet.</p>
-              ) : (
-                <div className="award-pills">
-                  <AwardPill label="Ballon d'Or" seasons={honors.ballonDOr} />
-                  <AwardPill label="World Team of the Year" seasons={honors.worldTeamOfYear} />
-                  <AwardPill label="Goalkeeper of the Year" seasons={honors.goalkeeperOfYear} />
-                  <AwardPill label="Defender of the Year" seasons={honors.defenderOfYear} />
-                  <AwardPill label="Americas Player of the Year" seasons={honors.americasPlayerOfYear} />
-                  <AwardPill label="Americas Team of the Year" seasons={honors.americasTeamOfYear} />
-                  <AwardPill label="Americas Goalkeeper of the Year" seasons={honors.americasGoalkeeperOfYear} />
-                  <AwardPill label="Americas Defender of the Year" seasons={honors.americasDefenderOfYear} />
-                  <AwardPill label="Player of the Season" seasons={honors.playerOfSeason} />
-                  <AwardPill label="Golden Boot" seasons={honors.goldenBoot} icon={<GoldenBootIcon />} />
-                  <AwardPill label="Team of the Season" seasons={honors.teamOfSeason} />
-                  <AwardPill label="League Champion" seasons={honors.leagueTitles} icon={<TrophyIcon />} />
-                  <AwardPill label="Continental Cup" seasons={honors.continentalCups} />
-                  <AwardPill label="Continental Shield" seasons={honors.shields} />
-                  <AwardPill label="Americas Cup" seasons={honors.americasCups} />
-                  <AwardPill label="Domestic Cup" seasons={honors.domesticCups} />
-                </div>
-              )}
             </div>
           </div>
 
@@ -369,8 +339,6 @@ export function PlayerProfile() {
               )}
             </div>
           </div>
-
-          <HowHeSeesClubs league={league} player={player} />
         </div>
 
         <div className="col-lg-7">
@@ -529,6 +497,8 @@ export function PlayerProfile() {
           </p>
         </div>
       </div>
+
+      <HowHeSeesClubs league={league} player={player} />
     </div>
   );
 }

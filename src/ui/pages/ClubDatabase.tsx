@@ -13,6 +13,7 @@ import {
   CLUB_DB_PAGE_SIZE, buildClubRows, clubSortAccessors, clubSortKeysFor, filterClubRows,
   type ClubColumnSet, type ClubDbRow, type ClubSortKey,
 } from "../clubDatabase.js";
+import { ReputationTrend } from "../components/ReputationTrend.js";
 import { pageCount, pageOf } from "../playerDatabase.js";
 
 /**
@@ -176,6 +177,7 @@ export function ClubDatabase() {
                   <SortableTh sortKey="power" sort={sort} onSort={toggle} className="text-end">Power</SortableTh>
                   <SortableTh sortKey="squad" sort={sort} onSort={toggle} className="text-end">Squad</SortableTh>
                   <SortableTh sortKey="age" sort={sort} onSort={toggle} className="text-end">Avg age</SortableTh>
+                  <SortableTh sortKey="reputation" sort={sort} onSort={toggle} className="text-end">Reputation</SortableTh>
                   <SortableTh sortKey="hype" sort={sort} onSort={toggle} className="text-end">Hype</SortableTh>
                 </>
               )}
@@ -258,6 +260,7 @@ function ClubRow({
           <td className="text-end">{row.powerScore.toFixed(1)}</td>
           <td className="text-end">{row.squadSize}</td>
           <td className="text-end">{row.avgAge > 0 ? row.avgAge.toFixed(1) : "—"}</td>
+          <td className="text-end"><ReputationTrend value={row.reputation} change={row.reputationChange} /></td>
           <td className="text-end">{Math.round(row.hype)}</td>
         </>
       )}
