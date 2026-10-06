@@ -3,7 +3,7 @@ import type { StoredTeam } from "./teams/clubs.js";
 import { computeOvr } from "./players/ovr.js";
 import type { Player, PlayerRatings, Position, SkillKey } from "./players/types.js";
 import { emptyCareerSummary, type CareerSummary } from "./players/careerSummary.js";
-import type { ArchivedPlayer } from "./players/archive.js";
+import type { ArchivedPlayer, RetireeCareer } from "./players/archive.js";
 import { ratingsForOvr } from "./players/generate.js";
 import { seasonSalaryForOvr } from "./contracts.js";
 import { hashInts } from "../engine/rng.js";
@@ -268,16 +268,21 @@ function careerFromArchive(a: ArchivedPlayer): CareerSummary {
  * at (`finalOvr`), off a stream seeded by his pid so the same retiree always
  * comes back the same. Everything the archive does keep comes with him: career
  * totals and bests, the club-per-season line honours are credited on, his peak
- * and his caps. His per-season stat lines are gone for good, which is why a
- * living player's honours fall back to his career summary
- * (`core/playerHonors.ts`).
+ * and his caps. His per-season stat lines come back too when `saved` holds them
+ * (`RetireeCareer`, kept for anyone who retired after they started being
+ * stored); for an older retiree they are gone for good, which is why a living
+ * player's honours fall back to his career summary (`core/playerHonors.ts`).
  *
  * He keeps his real age, so a 38-year-old is still 38 and the next offseason's
  * retirement roll treats him as one; edit his age if that's not the plan (a
  * ratings lock stops decline, not retirement).
  * Pure and off the shared rng.
  */
-export function unretirePlayer(league: LeagueStore, pid: number): LeagueStore {
+export function unretirePlayer(
+  league: LeagueStore,
+  pid: number,
+  saved?: RetireeCareer,
+): LeagueStore {
   const archive = league.retiredPlayers ?? [];
   const a = archive.find((r) => r.pid === pid);
   if (!a || league.players.some((p) => p.pid === pid)) return league;
@@ -316,7 +321,7 @@ export function unretirePlayer(league: LeagueStore, pid: number): LeagueStore {
     // Expiring this season, which is what makes him a free agent anyone can sign.
     contract: { salary: seasonSalaryForOvr(ovr, pid, league.season), expiresSeason: league.season },
     injury: null,
-    stats: [],
+    stats: saved?.pid === pid ? saved.stats : [],
     hist: [
       ...pastHist,
       { season: nowStamp, ratings, ovr, potential: ovr, academy: false, pos: a.pos },
@@ -324,10 +329,12 @@ export function unretirePlayer(league: LeagueStore, pid: number): LeagueStore {
     peakOvr: beatsPeak ? ovr : a.peakOvr,
     peakOvrSeason: beatsPeak ? league.season - 1 : a.peakSeason,
     career: careerFromArchive(a),
-    // The archive keeps only the headline international numbers; the
-    // per-campaign lines and tournament counts didn't survive, so the World
-    // Cups he won are the fewest he can have been named for.
-    intl: a.caps > 0 || a.intlTitles > 0
+    // The saved record when there is one. Otherwise the archive keeps only the
+    // headline international numbers; the per-campaign lines and tournament
+    // counts didn't survive, so the World Cups he won are the fewest he can
+    // have been named for.
+    intl: saved?.pid === pid && saved.intl ? saved.intl
+      : a.caps > 0 || a.intlTitles > 0
       ? {
           caps: a.caps, goals: a.intlGoals, assists: 0,
           tournaments: a.intlTitles, titles: a.intlTitles, seasons: [],

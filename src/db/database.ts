@@ -2,6 +2,7 @@ import { openDB, type IDBPDatabase, type DBSchema } from "idb";
 import type { LeagueStore } from "../core/leagueState.js";
 import type { Player } from "../core/players/types.js";
 import type { ArchivedPlayer } from "../core/players/archive.js";
+import type { PackedRetireeCareer } from "./retireeCareerPack.js";
 import type { PlayedMatch } from "../core/standings.js";
 
 const DB_NAME = "soccer-gm";
@@ -61,7 +62,18 @@ const DB_NAME = "soccer-gm";
  * played rows at all** — see `playedToWrite` in leagueDb.ts for why the diff is
  * an append rather than the identity comparison players need.
  */
-const DB_VERSION = 6;
+/*
+ * 7 added `retireeCareers`: an archived retiree's full season-by-season stat
+ * lines, so his profile can show the same tables a living player's does.
+ * They are kept beside the archive row rather than on it because the archive is
+ * held in memory all session and these grow with every season he played; here
+ * they cost disk only, and are read one player at a time when a profile opens.
+ * Packed as bare number arrays (retireeCareerPack.ts): measured on real saves,
+ * ~6 KB a retiree as objects and ~2.4 KB packed, so ~48 MB at the archive's
+ * 20,000-row cap rather than ~120 MB.
+ * Nothing to migrate: a retiree from before this has no lines left anywhere.
+ */
+const DB_VERSION = 7;
 
 /**
  * A league as it sits on disk.
@@ -172,6 +184,17 @@ export interface SoccerGMDB extends DBSchema {
     value: ArchivedPlayer;
   };
   /**
+   * One archived retiree's full stat lines, keyed `[lid, pid]` like `retirees`.
+   *
+   * A row exists only while its archive row does: `saveLeague` deletes it when
+   * the archive cap prunes him (or God Mode brings him back), and sweeps any
+   * strays on a full write. Never read by `loadLeague` — only by his profile.
+   */
+  retireeCareers: {
+    key: [number, number];
+    value: PackedRetireeCareer;
+  };
+  /**
    * One league match, keyed `[lid, matchIndex]`.
    *
    * The key's second element is the match's **position in `league.played`**,
@@ -246,6 +269,11 @@ export function getDb(): Promise<IDBPDatabase<SoccerGMDB>> {
           // mid-season record carries ~10.5k matches and a versionchange
           // transaction is the worst possible place to move them.
           db.createObjectStore("played");
+        }
+        if (!db.objectStoreNames.contains("retireeCareers")) {
+          // Out-of-line `[lid, pid]`. Starts empty and stays that way for an
+          // old save's existing retirees: their lines were deleted with them.
+          db.createObjectStore("retireeCareers");
         }
         if (!db.objectStoreNames.contains("careers")) {
           // Same out-of-line `[lid, pid]` key again, and split out of the

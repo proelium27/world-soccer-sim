@@ -1,6 +1,6 @@
 import type { LeagueStore } from "../core/leagueState.js";
 import type { Player } from "../core/players/types.js";
-import type { ArchivedPlayer } from "../core/players/archive.js";
+import type { ArchivedPlayer, RetireeCareer } from "../core/players/archive.js";
 import type { PlayedMatch } from "../core/standings.js";
 import type { BoxScore } from "../engine/attribution.js";
 import {
@@ -8,6 +8,9 @@ import {
   type TeamSeasonAcc, type TeamSeasonStats,
 } from "../core/standings.js";
 import { getDb, type StoredLeague, type StoredPlayer, type PlayerCareer } from "./database.js";
+import {
+  packRetireeCareer, unpackRetireeCareer, type PackedRetireeCareer,
+} from "./retireeCareerPack.js";
 import { migrateLeague } from "./migrate.js";
 
 /**
@@ -504,13 +507,14 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
   const { players, retiredPlayers, played, ...rest } = league;
 
   const tx = db.transaction(
-    ["leagues", "players", "careers", "retirees", "played"],
+    ["leagues", "players", "careers", "retirees", "retireeCareers", "played"],
     "readwrite",
   );
   const leagues = tx.objectStore("leagues");
   const playerStore = tx.objectStore("players");
   const careerStore = tx.objectStore("careers");
   const retireeStore = tx.objectStore("retirees");
+  const retireeCareerStore = tx.objectStore("retireeCareers");
   const playedStore = tx.objectStore("played");
 
   let lid: number;
@@ -546,6 +550,17 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
   const archive = retiredPlayers ?? [];
   const retirees = retireesToWrite(lid, archive, storedSeq);
   if (retirees.full) await retireeStore.delete(retireeRange(lid));
+  // Stat lines are written by `saveRetireeCareers`, never from the archive in
+  // memory (which doesn't carry them), so a full write can't clear and refill
+  // them the way it does the rows above. It sweeps instead: any line whose
+  // archive row is gone. An incremental write just follows `retirees.remove`.
+  const strayLines: [number, number][] = [];
+  if (retirees.full) {
+    const kept = new Set(archive.map((r) => r.pid));
+    for (const key of await retireeCareerStore.getAllKeys(retireeRange(lid))) {
+      if (!kept.has(key[1])) strayLines.push(key);
+    }
+  }
 
   // Rows are keyed by position, so a full rewrite must drop anything past the
   // end: without it a season that shrank (the rollover, or a save loaded from
@@ -579,6 +594,8 @@ export async function saveLeague(league: LeagueStore): Promise<number> {
     ...identities.map((p) => playerStore.put(splitPlayer(p).identity, [lid, p.pid])),
     ...careers.map((p) => careerStore.put(splitPlayer(p).career, [lid, p.pid])),
     ...retirees.remove.map((pid) => retireeStore.delete([lid, pid])),
+    ...retirees.remove.map((pid) => retireeCareerStore.delete([lid, pid])),
+    ...strayLines.map((key) => retireeCareerStore.delete(key)),
     ...retirees.write.map((r) => retireeStore.put(r, [lid, r.pid])),
     ...playedPuts,
   ]);
@@ -747,15 +764,15 @@ export async function listLeagues(): Promise<
 }
 
 /**
- * Delete a league by lid, along with all of its player, career, retiree, played
- * and crest rows.
+ * Delete a league by lid, along with all of its player, career, retiree,
+ * retiree-career, played and crest rows.
  */
 export async function deleteLeague(lid: number): Promise<void> {
   // A reused lid must not inherit this save's team-season fold.
   seasonFolds.delete(lid);
   const db = await getDb();
   const tx = db.transaction(
-    ["leagues", "players", "careers", "retirees", "crests", "played"],
+    ["leagues", "players", "careers", "retirees", "retireeCareers", "crests", "played"],
     "readwrite",
   );
   await Promise.all([
@@ -763,6 +780,7 @@ export async function deleteLeague(lid: number): Promise<void> {
     tx.objectStore("players").delete(playerRange(lid)),
     tx.objectStore("careers").delete(careerRange(lid)),
     tx.objectStore("retirees").delete(retireeRange(lid)),
+    tx.objectStore("retireeCareers").delete(retireeRange(lid)),
     tx.objectStore("played").delete(playedRange(lid)),
     // In this transaction rather than through crestDb's own, so a deleted
     // league can never leave its badges behind for a later save to inherit by
@@ -797,4 +815,49 @@ export async function storedPlayedRows(lid: number): Promise<PlayedMatch[]> {
 export async function storedRetireeRows(lid: number): Promise<ArchivedPlayer[]> {
   const db = await getDb();
   return db.getAll("retirees", retireeRange(lid));
+}
+
+/**
+ * Store archived retirees' full stat lines (`RetireeCareer`), packed.
+ *
+ * Its own transaction, called by whoever has the lines (the sim's result, an
+ * import) rather than by `saveLeague`: the league in memory never carries them,
+ * which is the point. A line that lands without an archive row to go with it
+ * (a crash between this and the league save) is swept on the next full write.
+ */
+export async function saveRetireeCareers(lid: number, rows: RetireeCareer[]): Promise<void> {
+  await savePackedRetireeCareers(lid, rows.map(packRetireeCareer));
+}
+
+/** The same, for rows already packed: an import carries them that way. */
+export async function savePackedRetireeCareers(
+  lid: number,
+  rows: PackedRetireeCareer[],
+): Promise<void> {
+  if (!lid || rows.length === 0) return;
+  const db = await getDb();
+  const tx = db.transaction("retireeCareers", "readwrite");
+  await Promise.all(rows.map((r) => tx.store.put(r, [lid, r.pid])));
+  await tx.done;
+}
+
+/** One retiree's stat lines, or undefined if none were kept (he retired before they were). */
+export async function loadRetireeCareer(
+  lid: number,
+  pid: number,
+): Promise<RetireeCareer | undefined> {
+  const db = await getDb();
+  const row = await db.get("retireeCareers", [lid, pid]);
+  return row && unpackRetireeCareer(row);
+}
+
+/**
+ * Every retiree's stat lines for one league, still packed: an export writes
+ * them into the file as they are, which keeps both the file and the memory it
+ * takes to build it at the packed size.
+ */
+export async function loadPackedRetireeCareers(lid: number): Promise<PackedRetireeCareer[]> {
+  if (!lid) return [];
+  const db = await getDb();
+  return db.getAll("retireeCareers", retireeRange(lid));
 }

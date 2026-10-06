@@ -150,3 +150,50 @@ describe("retired player profile", () => {
     expect(html).not.toContain("Should Not Show");
   });
 });
+
+/**
+ * The stat tables a retiree's profile shows, given the lines kept beside his
+ * archive row (`RetireeCareer`). Rendered directly rather than through the
+ * page: the page reads those lines off disk in an effect, which a static render
+ * never runs.
+ */
+describe("retired player stat tables", () => {
+  it("shows his full season lines, the same columns a living player gets", async () => {
+    const { PlayerStatsCard } = await import("../../src/ui/components/PlayerStatsCard.js");
+    const { emptySeasonStats } = await import("../../src/core/players/types.js");
+    const league = makeLeague(0, 1);
+    const club = league.teams[0];
+    const stats = [10, 11].map((season) => ({
+      ...emptySeasonStats(season, club.tid),
+      appearances: 30, goals: 27 + season, assists: 4, minutesPlayed: 2700,
+      ratingSum: 210, avgRating: 7,
+    }));
+    const html = renderToStaticMarkup(createElement(
+      MemoryRouter, null,
+      createElement(PlayerStatsCard, {
+        league, pid: 999001, pos: "ST", nationality: "eng", stats, intl: null,
+        seasonTid: () => club.tid,
+      }),
+    ));
+    expect(html).toContain("Season Stats");
+    expect(html).toContain(">37<");
+    expect(html).toContain(">38<");
+    // The career row under them adds the two up.
+    expect(html).toContain(">75<");
+  });
+
+  it("falls back to what the archive kept when no lines were stored", async () => {
+    const { PlayerStatsCard } = await import("../../src/ui/components/PlayerStatsCard.js");
+    const league = makeLeague(0, 1);
+    const html = renderToStaticMarkup(createElement(
+      MemoryRouter, null,
+      createElement(PlayerStatsCard, {
+        league, pid: 999001, pos: "ST", nationality: "eng", stats: [], intl: null,
+        seasonTid: () => null,
+        leagueEmpty: createElement("p", null, "Only the archive line"),
+      }),
+    ));
+    expect(html).toContain("Only the archive line");
+    expect(html).not.toContain("No matches played yet");
+  });
+});

@@ -9,11 +9,11 @@ import type { LeagueArchive } from "../core/simArchive.js";
 import {
   detachArchive, reattachArchive, detachPlayed, reattachPlayed,
   detachCareer, reattachCareer, detachNews, reattachNews,
-  detachTransfers, reattachTransfers,
+  detachTransfers, reattachTransfers, reattachRetireeCareers,
 } from "../core/simArchive.js";
 import { referencedPids } from "../core/players/playerNames.js";
 import { honourSourcesOf } from "../core/frivolities/goat.js";
-import { teamSeasonStatsFor, teamSeasonAccFor } from "../db/leagueDb.js";
+import { teamSeasonStatsFor, teamSeasonAccFor, saveRetireeCareers } from "../db/leagueDb.js";
 import { offseasonCoefficientSlots } from "../core/cup/coefficients.js";
 
 export type SimProgress = {
@@ -51,6 +51,8 @@ type Pending = {
   transfers: ReturnType<typeof detachTransfers>["transfers"] | null;
   /** The news feed and archived cups the worker was not given. */
   news: ReturnType<typeof detachNews>["news"] | null;
+  /** The save this command ran on, which is where its retirees' stat lines are stored. */
+  lid: number;
 };
 
 export function useSimWorker() {
@@ -108,7 +110,28 @@ export function useSimWorker() {
           if (pending.careers) league = reattachCareer(league, pending.careers);
           if (pending.played) league = reattachPlayed(league, pending.played);
           if (pending.archive) league = reattachArchive(league, pending.archive);
-          pending.resolve(league);
+          // This offseason's retirees' full stat lines go straight to disk
+          // rather than onto the league, which would hold them in memory for
+          // the rest of the session (see RetireeCareer). Written before the
+          // caller saves the archive rows they belong to. A failed write costs
+          // only the detail on these profiles, so it never fails the sim.
+          const lines = e.data.type === "offseasonResult" || e.data.type === "jumpResult"
+            ? reattachRetireeCareers(
+                e.data.retireeCareers ?? [], pending.careers, league.retiredPlayers ?? [],
+              )
+            : [];
+          const done = league;
+          if (lines.length === 0) {
+            pending.resolve(done);
+          } else {
+            saveRetireeCareers(pending.lid, lines).then(
+              () => pending.resolve(done),
+              (err) => {
+                console.error("Could not store retired players' stat lines", err);
+                pending.resolve(done);
+              },
+            );
+          }
         }
         pendingRef.current = null;
         progressRef.current = null;
@@ -232,7 +255,9 @@ export function useSimWorker() {
               }
             : { ...command, league: payload };
 
-        pendingRef.current = { resolve, reject, archive, played, careers, news, transfers };
+        pendingRef.current = {
+          resolve, reject, archive, played, careers, news, transfers, lid: command.league.lid,
+        };
         progressRef.current = handlers.onProgress ?? null;
         jumpProgressRef.current = handlers.onJumpProgress ?? null;
         workerRef.current?.postMessage(outgoing);

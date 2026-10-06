@@ -12,7 +12,9 @@ import type { ForeignRule } from "../../core/foreignRules.js";
 import type { CupCompetitionId } from "../../core/constants.js";
 import type { SimThrough, IntlMode, PlayoffMode } from "../../worker/protocol.js";
 import { useSimWorker, type SimProgress, type JumpProgressUpdate } from "../useSimWorker.js";
-import { saveLeague, loadLeague, elideWrittenDetail } from "../../db/leagueDb.js";
+import {
+  saveLeague, loadLeague, elideWrittenDetail, savePackedRetireeCareers, loadRetireeCareer,
+} from "../../db/leagueDb.js";
 import { loadCrests, saveCrests } from "../../db/crestDb.js";
 import { getActiveLid, setActiveLid, clearActiveLid } from "../../db/activeLeague.js";
 import { setSeasonStartYear } from "../format.js";
@@ -1392,7 +1394,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   );
 
   const unretirePlayerAction = useCallback(
-    (pid: number) => mutate((l) => (l.godMode ? unretirePlayer(l, pid) : null)),
+    async (pid: number) => {
+      // His stored stat lines, if he retired after they started being kept.
+      // Read first, outside the action chain: it is a plain read of a row
+      // nothing else writes, and a failure only means he comes back without them.
+      const lid = leagueRef.current?.lid;
+      const saved = lid ? await loadRetireeCareer(lid, pid).catch(() => undefined) : undefined;
+      await mutate((l) => (l.godMode ? unretirePlayer(l, pid, saved) : null));
+    },
     [mutate],
   );
 
@@ -1426,7 +1435,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   }, [league, crests]);
 
   const doImport = useCallback(async (file: File) => {
-    const { league: imported, crests: importedCrests } = await importLeagueJSON(file);
+    const {
+      league: imported, crests: importedCrests, retireeCareers,
+    } = await importLeagueJSON(file);
     // An import always lands as a NEW save. The file still carries the lid it
     // held in whatever browser exported it, and saveLeague keys off that lid —
     // so keeping it silently overwrote whatever league already sat at that key
@@ -1437,6 +1448,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     // After the league, because the crest rows are keyed by the lid IndexedDB
     // has only just handed out — the same ordering setLeague documents.
     if (importedCrests.size > 0) await saveCrests(lid, importedCrests);
+    await savePackedRetireeCareers(lid, retireeCareers);
     setActiveLid(lid);
     commitLeague({ ...imported, lid }, importedCrests);
   }, [commitLeague]);
