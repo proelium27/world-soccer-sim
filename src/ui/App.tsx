@@ -77,8 +77,8 @@ function RootRedirect() {
  * the router and the sport-name provider to read either one.
  */
 function RouteSeo() {
-  const { brand } = useSportName();
-  useRouteSeo(brand);
+  const { brand, term } = useSportName();
+  useRouteSeo(brand, term);
   return null;
 }
 
