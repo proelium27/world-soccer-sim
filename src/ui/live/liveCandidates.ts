@@ -10,6 +10,7 @@
  * four different cup shapes — can be tested directly.
  */
 import type { LeagueStore } from "../../core/leagueState.js";
+import type { StoredTeam } from "../../core/teams/clubs.js";
 import type { PlayedMatch } from "../../core/standings.js";
 import type { CupState, CupTie } from "../../core/cup/types.js";
 import { competitionOf, competitionSplit } from "../../core/competitions.js";
@@ -41,10 +42,17 @@ export interface LiveView {
    * in cupCandidate.
    */
   lineups: MatchLineups | null;
+  /**
+   * The sides to name and colour, when they are not the save's clubs: an
+   * international match's nations (see intlLive.ts). Absent means league.teams.
+   */
+  teams?: StoredTeam[];
+  /** Which nation a stand-in tid is, so the viewer draws its flag. */
+  nationOf?: (tid: number) => string | undefined;
 }
 
 export interface LiveCandidate {
-  key: "league" | "cup" | "domestic";
+  key: "league" | "cup" | "domestic" | "intl";
   choice: LiveChoice;
   view: LiveView;
 }

@@ -13,24 +13,9 @@ import { Link } from "react-router-dom";
 import { PICKABLE_NATIONALITIES } from "../../components/NationalityEditor.js";
 import { INTL_TOURNAMENT_NAME, INTL_CYCLE_YEARS } from "../../../core/constants.js";
 import { EmptyState } from "../../components/EmptyState.js";
+import { koRoundName } from "../../intlRounds.js";
 
-/** Knockout round names, deepest first, for a bracket of up to five rounds (a 48-nation World Cup's). */
-export const KO_ROUND_NAMES = ["Round of 32", "Round of 16", "Quarter-finals", "Semi-finals", "Final"];
-
-/** Rounds in a 32-nation World Cup's bracket, the depth a caller with no total gets. */
-const DEFAULT_KO_ROUNDS = 4;
-
-/**
- * What to call knockout round `round` of a bracket that has `totalRounds` of
- * them. Named backwards from the final, because brackets differ in depth: the
- * World Cup's is four rounds at 32 nations and five at 48, while a
- * confederation cup's can be two, whose round 0 is the semi-finals rather than
- * the quarters. With no total supplied it assumes a 32-nation World Cup.
- */
-export function koRoundName(round: number, totalRounds: number = DEFAULT_KO_ROUNDS): string {
-  const fromFinal = totalRounds - 1 - round;
-  return KO_ROUND_NAMES[KO_ROUND_NAMES.length - 1 - fromFinal] ?? `Round ${round + 1}`;
-}
+export { KO_ROUND_NAMES, koRoundName } from "../../intlRounds.js";
 
 /**
  * Every country you can be put in charge of: anything with a name pool and a

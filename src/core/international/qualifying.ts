@@ -316,6 +316,13 @@ export function playQualifyingRound(
   campaign: IntlQualifyingCampaign,
   players: Player[],
   lid: number,
+  /**
+   * Keep this leg's box scores on its fixtures, which qualifying normally
+   * drops. Only the live viewer asks, so it has a match to replay, and it
+   * strips them again before the save is written (stripQualifyingDetail).
+   * Storage only: the matches, and every draw behind them, are the same.
+   */
+  keepBoxScores = false,
 ): { campaign: IntlQualifyingCampaign; delta: CareerDelta; injured: number[] } {
   const delta = emptyCareerDelta();
   const injured = new Set<number>();
@@ -347,7 +354,7 @@ export function playQualifyingRound(
   const matchData = liveMatchData();
 
   const seed = hashInts(lid, campaign.season, QUALIFYING_GROUP_STREAM, leg);
-  const played = playGroups(campaign.groups, matchData, seed, false, delta, injured, leg);
+  const played = playGroups(campaign.groups, matchData, seed, keepBoxScores, delta, injured, leg);
 
   const complete = played.every((g) => g.matches.every((m) => m.homeGoals >= 0));
   if (!complete) {

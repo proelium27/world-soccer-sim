@@ -29,11 +29,11 @@ export {
   editableSquad, displaySquad, writeSquad, isValidNationSquad,
   type CampaignSlot, type FoundSquad,
 } from "./userSquad.js";
-export { finalTie, tournamentGoals, roundsRemaining, summarize, summarizeQualifying } from "./tournament.js";
+export { finalTie, tournamentGoals, roundsRemaining, nextKnockoutRound, summarize, summarizeQualifying } from "./tournament.js";
 export { nationRecords, finishOf, type NationRecord } from "./nationHistory.js";
 export {
   isIntlStagePending, initInternationalCampaign, playIntlStage, simThroughInternational,
-  applyCareerDelta,
+  applyCareerDelta, stripQualifyingDetail,
 } from "./staging.js";
 
 export function emptyInternationalState(): InternationalState {

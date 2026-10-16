@@ -61,6 +61,8 @@ import { SimOverlay } from "../components/SimOverlay.js";
 import { JumpOverlay, type JumpResult } from "../components/JumpOverlay.js";
 import { LiveMatchRedirect, WATCH_PATH } from "../pages/WatchMatch.js";
 import { liveCandidates, type LiveCandidate } from "../live/liveCandidates.js";
+import { intlLiveView, type IntlWatchTarget } from "../live/intlLive.js";
+import { stripQualifyingDetail } from "../../core/international/index.js";
 import { playSuperCups, superCupsPending } from "../../core/superCup/superCup.js";
 import { superCupChampion } from "../../core/superCup/types.js";
 import type { PlayedMatch } from "../../core/standings.js";
@@ -125,6 +127,12 @@ interface LeagueContextValue {
   offseasonAction: () => Promise<void>;
   /** Play the next staged international stage ("stage") or every remaining one ("through"). */
   intlStageAction: (mode: IntlMode) => Promise<void>;
+  /**
+   * Play the next international stage and watch one of its matches, the
+   * international counterpart of simLiveAction. Committed when the viewer
+   * closes, which then goes to `returnTo` (the National Teams Schedule).
+   */
+  intlLiveAction: (target: IntlWatchTarget, returnTo?: string) => Promise<void>;
   /** Play the next playoff block ("stage"), or blocks until one the user's club is in ("through"). */
   playoffStageAction: (mode: PlayoffMode) => Promise<void>;
   signFreeAgentAction: (pid: number) => Promise<void>;
@@ -730,6 +738,42 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       console.error("International stage failed:", err);
     }
   }), [runExclusive, runIntlStage, commitLeague]);
+
+  const intlLiveAction = useCallback((target: IntlWatchTarget, returnTo?: string) => runExclusive(async () => {
+    const current = leagueRef.current;
+    if (!current || overlayOpenRef.current || liveOpenRef.current) return;
+    try {
+      // Qualifying keeps its box scores for this one stage so there is a match
+      // to replay, and they are dropped again before anything is saved: the
+      // save ends up exactly as an unwatched stage leaves it.
+      const result = await runIntlStage("stage", current, true);
+      const committed = { ...result, international: stripQualifyingDetail(result.international) };
+      const live = intlLiveView(current.international, result.international, target);
+      if (!live) {
+        // The match wasn't in this stage after all. Still a played stage.
+        const lid = await saveLeague(committed);
+        commitLeague({ ...committed, lid });
+        return;
+      }
+      pendingResultRef.current = committed;
+      liveOpenRef.current = true;
+      liveReturnRef.current = returnTo ?? "/national-teams/schedule";
+      setLiveCandidates([{
+        key: "intl",
+        choice: { key: "intl", title: live.view.competitionName, detail: live.detail },
+        view: live.view,
+      }]);
+      setLiveChoice("intl");
+      navigate(WATCH_PATH);
+      trackEvent("intl_stage_played", { mode: "stage" });
+    } catch (err) {
+      pendingResultRef.current = null;
+      liveOpenRef.current = false;
+      setLiveCandidates(null);
+      setLiveChoice(null);
+      console.error("Live international stage failed:", err);
+    }
+  }), [runExclusive, runIntlStage, commitLeague, navigate]);
 
   const playoffStageAction = useCallback((mode: PlayoffMode) => runExclusive(async () => {
     const current = leagueRef.current;
@@ -1497,6 +1541,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     jumpSeasonsAction,
     offseasonAction,
     intlStageAction,
+    intlLiveAction,
     playoffStageAction,
     signFreeAgentAction,
     releasePlayerAction,
@@ -1560,7 +1605,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     league, crests, loadingActiveLeague, setLeague, loadLeagueAction, switchLeagueAction,
     customizeTeamsAction, simAction, simLiveAction, liveMatch, chooseLiveMatch,
     finishLiveMatch, jumpSeasonsAction, offseasonAction,
-    intlStageAction, playoffStageAction, signFreeAgentAction,
+    intlStageAction, intlLiveAction, playoffStageAction, signFreeAgentAction,
     releasePlayerAction, signToAcademyAction,
     setScoutDirectionsAction,
     promoteFromAcademyAction,
