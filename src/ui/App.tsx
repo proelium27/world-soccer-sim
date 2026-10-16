@@ -158,7 +158,9 @@ export function App() {
             {/* Club-only despite living under League in the sidebar: the page
                 is your club's fixture list and nothing else, so without a club
                 it is an empty table rather than a world schedule. */}
-            <Route path="/schedule" element={<ClubOnly><Schedule /></ClubOnly>} />
+            {/* Not ClubOnly: past "Your club" it browses every competition in the
+                world, which is what a spectator save is for. */}
+            <Route path="/schedule" element={<Schedule />} />
             <Route path="/news" element={<NewsFeed />} />
             <Route path="/awards" element={<Awards />} />
             {/* Every season on one page, a line each. Not ClubOnly: it is a

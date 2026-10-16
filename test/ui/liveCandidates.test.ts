@@ -209,3 +209,31 @@ describe("liveCandidates — the cup", () => {
     expect(got.map((c) => c.key)).toEqual(["league"]);
   });
 });
+
+describe("liveCandidates — watching someone else's match", () => {
+  it("follows the club it is pointed at, and reads as a neutral", () => {
+    const results = [playedMatch(USER, 2, []), playedMatch(3, 4, [at(10, "goal")])];
+    const got = liveCandidates(league(), league(), results, nameOf, 3);
+    expect(got).toHaveLength(1);
+    expect(got[0].view.match.home).toBe(3);
+    expect(got[0].choice.detail).toBe("Matchday 3, Club 3 v Club 4");
+    // The rail still carries the rest of that division, the user's game included.
+    expect(got[0].view.otherMatches.map((m) => m.home)).toEqual([USER]);
+  });
+
+  it("finds a Continental Shield match, which lives on its own state", () => {
+    const shield = cupState({
+      name: "Continental Shield",
+      leaguePhase: {
+        teams: [1, 2, 3, 4],
+        matches: [
+          { round: 0, matchday: MD, home: 3, away: 4, played: true, homeGoals: 1, awayGoals: 0, boxScore: box([at(30, "goal")]) },
+        ],
+      },
+    });
+    const after = { ...league(), shield } as unknown as LeagueStore;
+    const got = liveCandidates(league(), after, [playedMatch(3, 2, [])], nameOf, 3);
+    expect(got.map((c) => c.key)).toEqual(["cup", "league"]);
+    expect(got[0].view.competitionName).toBe("Continental Shield");
+  });
+});

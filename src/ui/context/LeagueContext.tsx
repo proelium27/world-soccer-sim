@@ -69,6 +69,14 @@ import { simChunkTargets, simMatchdayCount } from "../../core/simChunks.js";
 import { isLowMemoryDevice } from "../lowMemoryDevice.js";
 import { userSpendPolicy } from "../userDebt.js";
 
+/** Whose match the live viewer follows, and which one when they play twice. */
+export interface LiveFocus {
+  tid: number;
+  key?: LiveCandidate["key"];
+  /** Where closing the viewer goes. The Dashboard when absent. */
+  returnTo?: string;
+}
+
 interface LeagueContextValue {
   league: LeagueStore | null;
   loadingActiveLeague: boolean;
@@ -92,8 +100,12 @@ interface LeagueContextValue {
    * Same sim as simAction("game") — the result is already decided before the
    * first whistle; the viewer replays its recorded event stream. The matchday
    * is not committed until the viewer is closed.
+   *
+   * `focus` watches some other club's match instead (the Schedule page's
+   * Watch button), and `focus.key` picks which of its matches when it plays
+   * twice that day, so the picker is skipped.
    */
-  simLiveAction: () => Promise<void>;
+  simLiveAction: (focus?: LiveFocus) => Promise<void>;
   /**
    * The uncommitted matchday waiting to be watched, and which of its matches
    * the user picked. Null whenever nothing is pending.
@@ -270,6 +282,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   // happens when the matchday offered more than one.
   const [liveChoice, setLiveChoice] = useState<string | null>(null);
   const liveOpenRef = useRef(false);
+  // Where closing the live viewer returns to (see LiveFocus.returnTo).
+  const liveReturnRef = useRef("/dashboard");
   // What /watch reads. Bundled into one object so a consumer that doesn't care
   // about the live viewer isn't re-rendered by the choice changing, and so the
   // "is anything pending" test is a single null check everywhere.
@@ -556,11 +570,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     setLiveChoice(null);
     // Clearing the candidates lifts LiveMatchRedirect's hold, but the user is
     // still standing on /watch, which now has nothing to show. Send them
-    // somewhere that reflects what they just watched.
-    navigate("/dashboard");
+    // somewhere that reflects what they just watched: back where they started
+    // it, when that was a Schedule row, else the Dashboard.
+    navigate(liveReturnRef.current);
   }), [runExclusive, commitLeague, navigate]);
 
-  const simLiveAction = useCallback(() => runExclusive(async () => {
+  const simLiveAction = useCallback((focus?: LiveFocus) => runExclusive(async () => {
     const current = leagueRef.current;
     if (!current || overlayOpenRef.current || liveOpenRef.current) return;
     try {
@@ -579,7 +594,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         current.teams.find((t) => t.tid === tid)?.name ?? `#${tid}`;
       // A cup matchday is an ordinary league matchday too, so this can hand
       // back two matches — the cup tie and the league fixture.
-      const candidates = liveCandidates(current, result, mdResults, clubName);
+      const candidates = liveCandidates(
+        current, result, mdResults, clubName, focus?.tid ?? current.meta.userTid,
+      );
       if (candidates.length === 0) {
         // Nothing of the user's to watch — commit it like an ordinary sim
         // rather than opening an empty viewer.
@@ -590,9 +607,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
       pendingResultRef.current = result;
       liveOpenRef.current = true;
+      liveReturnRef.current = focus?.returnTo ?? "/dashboard";
       setLiveCandidates(candidates);
-      // Only ask when there is genuinely a choice to make.
-      setLiveChoice(candidates.length === 1 ? candidates[0].key : null);
+      // Only ask when there is genuinely a choice to make, and not when the
+      // Schedule row that started this already said which match it meant.
+      const named = focus?.key ? candidates.find((c) => c.key === focus.key) : undefined;
+      setLiveChoice(named?.key ?? (candidates.length === 1 ? candidates[0].key : null));
       // The viewer is a route now, and this action fires from the top bar of
       // whatever page you happen to be on, so opening it means going there.
       navigate(WATCH_PATH);

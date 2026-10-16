@@ -65,9 +65,19 @@ function tieFinish(t: CupTie, swapped = false): Pick<LiveMatch, "extraTimeClock"
   };
 }
 
-/** "at home to Kestrel City" / "away to Kestrel City", from the user's side. */
-function versus(userTid: number, home: number, away: number, nameOf: (tid: number) => string): string {
-  return home === userTid ? `at home to ${nameOf(away)}` : `away to ${nameOf(home)}`;
+/**
+ * "at home to Kestrel City" / "away to Kestrel City", from the user's side, or
+ * "Kestrel City v Ashford" for a match the user is watching as a neutral.
+ */
+function versus(
+  userTid: number,
+  home: number,
+  away: number,
+  nameOf: (tid: number) => string,
+): string {
+  if (home === userTid) return `at home to ${nameOf(away)}`;
+  if (away === userTid) return `away to ${nameOf(home)}`;
+  return `${nameOf(home)} v ${nameOf(away)}`;
 }
 
 /**
@@ -77,23 +87,24 @@ function versus(userTid: number, home: number, away: number, nameOf: (tid: numbe
 function leagueCandidate(
   before: LeagueStore,
   mdResults: PlayedMatch[],
+  focusTid: number,
   nameOf: (tid: number) => string,
 ): LiveCandidate | null {
   const userTid = before.meta.userTid;
-  const played = mdResults.find((m) => m.home === userTid || m.away === userTid);
-  const userTeam = before.teams.find((t) => t.tid === userTid);
-  if (!played || !userTeam) return null;
+  const played = mdResults.find((m) => m.home === focusTid || m.away === focusTid);
+  const focusTeam = before.teams.find((t) => t.tid === focusTid);
+  if (!played || !focusTeam) return null;
 
-  const compTeamIds = before.teams.filter((t) => t.compId === userTeam.compId).map((t) => t.tid);
+  const compTeamIds = before.teams.filter((t) => t.compId === focusTeam.compId).map((t) => t.tid);
   const inComp = new Set(compTeamIds);
   const match = toLiveMatch(played);
-  // The rail shows the user's own division. Every competition in the world
+  // The rail shows the watched club's own division. Every competition in the world
   // plays the same day, and all sixteen at once is noise.
   const otherMatches = mdResults
     .filter((m) => m !== played && inComp.has(m.home))
     .map(toLiveMatch);
   const priorMatches = before.played.filter((m) => inComp.has(m.home));
-  const competitionName = competitionOf(before.competitions, userTeam.compId).name;
+  const competitionName = competitionOf(before.competitions, focusTeam.compId).name;
 
   return {
     key: "league",
@@ -110,7 +121,7 @@ function leagueCandidate(
         liveTableRows(
           compTeamIds, priorMatches, [match, ...otherMatches], minute,
           pointsDeductionMap(before.debtSanctions, before.season),
-          competitionSplit(competitionOf(before.competitions, userTeam.compId)),
+          competitionSplit(competitionOf(before.competitions, focusTeam.compId)),
         ),
       lineups: matchLineups(played.boxScore),
     },
@@ -158,6 +169,7 @@ function leaguePhaseRowsAtMinute(
 function cupCandidate(
   cup: CupState | null,
   userTid: number,
+  focusTid: number,
   matchday: number,
   nameOf: (tid: number) => string,
 ): LiveCandidate | null {
@@ -181,7 +193,7 @@ function cupCandidate(
     view: { match, otherMatches, competitionName, subtitle, tableAtMinute, lineups },
   });
 
-  const mine = (home: number, away: number) => home === userTid || away === userTid;
+  const mine = (home: number, away: number) => home === focusTid || away === focusTid;
 
   // 1. League phase.
   const lp = cup.leaguePhase;
@@ -201,7 +213,7 @@ function cupCandidate(
         asLive(ours),
         today.filter((m) => m !== ours).map(asLive),
         `${openingStageName(cup)}, round ${ours.round + 1}`,
-        (minute) => leaguePhaseRowsAtMinute(cup, matchday, minute, userTid),
+        (minute) => leaguePhaseRowsAtMinute(cup, matchday, minute, focusTid),
         matchLineups(ours.boxScore!),
       );
     }
@@ -309,13 +321,14 @@ function cupCandidate(
 function domesticCandidate(
   cups: DomesticCupState[],
   userTid: number,
+  focusTid: number,
   matchday: number,
   nameOf: (tid: number) => string,
 ): LiveCandidate | null {
   for (const cup of cups) {
     const round = cup.rounds.find((r) => r.matchday === matchday && r.ties.length > 0);
     if (!round) continue;
-    const ours = round.ties.find((t) => t.home === userTid || t.away === userTid);
+    const ours = round.ties.find((t) => t.home === focusTid || t.away === focusTid);
     if (!ours?.boxScore) continue;
 
     const asLive = (t: typeof ours): LiveMatch => ({
@@ -351,18 +364,30 @@ function domesticCandidate(
 /**
  * Everything the user could watch on the matchday just simulated, in the order
  * the engine played them — the cup round runs before the league fixtures.
+ *
+ * `focusTid` is whose matches to look for. It defaults to the user's club; the
+ * Schedule page passes any other club to watch a match the user isn't in (and
+ * a spectator save, which has no club, has to). Only the club changes: the
+ * phrasing still reads from the user's side when they happen to be playing.
+ *
+ * All three continental competitions are searched, since a club plays in at
+ * most one of them and the one it is in can be any of the three.
  */
 export function liveCandidates(
   before: LeagueStore,
   after: LeagueStore,
   mdResults: PlayedMatch[],
   nameOf: (tid: number) => string,
+  focusTid: number = before.meta.userTid,
 ): LiveCandidate[] {
   const userTid = before.meta.userTid;
-  const league = leagueCandidate(before, mdResults, nameOf);
+  const league = leagueCandidate(before, mdResults, focusTid, nameOf);
   const matchday = league?.view.match.matchday ?? mdResults[0]?.matchday;
   if (matchday === undefined) return [];
-  const cup = cupCandidate(after.cup, userTid, matchday, nameOf);
-  const domestic = domesticCandidate(after.domesticCups ?? [], userTid, matchday, nameOf);
+  const cup =
+    cupCandidate(after.cup, userTid, focusTid, matchday, nameOf) ??
+    cupCandidate(after.shield, userTid, focusTid, matchday, nameOf) ??
+    cupCandidate(after.americasCup ?? null, userTid, focusTid, matchday, nameOf);
+  const domestic = domesticCandidate(after.domesticCups ?? [], userTid, focusTid, matchday, nameOf);
   return [cup, domestic, league].filter((c): c is LiveCandidate => c !== null);
 }

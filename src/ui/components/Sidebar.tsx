@@ -31,11 +31,9 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       <NavLink to="/promotion-playoffs" className="nav-link" onClick={onNavigate}>Promotion Playoffs</NavLink>
       <NavLink to="/title-playoffs" className="nav-link" onClick={onNavigate}>Title Playoffs</NavLink>
       <NavLink to="/power-rankings" className="nav-link" onClick={onNavigate}>Power Rankings</NavLink>
-      {/* Your club's fixture list, not the world's — so it has nothing to show
-          without a club, despite sitting under League. */}
-      {!spectating && (
-        <NavLink to="/schedule" className="nav-link" onClick={onNavigate}>Schedule</NavLink>
-      )}
+      {/* Every competition's fixtures, your club's by default, so a spectator
+          has as much use for it as a manager. */}
+      <NavLink to="/schedule" className="nav-link" onClick={onNavigate}>Schedule</NavLink>
       <NavLink to="/leaders" className="nav-link" onClick={onNavigate}>Stat Leaders</NavLink>
       <NavLink to="/database/players" className="nav-link" onClick={onNavigate}>Database</NavLink>
       <NavLink to="/awards" className="nav-link" onClick={onNavigate}>Awards</NavLink>
