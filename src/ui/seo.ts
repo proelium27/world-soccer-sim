@@ -32,6 +32,12 @@ interface PageSeo {
    * loaded save to show anything, so it's marked noindex instead.
    */
   canonical?: string;
+  /**
+   * Add the "Free Online ... Manager Game" tagline after the brand, matching
+   * the title index.html ships. Without it the homepage's rendered title (the
+   * one Google indexes) shrank to the bare brand once React mounted.
+   */
+  tagline?: boolean;
 }
 
 /**
@@ -43,11 +49,13 @@ const ROUTES: Record<string, PageSeo> = {
     title: "",
     description: DEFAULT_DESCRIPTION,
     canonical: "/",
+    tagline: true,
   },
   "/leagues": {
     title: "",
     description: DEFAULT_DESCRIPTION,
     canonical: "/",
+    tagline: true,
   },
   "/new-league": {
     title: "Start a new league",
@@ -167,13 +175,17 @@ function setCanonical(href: string | null): void {
  * the tree. This owns `document.title` outright — nothing else should write it,
  * or the two will fight over which one ran last.
  */
-export function useRouteSeo(brand: string): void {
+export function useRouteSeo(brand: string, term: string): void {
   const { pathname } = useLocation();
 
   useEffect(() => {
     const page = lookup(pathname);
 
-    const title = page.title ? `${page.title} | ${brand}` : brand;
+    const title = page.title
+      ? `${page.title} | ${brand}`
+      : page.tagline
+        ? `${brand} | Free Online ${term} Manager Game`
+        : brand;
     document.title = title;
 
     setMeta("description", page.description);
@@ -192,5 +204,5 @@ export function useRouteSeo(brand: string): void {
       setProperty("og:url", SITE_ORIGIN + "/");
       setMeta("robots", "noindex, follow");
     }
-  }, [pathname, brand]);
+  }, [pathname, brand, term]);
 }

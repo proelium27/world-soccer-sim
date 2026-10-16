@@ -14,6 +14,7 @@ import { ROSTER_FILES } from "../rosterDownload.js";
 import { RosterFilesSection } from "../components/RosterFilesSection.js";
 import { CopyAiPromptButton } from "../components/CopyAiPromptButton.js";
 import { competitionTeamCount, worldCompetitions, worldTeamSlots } from "../../core/competitions.js";
+import { USER_ACADEMY_ENTRY_AGE } from "../../core/constants.js";
 
 interface LeagueSummary {
   lid: number;
@@ -44,15 +45,15 @@ const WORLD_SIZE = (() => {
  * What a first-time visitor sees instead of an empty save list. Doubles as the
  * site's only real homepage copy, so it's plain prose rather than UI chrome.
  */
-function FirstRunIntro({ brand }: { brand: string }) {
+function FirstRunIntro({ brand, sport }: { brand: string; sport: string }) {
   return (
     <header className="mb-4">
       <h1 className="h2 mb-3">{brand}</h1>
       <p>
-        A free soccer management game that runs right here in your browser. Take
-        over a club, pick the lineup, work the transfer market, and see how far
-        you can take them. No account and no download, and your saves stay on
-        this device.
+        A free {sport} sim and management game that runs right here in your
+        browser. Take over a club, pick the lineup, work the transfer market, and
+        see how far you can take them. No account and no download, and your saves
+        stay on this device.
       </p>
       <ul className="text-muted">
         {/* Counted off the shipped world rather than typed in: this line went
@@ -79,6 +80,58 @@ function FirstRunIntro({ brand }: { brand: string }) {
   );
 }
 
+/**
+ * The rest of the homepage copy, under the start-a-league buttons so it never
+ * sits between a new player and the game. First-run only, like the intro: once
+ * someone has a save this page is a save list, and nobody needs the pitch again.
+ *
+ * It exists for search. The intro alone was ~120 words and never used the
+ * phrases people look for (soccer sim, soccer simulator, soccer manager game),
+ * so the site ranked for its own name and nothing else. One line per item;
+ * the how-it-works detail stays in the Manual.
+ */
+export function FirstRunAbout({ sport }: { sport: string }) {
+  return (
+    <section className="mt-5 text-muted" aria-label="About the game">
+      <h2 className="h5 text-body">How a season plays</h2>
+      <ul>
+        <li>Pick your starting XI and formation, then sim one match or skip ahead a few matchdays.</li>
+        <li>Buy, sell and loan players in the summer and winter windows. Rival clubs bid for yours too.</li>
+        <li>Kids join your academy at {USER_ACADEMY_ENTRY_AGE}. You decide who gets cut and who gets a contract.</li>
+        <li>Keep the wage bill in check, or the board will notice.</li>
+        <li>Chase the league, the domestic cup and a continental cup, or just try to stay up.</li>
+      </ul>
+
+      <h2 className="h5 text-body mt-4">Built for long saves</h2>
+      <ul>
+        <li>Players develop, peak, age and retire, and the record books keep all of them.</li>
+        <li>Clubs rise and fall over decades, and whole leagues climb or slide down the world rankings.</li>
+        <li>Rather watch than manage? Start a save with nobody in charge and let the world play out.</li>
+        <li>Load roster files to play with real clubs, or use God Mode to change anything.</li>
+      </ul>
+
+      <h2 className="h5 text-body mt-4">If you play Basketball GM</h2>
+      <p>
+        It's the same idea for {sport}: a single-player management sim that's all
+        front office. Instead of a draft you get promotion and relegation, cups and
+        a transfer market.
+      </p>
+
+      <h2 className="h5 text-body mt-4">Questions</h2>
+      <dl>
+        <dt className="text-body">Is it free?</dt>
+        <dd>Yes. There's nothing to buy.</dd>
+        <dt className="text-body">Do I need to download anything?</dt>
+        <dd>No. It runs in any modern browser.</dd>
+        <dt className="text-body">Where are my saves?</dt>
+        <dd>In this browser, on this device. Export a save to a file to back it up or move it.</dd>
+        <dt className="text-body">Are the clubs real?</dt>
+        <dd>The default world is made up. Load a roster file if you want real clubs and badges.</dd>
+      </dl>
+    </section>
+  );
+}
+
 export function Leagues() {
   const [leagues, setLeagues] = useState<LeagueSummary[] | null>(null);
   const [editor, setEditor] = useState<TeamEditor | null>(null);
@@ -98,7 +151,8 @@ export function Leagues() {
   }, []);
   const { loadLeagueAction, customizeTeamsAction, importJSON } = useLeague();
   const navigate = useNavigate();
-  const { brand } = useSportName();
+  const { brand, term } = useSportName();
+  const sport = term.toLowerCase();
 
   // Nobody has a save here yet, so this is somebody's first look at the game
   // (and it's the page search engines land on). Lead with what the game is
@@ -317,7 +371,7 @@ export function Leagues() {
 
   return (
     <div className="container py-4" style={{ maxWidth: 720 }}>
-      {firstRun ? <FirstRunIntro brand={brand} /> : <h1 className="h2 mb-3">Your Leagues</h1>}
+      {firstRun ? <FirstRunIntro brand={brand} sport={sport} /> : <h1 className="h2 mb-3">Your Leagues</h1>}
 
       {importError && (
         <div className="alert alert-danger py-2" role="alert">
@@ -478,6 +532,8 @@ export function Leagues() {
         files={ROSTER_FILES}
         onImport={() => importInputRef.current?.click()}
       />
+
+      {firstRun && <FirstRunAbout sport={sport} />}
     </div>
   );
 }
