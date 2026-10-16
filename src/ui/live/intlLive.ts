@@ -6,8 +6,9 @@
  * StoredTeam list keyed by tid, and nations are keyed by `nid`, an index into
  * one campaign's `nations` that collides with real club tids. So every nation
  * is shifted up by NATION_TID_BASE into stand-in teams the viewer can read,
- * and the flag is drawn through LiveMatchView's `crest` hook rather than a
- * club crest that would belong to whichever club owns that tid.
+ * and the flag is drawn through LiveMatchView's `nationOf` prop (its
+ * SideBadge) rather than a club crest that would belong to whichever club
+ * owns that tid.
  *
  * Pure and free of React, like liveCandidates.
  */
@@ -162,14 +163,18 @@ export function intlLiveView(
   const qualifying = target.comp.kind === "qualifying";
 
   // A group match this stage played.
+  // The pairing can recur in another leg, so it is the one that went from
+  // unplayed to played, not the first unplayed one in the list.
   for (let g = 0; g < prior.groups.length; g++) {
-    const j = prior.groups[g].matches.findIndex(
-      (m) => m.homeGoals < 0 && m.home === target.home && m.away === target.away,
-    );
-    if (j < 0) continue;
     const group = now.groups[g];
-    const m = group?.matches[j];
-    if (!m || m.homeGoals < 0 || !m.boxScore) return null;
+    const j = prior.groups[g].matches.findIndex((p, k) => {
+      const n = group?.matches[k];
+      return p.homeGoals < 0 && p.home === target.home && p.away === target.away
+        && !!n && n.homeGoals >= 0;
+    });
+    if (j < 0) continue;
+    const m = group.matches[j];
+    if (!m.boxScore) return null;
     const leg = m.leg ?? 0;
     const others = group.matches.filter(
       (o, k) => k !== j && o.boxScore && (o.leg ?? 0) === leg && o.round === m.round
@@ -194,7 +199,7 @@ export function intlLiveView(
   // A knockout tie in the round that was next.
   if (prior.tournament && now.tournament) {
     const { round, field } = nextKnockoutRound(prior.tournament);
-    const totalRounds = round + Math.log2(Math.max(2, field.length));
+    const totalRounds = round + Math.round(Math.log2(Math.max(2, field.length)));
     const today = now.tournament.ties.filter((t) => t.round === round && t.boxScore);
     const tie = today.find((t) => t.home === target.home && t.away === target.away);
     if (!tie?.boxScore) return null;
@@ -240,41 +245,66 @@ export function fieldPairs(field: number[]): [number, number][] {
   return out;
 }
 
+const pairKey = (home: number, away: number) => `${home}-${away}`;
+
 /**
- * Whether the next international stage plays this fixture, which is what puts
- * a Watch button on it. Mirrors playIntlStage: one qualifying leg, a whole
- * group stage, or one knockout round (in a confederation cup, only the cups
- * with the most rounds left, since the finals are aligned).
+ * Every fixture the next international stage plays in `comp`, as "home-away"
+ * nid keys, which is what puts a Watch button on a row. Built once per render
+ * rather than asked per row, since qualifying has hundreds of fixtures. Mirrors
+ * playIntlStage: one qualifying leg, a whole group stage, or one knockout
+ * round (in a confederation cup, only the cups with the most rounds left,
+ * since the finals are aligned).
  */
-export function inNextStage(intl: InternationalState, comp: IntlComp, home: number, away: number): boolean {
-  const unplayedGroupMatch = (groups: IntlGroup[], leg?: number) => groups.some((g) =>
-    g.matches.some((m) => m.homeGoals < 0 && m.home === home && m.away === away
-      && (leg === undefined || (m.leg ?? 0) === leg)));
-  const nextTie = (t: IntlTournament) =>
-    fieldPairs(nextKnockoutRound(t).field).some(([h, a]) => h === home && a === away);
+export function nextStagePairs(intl: InternationalState, comp: IntlComp): Set<string> {
+  const out = new Set<string>();
+  const addGroups = (groups: IntlGroup[], leg?: number) => {
+    for (const g of groups) {
+      for (const m of g.matches) {
+        if (m.homeGoals < 0 && (leg === undefined || (m.leg ?? 0) === leg)) out.add(pairKey(m.home, m.away));
+      }
+    }
+  };
+  const addTies = (t: IntlTournament) => {
+    for (const [h, a] of fieldPairs(nextKnockoutRound(t).field)) out.add(pairKey(h, a));
+  };
 
   switch (intl.stage) {
     case "qualifying": {
       const q = intl.qualifying;
-      if (comp.kind !== "qualifying" || !q) return false;
+      if (comp.kind !== "qualifying" || !q) break;
       const pending = q.groups.flatMap((g) => g.matches.filter((m) => m.homeGoals < 0).map((m) => m.leg ?? 0));
-      return pending.length > 0 && unplayedGroupMatch(q.groups, Math.min(...pending));
+      if (pending.length > 0) addGroups(q.groups, Math.min(...pending));
+      break;
     }
     case "groups":
-      return comp.kind === "worldCup" && !!intl.tournament && unplayedGroupMatch(intl.tournament.groups);
+      if (comp.kind === "worldCup" && intl.tournament) addGroups(intl.tournament.groups);
+      break;
     case "knockout":
-      return comp.kind === "worldCup" && !!intl.tournament && roundsRemaining(intl.tournament) > 0
-        && nextTie(intl.tournament);
+      if (comp.kind === "worldCup" && intl.tournament && roundsRemaining(intl.tournament) > 0) addTies(intl.tournament);
+      break;
     case "confederation-groups":
     case "confederation-ko": {
-      if (comp.kind !== "confederation") return false;
+      if (comp.kind !== "confederation") break;
       const cup = intl.confederationCups.find((c) => c.confederation === comp.confederation);
-      if (!cup) return false;
-      if (intl.stage === "confederation-groups") return unplayedGroupMatch(cup.groups);
-      const deepest = Math.max(0, ...intl.confederationCups.map(roundsRemaining));
-      return deepest > 0 && roundsRemaining(cup) === deepest && nextTie(cup);
+      if (!cup) break;
+      if (intl.stage === "confederation-groups") {
+        addGroups(cup.groups);
+      } else {
+        const deepest = Math.max(0, ...intl.confederationCups.map(roundsRemaining));
+        if (deepest > 0 && roundsRemaining(cup) === deepest) addTies(cup);
+      }
+      break;
     }
     default:
-      return false;
+      break;
   }
+  return out;
 }
+
+/** Whether the next international stage plays this one fixture. */
+export function inNextStage(intl: InternationalState, comp: IntlComp, home: number, away: number): boolean {
+  return nextStagePairs(intl, comp).has(pairKey(home, away));
+}
+
+/** The key `nextStagePairs` files a fixture under. */
+export { pairKey };

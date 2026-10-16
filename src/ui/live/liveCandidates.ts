@@ -14,7 +14,7 @@ import type { StoredTeam } from "../../core/teams/clubs.js";
 import type { PlayedMatch } from "../../core/standings.js";
 import type { CupState, CupTie } from "../../core/cup/types.js";
 import { competitionOf, competitionSplit } from "../../core/competitions.js";
-import { cupRoundName, koRoundsOf, openingStageName } from "../../core/cup/cup.js";
+import { cupRoundName, koLegMatchdays, koRoundsOf, openingStageName } from "../../core/cup/cup.js";
 import type { DomesticCupState } from "../../core/domesticCup/types.js";
 import { domesticRoundName } from "../../core/domesticCup/cup.js";
 import { leaguePhaseTable } from "../../core/cup/leaguePhase.js";
@@ -251,8 +251,10 @@ function cupCandidate(
     }
   }
 
-  // 3. A knockout first leg, still held pending its second.
-  const legs = cup.koLegs;
+  // 3. A knockout first leg, still held pending its second. Held for every
+  // matchday until the second leg, so it only counts on the day it was played.
+  const legMds = koLegMatchdays(cup);
+  const legs = cup.koLegs?.filter((l) => legMds[l.round]?.[0] === matchday);
   if (legs && legs.length > 0) {
     const ours = legs.find((l) => mine(l.home, l.away));
     if (ours) {

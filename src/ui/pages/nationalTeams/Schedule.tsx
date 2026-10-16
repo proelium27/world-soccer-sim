@@ -8,7 +8,7 @@ import { bestThirdsFor } from "../../../core/international/format.js";
 import {
   NationalTeamsLayout, NationName, koRoundName, useHasInternational, IntlEmpty, liveCampaign,
 } from "./shared.js";
-import { fieldPairs, inNextStage, stageComp, type IntlComp } from "../../live/intlLive.js";
+import { fieldPairs, nextStagePairs, pairKey, stageComp, type IntlComp } from "../../live/intlLive.js";
 import { intlStageButton, intlStageThroughLabel, type PlayableStage } from "../../intlStageLabels.js";
 
 /** Asks whether a fixture is in the next stage, and if so plays the stage and watches it. */
@@ -272,11 +272,16 @@ export function NTSchedule() {
   const pending = league.phase === "offseason" && isIntlStagePending(intl);
   const stage = pending ? (intl.stage as PlayableStage) : null;
   const returnTo = location.pathname + location.search;
-  const watch: WatchFn = pending && comp
-    ? (home, away) => (inNextStage(intl, comp, home, away)
+  const nextPairs = pending && comp ? nextStagePairs(intl, comp) : null;
+  const watch: WatchFn = nextPairs && comp
+    ? (home, away) => (nextPairs.has(pairKey(home, away))
       ? () => intlLiveAction({ comp, home, away }, returnTo)
       : null)
     : null;
+  // Remounting on progress resets each view's round pick to the stage now up
+  // next, so pressing a stage button here doesn't leave you on the old one.
+  const progress = (groups: { matches: { homeGoals: number }[] }[], ties = 0) =>
+    groups.reduce((n, g) => n + g.matches.filter((m) => m.homeGoals >= 0).length, 0) + ties;
 
   const confCup = comp?.kind === "confederation"
     ? intl.confederationCups.find((c) => c.confederation === comp.confederation) ?? null
@@ -311,11 +316,11 @@ export function NTSchedule() {
         )}
       </div>
       {comp?.kind === "qualifying" && qualifying ? (
-        <QualifyingSchedule key="qualifying" campaign={qualifying} watch={watch} />
+        <QualifyingSchedule key={`qualifying-${progress(qualifying.groups)}`} campaign={qualifying} watch={watch} />
       ) : comp?.kind === "worldCup" && tournament ? (
-        <TournamentSchedule key="worldCup" tournament={tournament} watch={watch} />
+        <TournamentSchedule key={`worldCup-${progress(tournament.groups, tournament.ties.length)}`} tournament={tournament} watch={watch} />
       ) : confCup ? (
-        <TournamentSchedule key={confCup.confederation} tournament={confCup} watch={watch} />
+        <TournamentSchedule key={`${confCup.confederation}-${progress(confCup.groups, confCup.ties.length)}`} tournament={confCup} watch={watch} />
       ) : (
         <p className="text-muted">No fixtures to show yet.</p>
       )}

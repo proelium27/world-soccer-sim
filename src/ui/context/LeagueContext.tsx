@@ -61,8 +61,8 @@ import { SimOverlay } from "../components/SimOverlay.js";
 import { JumpOverlay, type JumpResult } from "../components/JumpOverlay.js";
 import { LiveMatchRedirect, WATCH_PATH } from "../pages/WatchMatch.js";
 import { liveCandidates, type LiveCandidate } from "../live/liveCandidates.js";
-import { intlLiveView, type IntlWatchTarget } from "../live/intlLive.js";
-import { stripQualifyingDetail } from "../../core/international/index.js";
+import { inNextStage, intlLiveView, type IntlWatchTarget } from "../live/intlLive.js";
+import { isIntlStagePending, stripQualifyingDetail } from "../../core/international/index.js";
 import { playSuperCups, superCupsPending } from "../../core/superCup/superCup.js";
 import { superCupChampion } from "../../core/superCup/types.js";
 import type { PlayedMatch } from "../../core/standings.js";
@@ -742,6 +742,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const intlLiveAction = useCallback((target: IntlWatchTarget, returnTo?: string) => runExclusive(async () => {
     const current = leagueRef.current;
     if (!current || overlayOpenRef.current || liveOpenRef.current) return;
+    // A Watch button rendered before the stage was played some other way must
+    // not quietly play whatever stage comes next instead.
+    if (
+      current.phase !== "offseason" || !isIntlStagePending(current.international)
+      || !inNextStage(current.international, target.comp, target.home, target.away)
+    ) return;
     try {
       // Qualifying keeps its box scores for this one stage so there is a match
       // to replay, and they are dropped again before anything is saved: the

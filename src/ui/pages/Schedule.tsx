@@ -16,6 +16,7 @@ import {
   type FixtureSource,
 } from "../scheduleFixtures.js";
 import type { CupCompetitionId } from "../../core/constants.js";
+import type { LeagueStore } from "../../core/leagueState.js";
 
 const CONTINENTAL: { id: CupCompetitionId; name: string }[] = [
   { id: "continental", name: "Continental Cup" },
@@ -257,24 +258,50 @@ function CompetitionFixtures({ rows, userTid, currentMatchday }: {
   );
 }
 
+/**
+ * Every view this save can show, as <select> values. A `?view=` that isn't one
+ * of them (an old link, a league God Mode removed, "club" on a spectator save)
+ * falls back to the default rather than showing an empty page under a select
+ * that names something else.
+ */
+function viewKeys(league: LeagueStore): Set<string> {
+  const keys = new Set<string>();
+  if (!isSpectator(league)) keys.add("club");
+  for (const c of CONTINENTAL) if (continentalCupOf(league, c.id)) keys.add(`cont:${c.id}`);
+  for (const c of league.competitions) keys.add(`league:${c.id}`);
+  for (const c of league.domesticCups ?? []) keys.add(`dom:${c.country}`);
+  return keys;
+}
+
+function resolveSource(league: LeagueStore, key: string | null): FixtureSource {
+  const userTid = league.meta.userTid;
+  if (key !== null && viewKeys(league).has(key)) return parseSource(key, userTid);
+  return isSpectator(league)
+    ? { kind: "league", compId: league.competitions[0].id }
+    : { kind: "club", tid: userTid };
+}
+
 export function Schedule() {
   const { league } = useLeague();
   const [params, setParams] = useSearchParams();
   const key = params.get("view");
   // Picking a competition starts it on its own current matchday.
   const setKey = (v: string) => setParams({ view: v }, { replace: true });
+  // Scans the whole world's fixtures for a league view, so only when the
+  // league or the view changes, not on every render.
+  const resolved = useMemo(() => {
+    if (!league) return null;
+    const source = resolveSource(league, key);
+    return { source, rows: fixturesFor(league, source) };
+  }, [league, key]);
 
-  if (!league) {
+  if (!league || !resolved) {
     return <p className="p-3">Loading...</p>;
   }
 
   const userTid = league.meta.userTid;
   const spectating = isSpectator(league);
-  const firstLeague: FixtureSource = { kind: "league", compId: league.competitions[0].id };
-  const source = key !== null
-    ? parseSource(key, userTid)
-    : spectating ? firstLeague : { kind: "club" as const, tid: userTid };
-  const rows = fixturesFor(league, source);
+  const { source, rows } = resolved;
   const currentMatchday = currentMatchdayOf(league);
 
   const continental = CONTINENTAL.filter((c) => continentalCupOf(league, c.id) !== null);

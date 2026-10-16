@@ -68,6 +68,9 @@ function tie(over: Record<string, unknown>) {
 
 const nameOf = (tid: number) => `Club ${tid}`;
 
+/** A knockout calendar whose quarter-final first legs are on MD. */
+const FIRST_LEG_ON_MD = { ko: [[MD, MD + 4], [MD + 8, MD + 12], [MD + 16]] } as never;
+
 function cupState(over: Partial<CupState>): CupState {
   return {
     season: 2,
@@ -151,6 +154,8 @@ describe("liveCandidates — the cup", () => {
 
   it("finds a knockout first leg while it is still held pending the second", () => {
     const cup = cupState({
+      // The first leg only counts on its own matchday, so say which one that is.
+      calendar: FIRST_LEG_ON_MD,
       koLegs: [
         { round: 0, home: USER, away: 3, homeGoals: 1, awayGoals: 1, boxScore: box([at(40, "goal")]) },
         { round: 0, home: 2, away: 4, homeGoals: 0, awayGoals: 0, boxScore: box([]) },
@@ -206,6 +211,19 @@ describe("liveCandidates — the cup", () => {
       },
     });
     const got = liveCandidates(league(), league(cup), leagueResults, nameOf);
+    expect(got.map((c) => c.key)).toEqual(["league"]);
+  });
+});
+
+describe("liveCandidates — a first leg held over", () => {
+  it("doesn't offer last week's first leg on a league-only matchday", () => {
+    // koLegs keeps the first leg until the second is played, so on the
+    // matchdays in between it is still there and must not read as today's.
+    const cup = cupState({
+      calendar: FIRST_LEG_ON_MD,
+      koLegs: [{ round: 0, home: USER, away: 3, homeGoals: 1, awayGoals: 1, boxScore: box([at(40, "goal")]) }],
+    });
+    const got = liveCandidates(league(), league(cup), [{ ...playedMatch(USER, 2, []), matchday: 99 }], nameOf);
     expect(got.map((c) => c.key)).toEqual(["league"]);
   });
 });
