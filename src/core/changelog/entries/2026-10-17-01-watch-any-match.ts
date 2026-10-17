@@ -1,7 +1,7 @@
 import type { ChangelogEntry } from "../types.js";
 
 const entry: ChangelogEntry = {
-  date: "2026-10-16",
+  date: "2026-10-17",
   title: "Watch any match, club or international, from the Schedule",
   items: [
     "The Schedule page used to show only your own club. Now there's a dropdown at the top that switches it to any league, continental cup or domestic cup in the world, and you step through it a matchday at a time.",
