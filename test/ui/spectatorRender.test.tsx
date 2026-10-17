@@ -117,12 +117,12 @@ describe("spectator: rendering without a club", () => {
       createElement(Sidebar, { open: false, onNavigate: () => {} }),
     );
     for (const gone of ["/roster", "/transfers", "/finance", "/academy", "/loans",
-      "/incoming-offers", "/free-agents", "/incoming-talent", "/manager", "/schedule",
+      "/incoming-offers", "/free-agents", "/incoming-talent", "/manager",
       "/national-teams/my-squad", "/national-teams/federation"]) {
       expect(html).not.toContain(`href="${gone}"`);
     }
     for (const kept of ["/standings", "/cup", "/news", "/awards", "/frivolities",
-      "/power-rankings", "/national-teams/world-cup"]) {
+      "/power-rankings", "/national-teams/world-cup", "/schedule"]) {
       expect(html).toContain(`href="${kept}"`);
     }
     // The watchlist survives: it is a note about players anywhere in the world,

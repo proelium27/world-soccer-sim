@@ -68,7 +68,13 @@ export type WorkerCommand =
        */
       cupSlots?: [number, Partial<Record<CupCompetitionId, number>>][] | null;
     }
-  | { type: "intl"; mode: IntlMode; league: LeagueStore }
+  | {
+      type: "intl";
+      mode: IntlMode;
+      league: LeagueStore;
+      /** "stage" only: keep qualifying box scores for the live viewer (see playQualifyingRound). */
+      keepDetail?: boolean;
+    }
   | { type: "playoffs"; mode: PlayoffMode; league: LeagueStore }
   /** Play `seasons` whole seasons with the AI running the user's club (core/autopilot.ts). */
   | {

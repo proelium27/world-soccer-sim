@@ -68,6 +68,9 @@ function tie(over: Record<string, unknown>) {
 
 const nameOf = (tid: number) => `Club ${tid}`;
 
+/** A knockout calendar whose quarter-final first legs are on MD. */
+const FIRST_LEG_ON_MD = { ko: [[MD, MD + 4], [MD + 8, MD + 12], [MD + 16]] } as never;
+
 function cupState(over: Partial<CupState>): CupState {
   return {
     season: 2,
@@ -151,6 +154,8 @@ describe("liveCandidates — the cup", () => {
 
   it("finds a knockout first leg while it is still held pending the second", () => {
     const cup = cupState({
+      // The first leg only counts on its own matchday, so say which one that is.
+      calendar: FIRST_LEG_ON_MD,
       koLegs: [
         { round: 0, home: USER, away: 3, homeGoals: 1, awayGoals: 1, boxScore: box([at(40, "goal")]) },
         { round: 0, home: 2, away: 4, homeGoals: 0, awayGoals: 0, boxScore: box([]) },
@@ -207,5 +212,46 @@ describe("liveCandidates — the cup", () => {
     });
     const got = liveCandidates(league(), league(cup), leagueResults, nameOf);
     expect(got.map((c) => c.key)).toEqual(["league"]);
+  });
+});
+
+describe("liveCandidates — a first leg held over", () => {
+  it("doesn't offer last week's first leg on a league-only matchday", () => {
+    // koLegs keeps the first leg until the second is played, so on the
+    // matchdays in between it is still there and must not read as today's.
+    const cup = cupState({
+      calendar: FIRST_LEG_ON_MD,
+      koLegs: [{ round: 0, home: USER, away: 3, homeGoals: 1, awayGoals: 1, boxScore: box([at(40, "goal")]) }],
+    });
+    const got = liveCandidates(league(), league(cup), [{ ...playedMatch(USER, 2, []), matchday: 99 }], nameOf);
+    expect(got.map((c) => c.key)).toEqual(["league"]);
+  });
+});
+
+describe("liveCandidates — watching someone else's match", () => {
+  it("follows the club it is pointed at, and reads as a neutral", () => {
+    const results = [playedMatch(USER, 2, []), playedMatch(3, 4, [at(10, "goal")])];
+    const got = liveCandidates(league(), league(), results, nameOf, 3);
+    expect(got).toHaveLength(1);
+    expect(got[0].view.match.home).toBe(3);
+    expect(got[0].choice.detail).toBe("Matchday 3, Club 3 v Club 4");
+    // The rail still carries the rest of that division, the user's game included.
+    expect(got[0].view.otherMatches.map((m) => m.home)).toEqual([USER]);
+  });
+
+  it("finds a Continental Shield match, which lives on its own state", () => {
+    const shield = cupState({
+      name: "Continental Shield",
+      leaguePhase: {
+        teams: [1, 2, 3, 4],
+        matches: [
+          { round: 0, matchday: MD, home: 3, away: 4, played: true, homeGoals: 1, awayGoals: 0, boxScore: box([at(30, "goal")]) },
+        ],
+      },
+    });
+    const after = { ...league(), shield } as unknown as LeagueStore;
+    const got = liveCandidates(league(), after, [playedMatch(3, 2, [])], nameOf, 3);
+    expect(got.map((c) => c.key)).toEqual(["cup", "league"]);
+    expect(got[0].view.competitionName).toBe("Continental Shield");
   });
 });

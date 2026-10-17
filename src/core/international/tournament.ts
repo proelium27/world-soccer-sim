@@ -150,7 +150,7 @@ export function roundsRemaining(t: IntlTournament): number {
  * has been played yet, otherwise the winners of the most recent round in the
  * order they were played (which is the pairing order for the round to come).
  */
-function nextKnockoutRound(tournament: IntlTournament): { round: number; field: number[] } {
+export function nextKnockoutRound(tournament: IntlTournament): { round: number; field: number[] } {
   if (tournament.ties.length === 0) return { round: 0, field: [...tournament.bracket] };
   const lastRound = Math.max(...tournament.ties.map((t) => t.round));
   const field = tournament.ties.filter((t) => t.round === lastRound).map((t) => t.winner);

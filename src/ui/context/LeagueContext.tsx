@@ -61,6 +61,8 @@ import { SimOverlay } from "../components/SimOverlay.js";
 import { JumpOverlay, type JumpResult } from "../components/JumpOverlay.js";
 import { LiveMatchRedirect, WATCH_PATH } from "../pages/WatchMatch.js";
 import { liveCandidates, type LiveCandidate } from "../live/liveCandidates.js";
+import { inNextStage, intlLiveView, type IntlWatchTarget } from "../live/intlLive.js";
+import { isIntlStagePending, stripQualifyingDetail } from "../../core/international/index.js";
 import { playSuperCups, superCupsPending } from "../../core/superCup/superCup.js";
 import { superCupChampion } from "../../core/superCup/types.js";
 import type { PlayedMatch } from "../../core/standings.js";
@@ -68,6 +70,14 @@ import { trackEvent, trackEventNow } from "../analytics.js";
 import { simChunkTargets, simMatchdayCount } from "../../core/simChunks.js";
 import { isLowMemoryDevice } from "../lowMemoryDevice.js";
 import { userSpendPolicy } from "../userDebt.js";
+
+/** Whose match the live viewer follows, and which one when they play twice. */
+export interface LiveFocus {
+  tid: number;
+  key?: LiveCandidate["key"];
+  /** Where closing the viewer goes. The Dashboard when absent. */
+  returnTo?: string;
+}
 
 interface LeagueContextValue {
   league: LeagueStore | null;
@@ -92,8 +102,12 @@ interface LeagueContextValue {
    * Same sim as simAction("game") — the result is already decided before the
    * first whistle; the viewer replays its recorded event stream. The matchday
    * is not committed until the viewer is closed.
+   *
+   * `focus` watches some other club's match instead (the Schedule page's
+   * Watch button), and `focus.key` picks which of its matches when it plays
+   * twice that day, so the picker is skipped.
    */
-  simLiveAction: () => Promise<void>;
+  simLiveAction: (focus?: LiveFocus) => Promise<void>;
   /**
    * The uncommitted matchday waiting to be watched, and which of its matches
    * the user picked. Null whenever nothing is pending.
@@ -113,6 +127,12 @@ interface LeagueContextValue {
   offseasonAction: () => Promise<void>;
   /** Play the next staged international stage ("stage") or every remaining one ("through"). */
   intlStageAction: (mode: IntlMode) => Promise<void>;
+  /**
+   * Play the next international stage and watch one of its matches, the
+   * international counterpart of simLiveAction. Committed when the viewer
+   * closes, which then goes to `returnTo` (the National Teams Schedule).
+   */
+  intlLiveAction: (target: IntlWatchTarget, returnTo?: string) => Promise<void>;
   /** Play the next playoff block ("stage"), or blocks until one the user's club is in ("through"). */
   playoffStageAction: (mode: PlayoffMode) => Promise<void>;
   signFreeAgentAction: (pid: number) => Promise<void>;
@@ -270,6 +290,8 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   // happens when the matchday offered more than one.
   const [liveChoice, setLiveChoice] = useState<string | null>(null);
   const liveOpenRef = useRef(false);
+  // Where closing the live viewer returns to (see LiveFocus.returnTo).
+  const liveReturnRef = useRef("/dashboard");
   // What /watch reads. Bundled into one object so a consumer that doesn't care
   // about the live viewer isn't re-rendered by the choice changing, and so the
   // "is anything pending" test is a single null check everywhere.
@@ -556,11 +578,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     setLiveChoice(null);
     // Clearing the candidates lifts LiveMatchRedirect's hold, but the user is
     // still standing on /watch, which now has nothing to show. Send them
-    // somewhere that reflects what they just watched.
-    navigate("/dashboard");
+    // somewhere that reflects what they just watched: back where they started
+    // it, when that was a Schedule row, else the Dashboard.
+    navigate(liveReturnRef.current);
   }), [runExclusive, commitLeague, navigate]);
 
-  const simLiveAction = useCallback(() => runExclusive(async () => {
+  const simLiveAction = useCallback((focus?: LiveFocus) => runExclusive(async () => {
     const current = leagueRef.current;
     if (!current || overlayOpenRef.current || liveOpenRef.current) return;
     try {
@@ -579,7 +602,9 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         current.teams.find((t) => t.tid === tid)?.name ?? `#${tid}`;
       // A cup matchday is an ordinary league matchday too, so this can hand
       // back two matches — the cup tie and the league fixture.
-      const candidates = liveCandidates(current, result, mdResults, clubName);
+      const candidates = liveCandidates(
+        current, result, mdResults, clubName, focus?.tid ?? current.meta.userTid,
+      );
       if (candidates.length === 0) {
         // Nothing of the user's to watch — commit it like an ordinary sim
         // rather than opening an empty viewer.
@@ -590,9 +615,12 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
 
       pendingResultRef.current = result;
       liveOpenRef.current = true;
+      liveReturnRef.current = focus?.returnTo ?? "/dashboard";
       setLiveCandidates(candidates);
-      // Only ask when there is genuinely a choice to make.
-      setLiveChoice(candidates.length === 1 ? candidates[0].key : null);
+      // Only ask when there is genuinely a choice to make, and not when the
+      // Schedule row that started this already said which match it meant.
+      const named = focus?.key ? candidates.find((c) => c.key === focus.key) : undefined;
+      setLiveChoice(named?.key ?? (candidates.length === 1 ? candidates[0].key : null));
       // The viewer is a route now, and this action fires from the top bar of
       // whatever page you happen to be on, so opening it means going there.
       navigate(WATCH_PATH);
@@ -710,6 +738,48 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       console.error("International stage failed:", err);
     }
   }), [runExclusive, runIntlStage, commitLeague]);
+
+  const intlLiveAction = useCallback((target: IntlWatchTarget, returnTo?: string) => runExclusive(async () => {
+    const current = leagueRef.current;
+    if (!current || overlayOpenRef.current || liveOpenRef.current) return;
+    // A Watch button rendered before the stage was played some other way must
+    // not quietly play whatever stage comes next instead.
+    if (
+      current.phase !== "offseason" || !isIntlStagePending(current.international)
+      || !inNextStage(current.international, target.comp, target.home, target.away)
+    ) return;
+    try {
+      // Qualifying keeps its box scores for this one stage so there is a match
+      // to replay, and they are dropped again before anything is saved: the
+      // save ends up exactly as an unwatched stage leaves it.
+      const result = await runIntlStage("stage", current, true);
+      const committed = { ...result, international: stripQualifyingDetail(result.international) };
+      const live = intlLiveView(current.international, result.international, target);
+      if (!live) {
+        // The match wasn't in this stage after all. Still a played stage.
+        const lid = await saveLeague(committed);
+        commitLeague({ ...committed, lid });
+        return;
+      }
+      pendingResultRef.current = committed;
+      liveOpenRef.current = true;
+      liveReturnRef.current = returnTo ?? "/national-teams/schedule";
+      setLiveCandidates([{
+        key: "intl",
+        choice: { key: "intl", title: live.view.competitionName, detail: live.detail },
+        view: live.view,
+      }]);
+      setLiveChoice("intl");
+      navigate(WATCH_PATH);
+      trackEvent("intl_stage_played", { mode: "stage" });
+    } catch (err) {
+      pendingResultRef.current = null;
+      liveOpenRef.current = false;
+      setLiveCandidates(null);
+      setLiveChoice(null);
+      console.error("Live international stage failed:", err);
+    }
+  }), [runExclusive, runIntlStage, commitLeague, navigate]);
 
   const playoffStageAction = useCallback((mode: PlayoffMode) => runExclusive(async () => {
     const current = leagueRef.current;
@@ -1477,6 +1547,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     jumpSeasonsAction,
     offseasonAction,
     intlStageAction,
+    intlLiveAction,
     playoffStageAction,
     signFreeAgentAction,
     releasePlayerAction,
@@ -1540,7 +1611,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     league, crests, loadingActiveLeague, setLeague, loadLeagueAction, switchLeagueAction,
     customizeTeamsAction, simAction, simLiveAction, liveMatch, chooseLiveMatch,
     finishLiveMatch, jumpSeasonsAction, offseasonAction,
-    intlStageAction, playoffStageAction, signFreeAgentAction,
+    intlStageAction, intlLiveAction, playoffStageAction, signFreeAgentAction,
     releasePlayerAction, signToAcademyAction,
     setScoutDirectionsAction,
     promoteFromAcademyAction,

@@ -200,7 +200,8 @@ function LiveWatch() {
       <LiveMatchView
         match={chosen.view.match}
         otherMatches={chosen.view.otherMatches}
-        teams={league?.teams ?? []}
+        teams={chosen.view.teams ?? league?.teams ?? []}
+        nationOf={chosen.view.nationOf}
         playerName={playerName}
         competitionName={chosen.view.competitionName}
         subtitle={chosen.view.subtitle}

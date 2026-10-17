@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { StoredTeam } from "../../core/teams/clubs.js";
 import type { MatchEvent, MatchPosition } from "../../engine/attribution.js";
 import { ClubCrest } from "./ClubCrest.js";
+import { Flag } from "./Flag.js";
 import { eventSummary, KEY_EVENTS, TimelineRow, TimelineMarkerRow } from "./matchEvents.js";
 import {
   EXTRA_TIME_HALF_MINUTES,
@@ -73,6 +74,12 @@ interface LiveMatchViewProps {
    * the first (see lineups.ts).
    */
   lineups?: MatchLineups | null;
+  /**
+   * Which nation a tid stands for, for an international match: its sides are
+   * stand-in teams (see live/intlLive.ts), drawn with a flag instead of a club
+   * crest. Absent for every club match.
+   */
+  nationOf?: (tid: number) => string | undefined;
   /** Called when the user leaves the viewer — commits the matchday in the live flow. */
   onComplete: () => void;
   completeLabel?: string;
@@ -138,6 +145,15 @@ function ClubName({ name, abbrev }: { name: string; abbrev: string }) {
   );
 }
 
+/** A side's badge: the club crest, or a nation's flag in an international. */
+function SideBadge({ tid, colors, size, nation }: {
+  tid: number; colors: [string, string]; size: number; nation?: string;
+}) {
+  return nation
+    ? <Flag nationality={nation} size={Math.round(size * 0.7)} tip={false} />
+    : <ClubCrest tid={tid} colors={colors} size={size} />;
+}
+
 /**
  * One side's substitutions, under the pitch.
  *
@@ -152,8 +168,10 @@ function SubList({
   playerName,
   minute,
   firstHalfStoppage,
+  nation,
 }: {
   tid: number;
+  nation?: string;
   name: string;
   colors: [string, string];
   lineup: SideLineup;
@@ -167,7 +185,7 @@ function SubList({
   return (
     <section className="live-sheet">
       <h3 className="live-sheet-head">
-        <ClubCrest tid={tid} colors={colors} size={18} />
+        <SideBadge tid={tid} colors={colors} size={18} nation={nation} />
         <span>{name}</span>
         {lineup.formation && <span className="live-sheet-shape">{lineup.formation}</span>}
       </h3>
@@ -207,6 +225,7 @@ export function LiveMatchView({
   onComplete,
   completeLabel = "Continue",
   skipLabel,
+  nationOf,
 }: LiveMatchViewProps) {
   const [showAllEvents, setShowAllEvents] = useState(true);
   // The clock on the wall is not the minute playback is on: a minute past 45 in
@@ -353,13 +372,13 @@ export function LiveMatchView({
           <h1 className="bs-scoreline live-scoreline">
             <span className="bs-club bs-club--home">
               <ClubName name={nameOf(match.home)} abbrev={abbrevOf(match.home)} />
-              <ClubCrest tid={match.home} colors={homeTeam?.colors ?? ["#888", "#444"]} size={30} />
+              <SideBadge tid={match.home} colors={homeTeam?.colors ?? ["#888", "#444"]} size={30} nation={nationOf?.(match.home)} />
             </span>
             <span className="live-score stat-num">
               {score.home} - {score.away}
             </span>
             <span className="bs-club bs-club--away">
-              <ClubCrest tid={match.away} colors={awayTeam?.colors ?? ["#888", "#444"]} size={30} />
+              <SideBadge tid={match.away} colors={awayTeam?.colors ?? ["#888", "#444"]} size={30} nation={nationOf?.(match.away)} />
               <ClubName name={nameOf(match.away)} abbrev={abbrevOf(match.away)} />
             </span>
           </h1>
@@ -486,6 +505,7 @@ export function LiveMatchView({
             <div className="live-lineups-grid">
               <SubList
                 tid={match.home}
+                nation={nationOf?.(match.home)}
                 name={nameOf(match.home)}
                 colors={homeTeam?.colors ?? ["#888", "#444"]}
                 lineup={lineups.home}
@@ -495,6 +515,7 @@ export function LiveMatchView({
               />
               <SubList
                 tid={match.away}
+                nation={nationOf?.(match.away)}
                 name={nameOf(match.away)}
                 colors={awayTeam?.colors ?? ["#888", "#444"]}
                 lineup={lineups.away}

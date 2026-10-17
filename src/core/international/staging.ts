@@ -211,13 +211,17 @@ export function playIntlStage(
   players: Player[],
   lid: number,
   season: number,
+  /** Keep qualifying's box scores so the live viewer can replay one (see playQualifyingRound). */
+  opts: { keepQualifyingDetail?: boolean } = {},
 ): { international: InternationalState; players: Player[] } {
   switch (state.stage) {
     case "qualifying": {
       if (!state.qualifying) return { international: { ...state, stage: "done" }, players };
       // Play this offseason's one leg. The campaign spans three offseasons, so
       // only archive its summary once the last leg locks in the qualifiers.
-      const { campaign, delta, injured } = playQualifyingRound(state.qualifying, players, lid);
+      const { campaign, delta, injured } = playQualifyingRound(
+        state.qualifying, players, lid, opts.keepQualifyingDetail ?? false,
+      );
       const finished = campaign.qualified.length > 0;
       return {
         international: {
@@ -335,6 +339,27 @@ export function playIntlStage(
     default: // null or "done" — nothing left to play
       return { international: state, players };
   }
+}
+
+/**
+ * Drop the box scores a watched qualifying leg kept (see playQualifyingRound),
+ * so the save stores exactly what an unwatched leg would have. Returns the
+ * state untouched when there is nothing to drop.
+ */
+export function stripQualifyingDetail(state: InternationalState): InternationalState {
+  const q = state.qualifying;
+  if (!q || !q.groups.some((g) => g.matches.some((m) => m.boxScore))) return state;
+  return {
+    ...state,
+    qualifying: {
+      ...q,
+      groups: q.groups.map((g) =>
+        g.matches.some((m) => m.boxScore)
+          ? { ...g, matches: g.matches.map((m) => (m.boxScore ? { ...m, boxScore: null } : m)) }
+          : g,
+      ),
+    },
+  };
 }
 
 /**

@@ -165,7 +165,7 @@ export function useSimWorker() {
             slimProgress?: boolean;
           }
         | { type: "offseason"; league: LeagueStore }
-        | { type: "intl"; mode: IntlMode; league: LeagueStore }
+        | { type: "intl"; mode: IntlMode; league: LeagueStore; keepDetail?: boolean }
         | { type: "playoffs"; mode: PlayoffMode; league: LeagueStore }
         | { type: "jump"; seasons: number; league: LeagueStore },
       handlers: {
@@ -302,7 +302,8 @@ export function useSimWorker() {
   );
 
   const runIntlStage = useCallback(
-    (mode: IntlMode, league: LeagueStore): Promise<LeagueStore> => post({ type: "intl", mode, league }),
+    (mode: IntlMode, league: LeagueStore, keepDetail?: boolean): Promise<LeagueStore> =>
+      post({ type: "intl", mode, league, keepDetail }),
     [post],
   );
 

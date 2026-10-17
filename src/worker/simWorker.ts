@@ -82,7 +82,10 @@ self.onmessage = (e: MessageEvent<WorkerCommand>) => {
     const { international, players } =
       cmd.mode === "through"
         ? simThroughInternational(cmd.league.international, cmd.league.players, cmd.league.lid, cmd.league.season)
-        : playIntlStage(cmd.league.international, cmd.league.players, cmd.league.lid, cmd.league.season);
+        : playIntlStage(
+          cmd.league.international, cmd.league.players, cmd.league.lid, cmd.league.season,
+          { keepQualifyingDetail: cmd.keepDetail },
+        );
     const result = { ...cmd.league, international, players };
     const response: WorkerResponse = { type: "intlResult", league: result };
     self.postMessage(response);
